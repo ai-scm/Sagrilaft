@@ -1,0 +1,65 @@
+# ── Credenciales y secretos ──────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# Entorno virtual
+venv/
+.venv/
+env/
+.env/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+
+# ── Node / React / Vite ──────────────────────────────────
+node_modules/
+dist/
+.vite/
+.cache/
+*.local
+
+# ── Bases de datos locales ───────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
+
+# ── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Sistemas operativos ──────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ─────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
