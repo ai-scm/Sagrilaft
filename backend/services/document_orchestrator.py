@@ -29,6 +29,11 @@ class DocumentValidationOrchestrator:
         self._extractor = extractor
         self._validators: Dict[str, IDocumentValidator] = {}
 
+    @property
+    def extractor(self) -> IAIExtractor:
+        """Expone el extractor IA para uso directo (ej. pre-llenado de formulario)."""
+        return self._extractor
+
     def register_validator(self, validator: IDocumentValidator) -> None:
         """Registra un validador para un tipo de documento."""
         self._validators[validator.document_type] = validator

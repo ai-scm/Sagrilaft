@@ -1,0 +1,34 @@
+/**
+ * Configuración declarativa del formulario SAGRILAFT.
+ * Centraliza constantes y metadatos para que los pasos
+ * no tengan magic strings ni números mágicos dispersos.
+ */
+
+export const TOTAL_STEPS = 7;
+
+/**
+ * Documentos adjuntos requeridos.
+ * soloJuridica: true → se omite para Persona Natural.
+ */
+export const DOCUMENTOS_CONFIG = [
+  { label: 'Cédula del Representante Legal',                   tipoDoc: 'cedula_representante',   accepted: '.pdf,.jpg,.jpeg,.png', soloJuridica: true  },
+  { label: 'Certificado de Existencia y Representación Legal', tipoDoc: 'certificado_existencia', accepted: '.pdf', hint: 'No mayor a 30 días', soloJuridica: true  },
+  { label: 'Estados Financieros',                              tipoDoc: 'estados_financieros',    accepted: '.pdf', soloJuridica: true  },
+  { label: 'Declaración de Renta',                             tipoDoc: 'declaracion_renta',      accepted: '.pdf', soloJuridica: true  },
+  { label: 'RUT (Registro Único Tributario)',                  tipoDoc: 'rut',                    accepted: '.pdf', hint: 'Debe ser del año en curso', soloJuridica: false },
+  { label: 'Referencias Bancarias',                            tipoDoc: 'referencias_bancarias',  accepted: '.pdf', soloJuridica: false },
+];
+
+/**
+ * Campos obligatorios por paso.
+ * Fuente única de verdad para validación en useFormulario.
+ */
+export const CAMPOS_REQUERIDOS = {
+  1: [],
+  2: ['tipo_contraparte', 'tipo_persona', 'tipo_solicitud', 'razon_social', 'tipo_identificacion', 'numero_identificacion', 'direccion', 'departamento', 'ciudad', 'telefono', 'correo'],
+  3: ['nombre_representante', 'tipo_doc_representante', 'numero_doc_representante', 'fecha_expedicion', 'ciudad_expedicion', 'nacionalidad', 'fecha_nacimiento', 'ciudad_nacimiento', 'profesion', 'correo_representante', 'telefono_representante', 'direccion_funciones', 'ciudad_funciones'],
+  4: [],
+  5: ['actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
+  6: ['contacto_ordenes_nombre', 'contacto_ordenes_cargo', 'contacto_ordenes_telefono', 'contacto_ordenes_correo', 'contacto_pagos_nombre', 'contacto_pagos_cargo', 'contacto_pagos_telefono', 'contacto_pagos_correo', 'entidad_bancaria', 'ciudad_banco', 'tipo_cuenta', 'numero_cuenta'],
+  7: ['origen_fondos', 'nombre_firma', 'fecha_firma', 'ciudad_firma'],
+};

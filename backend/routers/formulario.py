@@ -279,7 +279,7 @@ async def subir_documento(
 
     # 3. Extracción IA — SOLO para este tipo_documento, una sola invocación
     campos_sugeridos: dict = {}
-    extractor = request.app.state.orchestrator._extractor
+    extractor = request.app.state.orchestrator.extractor
     extraction = await extractor.extract(
         file_path=file_path,
         document_type=tipo_documento,
@@ -353,7 +353,7 @@ async def prefill_desde_documento(
 
     # Usar el extractor Bedrock del orchestrator
     orchestrator = request.app.state.orchestrator
-    extraction = await orchestrator._extractor.extract(
+    extraction = await orchestrator.extractor.extract(
         file_path=documento.ruta_archivo,
         document_type=documento.tipo_documento,
     )
@@ -397,7 +397,7 @@ async def prefill_todos_documentos(
     detalles: list = []
 
     for doc in formulario.documentos:
-        extraction = await orchestrator._extractor.extract(
+        extraction = await orchestrator.extractor.extract(
             file_path=doc.ruta_archivo,
             document_type=doc.tipo_documento,
         )

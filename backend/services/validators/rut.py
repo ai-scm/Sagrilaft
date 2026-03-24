@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from services.contracts import ExtractionResult, ValidationFinding
+from services.validators._utils import DATE_FORMAT, normalize_id, normalize_text
 
 
 class RutValidator:
@@ -27,8 +28,7 @@ class RutValidator:
         form_data: Dict[str, Any],
     ) -> List[ValidationFinding]:
         if not extracted_data.extraido:
-            return [ValidationFinding(
-                resultado="advertencia",
+            return [ValidationFinding.advertencia(
                 campo="rut",
                 detalle=f"No se pudieron extraer datos del RUT. {extracted_data.mensaje}",
             )]
@@ -54,9 +54,7 @@ class RutValidator:
         actividades = datos.get("actividades_economicas", [])
         ciiu_form = form_data.get("codigo_ciiu")
         if actividades and ciiu_form:
-            ciiu_encontrado = any(
-                str(ciiu_form) in str(act) for act in actividades
-            )
+            ciiu_encontrado = any(str(ciiu_form) in str(act) for act in actividades)
             findings.append(ValidationFinding(
                 resultado="ok" if ciiu_encontrado else "advertencia",
                 campo="codigo_ciiu",
@@ -73,22 +71,20 @@ class RutValidator:
         fecha_doc = datos.get("fecha_documento")
         if fecha_doc:
             try:
-                anio_doc = datetime.strptime(str(fecha_doc), "%Y-%m-%d").year
+                anio_doc = datetime.strptime(str(fecha_doc), DATE_FORMAT).year
                 anio_actual = datetime.now().year
-                if anio_doc != anio_actual:
-                    findings.append(ValidationFinding(
-                        resultado="error",
-                        campo="fecha_rut",
-                        detalle=f"RUT es del año {anio_doc}. Debe ser del año en curso ({anio_actual}).",
-                        valor_documento=str(fecha_doc),
-                    ))
-                else:
-                    findings.append(ValidationFinding(
-                        resultado="ok",
+                coincide = anio_doc == anio_actual
+                findings.append(
+                    ValidationFinding.ok(
                         campo="fecha_rut",
                         detalle=f"RUT es del año vigente ({anio_actual}).",
                         valor_documento=str(fecha_doc),
-                    ))
+                    ) if coincide else ValidationFinding.error(
+                        campo="fecha_rut",
+                        detalle=f"RUT es del año {anio_doc}. Debe ser del año en curso ({anio_actual}).",
+                        valor_documento=str(fecha_doc),
+                    )
+                )
             except ValueError:
                 pass
 
@@ -98,34 +94,28 @@ class RutValidator:
     def _compare_text(doc_val: Any, form_val: Any, campo: str, nombre: str) -> ValidationFinding | None:
         if not doc_val or not form_val:
             return None
-        d = str(doc_val).lower().strip()
-        f = str(form_val).lower().strip()
-        if d == f:
-            return ValidationFinding(
-                resultado="ok", campo=campo,
-                detalle=f"{nombre} coincide con el RUT.",
+        coincide = normalize_text(doc_val) == normalize_text(form_val)
+        return (
+            ValidationFinding.ok(
+                campo=campo, detalle=f"{nombre} coincide con el RUT.",
+                valor_formulario=str(form_val), valor_documento=str(doc_val),
+            ) if coincide else ValidationFinding.error(
+                campo=campo, detalle=f"{nombre} NO coincide entre el RUT y el formulario.",
                 valor_formulario=str(form_val), valor_documento=str(doc_val),
             )
-        return ValidationFinding(
-            resultado="error", campo=campo,
-            detalle=f"{nombre} NO coincide entre el RUT y el formulario.",
-            valor_formulario=str(form_val), valor_documento=str(doc_val),
         )
 
     @staticmethod
     def _compare_nit(doc_val: Any, form_val: Any) -> ValidationFinding | None:
         if not doc_val or not form_val:
             return None
-        d = str(doc_val).replace(".", "").replace("-", "").strip()
-        f = str(form_val).replace(".", "").replace("-", "").strip()
-        if d == f:
-            return ValidationFinding(
-                resultado="ok", campo="nit_rut",
-                detalle="NIT coincide con el RUT.",
+        coincide = normalize_id(doc_val) == normalize_id(form_val)
+        return (
+            ValidationFinding.ok(
+                campo="nit_rut", detalle="NIT coincide con el RUT.",
+                valor_formulario=str(form_val), valor_documento=str(doc_val),
+            ) if coincide else ValidationFinding.error(
+                campo="nit_rut", detalle="NIT NO coincide entre el RUT y el formulario.",
                 valor_formulario=str(form_val), valor_documento=str(doc_val),
             )
-        return ValidationFinding(
-            resultado="error", campo="nit_rut",
-            detalle="NIT NO coincide entre el RUT y el formulario.",
-            valor_formulario=str(form_val), valor_documento=str(doc_val),
         )

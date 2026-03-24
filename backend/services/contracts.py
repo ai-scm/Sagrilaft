@@ -35,6 +35,38 @@ class ValidationFinding:
     valor_formulario: Optional[str] = None
     valor_documento: Optional[str] = None
 
+    # ── Factory methods — evitan repetir resultado="ok"|"error"|"advertencia" ──
+
+    @classmethod
+    def ok(
+        cls,
+        campo: str,
+        detalle: str,
+        valor_formulario: Optional[str] = None,
+        valor_documento: Optional[str] = None,
+    ) -> "ValidationFinding":
+        return cls("ok", campo, detalle, valor_formulario, valor_documento)
+
+    @classmethod
+    def error(
+        cls,
+        campo: str,
+        detalle: str,
+        valor_formulario: Optional[str] = None,
+        valor_documento: Optional[str] = None,
+    ) -> "ValidationFinding":
+        return cls("error", campo, detalle, valor_formulario, valor_documento)
+
+    @classmethod
+    def advertencia(
+        cls,
+        campo: str,
+        detalle: str,
+        valor_formulario: Optional[str] = None,
+        valor_documento: Optional[str] = None,
+    ) -> "ValidationFinding":
+        return cls("advertencia", campo, detalle, valor_formulario, valor_documento)
+
 
 # ═══════════════════════════════════════════════════════════════
 # Protocols (Interfaces)
