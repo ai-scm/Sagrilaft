@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from core import load_config
 from database import engine, Base
 from routers import formulario, validacion, listas_cautela
+from services.lista_cautela_service import ListaCautelaService
+from services.listas.mock_providers import MOCK_PROVIDERS
 from services.bedrock_extractor import BedrockExtractor
 from services.document_orchestrator import DocumentValidationOrchestrator
 from services.validators.camara_comercio import CamaraComercioValidator
@@ -69,6 +71,7 @@ async def lifespan(app: FastAPI):
     # Inyectar orquestador en app.state (DI pobre pero simple)
     app.state.orchestrator = _create_orchestrator(config)
     app.state.config = config
+    app.state.lista_cautela_service = ListaCautelaService(MOCK_PROVIDERS)
 
     logger.info("✅ SAGRILAFT API iniciada")
     yield

@@ -22,6 +22,11 @@ def _get_orchestrator(request: Request):
     return request.app.state.orchestrator
 
 
+def _get_lista_cautela_service(request: Request) -> ListaCautelaService:
+    """Obtiene el servicio de listas de cautela inyectado via app.state (DI)."""
+    return request.app.state.lista_cautela_service
+
+
 @router.post("/{id}", response_model=List[ValidacionResponse])
 async def validar_formulario(
     id: str,
@@ -60,32 +65,48 @@ async def validar_formulario(
     }
 
     orchestrator = _get_orchestrator(request)
+    lista_cautela_service = _get_lista_cautela_service(request)
     todos_hallazgos: list[ResultadoValidacion] = []
 
     # ── 1. Validación de documentos via IA ──────────────
-    for documento in formulario.documentos:
-        findings = await orchestrator.validate_document(
-            file_path=documento.ruta_archivo,
-            document_type=documento.tipo_documento,
-            form_data=form_data,
-        )
+    documentos_lista = [
+        {"file_path": doc.ruta_archivo, "document_type": doc.tipo_documento}
+        for doc in formulario.documentos
+    ]
+    individual_findings, cross_findings = await orchestrator.validate_all_documents(
+        documents=documentos_lista,
+        form_data=form_data,
+    )
 
-        for f in findings:
-            resultado_db = ResultadoValidacion(
-                formulario_id=id,
-                tipo="documento",
-                campo=f.campo,
-                resultado=f.resultado,
-                detalle=f.detalle,
-                valor_formulario=f.valor_formulario,
-                valor_documento=f.valor_documento,
-            )
-            db.add(resultado_db)
-            todos_hallazgos.append(resultado_db)
+    for f in individual_findings:
+        resultado_db = ResultadoValidacion(
+            formulario_id=id,
+            tipo="documento",
+            campo=f.campo,
+            resultado=f.resultado,
+            detalle=f.detalle,
+            valor_formulario=f.valor_formulario,
+            valor_documento=f.valor_documento,
+        )
+        db.add(resultado_db)
+        todos_hallazgos.append(resultado_db)
+
+    for f in cross_findings:
+        resultado_db = ResultadoValidacion(
+            formulario_id=id,
+            tipo="cruce_documentos",
+            campo=f.campo,
+            resultado=f.resultado,
+            detalle=f.detalle,
+            valor_formulario=f.valor_formulario,
+            valor_documento=f.valor_documento,
+        )
+        db.add(resultado_db)
+        todos_hallazgos.append(resultado_db)
 
     # ── 2. Listas de cautela: razón social ──────────────
     if formulario.razon_social:
-        resultados_listas = ListaCautelaService.buscar_todas_listas(
+        resultados_listas = lista_cautela_service.buscar_todas_listas(
             formulario.razon_social,
             formulario.numero_identificacion,
         )
@@ -102,7 +123,7 @@ async def validar_formulario(
 
     # ── 3. Listas de cautela: representante legal ───────
     if formulario.nombre_representante:
-        resultados_rep = ListaCautelaService.buscar_todas_listas(
+        resultados_rep = lista_cautela_service.buscar_todas_listas(
             formulario.nombre_representante,
             formulario.numero_doc_representante,
         )

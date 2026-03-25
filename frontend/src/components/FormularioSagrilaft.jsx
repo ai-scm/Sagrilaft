@@ -25,10 +25,11 @@ export default function FormularioSagrilaft() {
   const {
     step, formData, errors, helpField, setHelpField,
     codigoPeticion, documentos, saving, uploadingDoc,
-    juntaDirectiva, accionistas, submitted, lastSaved,
+    juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
+    handleBeneficiarioChange, addBeneficiario,
   } = useFormulario();
 
   if (submitted) {
@@ -72,6 +73,9 @@ export default function FormularioSagrilaft() {
             accionistas={accionistas}
             onAccionistaChange={handleAccionistaChange}
             onAddAccionista={addAccionista}
+            beneficiarios={beneficiarios}
+            onBeneficiarioChange={handleBeneficiarioChange}
+            onAddBeneficiario={addBeneficiario}
           />
         )}
 

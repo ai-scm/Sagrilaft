@@ -53,8 +53,8 @@ const helpTexts = {
   },
   telefono: {
     titulo: "Teléfono",
-    descripcion: "Número telefónico principal con indicativo de ciudad o celular.",
-    ejemplo: "601 3456789 o 310 2345678"
+    descripcion: "Número telefónico principal.",
+    ejemplo: "310 2345678"
   },
   correo: {
     titulo: "Correo Electrónico",
@@ -74,7 +74,7 @@ const helpTexts = {
   // Representante Legal
   nombre_representante: {
     titulo: "Nombres y Apellidos del Representante Legal",
-    descripcion: "Nombre completo tal como aparece en el certificado de cámara de comercio. Para persona natural, ingrese su propio nombre completo.",
+    descripcion: "Nombre completo tal como aparece en los certificados anteriores. Para persona natural, ingrese su propio nombre completo.",
   },
   tipo_doc_representante: {
     titulo: "Tipo de Documento",
@@ -120,6 +120,43 @@ const helpTexts = {
   direccion_funciones: {
     titulo: "Dirección donde Ejerce Funciones",
     descripcion: "Dirección del lugar donde el representante legal ejerce sus funciones.",
+  },
+  ciudad_funciones: {
+    titulo: "Ciudad donde Ejerce Funciones",
+    descripcion: "Ciudad donde el representante legal desarrolla habitualmente sus actividades.",
+  },
+  departamento_funciones: {
+    titulo: "Departamento (Funciones)",
+    descripcion: "Departamento donde el representante legal ejerce sus funciones. Selecciónelo para filtrar las ciudades disponibles.",
+  },
+  pais_funciones: {
+    titulo: "País (Funciones)",
+    descripcion: "País donde el representante legal ejerce sus funciones.",
+  },
+  departamento_expedicion: {
+    titulo: "Departamento de Expedición",
+    descripcion: "Departamento colombiano donde fue expedido el documento de identidad. Selecciónelo para filtrar las ciudades disponibles.",
+  },
+  pais_expedicion: {
+    titulo: "País de Expedición",
+    descripcion: "País donde fue expedido el documento de identidad del representante legal.",
+  },
+  departamento_nacimiento: {
+    titulo: "Departamento de Nacimiento",
+    descripcion: "Departamento colombiano de nacimiento del representante legal. Selecciónelo para filtrar las ciudades disponibles.",
+  },
+  pais_nacimiento: {
+    titulo: "País de Nacimiento",
+    descripcion: "País de nacimiento del representante legal.",
+  },
+  direccion_residencia: {
+    titulo: "Dirección de Residencia",
+    descripcion: "Dirección de residencia actual de la persona natural.",
+    ejemplo: "Carrera 15 # 80 - 22, Apto 301"
+  },
+  ciudad_residencia: {
+    titulo: "Ciudad de Residencia",
+    descripcion: "Ciudad donde reside actualmente la persona natural.",
   },
 
   // Financiera

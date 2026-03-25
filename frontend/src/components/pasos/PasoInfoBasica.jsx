@@ -40,7 +40,7 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors 
 
   return (
     <div className="form-card">
-      <h2 className="section-title">🏢 Clasificación e Información Básica</h2>
+      <h2 className="section-title">CLASIFICACION E INFORMACIÓN BASICA DE LA EMPRESA</h2>
       <p className="section-subtitle">Datos generales de la empresa</p>
 
       <div className="form-row">
@@ -139,9 +139,9 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors 
 
       <div className="form-row">
         <FormField
-          label="Código Actividad ICA" name="codigo_ica"
+          label="Código Actividad ICA" name="codigo_ica" required
           value={formData.codigo_ica} onChange={onChange}
-          onOpenHelp={onOpenHelp}
+          onOpenHelp={onOpenHelp} error={errors.codigo_ica}
         />
         <FormField
           label="Página Web" name="pagina_web" type="url"

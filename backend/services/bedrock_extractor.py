@@ -38,9 +38,11 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - razon_social: nombre o razón social completa
 - nit: número de identificación tributaria (solo dígitos, sin puntos ni guiones)
 - actividades_economicas: lista de códigos CIIU con descripción (array de strings)
+- codigo_ica: código de la actividad principal para el Impuesto de Industria y Comercio (ICA). Búscalo en la sección "CLASIFICACION" → subsección "Actividad Principal" → campo "46. Codigo". Devuelve solo el número, sin texto adicional.
 - fecha_documento: fecha del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
+- cedula_representante: número de cédula del representante legal o firmante (solo dígitos, si aparece en el documento; puede estar en sección de firma o representación)
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
@@ -97,6 +99,7 @@ PREFILL_MAPPING: Dict[str, Dict[str, str]] = {
         "nit": "numero_identificacion",
         "direccion": "direccion",
         "correo": "correo",
+        "codigo_ica": "codigo_ica",
     },
     "certificado_existencia": {
         "razon_social": "razon_social",

@@ -84,9 +84,7 @@ class FormularioBase(BaseModel):
     total_pasivos: Optional[float] = None
     patrimonio: Optional[float] = None
 
-    # 7. Moneda Extranjera
-    operaciones_moneda_extranjera: Optional[str] = None
-    paises_operaciones: Optional[str] = None
+    # 7. Tipos de transacción
     tipos_transaccion: Optional[str] = None
 
     # 8. Clasificación Empresa

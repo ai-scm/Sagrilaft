@@ -9,7 +9,7 @@ Alarmas:
 from typing import Any, Dict, List
 
 from services.contracts import ExtractionResult, ValidationFinding
-from services.validators._utils import normalize_id, normalize_text
+from services.validators._utils import normalize_id, normalize_text, parse_fecha
 
 
 class CedulaValidator:
@@ -84,13 +84,33 @@ class CedulaValidator:
                 ))
 
         # --- Fecha de nacimiento ---
+        # La cédula usa DD-MMM-AAAA (ej: "01-SEP-1995"); el formulario usa YYYY-MM-DD.
+        # Se normalizan ambos a objeto date antes de comparar.
         doc_fn = datos.get("fecha_nacimiento")
         form_fn = form_data.get("fecha_nacimiento")
         if doc_fn and form_fn:
-            if normalize_text(doc_fn) != normalize_text(form_fn):
+            fecha_doc  = parse_fecha(doc_fn)
+            fecha_form = parse_fecha(form_fn)
+            if fecha_doc and fecha_form:
+                coincide = fecha_doc == fecha_form
+                findings.append(
+                    ValidationFinding.ok(
+                        campo="fecha_nacimiento_cedula",
+                        detalle="Fecha de nacimiento coincide con la cédula.",
+                        valor_formulario=str(form_fn),
+                        valor_documento=str(doc_fn),
+                    ) if coincide else ValidationFinding.advertencia(
+                        campo="fecha_nacimiento_cedula",
+                        detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
+                        valor_formulario=str(form_fn),
+                        valor_documento=str(doc_fn),
+                    )
+                )
+            elif not fecha_doc or not fecha_form:
+                # Si algún formato no es parseable, se deja como advertencia informativa
                 findings.append(ValidationFinding.advertencia(
                     campo="fecha_nacimiento_cedula",
-                    detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
+                    detalle="No se pudo comparar la fecha de nacimiento (formato no reconocido). Verifique manualmente.",
                     valor_formulario=str(form_fn),
                     valor_documento=str(doc_fn),
                 ))

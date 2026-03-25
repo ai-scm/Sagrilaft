@@ -14,6 +14,42 @@ from services.contracts import ValidationFinding
 DATE_FORMAT = "%Y-%m-%d"
 VIGENCIA_MAX_DIAS = 30
 
+# Meses en español usados en cédulas colombianas (DD-MMM-AAAA)
+_MESES_ES = {
+    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
+    "jul": 7, "ago": 8, "sep": 9, "oct": 10, "nov": 11, "dic": 12,
+}
+
+
+def parse_fecha(value: Any):
+    """
+    Parsea una fecha en cualquiera de los dos formatos posibles:
+      - YYYY-MM-DD   (formulario con <input type="date">)
+      - DD-MMM-AAAA  (cédula colombiana, ej: '01-SEP-1995')
+
+    Retorna un objeto `date` o `None` si no puede parsearse.
+    """
+    if not value:
+        return None
+    s = str(value).strip()
+    # Formato ISO: YYYY-MM-DD
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except ValueError:
+        pass
+    # Formato cédula: DD-MMM-AAAA (mes en español)
+    partes = s.split("-")
+    if len(partes) == 3:
+        dia_str, mes_str, anio_str = partes
+        mes_num = _MESES_ES.get(mes_str.lower())
+        if mes_num:
+            try:
+                from datetime import date
+                return date(int(anio_str), mes_num, int(dia_str))
+            except ValueError:
+                pass
+    return None
+
 
 def normalize_text(value: Any) -> str:
     """Normaliza texto para comparación: minúsculas y sin espacios extremos."""

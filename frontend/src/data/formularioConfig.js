@@ -7,6 +7,20 @@
 export const TOTAL_STEPS = 7;
 
 /**
+ * Cargos válidos para la Junta Directiva y Representantes.
+ * Fuente única de verdad — agregar nuevas opciones aquí sin tocar el componente.
+ */
+export const CARGOS_JUNTA_DIRECTIVA = [
+  'Presidente',
+  'Gerente General / Representante Legal',
+  'Gerente Suplente',
+  'Segundo Suplente del Gerente',
+  'Junta Directiva Principal Primer Renglón',
+  'Junta Directiva Principal Segundo Renglón',
+  'Junta Directiva Principal Tercer Renglón',
+];
+
+/**
  * Documentos adjuntos requeridos.
  * soloJuridica: true → se omite para Persona Natural.
  */
@@ -25,8 +39,8 @@ export const DOCUMENTOS_CONFIG = [
  */
 export const CAMPOS_REQUERIDOS = {
   1: [],
-  2: ['tipo_contraparte', 'tipo_persona', 'tipo_solicitud', 'razon_social', 'tipo_identificacion', 'numero_identificacion', 'direccion', 'departamento', 'ciudad', 'telefono', 'correo'],
-  3: ['nombre_representante', 'tipo_doc_representante', 'numero_doc_representante', 'fecha_expedicion', 'ciudad_expedicion', 'nacionalidad', 'fecha_nacimiento', 'ciudad_nacimiento', 'profesion', 'correo_representante', 'telefono_representante', 'direccion_funciones', 'ciudad_funciones'],
+  2: ['tipo_contraparte', 'tipo_persona', 'tipo_solicitud', 'razon_social', 'tipo_identificacion', 'numero_identificacion', 'direccion', 'departamento', 'ciudad', 'telefono', 'correo', 'codigo_ica'],
+  3: ['nombre_representante', 'tipo_doc_representante', 'numero_doc_representante', 'fecha_expedicion', 'departamento_expedicion', 'ciudad_expedicion', 'nacionalidad', 'fecha_nacimiento', 'ciudad_nacimiento', 'profesion', 'correo_representante', 'telefono_representante', 'direccion_funciones', 'ciudad_funciones'],
   4: [],
   5: ['actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
   6: ['contacto_ordenes_nombre', 'contacto_ordenes_cargo', 'contacto_ordenes_telefono', 'contacto_ordenes_correo', 'contacto_pagos_nombre', 'contacto_pagos_cargo', 'contacto_pagos_telefono', 'contacto_pagos_correo', 'entidad_bancaria', 'ciudad_banco', 'tipo_cuenta', 'numero_cuenta'],

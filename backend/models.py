@@ -96,9 +96,7 @@ class Formulario(Base):
     total_pasivos = Column(Float, nullable=True)
     patrimonio = Column(Float, nullable=True)
 
-    # --- 7. Referencias Bancarias extra ---
-    operaciones_moneda_extranjera = Column(String, nullable=True)
-    paises_operaciones = Column(String, nullable=True)
+    # --- 7. Tipos de transacción ---
     tipos_transaccion = Column(Text, nullable=True)  # JSON string
 
     # --- 8. Clasificación Empresa ---

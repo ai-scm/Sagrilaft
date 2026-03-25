@@ -1,5 +1,6 @@
 import { HelpIcon } from './HelpPanel';
 import helpTexts from '../data/helpTexts';
+import { getInputProps } from '../utils/inputValidation';
 
 /**
  * Campo de formulario reutilizable con tooltip de ayuda integrado.
@@ -13,6 +14,7 @@ export default function FormField({
 }) {
   const hasHelp = !!helpTexts[name];
   const placeholderText = placeholder || (helpTexts[name]?.ejemplo ? `Ej: ${helpTexts[name].ejemplo}` : '');
+  const inputProps = type !== 'select' && type !== 'textarea' ? getInputProps(name) : {};
 
   const fieldClasses = [
     type === 'textarea' ? 'form-textarea' : (type === 'select' ? 'form-select' : 'form-input'),
@@ -43,7 +45,8 @@ export default function FormField({
       ) : (
         <input
           type={type} name={name} className={fieldClasses}
-          value={value || ''} onChange={onChange} placeholder={placeholderText} {...rest}
+          value={value || ''} onChange={onChange} placeholder={placeholderText}
+          {...inputProps} {...rest}
         />
       )}
 

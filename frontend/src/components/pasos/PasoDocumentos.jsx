@@ -16,7 +16,7 @@ export default function PasoDocumentos({
       </p>
 
       <div className="info-box">
-        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos.</p>
+        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo este correcto).</p>
       </div>
 
       {DOCUMENTOS_CONFIG
