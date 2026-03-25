@@ -1,19 +1,28 @@
 """
 Funciones de dependencia (DI) centralizadas para los routers FastAPI.
 
-SRP: un único lugar donde se declaran las dependencias compartidas.
+SRP : único lugar donde se declaran y resuelven las dependencias compartidas.
+DIP : los routers dependen de estas abstracciones en lugar de acceder a
+      app.state directamente, desacoplando la infraestructura de los handlers.
 """
 
 from fastapi import Request
 
 from services.contracts import IAIExtractor
+from services.document_orchestrator import DocumentValidationOrchestrator
+from services.lista_cautela_service import ListaCautelaService
 
 
-def get_extractor(request: Request) -> IAIExtractor:
-    """Obtiene el extractor IA inyectado en app.state."""
-    return request.app.state.orchestrator.extractor
+def obtener_extractor(solicitud: Request) -> IAIExtractor:
+    """Obtiene el extractor IA registrado en el ciclo de vida de la aplicación."""
+    return solicitud.app.state.orchestrator.extractor
 
 
-def get_orchestrator(request: Request):
-    """Obtiene el orquestador de validación inyectado en app.state."""
-    return request.app.state.orchestrator
+def obtener_orquestador(solicitud: Request) -> DocumentValidationOrchestrator:
+    """Obtiene el orquestador de validación documental registrado en app.state."""
+    return solicitud.app.state.orchestrator
+
+
+def obtener_servicio_lista_cautela(solicitud: Request) -> ListaCautelaService:
+    """Obtiene el servicio de listas de cautela registrado en app.state."""
+    return solicitud.app.state.lista_cautela_service

@@ -2,17 +2,17 @@
 Servicio de búsqueda en listas de cautela.
 
 Recibe una lista de providers via inyección de dependencias.
-Para integrar una lista real, agregar un nuevo IListaCautelaProvider en
+Para integrar una lista real, agregar un nuevo IProveedorListaCautela en
 services/listas/mock_providers.py (o crear un módulo real_providers.py)
 y registrarlo en main.py — sin tocar esta clase.
 """
 from typing import Optional
 from schemas import ResultadoListaCautela
-from services.listas.contracts import IListaCautelaProvider
+from services.listas.contracts import IProveedorListaCautela
 
 
 class ListaCautelaService:
-    def __init__(self, providers: list[IListaCautelaProvider]):
+    def __init__(self, providers: list[IProveedorListaCautela]):
         self._providers = providers
 
     def buscar_todas_listas(
