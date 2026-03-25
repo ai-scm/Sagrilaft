@@ -47,6 +47,7 @@ export const REGLAS_INPUT = {
   telefono:                 { soloNumericos: true, longitudExacta: 10 },
   telefono_representante:   { soloNumericos: true, longitudExacta: 10 },
   codigo_ciiu:              { soloNumericos: true, longitudMaxima: 4 },
+  codigo_ica:               { soloNumericos: true, longitudMaxima: 4 },
   ingresos_mensuales:       { soloPositivo: true },
   otros_ingresos:           { soloPositivo: true },
   egresos_mensuales:        { soloPositivo: true },
