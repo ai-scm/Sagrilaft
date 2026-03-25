@@ -1,4 +1,6 @@
 import FormField from '../FormField';
+import LocationSelect from '../LocationSelect';
+import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_CONTRAPARTE = [
   { value: 'proveedor', label: 'Proveedor' },
@@ -30,10 +32,16 @@ const HR = () => (
  * Paso 2 — Clasificación e Información Básica del Sujeto Obligado / Contraparte.
  */
 export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors }) {
+  const {
+    paisesOptions, departamentosOptions, ciudadesOptions,
+    selectedPais, selectedDepartamento, selectedCiudad,
+    handlePaisChange, handleDepartamentoChange, handleCiudadChange,
+  } = useUbicacion(formData, onChange);
+
   return (
     <div className="form-card">
       <h2 className="section-title">🏢 Clasificación e Información Básica</h2>
-      <p className="section-subtitle">Datos generales de la empresa o persona natural</p>
+      <p className="section-subtitle">Datos generales de la empresa</p>
 
       <div className="form-row">
         <FormField
@@ -89,19 +97,24 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors 
       </div>
 
       <div className="form-row">
-        <FormField
+        <LocationSelect
           label="País" name="pais"
-          value={formData.pais || 'Colombia'} onChange={onChange}
-          onOpenHelp={onOpenHelp}
+          value={selectedPais} onChange={handlePaisChange}
+          options={paisesOptions}
+          onOpenHelp={onOpenHelp} error={errors.pais}
         />
-        <FormField
+        <LocationSelect
           label="Departamento" name="departamento" required
-          value={formData.departamento} onChange={onChange}
+          value={selectedDepartamento} onChange={handleDepartamentoChange}
+          options={departamentosOptions}
+          disabled={!formData.pais}
           onOpenHelp={onOpenHelp} error={errors.departamento}
         />
-        <FormField
+        <LocationSelect
           label="Ciudad" name="ciudad" required
-          value={formData.ciudad} onChange={onChange}
+          value={selectedCiudad} onChange={handleCiudadChange}
+          options={ciudadesOptions}
+          disabled={!formData.departamento}
           onOpenHelp={onOpenHelp} error={errors.ciudad}
         />
       </div>
