@@ -52,27 +52,6 @@ class ReferenciaBancariaValidator:
                 )
             )
 
-        # --- Entidad bancaria ---
-        entidad_doc = datos.get("entidad")
-        entidad_form = form_data.get("entidad_bancaria")
-        if entidad_doc and entidad_form:
-            norm_doc = normalize_text(entidad_doc)
-            norm_form = normalize_text(entidad_form)
-            coincide = norm_doc in norm_form or norm_form in norm_doc
-            findings.append(
-                ValidationFinding.ok(
-                    campo="entidad_bancaria",
-                    detalle="Entidad bancaria coincide.",
-                    valor_formulario=str(entidad_form),
-                    valor_documento=str(entidad_doc),
-                ) if coincide else ValidationFinding.error(
-                    campo="entidad_bancaria",
-                    detalle="Entidad bancaria NO coincide entre la certificación y el formulario.",
-                    valor_formulario=str(entidad_form),
-                    valor_documento=str(entidad_doc),
-                )
-            )
-
         # --- Vigencia (≤ 30 días) ---
         finding_fecha = check_vigencia(datos.get("fecha_documento"), campo="fecha_ref_bancaria")
         if finding_fecha:

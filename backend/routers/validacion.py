@@ -61,7 +61,6 @@ async def validar_formulario(
         "ingresos_mensuales": formulario.ingresos_mensuales,
         "egresos_mensuales": formulario.egresos_mensuales,
         "codigo_ciiu": formulario.codigo_ciiu,
-        "entidad_bancaria": formulario.entidad_bancaria,
     }
 
     orchestrator = _get_orchestrator(request)

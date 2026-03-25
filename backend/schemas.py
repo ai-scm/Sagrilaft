@@ -106,12 +106,6 @@ class FormularioBase(BaseModel):
     contacto_pagos_telefono: Optional[str] = None
     contacto_pagos_correo: Optional[str] = None
 
-    # 10. Info Bancaria
-    entidad_bancaria: Optional[str] = None
-    ciudad_banco: Optional[str] = None
-    tipo_cuenta: Optional[str] = None
-    numero_cuenta: Optional[str] = None
-
     # 11-12. Autorizaciones
     autorizacion_datos: Optional[bool] = False
     declaracion_origen_fondos: Optional[bool] = False

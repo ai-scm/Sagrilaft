@@ -43,6 +43,6 @@ export const CAMPOS_REQUERIDOS = {
   3: ['nombre_representante', 'tipo_doc_representante', 'numero_doc_representante', 'fecha_expedicion', 'departamento_expedicion', 'ciudad_expedicion', 'nacionalidad', 'fecha_nacimiento', 'ciudad_nacimiento', 'profesion', 'correo_representante', 'telefono_representante', 'direccion_funciones', 'ciudad_funciones'],
   4: [],
   5: ['actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
-  6: ['contacto_ordenes_nombre', 'contacto_ordenes_cargo', 'contacto_ordenes_telefono', 'contacto_ordenes_correo', 'contacto_pagos_nombre', 'contacto_pagos_cargo', 'contacto_pagos_telefono', 'contacto_pagos_correo', 'entidad_bancaria', 'ciudad_banco', 'tipo_cuenta', 'numero_cuenta'],
+  6: [],
   7: ['origen_fondos', 'nombre_firma', 'fecha_firma', 'ciudad_firma'],
 };

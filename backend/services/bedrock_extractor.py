@@ -29,7 +29,7 @@ EXTRACTION_PROMPTS: Dict[str, str] = {
 - numero_documento: número del documento (solo dígitos, sin puntos ni espacios)
 - fecha_expedicion: fecha de expedición en formato YYYY-MM-DD
 - lugar_expedicion: ciudad o municipio de expedición
-- fecha_nacimiento: fecha de nacimiento en formato DD-MMM-AAAA usando abreviaturas en español en mayúsculas. Ejemplos: "15-AGO-1990", "03-ENE-2001", "22-DIC-1985". Tabla de meses: 01=ENE, 02=FEB, 03=MAR, 04=ABR, 05=MAY, 06=JUN, 07=JUL, 08=AGO, 09=SEP, 10=OCT, 11=NOV, 12=DIC.
+- fecha_nacimiento: fecha de nacimiento en formato YYYY-MM-DD. Ejemplo: "1990-08-15".
 - lugar_nacimiento: ciudad o municipio de nacimiento tal como aparece en el documento
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
@@ -42,6 +42,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - fecha_documento: fecha del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
+- telefono: número de teléfono registrado (solo dígitos, sin espacios ni guiones)
 - cedula_representante: número de cédula del representante legal o firmante (solo dígitos, si aparece en el documento; puede estar en sección de firma o representación)
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
@@ -54,6 +55,8 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - fecha_documento: fecha de expedición del certificado en formato YYYY-MM-DD
 - direccion: dirección comercial registrada
 - municipio: municipio o ciudad registrada en la sección UBICACIÓN del certificado
+- correo: correo electrónico registrado en la sección UBICACIÓN del certificado (campo "Correo electrónico")
+- telefono: teléfono comercial registrado en la sección UBICACIÓN del certificado (campo "Teléfono comercial 1", solo dígitos)
 - objeto_social: descripción del objeto social (resumido)
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
@@ -99,6 +102,7 @@ PREFILL_MAPPING: Dict[str, Dict[str, str]] = {
         "nit": "numero_identificacion",
         "direccion": "direccion",
         "correo": "correo",
+        "telefono": "telefono",
         "codigo_ica": "codigo_ica",
     },
     "certificado_existencia": {
@@ -108,6 +112,8 @@ PREFILL_MAPPING: Dict[str, Dict[str, str]] = {
         "cedula_representante": "numero_doc_representante",
         "direccion": "direccion",
         "municipio": "ciudad",
+        "correo": "correo",
+        "telefono": "telefono",
     },
     "cedula_representante": {
         "nombre": "nombre_representante",

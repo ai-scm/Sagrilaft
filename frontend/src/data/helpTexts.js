@@ -201,20 +201,6 @@ const helpTexts = {
     descripcion: "Persona autorizada para recibir reportes y comunicaciones de pago.",
   },
 
-  // Info Bancaria
-  entidad_bancaria: {
-    titulo: "Entidad Bancaria",
-    descripcion: "Nombre del banco donde tiene la cuenta para recibir pagos.",
-  },
-  tipo_cuenta: {
-    titulo: "Tipo de Cuenta",
-    descripcion: "Tipo de cuenta bancaria (Ahorros o Corriente).",
-  },
-  numero_cuenta: {
-    titulo: "Número de Cuenta",
-    descripcion: "Número completo de la cuenta bancaria para pagos.",
-  },
-
   // Documentos
   doc_cedula_representante: {
     titulo: "Cédula del Representante Legal",

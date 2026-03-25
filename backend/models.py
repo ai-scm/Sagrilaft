@@ -118,12 +118,6 @@ class Formulario(Base):
     contacto_pagos_telefono = Column(String, nullable=True)
     contacto_pagos_correo = Column(String, nullable=True)
 
-    # --- 10. Info Bancaria ---
-    entidad_bancaria = Column(String, nullable=True)
-    ciudad_banco = Column(String, nullable=True)
-    tipo_cuenta = Column(String, nullable=True)
-    numero_cuenta = Column(String, nullable=True)
-
     # --- 11-12. Autorizaciones ---
     autorizacion_datos = Column(Boolean, default=False)
     declaracion_origen_fondos = Column(Boolean, default=False)

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { City } from 'country-state-city';
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
+import NacionalidadSelect from '../NacionalidadSelect';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_DOC = [
@@ -132,8 +133,8 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
 
       {/* ── Nacionalidad y fecha de nacimiento ──────────────────────────────── */}
       <div className="form-row">
-        <FormField
-          label="Nacionalidad" name="nacionalidad" required
+        <NacionalidadSelect
+          required
           value={formData.nacionalidad} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.nacionalidad}
         />

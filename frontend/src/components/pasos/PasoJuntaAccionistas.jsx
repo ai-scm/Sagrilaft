@@ -51,7 +51,7 @@ export default function PasoJuntaAccionistas({
 
   return (
     <div className="form-card">
-      <h2 className="section-title">Junta Directiva y Composición Accionaria</h2>
+      <h2 className="section-title">INFORMACIÓN JUNTA DIRECTIVA, REPRESENTANTES LEGALES Y REVISORES FISCALES</h2>
       <p className="section-subtitle">Registrar los datos de las personas que conforman la Junta Directiva Principal, Junta Directiva suplente y Revisores Fiscales, que se encuentran registradas en Cámara de Comercio.</p>
       <p className="section-subtitle">Para responder las preguntas respecto a PEP´s, tenga en cuenta que corresponden a personas expuestas políticamente o públicamente que: Manejan recursos públicos, tienen algún grado de poder público o gozan dereconocimiento público.</p>
 

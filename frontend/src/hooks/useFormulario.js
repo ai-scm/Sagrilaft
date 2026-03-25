@@ -34,6 +34,10 @@ export function useFormulario() {
     handleAccionistaChange, addAccionista,
     beneficiarios, setBeneficiarios,
     handleBeneficiarioChange, addBeneficiario,
+    referenciasComerciales, setReferenciasComerciales,
+    handleReferenciaChange, addReferencia,
+    referenciasBancarias, setReferenciasBancarias,
+    handleReferenciaBancariaChange, addReferenciaBancaria,
   } = useTablasDinamicas();
 
   const _buildPayload = () => ({
@@ -42,11 +46,13 @@ export function useFormulario() {
     junta_directiva: juntaDirectiva,
     accionistas,
     beneficiarios,
+    referencias_comerciales: referenciasComerciales,
+    referencias_bancarias: referenciasBancarias,
   });
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
-    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios },
-    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios },
+    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias },
+    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias },
     _buildPayload,
   );
 
@@ -184,6 +190,8 @@ export function useFormulario() {
     step, formData, errors, helpField, setHelpField,
     codigoPeticion, documentos, saving, uploadingDoc,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
+    referenciasComerciales, handleReferenciaChange, addReferencia,
+    referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,

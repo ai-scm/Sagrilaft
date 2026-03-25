@@ -26,6 +26,8 @@ export default function FormularioSagrilaft() {
     step, formData, errors, helpField, setHelpField,
     codigoPeticion, documentos, saving, uploadingDoc,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
+    referenciasComerciales, handleReferenciaChange, addReferencia,
+    referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
@@ -81,7 +83,17 @@ export default function FormularioSagrilaft() {
 
         {step === 5 && <PasoFinanciero {...pasoProps} />}
 
-        {step === 6 && <PasoContactosBancaria {...pasoProps} />}
+        {step === 6 && (
+          <PasoContactosBancaria
+            {...pasoProps}
+            referenciasComerciales={referenciasComerciales}
+            onReferenciaChange={handleReferenciaChange}
+            onAddReferencia={addReferencia}
+            referenciasBancarias={referenciasBancarias}
+            onReferenciaBancariaChange={handleReferenciaBancariaChange}
+            onAddReferenciaBancaria={addReferenciaBancaria}
+          />
+        )}
 
         {step === 7 && <PasoDeclaraciones {...pasoProps} />}
 

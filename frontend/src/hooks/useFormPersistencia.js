@@ -22,12 +22,12 @@ export function useFormPersistencia(
 ) {
   const {
     formData, step, formularioId, codigoPeticion,
-    juntaDirectiva, accionistas, beneficiarios,
+    juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
   } = snapshot;
 
   const {
     setFormData, setStep, setFormularioId, setCodigoPeticion,
-    setJuntaDirectiva, setAccionistas, setBeneficiarios,
+    setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias,
   } = setters;
 
   const [lastSaved, setLastSaved] = useState(null);
@@ -53,6 +53,8 @@ export function useFormPersistencia(
         setJuntaDirectiva(borrador.juntaDirectiva || [{ cargo: 'Presidente' }, { cargo: 'Gerente General / Rep. Legal' }]);
         setAccionistas(borrador.accionistas || [{}]);
         setBeneficiarios(borrador.beneficiarios || [{}]);
+        setReferenciasComerciales(borrador.referenciasComerciales || [{}, {}]);
+        setReferenciasBancarias(borrador.referenciasBancarias || [{}, {}]);
       }
     } catch (_) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +66,7 @@ export function useFormPersistencia(
     const interval = setInterval(async () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         formData, step, formularioId, codigoPeticion,
-        juntaDirectiva, accionistas, beneficiarios,
+        juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
         savedAt: new Date().toISOString(),
       }));
       if (formularioId) {
@@ -76,14 +78,14 @@ export function useFormPersistencia(
     }, INTERVALO_AUTOSAVE_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios]);
+  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias]);
 
   const limpiarBorrador = () => localStorage.removeItem(STORAGE_KEY);
 
   const guardarBorradorLocal = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       formData, step, formularioId, codigoPeticion,
-      juntaDirectiva, accionistas, beneficiarios,
+      juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
       savedAt: new Date().toISOString(),
     }));
   };

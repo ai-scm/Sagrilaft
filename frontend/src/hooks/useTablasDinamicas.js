@@ -32,9 +32,11 @@ function usarTabla(valorInicial) {
 }
 
 export function useTablasDinamicas() {
-  const junta             = usarTabla(JUNTA_INICIAL);
-  const accionistasTabla  = usarTabla([{}]);
+  const junta              = usarTabla(JUNTA_INICIAL);
+  const accionistasTabla   = usarTabla([{}]);
   const beneficiariosTabla = usarTabla([{}]);
+  const referenciasTabla          = usarTabla([{}, {}]);
+  const referenciasBancariasTabla = usarTabla([{}, {}]);
 
   return {
     // Junta Directiva
@@ -52,5 +54,15 @@ export function useTablasDinamicas() {
     setBeneficiarios:         beneficiariosTabla.setFilas,
     handleBeneficiarioChange: beneficiariosTabla.cambiarFila,
     addBeneficiario:          () => beneficiariosTabla.agregarFila({}),
+    // Referencias Comerciales
+    referenciasComerciales:        referenciasTabla.filas,
+    setReferenciasComerciales:     referenciasTabla.setFilas,
+    handleReferenciaChange:        referenciasTabla.cambiarFila,
+    addReferencia:                 () => referenciasTabla.agregarFila({}),
+    // Referencias Bancarias
+    referenciasBancarias:          referenciasBancariasTabla.filas,
+    setReferenciasBancarias:       referenciasBancariasTabla.setFilas,
+    handleReferenciaBancariaChange: referenciasBancariasTabla.cambiarFila,
+    addReferenciaBancaria:         () => referenciasBancariasTabla.agregarFila({}),
   };
 }
