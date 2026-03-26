@@ -133,22 +133,6 @@ const helpTexts = {
     titulo: "País (Funciones)",
     descripcion: "País donde el representante legal ejerce sus funciones.",
   },
-  departamento_expedicion: {
-    titulo: "Departamento de Expedición",
-    descripcion: "Departamento colombiano donde fue expedido el documento de identidad. Selecciónelo para filtrar las ciudades disponibles.",
-  },
-  pais_expedicion: {
-    titulo: "País de Expedición",
-    descripcion: "País donde fue expedido el documento de identidad del representante legal.",
-  },
-  departamento_nacimiento: {
-    titulo: "Departamento de Nacimiento",
-    descripcion: "Departamento colombiano de nacimiento del representante legal. Selecciónelo para filtrar las ciudades disponibles.",
-  },
-  pais_nacimiento: {
-    titulo: "País de Nacimiento",
-    descripcion: "País de nacimiento del representante legal.",
-  },
   direccion_residencia: {
     titulo: "Dirección de Residencia",
     descripcion: "Dirección de residencia actual de la persona natural.",

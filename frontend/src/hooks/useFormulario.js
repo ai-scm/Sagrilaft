@@ -13,6 +13,7 @@ import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
+import { validarTablasPaso4, CLAVES_ERROR_PASO4 } from '../utils/validacionTablas';
 
 export function useFormulario() {
   const [step, setStep] = useState(1);
@@ -45,7 +46,7 @@ export function useFormulario() {
     pagina_actual: step,
     junta_directiva: juntaDirectiva,
     accionistas,
-    beneficiarios,
+    beneficiario_final: beneficiarios,
     referencias_comerciales: referenciasComerciales,
     referencias_bancarias: referenciasBancarias,
   });
@@ -116,10 +117,41 @@ export function useFormulario() {
     }
   };
 
+  // ── Handlers de tablas (limpian errores del paso 4 al editar) ────────────
+
+  const _limpiarErroresPaso4 = useCallback(() => {
+    aplicarErrores(prev => {
+      const sinTablas = { ...prev };
+      for (const clave of CLAVES_ERROR_PASO4) delete sinTablas[clave];
+      return sinTablas;
+    });
+  }, [aplicarErrores]);
+
+  const onJuntaChange = useCallback((...args) => {
+    handleJuntaChange(...args);
+    _limpiarErroresPaso4();
+  }, [handleJuntaChange, _limpiarErroresPaso4]);
+
+  const onAccionistaChange = useCallback((...args) => {
+    handleAccionistaChange(...args);
+    _limpiarErroresPaso4();
+  }, [handleAccionistaChange, _limpiarErroresPaso4]);
+
+  const onBeneficiarioChange = useCallback((...args) => {
+    handleBeneficiarioChange(...args);
+    _limpiarErroresPaso4();
+  }, [handleBeneficiarioChange, _limpiarErroresPaso4]);
+
   // ── Navegación ───────────────────────────────────────────────────────────
 
   const handleNext = () => {
     const newErrors = validarPaso(step);
+    if (step === 4) {
+      Object.assign(newErrors, validarTablasPaso4({
+        juntaDirectiva, accionistas, beneficiarios,
+        tipoPersona: formData.tipo_persona,
+      }));
+    }
     aplicarErrores(newErrors);
     if (Object.keys(newErrors).length === 0) {
       setStep(prev => Math.min(prev + 1, TOTAL_STEPS));
@@ -144,6 +176,10 @@ export function useFormulario() {
     for (let s = 2; s <= TOTAL_STEPS; s++) {
       Object.assign(allErrors, validarPaso(s));
     }
+    Object.assign(allErrors, validarTablasPaso4({
+      juntaDirectiva, accionistas, beneficiarios,
+      tipoPersona: formData.tipo_persona,
+    }));
     if (!formData.autorizacion_datos) {
       allErrors.autorizacion_datos = 'Debe aceptar la autorización de tratamiento de datos';
     }
@@ -153,10 +189,13 @@ export function useFormulario() {
     aplicarErrores(allErrors);
 
     if (Object.keys(allErrors).length > 0) {
-      const firstFailStep = [2, 3, 5, 6, 7].find(s =>
-        (CAMPOS_REQUERIDOS[s] || []).some(f => allErrors[f]) ||
-        (s === 7 && (allErrors.autorizacion_datos || allErrors.declaracion_origen_fondos))
-      );
+      const tieneErroresPaso4 = ['junta_directiva_tabla', 'accionistas_tabla', 'beneficiarios_tabla']
+        .some(k => allErrors[k]);
+      const firstFailStep = [2, 3, 4, 5, 6, 7].find(s => {
+        if (s === 4) return tieneErroresPaso4;
+        return (CAMPOS_REQUERIDOS[s] || []).some(f => allErrors[f]) ||
+          (s === 7 && (allErrors.autorizacion_datos || allErrors.declaracion_origen_fondos));
+      });
       if (firstFailStep) {
         setStep(firstFailStep);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -194,7 +233,8 @@ export function useFormulario() {
     referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
-    handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
-    handleBeneficiarioChange, addBeneficiario,
+    handleJuntaChange: onJuntaChange, addJuntaMember,
+    handleAccionistaChange: onAccionistaChange, addAccionista,
+    handleBeneficiarioChange: onBeneficiarioChange, addBeneficiario,
   };
 }

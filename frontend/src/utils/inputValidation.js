@@ -35,11 +35,27 @@ const blockNegativeKeyDown = (e) => {
 };
 
 /**
+ * Expresión regular para validar correos electrónicos.
+ *
+ * Acepta:   usuario@dominio.com  |  nombre.apellido@empresa.co  |  user+tag@sub.domain.org
+ * Rechaza:  brayar  |  @sin-usuario  |  sin-arroba.com  |  usuario@  |  usuario@dominio
+ *
+ * Desglose:
+ *   ^[a-zA-Z0-9._%+\-]+   → parte local: letras, números y caracteres especiales permitidos
+ *   @                      → arroba obligatoria
+ *   [a-zA-Z0-9.\-]+        → dominio: letras, números, puntos y guiones
+ *   \.                     → punto separador antes de la extensión
+ *   [a-zA-Z]{2,}$          → extensión de al menos 2 letras (.com, .co, .org, .info…)
+ */
+export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+
+/**
  * Reglas por nombre de campo.
  *   soloNumericos  → bloquea teclas y paste no numéricos.
  *   longitudExacta → valida longitud exacta en N dígitos.
  *   longitudMaxima → valida longitud máxima de N dígitos.
  *   soloPositivo   → bloquea signo negativo; min=0 en el input.
+ *   formatoCorreo  → valida estructura usuario@dominio.ext
  */
 export const REGLAS_INPUT = {
   numero_identificacion:    { soloNumericos: true },
@@ -54,6 +70,8 @@ export const REGLAS_INPUT = {
   total_activos:            { soloPositivo: true },
   total_pasivos:            { soloPositivo: true },
   patrimonio:               { soloPositivo: true },
+  correo:                   { formatoCorreo: true },
+  correo_representante:     { formatoCorreo: true },
 };
 
 /**
@@ -104,6 +122,9 @@ export function validarReglasEspeciales(formData, camposDePaso) {
     }
     if (reglas.soloPositivo && parseFloat(valor) < 0) {
       errores[campo] = 'El valor debe ser mayor o igual a 0';
+    }
+    if (reglas.formatoCorreo && !REGEX_CORREO.test(valor)) {
+      errores[campo] = 'Ingrese un correo electrónico válido (ej: nombre@dominio.com)';
     }
   }
   return errores;

@@ -17,36 +17,18 @@ const today = new Date().toISOString().split('T')[0];
 /**
  * Paso 3 — Identidad del Sujeto Obligado / Representante Legal.
  *
- * Reutiliza useUbicacion (País → Departamento → Ciudad) en cuatro bloques:
- *   1. Lugar de expedición del documento
- *   2. Lugar de nacimiento
- *   3. Ciudad donde ejerce funciones
- *   4. Ciudad de residencia (solo persona natural)
+ * Reutiliza useUbicacion (País → Departamento → Ciudad) en dos bloques:
+ *   1. Ciudad donde ejerce funciones
+ *   2. Ciudad de residencia (solo persona natural)
  *
- * Cada bloque hereda el país de la empresa como valor por defecto,
- * pero el usuario puede cambiarlo de forma independiente.
+ * Ciudad de Expedición y Ciudad de Nacimiento son campos de texto libre;
+ * no usan selección jerárquica.
  */
 export default function PasoRepresentante({ formData, onChange, onOpenHelp, errors }) {
   const esNatural  = formData.tipo_persona === 'natural';
   const defaultPais = formData.pais || '';
 
-  // ── Bloque 1: Ciudad de Expedición ──────────────────────────────────────────
-  const ubExpedicion = useUbicacion(formData, onChange, {
-    paisKey:         'pais_expedicion',
-    departamentoKey: 'departamento_expedicion',
-    ciudadKey:       'ciudad_expedicion',
-    defaultPais,
-  });
-
-  // ── Bloque 2: Ciudad de Nacimiento ──────────────────────────────────────────
-  const ubNacimiento = useUbicacion(formData, onChange, {
-    paisKey:         'pais_nacimiento',
-    departamentoKey: 'departamento_nacimiento',
-    ciudadKey:       'ciudad_nacimiento',
-    defaultPais,
-  });
-
-  // ── Bloque 3: Ciudad donde ejerce funciones ──────────────────────────────────
+  // ── Bloque 1: Ciudad donde ejerce funciones ──────────────────────────────────
   const ubFunciones = useUbicacion(formData, onChange, {
     paisKey:         'pais_funciones',
     departamentoKey: 'departamento_funciones',
@@ -54,7 +36,7 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
     defaultPais,
   });
 
-  // ── Ciudad de Residencia: todas las ciudades del país (sin filtro departamento) ─
+  // ── Bloque 2: Ciudad de Residencia (todas las ciudades del país, sin filtro) ─
   const ciudadesResidencia = useMemo(
     () => City.getCitiesOfCountry(defaultPais || 'CO').map(c => ({ value: c.name, label: c.name })),
     [defaultPais],
@@ -105,28 +87,11 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
         />
       </div>
 
-      {/* ── Lugar de expedición (País → Departamento → Ciudad) ──────────────── */}
+      {/* ── Ciudad de Expedición ─────────────────────────────────────────────── */}
       <div className="form-row">
-        <LocationSelect
-          label="País de Expedición" name="pais_expedicion"
-          value={ubExpedicion.selectedPais}
-          onChange={ubExpedicion.handlePaisChange}
-          options={ubExpedicion.paisesOptions}
-          onOpenHelp={onOpenHelp}
-        />
-        <LocationSelect
-          label="Departamento de Expedición" name="departamento_expedicion" required
-          value={ubExpedicion.selectedDepartamento}
-          onChange={ubExpedicion.handleDepartamentoChange}
-          options={ubExpedicion.departamentosOptions}
-          onOpenHelp={onOpenHelp} error={errors.departamento_expedicion}
-        />
-        <LocationSelect
+        <FormField
           label="Ciudad de Expedición" name="ciudad_expedicion" required
-          value={ubExpedicion.selectedCiudad}
-          onChange={ubExpedicion.handleCiudadChange}
-          options={ubExpedicion.ciudadesOptions}
-          disabled={!ubExpedicion.selectedDepartamento}
+          value={formData.ciudad_expedicion} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.ciudad_expedicion}
         />
       </div>
@@ -146,29 +111,11 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
         />
       </div>
 
-      {/* ── Lugar de nacimiento (País → Departamento → Ciudad) ──────────────── */}
+      {/* ── Ciudad de Nacimiento ─────────────────────────────────────────────── */}
       <div className="form-row">
-        <LocationSelect
-          label="País de Nacimiento" name="pais_nacimiento"
-          value={ubNacimiento.selectedPais}
-          onChange={ubNacimiento.handlePaisChange}
-          options={ubNacimiento.paisesOptions}
-          onOpenHelp={onOpenHelp}
-        />
-        <LocationSelect
-          label="Departamento de Nacimiento" name="departamento_nacimiento"
-          value={ubNacimiento.selectedDepartamento}
-          onChange={ubNacimiento.handleDepartamentoChange}
-          options={ubNacimiento.departamentosOptions}
-          disabled={!ubNacimiento.selectedPais}
-          onOpenHelp={onOpenHelp}
-        />
-        <LocationSelect
+        <FormField
           label="Ciudad de Nacimiento" name="ciudad_nacimiento" required
-          value={ubNacimiento.selectedCiudad}
-          onChange={ubNacimiento.handleCiudadChange}
-          options={ubNacimiento.ciudadesOptions}
-          disabled={!ubNacimiento.selectedDepartamento}
+          value={formData.ciudad_nacimiento} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.ciudad_nacimiento}
         />
       </div>
