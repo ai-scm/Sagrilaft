@@ -99,14 +99,21 @@ class Formulario(Base):
     # --- 7. Tipos de transacción ---
     tipos_transaccion = Column(Text, nullable=True)  # JSON string
 
-    # --- 8. Clasificación Empresa ---
+    # --- 8. Clasificación Empresa y Régimen Tributario ---
     actividad_clasificacion = Column(String, nullable=True)
     actividad_especifica = Column(String, nullable=True)
     sector = Column(String, nullable=True)
     superintendencia = Column(String, nullable=True)
+    responsabilidades_renta = Column(String, nullable=True)
+    autorretenedor = Column(String, nullable=True)
+    responsabilidades_iva = Column(String, nullable=True)
     regimen_iva = Column(String, nullable=True)
     gran_contribuyente = Column(String, nullable=True)
-    autorretenedor = Column(Boolean, default=False)
+    entidad_sin_animo_lucro = Column(String, nullable=True)
+    retencion_ica = Column(String, nullable=True)
+    impuesto_ica = Column(String, nullable=True)
+    entidad_oficial = Column(String, nullable=True)
+    exento_retencion_fuente = Column(String, nullable=True)
 
     # --- 9. Contactos ---
     contacto_ordenes_nombre = Column(String, nullable=True)
@@ -129,12 +136,13 @@ class Formulario(Base):
     nombre_firma = Column(String, nullable=True)
 
     # --- Datos dinámicos (JSON) ---
-    junta_directiva = Column(Text, nullable=True)      # JSON array
-    accionistas = Column(Text, nullable=True)           # JSON array
-    beneficiario_final = Column(Text, nullable=True)
-    referencias_comerciales = Column(Text, nullable=True)  # JSON array
-    referencias_bancarias = Column(Text, nullable=True)    # JSON array
-    clasificaciones = Column(Text, nullable=True)       # JSON array
+    junta_directiva = Column(Text, nullable=True)              # JSON array
+    accionistas = Column(Text, nullable=True)                   # JSON array
+    beneficiario_final = Column(Text, nullable=True)            # JSON array
+    referencias_comerciales = Column(Text, nullable=True)       # JSON array
+    referencias_bancarias = Column(Text, nullable=True)         # JSON array
+    informacion_bancaria_pagos = Column(Text, nullable=True)    # JSON array
+    clasificaciones = Column(Text, nullable=True)               # JSON array
 
     # Relaciones
     documentos = relationship("DocumentoAdjunto", back_populates="formulario",

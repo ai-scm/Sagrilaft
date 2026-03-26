@@ -37,6 +37,7 @@ export function useTablasDinamicas() {
   const beneficiariosTabla = usarTabla([{}]);
   const referenciasTabla          = usarTabla([{}, {}]);
   const referenciasBancariasTabla = usarTabla([{}, {}]);
+  const infoBancariaPagosTabla    = usarTabla([{}, {}]);
 
   return {
     // Junta Directiva
@@ -64,5 +65,10 @@ export function useTablasDinamicas() {
     setReferenciasBancarias:       referenciasBancariasTabla.setFilas,
     handleReferenciaBancariaChange: referenciasBancariasTabla.cambiarFila,
     addReferenciaBancaria:         () => referenciasBancariasTabla.agregarFila({}),
+    // Información Bancaria para Pagos (paso 7)
+    infoBancariaPagos:            infoBancariaPagosTabla.filas,
+    setInfoBancariaPagos:         infoBancariaPagosTabla.setFilas,
+    handleInfoBancariaPagosChange: infoBancariaPagosTabla.cambiarFila,
+    addInfoBancariaPagos:         () => infoBancariaPagosTabla.agregarFila({}),
   };
 }

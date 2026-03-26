@@ -1,4 +1,10 @@
 import { CARGOS_JUNTA_DIRECTIVA } from '../../data/formularioConfig';
+import {
+  onlyTextKeyDown, onlyTextPaste,
+  onlyAlphanumericKeyDown, onlyAlphanumericPaste,
+  onlyNumericKeyDown, onlyNumericPaste,
+} from '../../utils/inputValidation';
+import { HR, ESTILO_CELDA_ERROR } from '../TablaFormComponents';
 
 const TIPOS_ID_JUNTA = [
   { value: 'CC',  label: 'CC'  },
@@ -18,10 +24,6 @@ const OPCIONES_PEP = [
   { value: 'no', label: 'No' },
 ];
 
-const HR = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid var(--gray-200)', margin: '28px 0' }} />
-);
-
 /**
  * Paso 4 — Junta Directiva y Composición Accionaria.
  * Solo aplica a Persona Jurídica; muestra mensaje alternativo para Natural.
@@ -31,8 +33,6 @@ const TIPOS_ID_BENEFICIARIO = [
   { value: 'CE',  label: 'CE'  },
   { value: 'PAS', label: 'PAS' },
 ];
-
-const ESTILO_CELDA_ERROR = { borderColor: 'var(--error, #e53e3e)' };
 
 export default function PasoJuntaAccionistas({
   formData,
@@ -99,6 +99,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={miembro.nombre || ''} placeholder="Nombre completo"
                       onChange={(e) => onJuntaChange(idx, 'nombre', e.target.value)}
+                      onKeyDown={onlyTextKeyDown} onPaste={onlyTextPaste}
                       style={err.nombre ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -116,6 +117,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={miembro.numero_id || ''} placeholder="Número"
                       onChange={(e) => onJuntaChange(idx, 'numero_id', e.target.value)}
+                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
+                      inputMode="numeric"
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -176,6 +179,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={acc.nombre || ''} placeholder="Nombre"
                       onChange={(e) => onAccionistaChange(idx, 'nombre', e.target.value)}
+                      onKeyDown={onlyAlphanumericKeyDown} onPaste={onlyAlphanumericPaste}
                       style={err.nombre ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -204,6 +208,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={acc.numero_id || ''} placeholder="Número"
                       onChange={(e) => onAccionistaChange(idx, 'numero_id', e.target.value)}
+                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
+                      inputMode="numeric"
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -263,6 +269,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={ben.nombre || ''} placeholder="Nombre"
                       onChange={(e) => onBeneficiarioChange(idx, 'nombre', e.target.value)}
+                      onKeyDown={onlyAlphanumericKeyDown} onPaste={onlyAlphanumericPaste}
                       style={err.nombre ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -291,6 +298,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={ben.numero_id || ''} placeholder="Número"
                       onChange={(e) => onBeneficiarioChange(idx, 'numero_id', e.target.value)}
+                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
+                      inputMode="numeric"
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>

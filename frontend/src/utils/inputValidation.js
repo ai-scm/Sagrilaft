@@ -7,11 +7,13 @@
  * Para agregar reglas a un campo nuevo, solo editar REGLAS_INPUT.
  */
 
-/** Teclas de control que siempre se permiten en inputs numéricos. */
+/** Teclas de control que siempre se permiten en cualquier input restringido. */
 const TECLAS_CONTROL = [
   'Backspace', 'Delete', 'Tab',
   'ArrowLeft', 'ArrowRight', 'Home', 'End',
 ];
+
+// ─── Solo numérico ────────────────────────────────────────────────────────────
 
 /** Bloquea teclas no numéricas. Permite atajos de teclado (Ctrl/Cmd). */
 export const onlyNumericKeyDown = (e) => {
@@ -24,6 +26,44 @@ export const onlyNumericKeyDown = (e) => {
 /** Bloquea pegado de texto que contenga caracteres no numéricos. */
 export const onlyNumericPaste = (e) => {
   if (!/^\d+$/.test(e.clipboardData.getData('text'))) {
+    e.preventDefault();
+  }
+};
+
+// ─── Solo texto (letras, tildes, espacios, guiones, puntos) ──────────────────
+
+const REGEX_CHAR_TEXTO = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
+
+/** Bloquea dígitos y símbolos no textuales. */
+export const onlyTextKeyDown = (e) => {
+  if (e.ctrlKey || e.metaKey) return;
+  if (!TECLAS_CONTROL.includes(e.key) && !REGEX_CHAR_TEXTO.test(e.key)) {
+    e.preventDefault();
+  }
+};
+
+/** Bloquea pegado que contenga caracteres no textuales. */
+export const onlyTextPaste = (e) => {
+  if (!/^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'.\-,]+$/.test(e.clipboardData.getData('text'))) {
+    e.preventDefault();
+  }
+};
+
+// ─── Alfanumérico (letras, números, espacios, guiones, puntos) ────────────────
+
+const REGEX_CHAR_ALFANUMERICO = /^[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
+
+/** Bloquea símbolos no alfanuméricos. */
+export const onlyAlphanumericKeyDown = (e) => {
+  if (e.ctrlKey || e.metaKey) return;
+  if (!TECLAS_CONTROL.includes(e.key) && !REGEX_CHAR_ALFANUMERICO.test(e.key)) {
+    e.preventDefault();
+  }
+};
+
+/** Bloquea pegado que contenga símbolos no alfanuméricos. */
+export const onlyAlphanumericPaste = (e) => {
+  if (!/^[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ\s'.\-,]+$/.test(e.clipboardData.getData('text'))) {
     e.preventDefault();
   }
 };
@@ -64,12 +104,12 @@ export const REGLAS_INPUT = {
   telefono_representante:   { soloNumericos: true, longitudExacta: 10 },
   codigo_ciiu:              { soloNumericos: true, longitudMaxima: 4 },
   codigo_ica:               { soloNumericos: true, longitudMaxima: 4 },
-  ingresos_mensuales:       { soloPositivo: true },
-  otros_ingresos:           { soloPositivo: true },
-  egresos_mensuales:        { soloPositivo: true },
-  total_activos:            { soloPositivo: true },
-  total_pasivos:            { soloPositivo: true },
-  patrimonio:               { soloPositivo: true },
+  ingresos_mensuales:       { soloNumericos: true, soloPositivo: true },
+  otros_ingresos:           { soloNumericos: true, soloPositivo: true },
+  egresos_mensuales:        { soloNumericos: true, soloPositivo: true },
+  total_activos:            { soloNumericos: true, soloPositivo: true },
+  total_pasivos:            { soloNumericos: true, soloPositivo: true },
+  patrimonio:               { soloNumericos: true, soloPositivo: true },
   correo:                   { formatoCorreo: true },
   correo_representante:     { formatoCorreo: true },
 };
@@ -89,8 +129,9 @@ export function getInputProps(fieldName) {
     props.inputMode = 'numeric';
   }
   if (reglas.soloPositivo) {
-    props.onKeyDown = blockNegativeKeyDown;
-    props.min       = 0;
+    // Solo aplica blockNegativeKeyDown si soloNumericos no lo cubre ya
+    if (!reglas.soloNumericos) props.onKeyDown = blockNegativeKeyDown;
+    props.min = 0;
   }
   if (reglas.longitudExacta) {
     props.maxLength = reglas.longitudExacta;

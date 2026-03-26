@@ -1,6 +1,8 @@
 import Select from 'react-select';
 import FormField from '../FormField';
 import { buildSelectStyles } from '../../utils/selectStyles';
+import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
+import { HR, SectionTitle, SubLabel, ESTILO_CELDA_ERROR, MensajeError } from '../TablaFormComponents';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -17,34 +19,18 @@ const TIPOS_TRANSACCION = [
   { value: 'otras',          label: 'Otras'             },
 ];
 
-// ── Helpers de presentación ────────────────────────────────────────────────────
-
-const HR = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid var(--gray-200)', margin: '24px 0' }} />
-);
-
-const SectionTitle = ({ children }) => (
-  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--gray-800)', marginBottom: '12px' }}>
-    {children}
-  </h3>
-);
-
-const SubLabel = ({ children }) => (
-  <p style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginBottom: '8px' }}>
-    {children}
-  </p>
-);
-
 // ── Componente ────────────────────────────────────────────────────────────────
 
 /**
  * Paso 6 — Referencias Comerciales, Referencias Bancarias e Info Bancaria.
  */
 export default function PasoContactosBancaria({
-  formData, onChange, onOpenHelp,
+  formData, onChange, onOpenHelp, errors = {},
   referenciasComerciales, onReferenciaChange, onAddReferencia,
   referenciasBancarias,   onReferenciaBancariaChange, onAddReferenciaBancaria,
 }) {
+  const errFilasComerciales = errors.referencias_comerciales_filas ?? [];
+  const errFilasBancarias   = errors.referencias_bancarias_filas   ?? [];
   const realizaMoneda     = formData.realiza_operaciones_moneda_extranjera === 'si';
   const tiposSeleccionados = formData.tipos_transaccion ?? [];
   const muestraCuales     = tiposSeleccionados.includes('otras');
@@ -65,6 +51,9 @@ export default function PasoContactosBancaria({
 
       {/* ── REFERENCIAS COMERCIALES ─────────────────────────────────────────── */}
       <SectionTitle>REFERENCIAS COMERCIALES</SectionTitle>
+      {errors.referencias_comerciales_tabla && (
+        <div className="field-error" style={{ marginBottom: '8px' }}>{errors.referencias_comerciales_tabla}</div>
+      )}
       <div className="data-table-container">
         <table className="data-table">
           <thead>
@@ -76,39 +65,53 @@ export default function PasoContactosBancaria({
             </tr>
           </thead>
           <tbody>
-            {referenciasComerciales.map((ref, idx) => (
-              <tr key={idx}>
-                <td>
-                  <input
-                    value={ref.nombre_establecimiento || ''}
-                    placeholder="Nombre del establecimiento"
-                    onChange={(e) => onReferenciaChange(idx, 'nombre_establecimiento', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <input
-                    value={ref.persona_contacto || ''}
-                    placeholder="Nombre completo"
-                    onChange={(e) => onReferenciaChange(idx, 'persona_contacto', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <input
-                    value={ref.telefono || ''}
-                    placeholder="Teléfono"
-                    inputMode="numeric"
-                    onChange={(e) => onReferenciaChange(idx, 'telefono', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <input
-                    value={ref.ciudad || ''}
-                    placeholder="Ciudad"
-                    onChange={(e) => onReferenciaChange(idx, 'ciudad', e.target.value)}
-                  />
-                </td>
-              </tr>
-            ))}
+            {referenciasComerciales.map((ref, idx) => {
+              const err = errFilasComerciales[idx] ?? {};
+              return (
+                <tr key={idx}>
+                  <td>
+                    <input
+                      value={ref.nombre_establecimiento || ''}
+                      placeholder="Nombre del establecimiento"
+                      onChange={(e) => onReferenciaChange(idx, 'nombre_establecimiento', e.target.value)}
+                      style={err.nombre_establecimiento ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.nombre_establecimiento} />
+                  </td>
+                  <td>
+                    <input
+                      value={ref.persona_contacto || ''}
+                      placeholder="Nombre completo"
+                      onChange={(e) => onReferenciaChange(idx, 'persona_contacto', e.target.value)}
+                      style={err.persona_contacto ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.persona_contacto} />
+                  </td>
+                  <td>
+                    <input
+                      value={ref.telefono || ''}
+                      placeholder="Teléfono"
+                      inputMode="numeric"
+                      maxLength={10}
+                      onKeyDown={onlyNumericKeyDown}
+                      onPaste={onlyNumericPaste}
+                      onChange={(e) => onReferenciaChange(idx, 'telefono', e.target.value)}
+                      style={err.telefono ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.telefono} />
+                  </td>
+                  <td>
+                    <input
+                      value={ref.ciudad || ''}
+                      placeholder="Ciudad"
+                      onChange={(e) => onReferenciaChange(idx, 'ciudad', e.target.value)}
+                      style={err.ciudad ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.ciudad} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -120,6 +123,9 @@ export default function PasoContactosBancaria({
 
       {/* ── REFERENCIAS BANCARIAS ───────────────────────────────────────────── */}
       <SectionTitle>REFERENCIAS BANCARIAS</SectionTitle>
+      {errors.referencias_bancarias_tabla && (
+        <div className="field-error" style={{ marginBottom: '8px' }}>{errors.referencias_bancarias_tabla}</div>
+      )}
       <div className="data-table-container">
         <table className="data-table">
           <thead>
@@ -129,24 +135,31 @@ export default function PasoContactosBancaria({
             </tr>
           </thead>
           <tbody>
-            {referenciasBancarias.map((ref, idx) => (
-              <tr key={idx}>
-                <td>
-                  <input
-                    value={ref.entidad || ''}
-                    placeholder="Nombre de la entidad"
-                    onChange={(e) => onReferenciaBancariaChange(idx, 'entidad', e.target.value)}
-                  />
-                </td>
-                <td>
-                  <input
-                    value={ref.producto || ''}
-                    placeholder="Ej: Cuenta corriente, CDT"
-                    onChange={(e) => onReferenciaBancariaChange(idx, 'producto', e.target.value)}
-                  />
-                </td>
-              </tr>
-            ))}
+            {referenciasBancarias.map((ref, idx) => {
+              const err = errFilasBancarias[idx] ?? {};
+              return (
+                <tr key={idx}>
+                  <td>
+                    <input
+                      value={ref.entidad || ''}
+                      placeholder="Nombre de la entidad"
+                      onChange={(e) => onReferenciaBancariaChange(idx, 'entidad', e.target.value)}
+                      style={err.entidad ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.entidad} />
+                  </td>
+                  <td>
+                    <input
+                      value={ref.producto || ''}
+                      placeholder="Ej: Cuenta corriente, CDT"
+                      onChange={(e) => onReferenciaBancariaChange(idx, 'producto', e.target.value)}
+                      style={err.producto ? ESTILO_CELDA_ERROR : undefined}
+                    />
+                    <MensajeError msg={err.producto} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

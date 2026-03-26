@@ -19,6 +19,7 @@ import PasoRepresentante from './pasos/PasoRepresentante';
 import PasoJuntaAccionistas from './pasos/PasoJuntaAccionistas';
 import PasoFinanciero from './pasos/PasoFinanciero';
 import PasoContactosBancaria from './pasos/PasoContactosBancaria';
+import PasoClasificacionContactoBancario from './pasos/PasoClasificacionContactoBancario';
 import PasoDeclaraciones from './pasos/PasoDeclaraciones';
 
 export default function FormularioSagrilaft() {
@@ -28,6 +29,7 @@ export default function FormularioSagrilaft() {
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     referenciasComerciales, handleReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
+    infoBancariaPagos, handleInfoBancariaPagosChange, addInfoBancariaPagos,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
@@ -95,7 +97,16 @@ export default function FormularioSagrilaft() {
           />
         )}
 
-        {step === 7 && <PasoDeclaraciones {...pasoProps} />}
+        {step === 7 && (
+          <PasoClasificacionContactoBancario
+            {...pasoProps}
+            infoBancariaPagos={infoBancariaPagos}
+            onInfoBancariaPagosChange={handleInfoBancariaPagosChange}
+            onAddInfoBancariaPagos={addInfoBancariaPagos}
+          />
+        )}
+
+        {step === 8 && <PasoDeclaraciones {...pasoProps} />}
 
         <NavegacionFormulario
           step={step}

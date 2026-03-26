@@ -19,14 +19,24 @@ const esCampoVacio = (valor) =>
 
 /** Etiquetas legibles para mensajes de error (fuente única de verdad). */
 const ETIQUETAS_CAMPO = {
-  cargo:             'Cargo',
-  nombre:            'Nombre',
-  porcentaje:        '% Participación',
-  porcentaje_control: '% Control',
-  tipo_id:           'Tipo ID',
-  numero_id:         'Número ID',
-  es_pep:            '¿PEP?',
-  vinculos_pep:      'Vínculos PEP',
+  cargo:                  'Cargo',
+  nombre:                 'Nombre',
+  porcentaje:             '% Participación',
+  porcentaje_control:     '% Control',
+  tipo_id:                'Tipo ID',
+  numero_id:              'Número ID',
+  es_pep:                 '¿PEP?',
+  vinculos_pep:           'Vínculos PEP',
+  nombre_establecimiento: 'Nombre del establecimiento',
+  persona_contacto:       'Persona a contactar',
+  telefono:               'Teléfono',
+  ciudad:                 'Ciudad',
+  entidad:                'Entidad',
+  producto:               'Producto',
+  entidad_bancaria:       'Entidad Bancaria',
+  ciudad_oficina:         'Ciudad / Oficina',
+  tipo_cuenta:            'Tipo de Cuenta',
+  numero_cuenta:          'Número de Cuenta',
 };
 
 const mensajeObligatorio = (campo) =>
@@ -190,6 +200,93 @@ export const validarTablasPaso4 = ({ juntaDirectiva, accionistas, beneficiarios,
 
 /** Claves de error del paso 4 (útil para limpiar errores cuando cambia una tabla). */
 export const CLAVES_ERROR_PASO4 = Object.values(ESQUEMAS_TABLA).flatMap((e) => [
+  e.errorKey,
+  e.errorKeyFilas,
+]);
+
+// ─── Esquemas y validación del paso 6 ────────────────────────────────────────
+
+const ESQUEMAS_PASO6 = {
+  referenciasComerciales: {
+    label:              'Referencias Comerciales',
+    errorKey:           'referencias_comerciales_tabla',
+    errorKeyFilas:      'referencias_comerciales_filas',
+    camposObligatorios: ['nombre_establecimiento', 'persona_contacto', 'telefono', 'ciudad'],
+    reglasCondicionales: [
+      // Reutiliza la misma regla de longitud exacta que REGLAS_INPUT.telefono (10 dígitos)
+      (fila) =>
+        !esCampoVacio(fila.telefono) && String(fila.telefono).length !== 10
+          ? { campo: 'telefono', mensaje: 'Debe tener exactamente 10 dígitos' }
+          : null,
+    ],
+  },
+  referenciasBancarias: {
+    label:              'Referencias Bancarias',
+    errorKey:           'referencias_bancarias_tabla',
+    errorKeyFilas:      'referencias_bancarias_filas',
+    camposObligatorios: ['entidad', 'producto'],
+    reglasCondicionales: [],
+  },
+};
+
+/**
+ * Valida las tablas del Paso 6 (Referencias Comerciales y Bancarias).
+ * Reutiliza el mismo motor genérico de validarTabla.
+ */
+export const validarTablasPaso6 = ({ referenciasComerciales, referenciasBancarias }) => {
+  const errores = {};
+
+  const tablas = [
+    { filas: referenciasComerciales, esquema: ESQUEMAS_PASO6.referenciasComerciales },
+    { filas: referenciasBancarias,   esquema: ESQUEMAS_PASO6.referenciasBancarias   },
+  ];
+
+  for (const { filas, esquema } of tablas) {
+    const { erroresFilas, mensajeTabla } = validarTabla(filas, esquema);
+    if (mensajeTabla) {
+      errores[esquema.errorKey]      = mensajeTabla;
+      errores[esquema.errorKeyFilas] = erroresFilas;
+    }
+  }
+
+  return errores;
+};
+
+/** Claves de error del paso 6. */
+export const CLAVES_ERROR_PASO6 = Object.values(ESQUEMAS_PASO6).flatMap((e) => [
+  e.errorKey,
+  e.errorKeyFilas,
+]);
+
+// ─── Esquemas y validación del paso 7 ────────────────────────────────────────
+
+const ESQUEMAS_PASO7 = {
+  infoBancariaPagos: {
+    label:              'Información Bancaria para Pagos',
+    errorKey:           'info_bancaria_pagos_tabla',
+    errorKeyFilas:      'info_bancaria_pagos_filas',
+    camposObligatorios: ['entidad_bancaria', 'ciudad_oficina', 'tipo_cuenta', 'numero_cuenta'],
+    reglasCondicionales: [],
+  },
+};
+
+/**
+ * Valida la tabla de Información Bancaria para Pagos del Paso 7.
+ * Reutiliza el mismo motor genérico de validarTabla.
+ */
+export const validarTablasPaso7 = ({ infoBancariaPagos }) => {
+  const errores = {};
+  const esquema = ESQUEMAS_PASO7.infoBancariaPagos;
+  const { erroresFilas, mensajeTabla } = validarTabla(infoBancariaPagos, esquema);
+  if (mensajeTabla) {
+    errores[esquema.errorKey]      = mensajeTabla;
+    errores[esquema.errorKeyFilas] = erroresFilas;
+  }
+  return errores;
+};
+
+/** Claves de error del paso 7. */
+export const CLAVES_ERROR_PASO7 = Object.values(ESQUEMAS_PASO7).flatMap((e) => [
   e.errorKey,
   e.errorKeyFilas,
 ]);

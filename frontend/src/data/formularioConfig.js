@@ -4,7 +4,7 @@
  * no tengan magic strings ni números mágicos dispersos.
  */
 
-export const TOTAL_STEPS = 7;
+export const TOTAL_STEPS = 8;
 
 /**
  * Cargos válidos para la Junta Directiva y Representantes.
@@ -44,5 +44,9 @@ export const CAMPOS_REQUERIDOS = {
   4: [],
   5: ['actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
   6: [],
-  7: ['origen_fondos', 'nombre_firma', 'fecha_firma', 'ciudad_firma'],
+  7: [
+    'contacto_ordenes_nombre', 'contacto_ordenes_cargo', 'contacto_ordenes_telefono', 'contacto_ordenes_correo',
+    'contacto_pagos_nombre',   'contacto_pagos_cargo',   'contacto_pagos_telefono',   'contacto_pagos_correo',
+  ],
+  8: ['origen_fondos', 'nombre_firma', 'fecha_firma', 'ciudad_firma'],
 };

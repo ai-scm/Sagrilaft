@@ -175,15 +175,31 @@ const helpTexts = {
     descripcion: "Patrimonio neto (Activos - Pasivos). Este valor se verificará contra los estados financieros adjuntos.",
   },
 
+  // Clasificación tributaria
+  actividad_clasificacion: { titulo: "Actividad", descripcion: "Actividad principal de la empresa." },
+  actividad_especifica:    { titulo: "Actividad Específica", descripcion: "Especifique la actividad de la empresa." },
+  sector:                  { titulo: "Sector", descripcion: "Sector económico al que pertenece la empresa." },
+  superintendencia:        { titulo: "Vigilado por la Superintendencia de", descripcion: "Superintendencia que vigila a la empresa." },
+  responsabilidades_renta: { titulo: "Responsabilidades Impuesto sobre la Renta", descripcion: "Responsabilidades tributarias en renta." },
+  autorretenedor:          { titulo: "Autorretenedor", descripcion: "Indica si la empresa es autorretenedora." },
+  responsabilidades_iva:   { titulo: "Responsabilidades en el IVA", descripcion: "Responsabilidades en impuesto sobre las ventas." },
+  regimen_iva:             { titulo: "Régimen IVA", descripcion: "Régimen de IVA al que pertenece la empresa." },
+  gran_contribuyente:      { titulo: "¿Es Gran Contribuyente?", descripcion: "Indica si la empresa es catalogada como gran contribuyente." },
+  entidad_sin_animo_lucro: { titulo: "Entidad sin Ánimo de Lucro", descripcion: "Indica si es una entidad sin ánimo de lucro." },
+  retencion_ica:           { titulo: "Retención de Industria y Comercio", descripcion: "Retención de ICA aplicable." },
+  impuesto_ica:            { titulo: "Impuesto de Industria y Comercio", descripcion: "ICA aplicable a la empresa." },
+  entidad_oficial:         { titulo: "Entidad Oficial", descripcion: "Indica si es una entidad del Estado." },
+  exento_retencion_fuente: { titulo: "Exento de Retención en la Fuente", descripcion: "Indica si la empresa está exenta de retención en la fuente." },
+
   // Contactos
-  contacto_ordenes_nombre: {
-    titulo: "Contacto para Órdenes de Compra",
-    descripcion: "Persona autorizada para recibir órdenes de compra y de servicio.",
-  },
-  contacto_pagos_nombre: {
-    titulo: "Contacto para Pagos",
-    descripcion: "Persona autorizada para recibir reportes y comunicaciones de pago.",
-  },
+  contacto_ordenes_nombre:   { titulo: "Nombre (Órdenes de Compra)", descripcion: "Persona autorizada para recibir órdenes de compra y de servicio." },
+  contacto_ordenes_cargo:    { titulo: "Cargo (Órdenes de Compra)", descripcion: "Cargo de la persona para órdenes de compra." },
+  contacto_ordenes_telefono: { titulo: "Teléfono (Órdenes de Compra)", descripcion: "Teléfono de contacto para órdenes de compra." },
+  contacto_ordenes_correo:   { titulo: "Correo (Órdenes de Compra)", descripcion: "Correo electrónico para órdenes de compra." },
+  contacto_pagos_nombre:     { titulo: "Nombre (Reportes de Pago)", descripcion: "Persona autorizada para recibir reportes y comunicaciones de pago." },
+  contacto_pagos_cargo:      { titulo: "Cargo (Reportes de Pago)", descripcion: "Cargo de la persona para reportes de pago." },
+  contacto_pagos_telefono:   { titulo: "Teléfono (Reportes de Pago)", descripcion: "Teléfono de contacto para reportes de pago." },
+  contacto_pagos_correo:     { titulo: "Correo (Reportes de Pago)", descripcion: "Correo electrónico para reportes de pago." },
 
   // Documentos
   doc_cedula_representante: {

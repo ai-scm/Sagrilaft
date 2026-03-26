@@ -19,9 +19,10 @@ export default function PasoDeclaraciones({ formData, onChange, onOpenHelp, erro
       {/* Autorización tratamiento de datos */}
       <div className="auth-box">
         <p>
-          En cumplimiento de la Ley Estatutaria 1581 de 2012 de Protección de Datos (LEPD), mediante el
-          registro de sus datos personales usted autoriza la recolección, almacenamiento y uso de los
-          mismos para el procedimiento de conocimiento del cliente/proveedor de la empresa.
+          En cumplimiento de la Ley Estatutaria 1581 de 2012 de Protección de Datos (LEPD), del Decreto 1377 de 2013 y de las medidas de seguridad definidas en la política de tratamiento desarrollada por HIGHTECH SOFTWARE CONTABLE SAS l a las cuales
+          puede tener acceso a través del correo electrónico: info@xxxxxl.com.co. Mediante el registro de sus datos personales en el presente formulario usted autoriza a HIGHTECH SOFTWARE CONTABLE SAS para la recolección, almacenamiento y uso de los
+          mismos con la finalidad de llevar a cabo el procedimiento de conocimiento del cliente/proveedor de la empresa. Usted, como titular de sus datos personales puede ejercer sus derechos de acceso, corrección, supresión o revocación mediante un escrito
+          dirigido a HIGHTECH SOFTWARE CONTABLE SAS, mediante correo electrónico a info@tXXXXXX indicando en el asunto el derecho que desea ejercitar
         </p>
       </div>
       <div className="checkbox-field" onClick={() => toggleCheckbox('autorizacion_datos')}>
@@ -41,10 +42,11 @@ export default function PasoDeclaraciones({ formData, onChange, onOpenHelp, erro
 
       {/* Declaración origen de fondos */}
       <div className="auth-box">
-        <p>Realizo la siguiente declaración de origen de fondos para contribuir en la prevención del LA/FT:</p>
+        <p>Manifiesto que todo lo aquí consignado es veraz. Así mismo, realizo la siguiente declaración de origen de fondos con el propósito de contribuir en la prevención y control del Lavado de Activos y Financiación del Terrorismo.</p>
         <ol>
-          <li>Los recursos con los cuales esta sociedad fue constituida no provienen de actividades ilícitas.</li>
-          <li>No admitiré depósitos con fondos de actividades ilícitas.</li>
+          <li> Declaro que los recursos con los cuales esta sociedad fue constituida no provienen de ninguna actividad ilícita de las contempladas en el Código Penal Colombiano o en cualquier norma que lo modifique o adiciones</li>
+          <li> No admitiré que terceros efectúen depósitos a mis cuentas con fondos de actividades ilícitas contempladas en el Código Penal Colombiano o en cualquier norma que lo modifique o adicione, ni efectuaré transacciones a tales actividades de o a favor de
+              personas relacionadas con las mismas.</li>
         </ol>
       </div>
       <FormField

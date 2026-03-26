@@ -23,11 +23,13 @@ export function useFormPersistencia(
   const {
     formData, step, formularioId, codigoPeticion,
     juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
+    infoBancariaPagos,
   } = snapshot;
 
   const {
     setFormData, setStep, setFormularioId, setCodigoPeticion,
     setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias,
+    setInfoBancariaPagos,
   } = setters;
 
   const [lastSaved, setLastSaved] = useState(null);
@@ -55,6 +57,7 @@ export function useFormPersistencia(
         setBeneficiarios(borrador.beneficiarios || [{}]);
         setReferenciasComerciales(borrador.referenciasComerciales || [{}, {}]);
         setReferenciasBancarias(borrador.referenciasBancarias || [{}, {}]);
+        setInfoBancariaPagos(borrador.infoBancariaPagos || [{}, {}]);
       }
     } catch (_) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +70,7 @@ export function useFormPersistencia(
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         formData, step, formularioId, codigoPeticion,
         juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
+        infoBancariaPagos,
         savedAt: new Date().toISOString(),
       }));
       if (formularioId) {
@@ -78,7 +82,7 @@ export function useFormPersistencia(
     }, INTERVALO_AUTOSAVE_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias]);
+  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos]);
 
   const limpiarBorrador = () => localStorage.removeItem(STORAGE_KEY);
 
@@ -86,6 +90,7 @@ export function useFormPersistencia(
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       formData, step, formularioId, codigoPeticion,
       juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
+      infoBancariaPagos,
       savedAt: new Date().toISOString(),
     }));
   };

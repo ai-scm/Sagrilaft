@@ -13,7 +13,11 @@ import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
-import { validarTablasPaso4, CLAVES_ERROR_PASO4 } from '../utils/validacionTablas';
+import {
+  validarTablasPaso4, CLAVES_ERROR_PASO4,
+  validarTablasPaso6, CLAVES_ERROR_PASO6,
+  validarTablasPaso7, CLAVES_ERROR_PASO7,
+} from '../utils/validacionTablas';
 
 export function useFormulario() {
   const [step, setStep] = useState(1);
@@ -39,6 +43,8 @@ export function useFormulario() {
     handleReferenciaChange, addReferencia,
     referenciasBancarias, setReferenciasBancarias,
     handleReferenciaBancariaChange, addReferenciaBancaria,
+    infoBancariaPagos, setInfoBancariaPagos,
+    handleInfoBancariaPagosChange, addInfoBancariaPagos,
   } = useTablasDinamicas();
 
   const _buildPayload = () => ({
@@ -49,11 +55,12 @@ export function useFormulario() {
     beneficiario_final: beneficiarios,
     referencias_comerciales: referenciasComerciales,
     referencias_bancarias: referenciasBancarias,
+    informacion_bancaria_pagos: infoBancariaPagos,
   });
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
-    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias },
-    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias },
+    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos },
+    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias, setInfoBancariaPagos },
     _buildPayload,
   );
 
@@ -142,6 +149,41 @@ export function useFormulario() {
     _limpiarErroresPaso4();
   }, [handleBeneficiarioChange, _limpiarErroresPaso4]);
 
+  // ── Handlers de tablas (limpian errores del paso 6 al editar) ────────────
+
+  const _limpiarErroresPaso6 = useCallback(() => {
+    aplicarErrores(prev => {
+      const sinTablas = { ...prev };
+      for (const clave of CLAVES_ERROR_PASO6) delete sinTablas[clave];
+      return sinTablas;
+    });
+  }, [aplicarErrores]);
+
+  const onReferenciaChange = useCallback((...args) => {
+    handleReferenciaChange(...args);
+    _limpiarErroresPaso6();
+  }, [handleReferenciaChange, _limpiarErroresPaso6]);
+
+  const onReferenciaBancariaChange = useCallback((...args) => {
+    handleReferenciaBancariaChange(...args);
+    _limpiarErroresPaso6();
+  }, [handleReferenciaBancariaChange, _limpiarErroresPaso6]);
+
+  // ── Handlers de tablas (limpian errores del paso 7 al editar) ────────────
+
+  const _limpiarErroresPaso7 = useCallback(() => {
+    aplicarErrores(prev => {
+      const sinTablas = { ...prev };
+      for (const clave of CLAVES_ERROR_PASO7) delete sinTablas[clave];
+      return sinTablas;
+    });
+  }, [aplicarErrores]);
+
+  const onInfoBancariaPagosChange = useCallback((...args) => {
+    handleInfoBancariaPagosChange(...args);
+    _limpiarErroresPaso7();
+  }, [handleInfoBancariaPagosChange, _limpiarErroresPaso7]);
+
   // ── Navegación ───────────────────────────────────────────────────────────
 
   const handleNext = () => {
@@ -151,6 +193,12 @@ export function useFormulario() {
         juntaDirectiva, accionistas, beneficiarios,
         tipoPersona: formData.tipo_persona,
       }));
+    }
+    if (step === 6) {
+      Object.assign(newErrors, validarTablasPaso6({ referenciasComerciales, referenciasBancarias }));
+    }
+    if (step === 7) {
+      Object.assign(newErrors, validarTablasPaso7({ infoBancariaPagos }));
     }
     aplicarErrores(newErrors);
     if (Object.keys(newErrors).length === 0) {
@@ -180,6 +228,8 @@ export function useFormulario() {
       juntaDirectiva, accionistas, beneficiarios,
       tipoPersona: formData.tipo_persona,
     }));
+    Object.assign(allErrors, validarTablasPaso6({ referenciasComerciales, referenciasBancarias }));
+    Object.assign(allErrors, validarTablasPaso7({ infoBancariaPagos }));
     if (!formData.autorizacion_datos) {
       allErrors.autorizacion_datos = 'Debe aceptar la autorización de tratamiento de datos';
     }
@@ -189,12 +239,13 @@ export function useFormulario() {
     aplicarErrores(allErrors);
 
     if (Object.keys(allErrors).length > 0) {
-      const tieneErroresPaso4 = ['junta_directiva_tabla', 'accionistas_tabla', 'beneficiarios_tabla']
-        .some(k => allErrors[k]);
-      const firstFailStep = [2, 3, 4, 5, 6, 7].find(s => {
+      const tieneErroresPaso4 = CLAVES_ERROR_PASO4.some(k => allErrors[k]);
+      const tieneErroresPaso7 = CLAVES_ERROR_PASO7.some(k => allErrors[k]);
+      const firstFailStep = [2, 3, 4, 5, 6, 7, 8].find(s => {
         if (s === 4) return tieneErroresPaso4;
+        if (s === 7) return tieneErroresPaso7;
         return (CAMPOS_REQUERIDOS[s] || []).some(f => allErrors[f]) ||
-          (s === 7 && (allErrors.autorizacion_datos || allErrors.declaracion_origen_fondos));
+          (s === 8 && (allErrors.autorizacion_datos || allErrors.declaracion_origen_fondos));
       });
       if (firstFailStep) {
         setStep(firstFailStep);
@@ -229,8 +280,9 @@ export function useFormulario() {
     step, formData, errors, helpField, setHelpField,
     codigoPeticion, documentos, saving, uploadingDoc,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
-    referenciasComerciales, handleReferenciaChange, addReferencia,
-    referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
+    referenciasComerciales, handleReferenciaChange: onReferenciaChange, addReferencia,
+    referenciasBancarias, handleReferenciaBancariaChange: onReferenciaBancariaChange, addReferenciaBancaria,
+    infoBancariaPagos, handleInfoBancariaPagosChange: onInfoBancariaPagosChange, addInfoBancariaPagos,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange: onJuntaChange, addJuntaMember,

@@ -37,6 +37,21 @@ export function useFormValidacion(formData) {
       }
     }
 
+    // Sección 8 — solo para Persona Jurídica
+    if (stepNum === 7 && formData.tipo_persona === 'juridica') {
+      const camposClasificacion = [
+        'actividad_clasificacion', 'actividad_especifica', 'sector', 'superintendencia',
+        'responsabilidades_renta', 'autorretenedor', 'responsabilidades_iva', 'regimen_iva', 'gran_contribuyente',
+        'entidad_sin_animo_lucro', 'retencion_ica', 'impuesto_ica', 'entidad_oficial', 'exento_retencion_fuente',
+      ];
+      for (const campo of camposClasificacion) {
+        const valor = formData[campo];
+        if (!valor || (typeof valor === 'string' && !valor.trim())) {
+          camposErr[campo] = `${helpTexts[campo]?.titulo || campo} es obligatorio`;
+        }
+      }
+    }
+
     return camposErr;
   }, [formData]);
 

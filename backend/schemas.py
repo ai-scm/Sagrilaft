@@ -45,6 +45,13 @@ class ReferenciaBancaria(BaseModel):
     producto: Optional[str] = None
 
 
+class InformacionBancariaPago(BaseModel):
+    entidad_bancaria: Optional[str] = None
+    ciudad_oficina: Optional[str] = None
+    tipo_cuenta: Optional[str] = None
+    numero_cuenta: Optional[str] = None
+
+
 # --- Schema principal del formulario ---
 class FormularioBase(BaseModel):
     # Clasificación
@@ -96,14 +103,21 @@ class FormularioBase(BaseModel):
     # 7. Tipos de transacción
     tipos_transaccion: Optional[str] = None
 
-    # 8. Clasificación Empresa
+    # 8. Clasificación Empresa y Régimen Tributario
     actividad_clasificacion: Optional[str] = None
     actividad_especifica: Optional[str] = None
     sector: Optional[str] = None
     superintendencia: Optional[str] = None
+    responsabilidades_renta: Optional[str] = None
+    autorretenedor: Optional[str] = None
+    responsabilidades_iva: Optional[str] = None
     regimen_iva: Optional[str] = None
     gran_contribuyente: Optional[str] = None
-    autorretenedor: Optional[bool] = False
+    entidad_sin_animo_lucro: Optional[str] = None
+    retencion_ica: Optional[str] = None
+    impuesto_ica: Optional[str] = None
+    entidad_oficial: Optional[str] = None
+    exento_retencion_fuente: Optional[str] = None
 
     # 9. Contactos
     contacto_ordenes_nombre: Optional[str] = None
@@ -131,6 +145,7 @@ class FormularioBase(BaseModel):
     beneficiario_final: Optional[List[BeneficiarioFinal]] = None
     referencias_comerciales: Optional[List[ReferenciaComercial]] = None
     referencias_bancarias: Optional[List[ReferenciaBancaria]] = None
+    informacion_bancaria_pagos: Optional[List[InformacionBancariaPago]] = None
     clasificaciones: Optional[List[str]] = None
 
     # Metadata
@@ -156,8 +171,9 @@ class FormularioResponse(FormularioBase):
         from_attributes = True
 
     @field_validator(
-        "junta_directiva", "accionistas", "referencias_comerciales",
-        "referencias_bancarias", "clasificaciones",
+        "junta_directiva", "accionistas", "beneficiario_final",
+        "referencias_comerciales", "referencias_bancarias",
+        "informacion_bancaria_pagos", "clasificaciones",
         mode="before"
     )
     @classmethod
