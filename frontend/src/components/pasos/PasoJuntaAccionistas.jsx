@@ -268,11 +268,14 @@ export default function PasoJuntaAccionistas({
                   </td>
                   <td>
                     <input
-                      type="number" step="0.01" min="0" max="100"
+                      type="number" step="0.01" min="25.01" max="100"
                       value={ben.porcentaje || ''} placeholder="%"
                       onChange={(e) => onBeneficiarioChange(idx, 'porcentaje', e.target.value)}
                       style={err.porcentaje ? ESTILO_CELDA_ERROR : undefined}
                     />
+                    {err.porcentaje && (
+                      <span style={{ color: 'var(--error, #e53e3e)', fontSize: '0.75rem', display: 'block' }}>{err.porcentaje}</span>
+                    )}
                   </td>
                   <td>
                     <select

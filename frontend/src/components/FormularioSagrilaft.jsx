@@ -106,6 +106,7 @@ export default function FormularioSagrilaft() {
           onNext={handleNext}
           onSaveDraft={handleSaveDraft}
           onSubmit={handleSubmit}
+          bloqueadoPorAnalisis={Object.values(uploadingDoc).some(Boolean)}
         />
       </main>
 

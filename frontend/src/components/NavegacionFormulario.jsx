@@ -5,6 +5,7 @@
 export default function NavegacionFormulario({
   step, totalSteps, saving, lastSaved,
   onPrev, onNext, onSaveDraft, onSubmit,
+  bloqueadoPorAnalisis = false,
 }) {
   return (
     <div className="form-card">
@@ -32,7 +33,13 @@ export default function NavegacionFormulario({
           </button>
 
           {step < totalSteps ? (
-            <button type="button" className="btn btn-primary" onClick={onNext}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onNext}
+              disabled={bloqueadoPorAnalisis}
+              style={bloqueadoPorAnalisis ? { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' } : undefined}
+            >
               Siguiente →
             </button>
           ) : (

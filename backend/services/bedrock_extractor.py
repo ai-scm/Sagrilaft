@@ -39,6 +39,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - nit: número de identificación tributaria (solo dígitos, sin puntos ni guiones)
 - actividades_economicas: lista de códigos CIIU con descripción (array de strings)
 - codigo_ica: código de la actividad principal para el Impuesto de Industria y Comercio (ICA). Búscalo en la sección "CLASIFICACION" → subsección "Actividad Principal" → campo "46. Codigo". Devuelve solo el número, sin texto adicional.
+- tipo_persona: tipo de persona de la sección "CLASIFICACIÓN E INFORMACIÓN BÁSICA DE LA EMPRESA" → pregunta "24. Tipo de contribuyente" → campo "Tipo de Persona". Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
 - fecha_documento: fecha del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
@@ -49,9 +50,12 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 
     "certificado_existencia": """Analiza este Certificado de Existencia y Representación Legal de Cámara de Comercio y extrae:
 - razon_social: razón social completa de la empresa
-- nit: NIT de la empresa (solo dígitos, sin puntos ni guiones)
+- tipo_persona: determina si el documento corresponde a una "Persona Jurídica" o "Persona Natural". Búscalo en el encabezado del certificado, en la sección de clasificación o en frases como "La persona jurídica..." o "La persona natural...". Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
+- tipo_identificacion: tipo de identificación de la empresa según la sección "NOMBRE, IDENTIFICACIÓN Y DOMICILIO". Busca la etiqueta del campo de número (ej: "NIT", "Cédula de ciudadanía", "Cédula de extranjería", "Pasaporte"). Normaliza SIEMPRE a uno de estos valores exactos: "NIT", "CC", "CE", "PAS". Reglas de normalización: si el documento dice "NIT" o "Número de Identificación Tributaria" → devuelve "NIT"; si dice "Cédula de ciudadanía" o "Cedula de ciudadania" → devuelve "CC"; si dice "Cédula de extranjería" o "Cedula de extranjeria" → devuelve "CE"; si dice "Pasaporte" → devuelve "PAS". Si no encuentras el tipo, devuelve "NIT" como valor por defecto para personas jurídicas.
+- nit: número de identificación de la empresa en la sección "NOMBRE, IDENTIFICACIÓN Y DOMICILIO" (solo dígitos, sin puntos, guiones ni dígito de verificación)
 - representante_legal: nombre completo del representante legal
 - cedula_representante: número de cédula del representante legal (solo dígitos)
+- termino_duracion: vigencia de la empresa extraída de la sección "TÉRMINO DE DURACIÓN" o de frases como "su duración es hasta el [FECHA]" o "su duración es indefinida". Si es una fecha específica devuelve formato YYYY-MM-DD; si es indefinida devuelve "INDEFINIDA".
 - fecha_documento: fecha de expedición del certificado en formato YYYY-MM-DD
 - direccion: dirección comercial registrada
 - municipio: municipio o ciudad registrada en la sección UBICACIÓN del certificado

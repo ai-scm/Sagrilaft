@@ -19,13 +19,14 @@ const esCampoVacio = (valor) =>
 
 /** Etiquetas legibles para mensajes de error (fuente única de verdad). */
 const ETIQUETAS_CAMPO = {
-  cargo:        'Cargo',
-  nombre:       'Nombre',
-  porcentaje:   '% Participación',
-  tipo_id:      'Tipo ID',
-  numero_id:    'Número ID',
-  es_pep:       '¿PEP?',
-  vinculos_pep: 'Vínculos PEP',
+  cargo:             'Cargo',
+  nombre:            'Nombre',
+  porcentaje:        '% Participación',
+  porcentaje_control: '% Control',
+  tipo_id:           'Tipo ID',
+  numero_id:         'Número ID',
+  es_pep:            '¿PEP?',
+  vinculos_pep:      'Vínculos PEP',
 };
 
 const mensajeObligatorio = (campo) =>
@@ -78,6 +79,10 @@ export const ESQUEMAS_TABLA = {
     errorKeyFilas:     'beneficiarios_filas',
     camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
+      (fila) =>
+        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 25
+          ? { campo: 'porcentaje', mensaje: 'El % de participación debe ser mayor al 25%' }
+          : null,
       (fila) =>
         !esCampoVacio(fila.tipo_id) && String(fila.tipo_id).toUpperCase() === 'NIT'
           ? { campo: 'tipo_id', mensaje: 'El Tipo ID del beneficiario final no puede ser NIT (debe ser CC, CE o PAS)' }

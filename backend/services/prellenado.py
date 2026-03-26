@@ -20,12 +20,73 @@ un dict global expuesto, evitando modificaciones accidentales desde otros módul
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+import re
+from typing import Any, Callable, Dict, List, Optional
 
 
 # ═══════════════════════════════════════════════════════════════
-# Mapeador de campos IA → formulario
+# Normalizadores de valor (OCP: agregar aquí sin tocar el motor)
 # ═══════════════════════════════════════════════════════════════
+
+def _normalizar_tipo_persona(valor: Any) -> Optional[str]:
+    """
+    Normaliza el campo "Tipo de Persona" a uno de los dos valores canónicos:
+    "Persona Jurídica" o "Persona Natural".
+
+    Aplica a RUT (sección 24) y Certificado de Existencia.
+    """
+    if valor is None:
+        return None
+
+    texto = re.sub(r'\s+', ' ', str(valor)).strip().upper()
+
+    if 'JURIDICA' in texto or 'JURÍDICA' in texto:
+        return 'Persona Jurídica'
+    if 'NATURAL' in texto:
+        return 'Persona Natural'
+
+    return None
+
+
+def _normalizar_tipo_identificacion(valor: Any) -> Optional[str]:
+    """
+    Convierte cualquier variación textual del tipo de identificación
+    al código canónico que usa el formulario: NIT | CC | CE | PAS.
+
+    Capa de seguridad frente a respuestas inesperadas del modelo IA.
+    El prompt ya solicita valores normalizados; esta función es el
+    fallback robusto para variaciones ortográficas o de idioma.
+    """
+    if valor is None:
+        return None
+
+    texto = re.sub(r'[.\s\-]', '', str(valor)).upper()
+
+    _TABLA_NORMALIZACION: Dict[str, str] = {
+        # NIT y variaciones
+        'NIT':                               'NIT',
+        'NUMERODEIDENTIFICACIONTRIBUTARIA':  'NIT',
+        'NROTRIBUTARIO':                     'NIT',
+        # Cédula de Ciudadanía
+        'CC':                                'CC',
+        'CEDULADECIUDADANIA':                'CC',
+        'CÉDULADECIUDADANÍA':                'CC',
+        'CEDULA':                            'CC',
+        'CÉDULA':                            'CC',
+        # Cédula de Extranjería
+        'CE':                                'CE',
+        'CEDULADEEXTRANJERIA':               'CE',
+        'CÉDULADEEXTRANJERÍIA':              'CE',
+        'CEDULAEXTRANJERIA':                 'CE',
+        'EXTRANJERIA':                       'CE',
+        # Pasaporte
+        'PAS':                               'PAS',
+        'PASAPORTE':                         'PAS',
+        'PASSPORT':                          'PAS',
+    }
+
+    return _TABLA_NORMALIZACION.get(texto)
+
 
 class MapeadorCamposFormulario:
     """
@@ -45,6 +106,7 @@ class MapeadorCamposFormulario:
         "rut": {
             "razon_social": "razon_social",
             "nit":          "numero_identificacion",
+            "tipo_persona": "tipo_persona",
             "direccion":    "direccion",
             "correo":       "correo",
             "telefono":     "telefono",
@@ -52,9 +114,12 @@ class MapeadorCamposFormulario:
         },
         "certificado_existencia": {
             "razon_social":        "razon_social",
+            "tipo_persona":        "tipo_persona",
+            "tipo_identificacion": "tipo_identificacion",
             "nit":                 "numero_identificacion",
             "representante_legal": "nombre_representante",
             "cedula_representante":"numero_doc_representante",
+            "termino_duracion":    "termino_duracion",
             "direccion":           "direccion",
             "municipio":           "ciudad",
             "correo":              "correo",
@@ -78,6 +143,18 @@ class MapeadorCamposFormulario:
         },
     }
 
+    # Transformaciones de valor por (tipo_documento, campo_formulario).
+    # OCP: agregar una nueva transformación sin modificar el motor de mapeo.
+    _TRANSFORMACIONES: Dict[str, Dict[str, Callable[[Any], Any]]] = {
+        "rut": {
+            "tipo_persona": _normalizar_tipo_persona,
+        },
+        "certificado_existencia": {
+            "tipo_persona":        _normalizar_tipo_persona,
+            "tipo_identificacion": _normalizar_tipo_identificacion,
+        },
+    }
+
     @classmethod
     def mapear(
         cls,
@@ -87,7 +164,9 @@ class MapeadorCamposFormulario:
         """
         Mapea los datos extraídos de un documento a los campos del formulario.
 
-        Solo incluye los campos con valor no nulo en el resultado.
+        Aplica transformaciones de valor cuando están configuradas en
+        _TRANSFORMACIONES (ej. normalización de tipo_identificacion).
+        Solo incluye los campos con valor no nulo tras la transformación.
 
         Args:
             tipo_documento:  Clave del tipo de documento (ej. "rut").
@@ -98,11 +177,20 @@ class MapeadorCamposFormulario:
             Retorna {} si el tipo de documento no tiene mapeo configurado.
         """
         mapeo = cls._MAPEO_POR_TIPO.get(tipo_documento, {})
-        return {
-            campo_formulario: datos_extraidos[campo_doc]
-            for campo_doc, campo_formulario in mapeo.items()
-            if datos_extraidos.get(campo_doc) is not None
-        }
+        transformaciones = cls._TRANSFORMACIONES.get(tipo_documento, {})
+        resultado = {}
+
+        for campo_doc, campo_formulario in mapeo.items():
+            valor = datos_extraidos.get(campo_doc)
+            if valor is None:
+                continue
+            transformar = transformaciones.get(campo_formulario)
+            if transformar:
+                valor = transformar(valor)
+            if valor is not None:
+                resultado[campo_formulario] = valor
+
+        return resultado
 
     @classmethod
     def tipos_soportados(cls) -> List[str]:
