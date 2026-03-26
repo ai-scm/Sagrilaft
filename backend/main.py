@@ -16,66 +16,66 @@ from database import engine, Base
 from routers import formulario, validacion, listas_cautela
 from services.lista_cautela_service import ListaCautelaService
 from services.listas.mock_providers import PROVEEDORES_MOCK
-from services.bedrock_extractor import BedrockExtractor
-from services.document_orchestrator import DocumentValidationOrchestrator
-from services.validators.camara_comercio import CamaraComercioValidator
-from services.validators.rut import RutValidator
-from services.validators.estados_financieros import EstadosFinancierosValidator
-from services.validators.cedula import CedulaValidator
-from services.validators.referencia_bancaria import ReferenciaBancariaValidator
+from services.bedrock_extractor import ExtractorBedrock
+from services.document_orchestrator import OrquestadorValidacionDocumentos
+from services.validators.camara_comercio import ValidadorCamaraComercio
+from services.validators.cruzado import ValidadorCruzadoDocumentos, REGLAS_CRUCE_PREDETERMINADAS
+from services.validators.rut import ValidadorRut
+from services.validators.estados_financieros import ValidadorEstadosFinancieros
+from services.validators.cedula import ValidadorCedula
+from services.validators.referencia_bancaria import ValidadorReferenciaBancaria
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _create_extractor(config):
-    """Factory: crea el extractor Bedrock con las credenciales configuradas."""
+def _crear_extractor(config) -> ExtractorBedrock:
+    """Fábrica: crea el extractor Bedrock con las credenciales configuradas."""
     logger.info(
         "Usando extractor Bedrock (región=%s, modelo=%s)",
         config.aws.region, config.aws.model_id
     )
-    return BedrockExtractor(
+    return ExtractorBedrock(
         region=config.aws.region,
-        model_id=config.aws.model_id,
+        modelo_id=config.aws.model_id,
         max_tokens=config.aws.max_tokens,
     )
 
 
-def _create_orchestrator(config) -> DocumentValidationOrchestrator:
-    """Factory: crea y configura el orquestador con todos los validadores."""
-    extractor = _create_extractor(config)
-    orchestrator = DocumentValidationOrchestrator(extractor)
+def _crear_orquestador(config) -> OrquestadorValidacionDocumentos:
+    """Fábrica: crea y configura el orquestador con todos los validadores."""
+    extractor = _crear_extractor(config)
+    validador_cruzado = ValidadorCruzadoDocumentos(REGLAS_CRUCE_PREDETERMINADAS)
+    orquestador = OrquestadorValidacionDocumentos(extractor, validador_cruzado)
 
-    # Registrar validadores (Open/Closed: agregar nuevos aquí sin tocar más código)
-    orchestrator.register_validator(CamaraComercioValidator())
-    orchestrator.register_validator(RutValidator())
-    orchestrator.register_validator(EstadosFinancierosValidator())
-    orchestrator.register_validator(CedulaValidator())
-    orchestrator.register_validator(ReferenciaBancariaValidator())
+    # Registrar validadores (OCP: agregar nuevos aquí sin tocar más código)
+    orquestador.registrar_validador(ValidadorCamaraComercio())
+    orquestador.registrar_validador(ValidadorRut())
+    orquestador.registrar_validador(ValidadorEstadosFinancieros())
+    orquestador.registrar_validador(ValidadorCedula())
+    orquestador.registrar_validador(ValidadorReferenciaBancaria())
 
     logger.info(
         "Validadores registrados: %s",
-        ", ".join(orchestrator.registered_types)
+        ", ".join(orquestador.tipos_registrados)
     )
-    return orchestrator
+    return orquestador
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle: inicialización y limpieza."""
+    """Ciclo de vida: inicialización y limpieza de la aplicación."""
     config = load_config()
 
-    # Crear tablas
     Base.metadata.create_all(bind=engine)
 
-    # Inyectar orquestador en app.state (DI pobre pero simple)
-    app.state.orchestrator = _create_orchestrator(config)
+    app.state.orchestrator = _crear_orquestador(config)
     app.state.config = config
     app.state.lista_cautela_service = ListaCautelaService(PROVEEDORES_MOCK)
 
-    logger.info("✅ SAGRILAFT API iniciada")
+    logger.info("SAGRILAFT API iniciada")
     yield
-    logger.info("🛑 SAGRILAFT API detenida")
+    logger.info("SAGRILAFT API detenida")
 
 
 app = FastAPI(
@@ -85,7 +85,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -94,17 +93,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
 app.include_router(formulario.enrutador)
 app.include_router(validacion.enrutador)
 app.include_router(listas_cautela.enrutador)
 
 
 @app.get("/")
-def root():
+def raiz():
     return {
-        "service": "SAGRILAFT API",
+        "servicio": "SAGRILAFT API",
         "version": "2.0.0",
-        "status": "running",
-        "ai_mode": "bedrock",
+        "estado": "activo",
+        "modo_ia": "bedrock",
     }

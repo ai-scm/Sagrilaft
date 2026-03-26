@@ -8,17 +8,17 @@ DIP : los routers dependen de estas abstracciones en lugar de acceder a
 
 from fastapi import Request
 
-from services.contracts import IAIExtractor
-from services.document_orchestrator import DocumentValidationOrchestrator
+from services.contracts import IExtractorIA
+from services.document_orchestrator import OrquestadorValidacionDocumentos
 from services.lista_cautela_service import ListaCautelaService
 
 
-def obtener_extractor(solicitud: Request) -> IAIExtractor:
+def obtener_extractor(solicitud: Request) -> IExtractorIA:
     """Obtiene el extractor IA registrado en el ciclo de vida de la aplicación."""
     return solicitud.app.state.orchestrator.extractor
 
 
-def obtener_orquestador(solicitud: Request) -> DocumentValidationOrchestrator:
+def obtener_orquestador(solicitud: Request) -> OrquestadorValidacionDocumentos:
     """Obtiene el orquestador de validación documental registrado en app.state."""
     return solicitud.app.state.orchestrator
 

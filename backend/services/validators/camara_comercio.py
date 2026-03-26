@@ -2,113 +2,98 @@
 Validador: Certificado de Existencia y Representación Legal (Cámara de Comercio).
 
 Alarmas que implementa:
-- Razón social no coincide
+- Razón social no coincide entre el certificado y el formulario
 - NIT no coincide
 - Representante legal no coincide
 - Cédula del representante no coincide
-- Certificado con más de 30 días
+- Certificado con más de 30 días de antigüedad
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from services.contracts import ExtractionResult, ValidationFinding
-from services.validators._utils import check_vigencia, normalize_id, normalize_text
+from services.contracts import HallazgoValidacion, ResultadoExtraccion
+from services.validators._utils import (
+    comparar_identificacion,
+    comparar_texto,
+    verificar_vigencia,
+)
 
 
-class CamaraComercioValidator:
-    """Valida Certificado de Cámara de Comercio contra datos del formulario."""
+class ValidadorCamaraComercio:
+    """
+    Valida el Certificado de Existencia y Representación Legal
+    contra los datos diligenciados en el formulario.
+
+    SRP : única responsabilidad — contrastar datos del certificado vs formulario.
+    OCP : extensible con nuevas reglas sin modificar las existentes.
+    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    """
+
+    FUENTE = "certificado de Cámara de Comercio"
 
     @property
-    def document_type(self) -> str:
+    def tipo_documento(self) -> str:
         return "certificado_existencia"
 
-    def validate(
+    def validar(
         self,
-        extracted_data: ExtractionResult,
-        form_data: Dict[str, Any],
-    ) -> List[ValidationFinding]:
-        if not extracted_data.extraido:
-            return [ValidationFinding.advertencia(
+        datos_extraidos: ResultadoExtraccion,
+        datos_formulario: Dict[str, Any],
+    ) -> List[HallazgoValidacion]:
+        """
+        Ejecuta todas las reglas de validación del certificado de Cámara de Comercio.
+
+        Args:
+            datos_extraidos:   Resultado de la extracción IA del documento.
+            datos_formulario:  Datos ingresados por el usuario en el formulario.
+
+        Returns:
+            Lista de hallazgos (ok / error / advertencia).
+        """
+        if not datos_extraidos.extraido:
+            return [HallazgoValidacion.advertencia(
                 campo="certificado_existencia",
-                detalle=f"No se pudieron extraer datos. {extracted_data.mensaje}",
+                detalle=f"No se pudieron extraer datos del certificado. {datos_extraidos.mensaje}",
             )]
 
-        findings: List[ValidationFinding] = []
-        datos = extracted_data.datos
-        source = "certificado de Cámara de Comercio"
+        hallazgos: List[Optional[HallazgoValidacion]] = []
+        datos = datos_extraidos.datos
 
-        # --- Razón social ---
-        findings.append(self._compare_text(
-            datos.get("razon_social"), form_data.get("razon_social"),
-            campo="razon_social", nombre="Razón social", source=source,
+        hallazgos.append(comparar_texto(
+            valor_doc=datos.get("razon_social"),
+            valor_form=datos_formulario.get("razon_social"),
+            campo="razon_social",
+            nombre="Razón social",
+            fuente=self.FUENTE,
         ))
 
-        # --- NIT ---
-        findings.append(self._compare_nit(
-            datos.get("nit"), form_data.get("numero_identificacion"),
+        hallazgos.append(comparar_identificacion(
+            valor_doc=datos.get("nit"),
+            valor_form=datos_formulario.get("numero_identificacion"),
+            campo="numero_identificacion",
+            nombre="NIT",
+            fuente=self.FUENTE,
         ))
 
-        # --- Representante legal ---
-        findings.append(self._compare_text(
-            datos.get("representante_legal"), form_data.get("nombre_representante"),
-            campo="nombre_representante", nombre="Representante legal", source=source,
+        hallazgos.append(comparar_texto(
+            valor_doc=datos.get("representante_legal"),
+            valor_form=datos_formulario.get("nombre_representante"),
+            campo="nombre_representante",
+            nombre="Representante legal",
+            fuente=self.FUENTE,
         ))
 
-        # --- Cédula del representante ---
-        findings.append(self._compare_nit(
-            datos.get("cedula_representante"), form_data.get("numero_doc_representante"),
-            campo="numero_doc_representante", nombre="Cédula del representante",
+        hallazgos.append(comparar_identificacion(
+            valor_doc=datos.get("cedula_representante"),
+            valor_form=datos_formulario.get("numero_doc_representante"),
+            campo="numero_doc_representante",
+            nombre="Cédula del representante",
+            fuente=self.FUENTE,
         ))
 
-        # --- Vigencia del certificado (≤ 30 días) ---
-        finding_fecha = check_vigencia(datos.get("fecha_documento"), campo="fecha_certificado_camara")
-        if finding_fecha:
-            findings.append(finding_fecha)
+        hallazgos.append(verificar_vigencia(
+            datos.get("fecha_documento"),
+            campo="fecha_certificado_camara",
+        ))
 
-        return [f for f in findings if f is not None]
-
-    # ── Helpers privados ──────────────────────────────────
-
-    @staticmethod
-    def _compare_text(
-        doc_value: Any, form_value: Any,
-        campo: str, nombre: str, source: str,
-    ) -> ValidationFinding | None:
-        if not doc_value or not form_value:
-            return None
-        coincide = normalize_text(doc_value) == normalize_text(form_value)
-        return (
-            ValidationFinding.ok(
-                campo=campo,
-                detalle=f"{nombre} coincide con {source}.",
-                valor_formulario=str(form_value),
-                valor_documento=str(doc_value),
-            ) if coincide else ValidationFinding.error(
-                campo=campo,
-                detalle=f"{nombre} NO coincide entre {source} y el formulario.",
-                valor_formulario=str(form_value),
-                valor_documento=str(doc_value),
-            )
-        )
-
-    @staticmethod
-    def _compare_nit(
-        doc_value: Any, form_value: Any,
-        campo: str = "numero_identificacion",
-        nombre: str = "NIT",
-    ) -> ValidationFinding | None:
-        if not doc_value or not form_value:
-            return None
-        coincide = normalize_id(doc_value) == normalize_id(form_value)
-        return (
-            ValidationFinding.ok(
-                campo=campo, detalle=f"{nombre} coincide.",
-                valor_formulario=str(form_value),
-                valor_documento=str(doc_value),
-            ) if coincide else ValidationFinding.error(
-                campo=campo,
-                detalle=f"{nombre} NO coincide entre el certificado y el formulario.",
-                valor_formulario=str(form_value),
-                valor_documento=str(doc_value),
-            )
-        )
+        return [h for h in hallazgos if h is not None]

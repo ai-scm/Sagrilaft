@@ -19,8 +19,8 @@ from database import get_db
 from dependencies import obtener_orquestador, obtener_servicio_lista_cautela
 from models import Formulario, ResultadoValidacion
 from schemas import ValidacionResponse
-from services.contracts import ValidationFinding
-from services.document_orchestrator import DocumentValidationOrchestrator
+from services.contracts import HallazgoValidacion
+from services.document_orchestrator import OrquestadorValidacionDocumentos
 from services.lista_cautela_service import ListaCautelaService
 
 enrutador = APIRouter(prefix="/api/validar", tags=["validación"])
@@ -32,7 +32,7 @@ enrutador = APIRouter(prefix="/api/validar", tags=["validación"])
 async def validar_formulario(
     formulario_id: str,
     sesion: Session = Depends(get_db),
-    orquestador: DocumentValidationOrchestrator = Depends(obtener_orquestador),
+    orquestador: OrquestadorValidacionDocumentos = Depends(obtener_orquestador),
     servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
 ) -> List[ValidacionResponse]:
     """
@@ -75,7 +75,7 @@ def _limpiar_validaciones_previas(sesion: Session, formulario_id: str) -> None:
 
 async def _validar_documentos(
     sesion: Session,
-    orquestador: DocumentValidationOrchestrator,
+    orquestador: OrquestadorValidacionDocumentos,
     formulario_id: str,
     formulario: Formulario,
 ) -> List[ResultadoValidacion]:
@@ -86,13 +86,13 @@ async def _validar_documentos(
     """
     datos_formulario = _extraer_datos_relevantes(formulario)
     lista_documentos = [
-        {"file_path": doc.ruta_archivo, "document_type": doc.tipo_documento}
+        {"ruta_archivo": doc.ruta_archivo, "tipo_documento": doc.tipo_documento}
         for doc in formulario.documentos
     ]
 
-    hallazgos_individuales, hallazgos_cruzados = await orquestador.validate_all_documents(
-        documents=lista_documentos,
-        form_data=datos_formulario,
+    hallazgos_individuales, hallazgos_cruzados = await orquestador.validar_todos_documentos(
+        documentos=lista_documentos,
+        datos_formulario=datos_formulario,
     )
 
     resultados: List[ResultadoValidacion] = []
@@ -168,9 +168,9 @@ def _extraer_datos_relevantes(formulario: Formulario) -> Dict[str, Any]:
 def _hallazgo_a_resultado(
     formulario_id: str,
     tipo: str,
-    hallazgo: ValidationFinding,
+    hallazgo: HallazgoValidacion,
 ) -> ResultadoValidacion:
-    """Convierte un ValidationFinding en un ResultadoValidacion persistible en BD."""
+    """Convierte un HallazgoValidacion en un ResultadoValidacion persistible en BD."""
     return ResultadoValidacion(
         formulario_id=formulario_id,
         tipo=tipo,

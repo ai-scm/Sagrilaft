@@ -1,28 +1,28 @@
 """
 Extractor de datos de documentos usando AWS Bedrock (Claude).
-Envía PDFs/imágenes a Claude para OCR + extracción estructurada.
 
+Envía PDFs/imágenes a Claude para OCR + extracción estructurada.
 Usa asyncio.to_thread para no bloquear el event loop de FastAPI
 con las llamadas síncronas de boto3.
 """
 
 import asyncio
-import base64
 import json
 import logging
 import mimetypes
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
-from services.contracts import ExtractionResult
+from services.contracts import ResultadoExtraccion
+from services.prellenado import mapear_campos_para_formulario
 
 logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════
-# Prompts de Extracción por Tipo de Documento
+# Prompts de extracción por tipo de documento
 # ═══════════════════════════════════════════════════════════════
 
-EXTRACTION_PROMPTS: Dict[str, str] = {
+PROMPTS_EXTRACCION: Dict[str, str] = {
     "cedula_representante": """Analiza este documento de identificación colombiano y extrae exactamente los siguientes campos:
 - tipo_documento: tipo de documento tal como aparece en el encabezado. Normaliza tildes: "CÉDULA DE CIUDADANÍA" → "CEDULA DE CIUDADANIA". Valores posibles: "CEDULA DE CIUDADANIA", "CEDULA DE EXTRANJERIA", "PASAPORTE".
 - nombre: nombre completo de la persona (nombres y apellidos)
@@ -95,202 +95,203 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 }
 
-# Mapping de tipo documento a campos de formulario para pre-fill
-PREFILL_MAPPING: Dict[str, Dict[str, str]] = {
-    "rut": {
-        "razon_social": "razon_social",
-        "nit": "numero_identificacion",
-        "direccion": "direccion",
-        "correo": "correo",
-        "telefono": "telefono",
-        "codigo_ica": "codigo_ica",
-    },
-    "certificado_existencia": {
-        "razon_social": "razon_social",
-        "nit": "numero_identificacion",
-        "representante_legal": "nombre_representante",
-        "cedula_representante": "numero_doc_representante",
-        "direccion": "direccion",
-        "municipio": "ciudad",
-        "correo": "correo",
-        "telefono": "telefono",
-    },
-    "cedula_representante": {
-        "nombre": "nombre_representante",
-        "numero_documento": "numero_doc_representante",
-        "tipo_documento": "tipo_doc_representante",
-        "fecha_nacimiento": "fecha_nacimiento",
-        "lugar_nacimiento": "ciudad_nacimiento",
-        "fecha_expedicion": "fecha_expedicion",
-        "lugar_expedicion": "ciudad_expedicion",
-    },
-    "estados_financieros": {
-        "total_activos": "total_activos",
-        "total_pasivos": "total_pasivos",
-        "patrimonio": "patrimonio",
-        "ingresos": "ingresos_mensuales",
-        "egresos": "egresos_mensuales",
-    },
-}
 
+# ═══════════════════════════════════════════════════════════════
+# Extractor
+# ═══════════════════════════════════════════════════════════════
 
-class BedrockExtractor:
+class ExtractorBedrock:
     """
-    Extractor real usando AWS Bedrock con Claude.
+    Extractor de datos usando AWS Bedrock con Claude.
 
-    Lee archivos locales (PDF/imagen), los envía a Claude via Bedrock,
+    Lee archivos locales (PDF/imagen), los envía a Claude vía Bedrock
     y parsea la respuesta JSON estructurada.
 
-    Nota: boto3 es síncrono, se wrappea con asyncio.to_thread
+    Nota: boto3 es síncrono; se envuelve con asyncio.to_thread
     para no bloquear el event loop de FastAPI.
+
+    DIP : implementa IExtractorIA — el orquestador depende de la abstracción,
+          no de esta clase directamente.
     """
 
-    def __init__(self, region: str, model_id: str, max_tokens: int = 4096):
+    def __init__(self, region: str, modelo_id: str, max_tokens: int = 4096) -> None:
         import boto3
-        self._client = boto3.client("bedrock-runtime", region_name=region)
-        self._model_id = model_id
+        self._cliente = boto3.client("bedrock-runtime", region_name=region)
+        self._modelo_id = modelo_id
         self._max_tokens = max_tokens
 
-    async def extract(
+    async def extraer(
         self,
-        file_path: str,
-        document_type: str,
-    ) -> ExtractionResult:
-        """Extrae datos de un documento usando Claude via Bedrock."""
-        prompt = EXTRACTION_PROMPTS.get(document_type)
+        ruta_archivo: str,
+        tipo_documento: str,
+    ) -> ResultadoExtraccion:
+        """
+        Extrae datos estructurados de un documento usando Claude vía Bedrock.
+
+        Args:
+            ruta_archivo:    Ruta local al archivo PDF o imagen.
+            tipo_documento:  Clave del documento (ej. 'rut', 'cedula_representante').
+
+        Returns:
+            ResultadoExtraccion con los datos parseados o el error encontrado.
+        """
+        prompt = PROMPTS_EXTRACCION.get(tipo_documento)
         if not prompt:
-            return ExtractionResult(
+            return ResultadoExtraccion(
                 extraido=False,
-                mensaje=f"Tipo de documento '{document_type}' no tiene prompt de extracción configurado."
+                mensaje=f"Tipo de documento '{tipo_documento}' no tiene prompt de extracción configurado.",
             )
 
         try:
-            # Ejecutar la llamada síncrona de boto3 en un thread separado
             return await asyncio.to_thread(
-                self._extract_sync, file_path, document_type, prompt
+                self._extraer_sincronico, ruta_archivo, tipo_documento, prompt
             )
         except ImportError:
             logger.error("boto3 no está instalado. Instale con: pip install boto3")
-            return ExtractionResult(
+            return ResultadoExtraccion(
                 extraido=False,
-                mensaje="boto3 no instalado. Ejecute: pip install boto3"
+                mensaje="boto3 no instalado. Ejecute: pip install boto3",
             )
-        except Exception as e:
-            logger.error("Error extrayendo datos de %s: %s", file_path, str(e))
-            return ExtractionResult(
+        except Exception as error:
+            logger.error("Error extrayendo datos de %s: %s", ruta_archivo, str(error))
+            return ResultadoExtraccion(
                 extraido=False,
-                mensaje=f"Error al procesar documento: {str(e)}"
+                mensaje=f"Error al procesar documento: {str(error)}",
             )
 
-    def _extract_sync(
+    # ─── Métodos privados ─────────────────────────────────────────────────────
+
+    def _extraer_sincronico(
         self,
-        file_path: str,
-        document_type: str,
+        ruta_archivo: str,
+        tipo_documento: str,
         prompt: str,
-    ) -> ExtractionResult:
-        """Llamada síncrona a Bedrock usando la API Converse Universal."""
-        file_content, media_type = self._read_file(file_path)
+    ) -> ResultadoExtraccion:
+        """
+        Llamada síncrona a Bedrock usando la API Converse Universal.
+
+        SRP : se ocupa únicamente de invocar el modelo y parsear la respuesta.
+        """
+        contenido_archivo, tipo_mime = self._leer_archivo(ruta_archivo)
 
         logger.info(
             "Invocando Bedrock (Converse API): modelo=%s, tipo=%s, tamaño=%d bytes",
-            self._model_id, document_type, len(file_content),
+            self._modelo_id, tipo_documento, len(contenido_archivo),
         )
 
-        file_extension = "pdf"
-        if media_type.startswith("image/"):
-            # png, jpeg, webp
-            file_extension = media_type.split("/")[-1]
-            if file_extension == "jpeg":
-                file_extension = "jpeg"
-            content_block = {
-                "image": {
-                    "format": file_extension,
-                    "source": {"bytes": file_content}
-                }
-            }
-        else:
-            # document: pdf, csv, doc, docx, xls, xlsx, html, txt, md
-            content_block = {
-                "document": {
-                    "name": "doc_" + document_type,
-                    "format": "pdf",
-                    "source": {"bytes": file_content}
-                }
-            }
+        bloque_contenido = self._construir_bloque_contenido(
+            tipo_mime, contenido_archivo, tipo_documento
+        )
 
-        response = self._client.converse(
-            modelId=self._model_id,
+        respuesta = self._cliente.converse(
+            modelId=self._modelo_id,
             messages=[
                 {
                     "role": "user",
-                    "content": [
-                        content_block,
-                        {"text": prompt}
-                    ]
+                    "content": [bloque_contenido, {"text": prompt}],
                 }
             ],
             inferenceConfig={
                 "maxTokens": self._max_tokens,
                 "temperature": 0.0,
-            }
+            },
         )
 
-        extracted_text = response["output"]["message"]["content"][0]["text"]
-
-        # Parsear JSON de la respuesta de la IA
-        datos = self._parse_json_response(extracted_text)
+        texto_extraido = respuesta["output"]["message"]["content"][0]["text"]
+        datos = self._parsear_respuesta_json(texto_extraido)
 
         logger.info(
             "Extracción exitosa: tipo=%s, campos_extraidos=%s",
-            document_type, list(datos.keys()),
+            tipo_documento, list(datos.keys()),
         )
 
-        return ExtractionResult(
+        return ResultadoExtraccion(
             extraido=True,
             datos=datos,
-            mensaje=f"Datos extraídos exitosamente de {document_type}",
+            mensaje=f"Datos extraídos exitosamente de {tipo_documento}",
             confianza=0.90,
         )
 
+    @staticmethod
+    def _construir_bloque_contenido(
+        tipo_mime: str,
+        contenido: bytes,
+        tipo_documento: str,
+    ) -> Dict[str, Any]:
+        """
+        Construye el bloque de contenido para la API Converse de Bedrock,
+        diferenciando entre imágenes y documentos PDF.
 
-    def _read_file(self, file_path: str) -> tuple[bytes, str]:
-        """Lee un archivo y determina su tipo MIME."""
-        with open(file_path, "rb") as f:
-            content = f.read()
+        Args:
+            tipo_mime:      MIME type del archivo (ej. 'image/png', 'application/pdf').
+            contenido:      Bytes del archivo.
+            tipo_documento: Clave de tipo (usada como nombre en bloques de documento).
 
-        import mimetypes
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type is None:
-            mime_type = "application/pdf"
-
-        return content, mime_type
+        Returns:
+            Diccionario con la estructura esperada por la API Converse.
+        """
+        if tipo_mime.startswith("image/"):
+            extension = tipo_mime.split("/")[-1]
+            return {
+                "image": {
+                    "format": extension,
+                    "source": {"bytes": contenido},
+                }
+            }
+        return {
+            "document": {
+                "name": f"doc_{tipo_documento}",
+                "format": "pdf",
+                "source": {"bytes": contenido},
+            }
+        }
 
     @staticmethod
-    def _parse_json_response(text: str) -> Dict[str, Any]:
-        """Parsea la respuesta JSON de Claude, tolerando markdown."""
-        cleaned = text.strip()
+    def _leer_archivo(ruta_archivo: str) -> Tuple[bytes, str]:
+        """
+        Lee el contenido binario de un archivo y determina su tipo MIME.
 
-        # Remover bloques ```json ... ```
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
-            cleaned = "\n".join(lines)
+        Returns:
+            Tupla (contenido_bytes, tipo_mime).
+        """
+        with open(ruta_archivo, "rb") as archivo:
+            contenido = archivo.read()
 
-        return json.loads(cleaned)
+        tipo_mime, _ = mimetypes.guess_type(ruta_archivo)
+        if tipo_mime is None:
+            tipo_mime = "application/pdf"
+
+        return contenido, tipo_mime
 
     @staticmethod
-    def get_prefill_fields(
-        document_type: str,
-        extracted_data: Dict[str, Any],
+    def _parsear_respuesta_json(texto: str) -> Dict[str, Any]:
+        """
+        Parsea la respuesta JSON de Claude, tolerando bloques de markdown
+        con triple comilla (```json ... ```).
+        """
+        limpio = texto.strip()
+        if limpio.startswith("```"):
+            lineas = limpio.split("\n")
+            lineas = [l for l in lineas if not l.strip().startswith("```")]
+            limpio = "\n".join(lineas)
+        return json.loads(limpio)
+
+    @staticmethod
+    def obtener_campos_prellenado(
+        tipo_documento: str,
+        datos_extraidos: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
         Mapea datos extraídos a campos del formulario para pre-llenado.
-        Retorna solo los campos que tienen valor no-nulo.
+
+        DRY: delega a mapear_campos_para_formulario (services/prellenado.py),
+        que es la fuente única de verdad para este mapeo.
+
+        Args:
+            tipo_documento:  Clave del tipo de documento procesado.
+            datos_extraidos: Diccionario con los campos extraídos por IA.
+
+        Returns:
+            Diccionario con los campos del formulario y sus valores sugeridos.
         """
-        mapping = PREFILL_MAPPING.get(document_type, {})
-        prefill = {}
-        for doc_field, form_field in mapping.items():
-            value = extracted_data.get(doc_field)
-            if value is not None:
-                prefill[form_field] = value
-        return prefill
+        return mapear_campos_para_formulario(tipo_documento, datos_extraidos)

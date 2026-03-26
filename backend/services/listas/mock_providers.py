@@ -65,7 +65,7 @@ class _ProveedorSimuladoBase:
     def buscar(
         self,
         nombre: str,
-        numero_id: Optional[str] = None,
+        numero_identificacion: Optional[str] = None,
     ) -> ResultadoListaCautela:
         """Busca por coincidencia parcial normalizada en los registros en memoria."""
         nombre_normalizado = _normalizar(nombre)

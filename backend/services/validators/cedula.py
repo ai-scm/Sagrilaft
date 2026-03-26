@@ -1,118 +1,161 @@
 """
 Validador: Cédula del Representante Legal.
 
-Alarmas:
+Alarmas que implementa:
 - Nombre no coincide con el formulario
 - Número de documento no coincide
+- Tipo de documento no coincide
+- Fecha de nacimiento difiere entre cédula y formulario
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from services.contracts import ExtractionResult, ValidationFinding
-from services.validators._utils import normalize_id, normalize_text, parse_fecha
+from services.contracts import HallazgoValidacion, ResultadoExtraccion
+from services.validators._utils import (
+    comparar_identificacion,
+    comparar_texto,
+    parsear_fecha,
+)
 
 
-class CedulaValidator:
-    """Valida cédula del representante contra datos del formulario."""
+class ValidadorCedula:
+    """
+    Valida la cédula del representante legal contra los datos del formulario.
+
+    SRP : única responsabilidad — contrastar datos de la cédula vs formulario.
+    OCP : extensible con nuevas reglas sin modificar las existentes.
+    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    """
+
+    FUENTE = "cédula del representante"
 
     @property
-    def document_type(self) -> str:
+    def tipo_documento(self) -> str:
         return "cedula_representante"
 
-    def validate(
+    def validar(
         self,
-        extracted_data: ExtractionResult,
-        form_data: Dict[str, Any],
-    ) -> List[ValidationFinding]:
-        if not extracted_data.extraido:
-            return [ValidationFinding.advertencia(
+        datos_extraidos: ResultadoExtraccion,
+        datos_formulario: Dict[str, Any],
+    ) -> List[HallazgoValidacion]:
+        """
+        Ejecuta todas las reglas de validación de la cédula.
+
+        Args:
+            datos_extraidos:   Resultado de la extracción IA del documento.
+            datos_formulario:  Datos ingresados por el usuario en el formulario.
+
+        Returns:
+            Lista de hallazgos (ok / error / advertencia).
+        """
+        if not datos_extraidos.extraido:
+            return [HallazgoValidacion.advertencia(
                 campo="cedula_representante",
-                detalle=f"No se pudieron extraer datos de la cédula. {extracted_data.mensaje}",
+                detalle=f"No se pudieron extraer datos de la cédula. {datos_extraidos.mensaje}",
             )]
 
-        findings: List[ValidationFinding] = []
-        datos = extracted_data.datos
+        hallazgos: List[Optional[HallazgoValidacion]] = []
+        datos = datos_extraidos.datos
 
-        # --- Nombre del representante ---
-        doc_nombre = datos.get("nombre")
-        form_nombre = form_data.get("nombre_representante")
-        if doc_nombre and form_nombre:
-            coincide = normalize_text(doc_nombre) == normalize_text(form_nombre)
-            findings.append(
-                ValidationFinding.ok(
-                    campo="nombre_representante_cedula",
-                    detalle="Nombre del representante coincide con la cédula.",
-                    valor_formulario=str(form_nombre),
-                    valor_documento=str(doc_nombre),
-                ) if coincide else ValidationFinding.error(
-                    campo="nombre_representante_cedula",
-                    detalle="Nombre del representante NO coincide con la cédula.",
-                    valor_formulario=str(form_nombre),
-                    valor_documento=str(doc_nombre),
-                )
-            )
+        hallazgos.append(self._validar_nombre(datos, datos_formulario))
+        hallazgos.append(self._validar_numero_documento(datos, datos_formulario))
+        hallazgos.append(self._validar_tipo_documento(datos, datos_formulario))
+        hallazgos.append(self._validar_fecha_nacimiento(datos, datos_formulario))
 
-        # --- Número de documento ---
-        doc_num = datos.get("numero_documento")
-        form_num = form_data.get("numero_doc_representante")
-        if doc_num and form_num:
-            coincide = normalize_id(doc_num) == normalize_id(form_num)
-            findings.append(
-                ValidationFinding.ok(
-                    campo="numero_doc_representante_cedula",
-                    detalle="Número de cédula coincide.",
-                    valor_formulario=str(form_num),
-                    valor_documento=str(doc_num),
-                ) if coincide else ValidationFinding.error(
-                    campo="numero_doc_representante_cedula",
-                    detalle="Número de cédula NO coincide entre el documento y el formulario.",
-                    valor_formulario=str(form_num),
-                    valor_documento=str(doc_num),
-                )
-            )
+        return [h for h in hallazgos if h is not None]
 
-        # --- Tipo de documento ---
-        doc_tipo = datos.get("tipo_documento")
-        form_tipo = form_data.get("tipo_doc_representante")
-        if doc_tipo and form_tipo:
-            if normalize_text(doc_tipo) != normalize_text(form_tipo):
-                findings.append(ValidationFinding.error(
-                    campo="tipo_doc_representante_cedula",
-                    detalle="Tipo de documento NO coincide entre la cédula y el formulario.",
-                    valor_formulario=str(form_tipo),
-                    valor_documento=str(doc_tipo),
-                ))
+    # ─── Reglas de validación privadas ───────────────────────────────────────
 
-        # --- Fecha de nacimiento ---
-        # La cédula usa DD-MMM-AAAA (ej: "01-SEP-1995"); el formulario usa YYYY-MM-DD.
-        # Se normalizan ambos a objeto date antes de comparar.
-        doc_fn = datos.get("fecha_nacimiento")
-        form_fn = form_data.get("fecha_nacimiento")
-        if doc_fn and form_fn:
-            fecha_doc  = parse_fecha(doc_fn)
-            fecha_form = parse_fecha(form_fn)
-            if fecha_doc and fecha_form:
-                coincide = fecha_doc == fecha_form
-                findings.append(
-                    ValidationFinding.ok(
-                        campo="fecha_nacimiento_cedula",
-                        detalle="Fecha de nacimiento coincide con la cédula.",
-                        valor_formulario=str(form_fn),
-                        valor_documento=str(doc_fn),
-                    ) if coincide else ValidationFinding.advertencia(
-                        campo="fecha_nacimiento_cedula",
-                        detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
-                        valor_formulario=str(form_fn),
-                        valor_documento=str(doc_fn),
-                    )
-                )
-            elif not fecha_doc or not fecha_form:
-                # Si algún formato no es parseable, se deja como advertencia informativa
-                findings.append(ValidationFinding.advertencia(
+    def _validar_nombre(
+        self,
+        datos: Dict[str, Any],
+        datos_formulario: Dict[str, Any],
+    ) -> Optional[HallazgoValidacion]:
+        """Compara el nombre del representante entre la cédula y el formulario."""
+        return comparar_texto(
+            valor_doc=datos.get("nombre"),
+            valor_form=datos_formulario.get("nombre_representante"),
+            campo="nombre_representante_cedula",
+            nombre="Nombre del representante",
+            fuente=self.FUENTE,
+        )
+
+    def _validar_numero_documento(
+        self,
+        datos: Dict[str, Any],
+        datos_formulario: Dict[str, Any],
+    ) -> Optional[HallazgoValidacion]:
+        """Compara el número de documento entre la cédula y el formulario."""
+        return comparar_identificacion(
+            valor_doc=datos.get("numero_documento"),
+            valor_form=datos_formulario.get("numero_doc_representante"),
+            campo="numero_doc_representante_cedula",
+            nombre="Número de cédula",
+            fuente=self.FUENTE,
+        )
+
+    @staticmethod
+    def _validar_tipo_documento(
+        datos: Dict[str, Any],
+        datos_formulario: Dict[str, Any],
+    ) -> Optional[HallazgoValidacion]:
+        """
+        Verifica que el tipo de documento de la cédula coincida con el formulario.
+        Solo genera hallazgo cuando hay discrepancia (no se emite ok para este campo).
+        """
+        tipo_doc = datos.get("tipo_documento")
+        tipo_formulario = datos_formulario.get("tipo_doc_representante")
+        if not tipo_doc or not tipo_formulario:
+            return None
+
+        return comparar_texto(
+            valor_doc=tipo_doc,
+            valor_form=tipo_formulario,
+            campo="tipo_doc_representante_cedula",
+            nombre="Tipo de documento",
+            fuente="cédula del representante",
+        )
+
+    @staticmethod
+    def _validar_fecha_nacimiento(
+        datos: Dict[str, Any],
+        datos_formulario: Dict[str, Any],
+    ) -> Optional[HallazgoValidacion]:
+        """
+        Compara la fecha de nacimiento entre la cédula y el formulario.
+
+        La cédula usa formato DD-MMM-AAAA (ej: '01-SEP-1995');
+        el formulario usa YYYY-MM-DD. Ambas se normalizan a `date` antes
+        de comparar para evitar falsos negativos por diferencia de formato.
+        """
+        fecha_en_doc = datos.get("fecha_nacimiento")
+        fecha_en_formulario = datos_formulario.get("fecha_nacimiento")
+
+        if not fecha_en_doc or not fecha_en_formulario:
+            return None
+
+        fecha_doc = parsear_fecha(fecha_en_doc)
+        fecha_formulario = parsear_fecha(fecha_en_formulario)
+
+        if fecha_doc and fecha_formulario:
+            coincide = fecha_doc == fecha_formulario
+            return (
+                HallazgoValidacion.ok(
                     campo="fecha_nacimiento_cedula",
-                    detalle="No se pudo comparar la fecha de nacimiento (formato no reconocido). Verifique manualmente.",
-                    valor_formulario=str(form_fn),
-                    valor_documento=str(doc_fn),
-                ))
+                    detalle="Fecha de nacimiento coincide con la cédula.",
+                    valor_formulario=str(fecha_en_formulario),
+                    valor_documento=str(fecha_en_doc),
+                ) if coincide else HallazgoValidacion.advertencia(
+                    campo="fecha_nacimiento_cedula",
+                    detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
+                    valor_formulario=str(fecha_en_formulario),
+                    valor_documento=str(fecha_en_doc),
+                )
+            )
 
-        return findings
+        return HallazgoValidacion.advertencia(
+            campo="fecha_nacimiento_cedula",
+            detalle="No se pudo comparar la fecha de nacimiento (formato no reconocido). Verifique manualmente.",
+            valor_formulario=str(fecha_en_formulario),
+            valor_documento=str(fecha_en_doc),
+        )

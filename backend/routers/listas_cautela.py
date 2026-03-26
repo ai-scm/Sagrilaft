@@ -4,7 +4,9 @@ Router de listas de cautela.
 Expone el endpoint de búsqueda en listas públicas de control de riesgo:
 OFAC, Naciones Unidas, Procuraduría, Contraloría y Policía Nacional.
 
-SRP : responsabilidad única de recibir la solicitud de búsqueda y devolver resultados.
+SRP : responsabilidad única de recibir la solicitud HTTP y retornar la respuesta.
+      La orquestación de búsqueda + cálculo de riesgo + construcción de respuesta
+      vive en ListaCautelaService.buscar_y_evaluar — no en este router.
 DIP : delega completamente en ListaCautelaService mediante inyección de dependencias.
 """
 
@@ -32,14 +34,7 @@ def buscar_en_listas(
     - Contraloría General de la República
     - Policía Nacional
     """
-    resultados = servicio.buscar_todas_listas(
+    return servicio.buscar_y_evaluar(
         busqueda.nombre,
         busqueda.numero_identificacion,
-    )
-    riesgo_general = ListaCautelaService.calcular_riesgo_general(resultados)
-
-    return RespuestaListaCautela(
-        nombre_buscado=busqueda.nombre,
-        resultados=resultados,
-        riesgo_general=riesgo_general,
     )

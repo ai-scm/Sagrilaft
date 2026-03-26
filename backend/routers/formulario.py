@@ -3,7 +3,7 @@ Router de formularios — responsabilidades HTTP exclusivamente.
 
 SRP : parsea solicitudes, delega al servicio y devuelve respuestas.
       Toda la lógica de negocio vive en FormularioService.
-DIP : depende de la abstracción IAIExtractor, no de la implementación Bedrock.
+DIP : depende de la abstracción IExtractorIA, no de la implementación Bedrock.
 """
 
 from typing import List
@@ -22,7 +22,7 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from services.contracts import IAIExtractor
+from services.contracts import IExtractorIA
 from services.formulario_service import FormularioService
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
@@ -32,7 +32,7 @@ enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
 def obtener_servicio_formulario(
     sesion: Session = Depends(get_db),
-    extractor: IAIExtractor = Depends(obtener_extractor),
+    extractor: IExtractorIA = Depends(obtener_extractor),
 ) -> FormularioService:
     """Crea un FormularioService con las dependencias inyectadas."""
     return FormularioService(sesion, extractor)
@@ -137,7 +137,7 @@ async def prellenar_desde_documento(
     El sistema procesa el adjunto y sugiere valores para el formulario
     con base en la información extraída.
     """
-    return await servicio.prefill_documento(formulario_id, doc_id)
+    return await servicio.prellenar_documento(formulario_id, doc_id)
 
 
 @enrutador.post("/{formulario_id}/prefill-all")
@@ -149,7 +149,7 @@ async def prellenar_todos_documentos(
     Escanea todos los documentos adjuntos con IA y retorna campos
     consolidados para pre-llenado completo del formulario.
     """
-    return await servicio.prefill_todos(formulario_id)
+    return await servicio.prellenar_todos(formulario_id)
 
 
 # ─── Helpers privados ────────────────────────────────────────────────────────

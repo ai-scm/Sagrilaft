@@ -1,60 +1,76 @@
 """
 Validador: Referencia Bancaria.
 
-Alarmas:
-- Titular no coincide con razón social
-- Certificación bancaria con más de 30 días
+Alarmas que implementa:
+- Titular de la cuenta no coincide con la razón social del formulario
+- Certificación bancaria con más de 30 días de antigüedad
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from services.contracts import ExtractionResult, ValidationFinding
-from services.validators._utils import check_vigencia, normalize_text
+from services.contracts import HallazgoValidacion, ResultadoExtraccion
+from services.validators._utils import comparar_texto, verificar_vigencia
 
 
-class ReferenciaBancariaValidator:
-    """Valida referencia/certificación bancaria contra datos del formulario."""
+class ValidadorReferenciaBancaria:
+    """
+    Valida la referencia o certificación bancaria contra los datos del formulario.
+
+    SRP : única responsabilidad — contrastar datos de la referencia vs formulario.
+    OCP : extensible con nuevas reglas sin modificar las existentes.
+    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    """
+
+    FUENTE = "referencia bancaria"
 
     @property
-    def document_type(self) -> str:
+    def tipo_documento(self) -> str:
         return "referencias_bancarias"
 
-    def validate(
+    def validar(
         self,
-        extracted_data: ExtractionResult,
-        form_data: Dict[str, Any],
-    ) -> List[ValidationFinding]:
-        if not extracted_data.extraido:
-            return [ValidationFinding.advertencia(
+        datos_extraidos: ResultadoExtraccion,
+        datos_formulario: Dict[str, Any],
+    ) -> List[HallazgoValidacion]:
+        """
+        Ejecuta todas las reglas de validación de la referencia bancaria.
+
+        Args:
+            datos_extraidos:   Resultado de la extracción IA del documento.
+            datos_formulario:  Datos ingresados por el usuario en el formulario.
+
+        Returns:
+            Lista de hallazgos (ok / error / advertencia).
+        """
+        if not datos_extraidos.extraido:
+            return [HallazgoValidacion.advertencia(
                 campo="referencia_bancaria",
-                detalle=f"No se pudieron extraer datos. {extracted_data.mensaje}",
+                detalle=f"No se pudieron extraer datos. {datos_extraidos.mensaje}",
             )]
 
-        findings: List[ValidationFinding] = []
-        datos = extracted_data.datos
+        hallazgos: List[Optional[HallazgoValidacion]] = []
+        datos = datos_extraidos.datos
 
-        # --- Titular vs razón social ---
-        titular = datos.get("titular")
-        razon = form_data.get("razon_social")
-        if titular and razon:
-            coincide = normalize_text(titular) == normalize_text(razon)
-            findings.append(
-                ValidationFinding.ok(
-                    campo="titular_banco",
-                    detalle="Titular de la cuenta coincide con la razón social.",
-                    valor_formulario=str(razon),
-                    valor_documento=str(titular),
-                ) if coincide else ValidationFinding.error(
-                    campo="titular_banco",
-                    detalle="Titular de la cuenta NO coincide con la razón social.",
-                    valor_formulario=str(razon),
-                    valor_documento=str(titular),
-                )
-            )
+        hallazgos.append(self._validar_titular(datos, datos_formulario))
+        hallazgos.append(verificar_vigencia(
+            datos.get("fecha_documento"),
+            campo="fecha_ref_bancaria",
+        ))
 
-        # --- Vigencia (≤ 30 días) ---
-        finding_fecha = check_vigencia(datos.get("fecha_documento"), campo="fecha_ref_bancaria")
-        if finding_fecha:
-            findings.append(finding_fecha)
+        return [h for h in hallazgos if h is not None]
 
-        return findings
+    # ─── Reglas de validación privadas ───────────────────────────────────────
+
+    def _validar_titular(
+        self,
+        datos: Dict[str, Any],
+        datos_formulario: Dict[str, Any],
+    ) -> Optional[HallazgoValidacion]:
+        """Compara el titular de la cuenta bancaria con la razón social del formulario."""
+        return comparar_texto(
+            valor_doc=datos.get("titular"),
+            valor_form=datos_formulario.get("razon_social"),
+            campo="titular_banco",
+            nombre="Titular de la cuenta",
+            fuente=self.FUENTE,
+        )

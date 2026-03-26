@@ -2,238 +2,152 @@
 Orquestador de validación de documentos.
 
 Coordina la extracción IA y la validación por tipo de documento.
-Depende de abstracciones (IAIExtractor, IDocumentValidator), no de implementaciones.
+Depende exclusivamente de abstracciones (IExtractorIA, IValidadorDocumento,
+IValidadorCruzado), nunca de implementaciones concretas.
 
-Principio SOLID:
-- O (Open/Closed): Agregar nuevos validadores sin modificar este orquestador.
-- D (Dependency Inversion): Recibe dependencias via constructor.
+SOLID:
+- S (Responsabilidad Única): Solo coordina el flujo; la lógica de cruce
+  vive en IValidadorCruzado; cada validador individual en IValidadorDocumento.
+- O (Abierto/Cerrado): Agregar nuevos validadores o reglas de cruce no
+  requiere modificar este orquestador.
+- D (Inversión de Dependencias): Recibe todas las dependencias vía constructor.
+
+DRY: La extracción con log y la ejecución del validador están centralizadas
+     en métodos privados reutilizados por ambos métodos públicos de validación.
 """
 
 import logging
 from typing import Any, Dict, List, Tuple
 
-from services.contracts import ExtractionResult, IAIExtractor, IDocumentValidator, ValidationFinding
-from services.validators._utils import normalize_id, normalize_text
+from services.contracts import (
+    HallazgoValidacion,
+    IExtractorIA,
+    IValidadorCruzado,
+    IValidadorDocumento,
+    ResultadoExtraccion,
+)
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentValidationOrchestrator:
+class OrquestadorValidacionDocumentos:
     """
     Punto central de validación de documentos.
 
-    Recibe un extractor IA y un conjunto de validadores registrados.
     Para cada documento: extrae datos con IA → selecciona validador → ejecuta.
+    Al final, delega la validación cruzada al IValidadorCruzado inyectado.
     """
 
-    def __init__(self, extractor: IAIExtractor):
+    def __init__(
+        self,
+        extractor: IExtractorIA,
+        validador_cruzado: IValidadorCruzado,
+    ) -> None:
+        """
+        Args:
+            extractor:        Implementación de extracción IA (ej. ExtractorBedrock).
+            validador_cruzado: Implementación de validación cruzada entre documentos.
+        """
         self._extractor = extractor
-        self._validators: Dict[str, IDocumentValidator] = {}
+        self._validador_cruzado = validador_cruzado
+        self._validadores: Dict[str, IValidadorDocumento] = {}
 
     @property
-    def extractor(self) -> IAIExtractor:
+    def extractor(self) -> IExtractorIA:
         """Expone el extractor IA para uso directo (ej. pre-llenado de formulario)."""
         return self._extractor
 
-    def register_validator(self, validator: IDocumentValidator) -> None:
+    def registrar_validador(self, validador: IValidadorDocumento) -> None:
         """Registra un validador para un tipo de documento."""
-        self._validators[validator.document_type] = validator
+        self._validadores[validador.tipo_documento] = validador
 
-    async def validate_document(
+    @property
+    def tipos_registrados(self) -> List[str]:
+        """Tipos de documento con validador registrado."""
+        return list(self._validadores.keys())
+
+    # ─── Métodos públicos de validación ──────────────────────────────────────
+
+    async def validar_documento(
         self,
-        file_path: str,
-        document_type: str,
-        form_data: Dict[str, Any],
-    ) -> List[ValidationFinding]:
+        ruta_archivo: str,
+        tipo_documento: str,
+        datos_formulario: Dict[str, Any],
+    ) -> List[HallazgoValidacion]:
         """
         Valida un documento individual contra los datos del formulario.
 
-        1. Extrae datos usando AWS Bedrock.
-        2. Busca validador registrado para el tipo.
-        3. Ejecuta validación y retorna hallazgos.
+        Flujo: extrae con IA → busca validador → ejecuta validación.
+
+        Args:
+            ruta_archivo:     Ruta local al archivo del documento.
+            tipo_documento:   Clave del tipo de documento a procesar.
+            datos_formulario: Datos del formulario para la validación.
         """
-        # Paso 1: Extracción IA
-        extraction = await self._extractor.extract(file_path, document_type)
+        extraccion = await self._extraer_con_log(ruta_archivo, tipo_documento)
+        return self._ejecutar_validador(extraccion, tipo_documento, datos_formulario)
 
-        logger.info(
-            "Extracción %s: éxito=%s, confianza=%.2f",
-            document_type, extraction.extraido, extraction.confianza
-        )
-
-        # Paso 2: Buscar validador
-        validator = self._validators.get(document_type)
-        if not validator:
-            logger.warning("Sin validador registrado para: %s", document_type)
-            return [ValidationFinding(
-                resultado="advertencia",
-                campo=document_type,
-                detalle=f"No hay validador configurado para '{document_type}'. Requiere revisión manual.",
-            )]
-
-        # Paso 3: Validar
-        return validator.validate(extraction, form_data)
-
-    async def validate_all_documents(
+    async def validar_todos_documentos(
         self,
-        documents: List[Dict[str, str]],
-        form_data: Dict[str, Any],
-    ) -> Tuple[List[ValidationFinding], List[ValidationFinding]]:
+        documentos: List[Dict[str, str]],
+        datos_formulario: Dict[str, Any],
+    ) -> Tuple[List[HallazgoValidacion], List[HallazgoValidacion]]:
         """
         Valida una lista de documentos contra el formulario y entre sí.
 
         Args:
-            documents: Lista de dicts con 'file_path' y 'document_type'.
-            form_data: Datos del formulario para contrastes.
+            documentos:       Lista de dicts con 'ruta_archivo' y 'tipo_documento'.
+            datos_formulario: Datos del formulario para contrastes.
 
         Returns:
             Tupla (hallazgos_individuales, hallazgos_cruzados).
             - hallazgos_individuales: cada documento vs formulario.
-            - hallazgos_cruzados: consistencia entre documentos (cedula, RUT, Cámara).
+            - hallazgos_cruzados: consistencia entre documentos.
         """
-        individual_findings: List[ValidationFinding] = []
-        extractions: Dict[str, Dict[str, Any]] = {}
+        hallazgos_individuales: List[HallazgoValidacion] = []
+        extracciones: Dict[str, Dict[str, Any]] = {}
 
-        for doc in documents:
-            doc_type = doc["document_type"]
-            extraction = await self._extractor.extract(doc["file_path"], doc_type)
+        for doc in documentos:
+            tipo = doc["tipo_documento"]
+            extraccion = await self._extraer_con_log(doc["ruta_archivo"], tipo)
 
-            logger.info(
-                "Extracción %s: éxito=%s, confianza=%.2f",
-                doc_type, extraction.extraido, extraction.confianza,
+            if extraccion.extraido:
+                extracciones[tipo] = extraccion.datos
+
+            hallazgos_individuales.extend(
+                self._ejecutar_validador(extraccion, tipo, datos_formulario)
             )
 
-            if extraction.extraido:
-                extractions[doc_type] = extraction.datos
+        hallazgos_cruzados = self._validador_cruzado.validar_cruzado(extracciones)
+        return hallazgos_individuales, hallazgos_cruzados
 
-            validator = self._validators.get(doc_type)
-            if not validator:
-                logger.warning("Sin validador registrado para: %s", doc_type)
-                individual_findings.append(ValidationFinding(
-                    resultado="advertencia",
-                    campo=doc_type,
-                    detalle=f"No hay validador configurado para '{doc_type}'. Requiere revisión manual.",
-                ))
-            else:
-                individual_findings.extend(validator.validate(extraction, form_data))
+    # ─── Helpers privados ────────────────────────────────────────────────────
 
-        cross_findings = self._cross_validate(extractions)
-        return individual_findings, cross_findings
+    async def _extraer_con_log(
+        self,
+        ruta_archivo: str,
+        tipo_documento: str,
+    ) -> ResultadoExtraccion:
+        """Extrae datos de un documento y registra el resultado en el log."""
+        extraccion = await self._extractor.extraer(ruta_archivo, tipo_documento)
+        logger.info(
+            "Extracción %s: éxito=%s, confianza=%.2f",
+            tipo_documento, extraccion.extraido, extraccion.confianza,
+        )
+        return extraccion
 
-    def _cross_validate(
-        self, extractions: Dict[str, Dict[str, Any]]
-    ) -> List[ValidationFinding]:
-        """
-        Valida consistencia de datos entre los documentos adjuntos.
-
-        Reglas:
-        1. Cédula del representante (doc cédula) == cedula_representante (Cámara de Comercio)
-        2. Cédula del representante (doc cédula) == cedula_representante (RUT, si está disponible)
-        3. Razón social: RUT == Cámara de Comercio
-        4. NIT: RUT == Cámara de Comercio
-        5. Dirección: RUT == Cámara de Comercio
-        """
-        findings: List[ValidationFinding] = []
-        rut = extractions.get("rut") or {}
-        camara = extractions.get("certificado_existencia") or {}
-        cedula = extractions.get("cedula_representante") or {}
-
-        # ── 1. Cédula: doc cédula vs Cámara de Comercio ─────────────────
-        ced_doc = normalize_id(cedula.get("numero_documento"))
-        ced_camara = normalize_id(camara.get("cedula_representante"))
-        if ced_doc and ced_camara:
-            coincide = ced_doc == ced_camara
-            findings.append(
-                ValidationFinding.ok(
-                    campo="cruce_cedula_vs_camara",
-                    detalle="Cédula del representante coincide entre la cédula y el Certificado de Existencia.",
-                    valor_formulario=camara.get("cedula_representante"),
-                    valor_documento=cedula.get("numero_documento"),
-                ) if coincide else ValidationFinding.error(
-                    campo="cruce_cedula_vs_camara",
-                    detalle="Cédula del representante NO coincide entre la cédula y el Certificado de Existencia.",
-                    valor_formulario=camara.get("cedula_representante"),
-                    valor_documento=cedula.get("numero_documento"),
-                )
-            )
-
-        # ── 2. Cédula: doc cédula vs RUT ─────────────────────────────────
-        ced_rut = normalize_id(rut.get("cedula_representante"))
-        if ced_doc and ced_rut:
-            coincide = ced_doc == ced_rut
-            findings.append(
-                ValidationFinding.ok(
-                    campo="cruce_cedula_vs_rut",
-                    detalle="Cédula del representante coincide entre la cédula y el RUT.",
-                    valor_formulario=rut.get("cedula_representante"),
-                    valor_documento=cedula.get("numero_documento"),
-                ) if coincide else ValidationFinding.error(
-                    campo="cruce_cedula_vs_rut",
-                    detalle="Cédula del representante NO coincide entre la cédula y el RUT.",
-                    valor_formulario=rut.get("cedula_representante"),
-                    valor_documento=cedula.get("numero_documento"),
-                )
-            )
-
-        # ── 3. Razón social: RUT vs Cámara de Comercio ───────────────────
-        rs_rut = normalize_text(rut.get("razon_social"))
-        rs_camara = normalize_text(camara.get("razon_social"))
-        if rs_rut and rs_camara:
-            coincide = rs_rut == rs_camara
-            findings.append(
-                ValidationFinding.ok(
-                    campo="cruce_razon_social",
-                    detalle="Razón social coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("razon_social"),
-                    valor_documento=rut.get("razon_social"),
-                ) if coincide else ValidationFinding.error(
-                    campo="cruce_razon_social",
-                    detalle="Razón social NO coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("razon_social"),
-                    valor_documento=rut.get("razon_social"),
-                )
-            )
-
-        # ── 4. NIT: RUT vs Cámara de Comercio ────────────────────────────
-        nit_rut = normalize_id(rut.get("nit"))
-        nit_camara = normalize_id(camara.get("nit"))
-        if nit_rut and nit_camara:
-            coincide = nit_rut == nit_camara
-            findings.append(
-                ValidationFinding.ok(
-                    campo="cruce_nit",
-                    detalle="NIT coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("nit"),
-                    valor_documento=rut.get("nit"),
-                ) if coincide else ValidationFinding.error(
-                    campo="cruce_nit",
-                    detalle="NIT NO coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("nit"),
-                    valor_documento=rut.get("nit"),
-                )
-            )
-
-        # ── 5. Dirección: RUT vs Cámara de Comercio ──────────────────────
-        dir_rut = normalize_text(rut.get("direccion"))
-        dir_camara = normalize_text(camara.get("direccion"))
-        if dir_rut and dir_camara:
-            coincide = dir_rut == dir_camara
-            findings.append(
-                ValidationFinding.ok(
-                    campo="cruce_direccion",
-                    detalle="Dirección coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("direccion"),
-                    valor_documento=rut.get("direccion"),
-                ) if coincide else ValidationFinding.error(
-                    campo="cruce_direccion",
-                    detalle="Dirección NO coincide entre RUT y Certificado de Existencia.",
-                    valor_formulario=camara.get("direccion"),
-                    valor_documento=rut.get("direccion"),
-                )
-            )
-
-        return findings
-
-    @property
-    def registered_types(self) -> List[str]:
-        """Tipos de documento con validador registrado."""
-        return list(self._validators.keys())
+    def _ejecutar_validador(
+        self,
+        extraccion: ResultadoExtraccion,
+        tipo_documento: str,
+        datos_formulario: Dict[str, Any],
+    ) -> List[HallazgoValidacion]:
+        """Busca el validador registrado para el tipo y ejecuta la validación."""
+        validador = self._validadores.get(tipo_documento)
+        if not validador:
+            logger.warning("Sin validador registrado para: %s", tipo_documento)
+            return [HallazgoValidacion.advertencia(
+                campo=tipo_documento,
+                detalle=f"No hay validador configurado para '{tipo_documento}'. Requiere revisión manual.",
+            )]
+        return validador.validar(extraccion, datos_formulario)

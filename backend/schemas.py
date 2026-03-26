@@ -24,6 +24,15 @@ class Accionista(BaseModel):
     vinculos_pep: Optional[str] = None
 
 
+class BeneficiarioFinal(BaseModel):
+    nombre: Optional[str] = None
+    porcentaje: Optional[float] = None
+    tipo_id: Optional[str] = None
+    numero_id: Optional[str] = None
+    es_pep: Optional[str] = None
+    vinculos_pep: Optional[str] = None
+
+
 class ReferenciaComercial(BaseModel):
     nombre: Optional[str] = None
     contacto: Optional[str] = None
@@ -119,7 +128,7 @@ class FormularioBase(BaseModel):
     # Datos dinámicos
     junta_directiva: Optional[List[MiembroJunta]] = None
     accionistas: Optional[List[Accionista]] = None
-    beneficiario_final: Optional[str] = None
+    beneficiario_final: Optional[List[BeneficiarioFinal]] = None
     referencias_comerciales: Optional[List[ReferenciaComercial]] = None
     referencias_bancarias: Optional[List[ReferenciaBancaria]] = None
     clasificaciones: Optional[List[str]] = None

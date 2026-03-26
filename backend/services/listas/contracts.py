@@ -26,14 +26,14 @@ class IProveedorListaCautela(Protocol):
     def buscar(
         self,
         nombre: str,
-        numero_id: Optional[str] = None,
+        numero_identificacion: Optional[str] = None,
     ) -> ResultadoListaCautela:
         """
         Busca un nombre e identificación en esta lista.
 
         Args:
-            nombre:    Nombre completo a buscar (normalización interna del proveedor).
-            numero_id: Número de identificación (opcional, si el proveedor lo soporta).
+            nombre:               Nombre completo a buscar (normalización interna).
+            numero_identificacion: Número de identificación (opcional).
 
         Returns:
             ResultadoListaCautela con estado de coincidencia, detalle y nivel de riesgo.
