@@ -1,5 +1,7 @@
 import FileUploadField from '../FileUploadField';
 import AlertasRazonSocial from '../AlertasRazonSocial';
+import AlertasNit from '../AlertasNit';
+import AlertasNombreRepresentante from '../AlertasNombreRepresentante';
 import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
 
 /**
@@ -11,7 +13,7 @@ import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
  */
 export default function PasoDocumentos({
   formData, documentos, onFileChange, onRemoveFile, onOpenHelp, uploadingDoc,
-  alertasRazonSocial,
+  alertasRazonSocial, alertasNit, alertasNombreRepresentante,
 }) {
   return (
     <div className="form-card">
@@ -25,6 +27,8 @@ export default function PasoDocumentos({
       </div>
 
       <AlertasRazonSocial alertas={alertasRazonSocial} />
+      <AlertasNit alertas={alertasNit} />
+      <AlertasNombreRepresentante alertas={alertasNombreRepresentante} />
 
       {DOCUMENTOS_CONFIG
         .filter(d => !d.soloJuridica || formData.tipo_persona !== 'natural')

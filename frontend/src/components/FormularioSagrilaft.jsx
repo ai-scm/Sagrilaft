@@ -35,6 +35,8 @@ export default function FormularioSagrilaft() {
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
     handleBeneficiarioChange, addBeneficiario,
     alertasRazonSocial,
+    alertasNit,
+    alertasNombreRepresentante,
   } = useFormulario();
 
   if (submitted) {
@@ -63,12 +65,14 @@ export default function FormularioSagrilaft() {
             onRemoveFile={handleRemoveFile}
             uploadingDoc={uploadingDoc}
             alertasRazonSocial={alertasRazonSocial}
+            alertasNit={alertasNit}
+            alertasNombreRepresentante={alertasNombreRepresentante}
           />
         )}
 
-        {step === 2 && <PasoInfoBasica {...pasoProps} alertasRazonSocial={alertasRazonSocial} />}
+        {step === 2 && <PasoInfoBasica {...pasoProps} alertasRazonSocial={alertasRazonSocial} alertasNit={alertasNit} />}
 
-        {step === 3 && <PasoRepresentante {...pasoProps} />}
+        {step === 3 && <PasoRepresentante {...pasoProps} alertasNombreRepresentante={alertasNombreRepresentante} />}
 
         {step === 4 && (
           <PasoJuntaAccionistas

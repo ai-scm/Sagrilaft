@@ -204,6 +204,41 @@ class AlertaInconsistenciaNombreResponse(BaseModel):
     mensaje: str
 
 
+class AlertaInconsistenciaNitResponse(BaseModel):
+    """
+    Representa una inconsistencia detectada entre el NIT del formulario
+    y el NIT encontrado en un documento adjunto.
+
+    Presente en DocumentoResponse únicamente cuando hay discrepancia de NIT.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str    # "error"
+    mensaje: str
+
+
+class AlertaInconsistenciaNombreRepresentanteResponse(BaseModel):
+    """
+    Representa una inconsistencia detectada entre el nombre del representante
+    legal en el formulario y el nombre encontrado en un documento adjunto.
+
+    Presente en DocumentoResponse únicamente cuando hay discrepancia de nombre
+    de representante.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str    # "error"
+    mensaje: str
+
+
 class DocumentoResponse(BaseModel):
     id: str
     tipo_documento: str
@@ -215,6 +250,10 @@ class DocumentoResponse(BaseModel):
     campos_sugeridos: Optional[dict] = None
     razon_social_extraida: Optional[str] = None
     alerta_nombre: Optional[AlertaInconsistenciaNombreResponse] = None
+    nit_extraido: Optional[str] = None
+    alerta_nit: Optional[AlertaInconsistenciaNitResponse] = None
+    nombre_representante_extraido: Optional[str] = None
+    alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentanteResponse] = None
 
     class Config:
         from_attributes = True

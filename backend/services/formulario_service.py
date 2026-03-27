@@ -38,6 +38,14 @@ from services.alertas.detector_inconsistencias_nombre import (
     AlertaInconsistenciaNombre,
     DetectorInconsistenciasNombre,
 )
+from services.alertas.detector_inconsistencias_nit import (
+    AlertaInconsistenciaNit,
+    DetectorInconsistenciasNit,
+)
+from services.alertas.detector_inconsistencias_nombre_representante import (
+    AlertaInconsistenciaNombreRepresentante,
+    DetectorInconsistenciasNombreRepresentante,
+)
 from services.contracts import IExtractorIA
 from services.prellenado import mapear_campos_para_formulario
 
@@ -352,18 +360,26 @@ class ResultadoGuardadoDocumento:
     SRP: evita que el router tenga que desempaquetar tuplas con semántica implícita.
 
     Attributes:
-        documento:           Entidad ORM del documento persistido.
-        campos_sugeridos:    Campos del formulario sugeridos por la IA.
+        documento:             Entidad ORM del documento persistido.
+        campos_sugeridos:      Campos del formulario sugeridos por la IA.
         razon_social_extraida: Nombre/razón social encontrada en el documento
                                (None si no aplica o no se extrajo).
-        alerta_nombre:       Alerta de inconsistencia si el nombre del documento
-                             no coincide con el formulario (None si no hay discrepancia).
+        alerta_nombre:         Alerta de inconsistencia si el nombre del documento
+                               no coincide con el formulario (None si no hay discrepancia).
+        nit_extraido:          NIT encontrado en el documento
+                               (None si no aplica o no se extrajo).
+        alerta_nit:            Alerta de inconsistencia si el NIT del documento
+                               no coincide con el formulario (None si no hay discrepancia).
     """
 
     documento: DocumentoAdjunto
     campos_sugeridos: Dict[str, Any]
     razon_social_extraida: Optional[str]
     alerta_nombre: Optional[AlertaInconsistenciaNombre]
+    nit_extraido: Optional[str] = None
+    alerta_nit: Optional[AlertaInconsistenciaNit] = None
+    nombre_representante_extraido: Optional[str] = None
+    alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -392,6 +408,8 @@ class FormularioService:
         self._extractor = extractor
         self._validador_envio = ValidadorEnvioFormulario()
         self._detector_nombres = DetectorInconsistenciasNombre()
+        self._detector_nit = DetectorInconsistenciasNit()
+        self._detector_nombre_representante = DetectorInconsistenciasNombreRepresentante()
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -547,6 +565,10 @@ class FormularioService:
         campos_sugeridos: Dict[str, Any] = {}
         razon_social_extraida: Optional[str] = None
         alerta_nombre: Optional[AlertaInconsistenciaNombre] = None
+        nit_extraido: Optional[str] = None
+        alerta_nit: Optional[AlertaInconsistenciaNit] = None
+        nombre_representante_extraido: Optional[str] = None
+        alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
 
         if extraccion.extraido:
             campos_sugeridos = mapear_campos_para_formulario(
@@ -560,12 +582,35 @@ class FormularioService:
                 datos_extraidos=extraccion.datos,
                 razon_social_formulario=formulario.razon_social,
             )
+            nit_extraido = self._detector_nit.extraer_nit_de_documento(
+                tipo_documento, extraccion.datos
+            )
+            alerta_nit = self._detector_nit.detectar(
+                tipo_documento=tipo_documento,
+                datos_extraidos=extraccion.datos,
+                numero_identificacion_formulario=formulario.numero_identificacion,
+                tipo_identificacion_formulario=formulario.tipo_identificacion,
+            )
+            nombre_representante_extraido = (
+                self._detector_nombre_representante.extraer_nombre_de_documento(
+                    tipo_documento, extraccion.datos
+                )
+            )
+            alerta_nombre_representante = self._detector_nombre_representante.detectar(
+                tipo_documento=tipo_documento,
+                datos_extraidos=extraccion.datos,
+                nombre_representante_formulario=formulario.nombre_representante,
+            )
 
         return ResultadoGuardadoDocumento(
             documento=documento,
             campos_sugeridos=campos_sugeridos,
             razon_social_extraida=razon_social_extraida,
             alerta_nombre=alerta_nombre,
+            nit_extraido=nit_extraido,
+            alerta_nit=alerta_nit,
+            nombre_representante_extraido=nombre_representante_extraido,
+            alerta_nombre_representante=alerta_nombre_representante,
         )
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:

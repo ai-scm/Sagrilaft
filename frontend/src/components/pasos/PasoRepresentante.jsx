@@ -3,6 +3,7 @@ import { City } from 'country-state-city';
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
 import NacionalidadSelect from '../NacionalidadSelect';
+import AlertasNombreRepresentante from '../AlertasNombreRepresentante';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_DOC = [
@@ -24,7 +25,7 @@ const today = new Date().toISOString().split('T')[0];
  * Ciudad de Expedición y Ciudad de Nacimiento son campos de texto libre;
  * no usan selección jerárquica.
  */
-export default function PasoRepresentante({ formData, onChange, onOpenHelp, errors }) {
+export default function PasoRepresentante({ formData, onChange, onOpenHelp, errors, alertasNombreRepresentante }) {
   const esNatural  = formData.tipo_persona === 'natural';
   const defaultPais = formData.pais || '';
 
@@ -62,6 +63,8 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
           onOpenHelp={onOpenHelp} error={errors.nombre_representante}
         />
       </div>
+
+      <AlertasNombreRepresentante alertas={alertasNombreRepresentante} />
 
       <div className="form-row">
         <FormField

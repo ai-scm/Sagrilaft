@@ -15,6 +15,8 @@ from database import get_db
 from dependencies import obtener_extractor
 from models import DocumentoAdjunto
 from schemas import (
+    AlertaInconsistenciaNitResponse,
+    AlertaInconsistenciaNombreRepresentanteResponse,
     AlertaInconsistenciaNombreResponse,
     DocumentoResponse,
     FormularioConDetalles,
@@ -176,6 +178,32 @@ def _construir_respuesta_documento(
             mensaje=a.mensaje,
         )
 
+    alerta_nit_schema = None
+    if resultado.alerta_nit:
+        n = resultado.alerta_nit
+        alerta_nit_schema = AlertaInconsistenciaNitResponse(
+            tipo_documento=n.tipo_documento,
+            nombre_documento=n.nombre_documento,
+            seccion_referencia=n.seccion_referencia,
+            valor_formulario=n.valor_formulario,
+            valor_documento=n.valor_documento,
+            tipo_alerta=n.tipo_alerta,
+            mensaje=n.mensaje,
+        )
+
+    alerta_nombre_representante_schema = None
+    if resultado.alerta_nombre_representante:
+        r = resultado.alerta_nombre_representante
+        alerta_nombre_representante_schema = AlertaInconsistenciaNombreRepresentanteResponse(
+            tipo_documento=r.tipo_documento,
+            nombre_documento=r.nombre_documento,
+            seccion_referencia=r.seccion_referencia,
+            valor_formulario=r.valor_formulario,
+            valor_documento=r.valor_documento,
+            tipo_alerta=r.tipo_alerta,
+            mensaje=r.mensaje,
+        )
+
     doc = resultado.documento
     return DocumentoResponse(
         id=doc.id,
@@ -187,4 +215,8 @@ def _construir_respuesta_documento(
         campos_sugeridos=resultado.campos_sugeridos or None,
         razon_social_extraida=resultado.razon_social_extraida,
         alerta_nombre=alerta_schema,
+        nit_extraido=resultado.nit_extraido,
+        alerta_nit=alerta_nit_schema,
+        nombre_representante_extraido=resultado.nombre_representante_extraido,
+        alerta_nombre_representante=alerta_nombre_representante_schema,
     )

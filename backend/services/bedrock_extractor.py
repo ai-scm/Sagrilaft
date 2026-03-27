@@ -40,6 +40,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - actividades_economicas: lista de códigos CIIU con descripción (array de strings)
 - codigo_ica: código de la actividad principal para el Impuesto de Industria y Comercio (ICA). Búscalo en la sección "CLASIFICACION" → subsección "Actividad Principal" → campo "46. Codigo". Devuelve solo el número, sin texto adicional.
 - tipo_persona: tipo de persona de la sección "CLASIFICACIÓN E INFORMACIÓN BÁSICA DE LA EMPRESA" → pregunta "24. Tipo de contribuyente" → campo "Tipo de Persona". Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
+- nombre_representante: nombre completo del representante legal. Búscalo en la sección "REPRESENTACIÓN" y concatena los campos en este orden: "106. Primer nombre" + "107. Otros nombres" (si existe) + "104. Primer apellido" + "105. Segundo apellido". Devuelve una sola cadena con los valores separados por espacio, omitiendo los que sean nulos.
 - fecha_documento: fecha del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
@@ -67,6 +68,8 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 
     "estados_financieros": """Analiza estos estados financieros y extrae las siguientes cifras del último año reportado:
 - razon_social: nombre o razón social de la empresa que presenta los estados financieros (búscalo en el encabezado o membrete del documento)
+- nit: NIT de la empresa (solo dígitos, sin puntos, guiones ni dígito de verificación). Búscalo en el encabezado, membrete o carátula del documento.
+- nombre_representante: nombre completo del representante legal o firmante principal del documento. Búscalo en la sección de firmas, en el bloque del representante legal, o en la carátula. Si no aparece explícitamente, devuelve null.
 - total_activos: valor numérico del total de activos (solo número, sin separadores)
 - total_pasivos: valor numérico del total de pasivos (solo número)
 - patrimonio: valor numérico del patrimonio neto (solo número)
@@ -95,6 +98,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - tipo_cuenta: tipo de producto (ahorros, corriente, etc.)
 - numero_cuenta: número de cuenta (parcial o completo)
 - titular: nombre del titular de la cuenta
+- nit: NIT del titular (solo dígitos, sin puntos, guiones ni dígito de verificación). Búscalo en el cuerpo de la carta bancaria; puede no estar presente.
 - fecha_documento: fecha de expedición en formato YYYY-MM-DD
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",

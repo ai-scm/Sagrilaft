@@ -14,6 +14,8 @@ import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
 import { useAlertasRazonSocial } from './useAlertasRazonSocial';
+import { useAlertasNit } from './useAlertasNit';
+import { useAlertasNombreRepresentante } from './useAlertasNombreRepresentante';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4,
   validarTablasPaso6, CLAVES_ERROR_PASO6,
@@ -34,6 +36,12 @@ export function useFormulario() {
   const { errors, validarPaso, aplicarErrores, limpiarError } = useFormValidacion(formData);
 
   const { registrarExtraccion, calcularAlertas, limpiarExtraccion } = useAlertasRazonSocial();
+  const { registrarExtraccionNit, calcularAlertasNit, limpiarExtraccionNit } = useAlertasNit();
+  const {
+    registrarExtraccionNombreRepresentante,
+    calcularAlertasNombreRepresentante,
+    limpiarExtraccionNombreRepresentante,
+  } = useAlertasNombreRepresentante();
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -91,6 +99,12 @@ export function useFormulario() {
       if (docRes.razon_social_extraida) {
         registrarExtraccion(tipoDoc, docRes.razon_social_extraida);
       }
+      if (docRes.nit_extraido) {
+        registrarExtraccionNit(tipoDoc, docRes.nit_extraido);
+      }
+      if (docRes.nombre_representante_extraido) {
+        registrarExtraccionNombreRepresentante(tipoDoc, docRes.nombre_representante_extraido);
+      }
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
       }
@@ -109,7 +123,9 @@ export function useFormulario() {
       return updated;
     });
     limpiarExtraccion(tipoDoc);
-  }, [limpiarExtraccion]);
+    limpiarExtraccionNit(tipoDoc);
+    limpiarExtraccionNombreRepresentante(tipoDoc);
+  }, [limpiarExtraccion, limpiarExtraccionNit, limpiarExtraccionNombreRepresentante]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -198,6 +214,14 @@ export function useFormulario() {
     if (step === 1 && alertasRazonSocial.length > 0) {
       newErrors._inconsistencias_nombre =
         'Corrige la razón social en el formulario o reemplaza el archivo adjunto para que los nombres coincidan.';
+    }
+    if (step === 1 && alertasNit.length > 0) {
+      newErrors._inconsistencias_nit =
+        'Corrige el NIT en el formulario o reemplaza el archivo adjunto para que los NITs coincidan.';
+    }
+    if (step === 1 && alertasNombreRepresentante.length > 0) {
+      newErrors._inconsistencias_nombre_representante =
+        'Corrige el nombre del representante en el formulario o reemplaza el archivo adjunto para que los nombres coincidan.';
     }
     if (step === 4) {
       Object.assign(newErrors, validarTablasPaso4({
@@ -288,6 +312,8 @@ export function useFormulario() {
   // ── Alertas de inconsistencia de nombre (reactivas a formData.razon_social) ─
 
   const alertasRazonSocial = calcularAlertas(formData.razon_social);
+  const alertasNit = calcularAlertasNit(formData.numero_identificacion, formData.tipo_identificacion);
+  const alertasNombreRepresentante = calcularAlertasNombreRepresentante(formData.nombre_representante);
 
   // ── Interfaz pública del hook ────────────────────────────────────────────
 
@@ -304,5 +330,7 @@ export function useFormulario() {
     handleAccionistaChange: onAccionistaChange, addAccionista,
     handleBeneficiarioChange: onBeneficiarioChange, addBeneficiario,
     alertasRazonSocial,
+    alertasNit,
+    alertasNombreRepresentante,
   };
 }

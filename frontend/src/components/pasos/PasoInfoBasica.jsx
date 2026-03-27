@@ -1,6 +1,7 @@
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
 import AlertasRazonSocial from '../AlertasRazonSocial';
+import AlertasNit from '../AlertasNit';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_CONTRAPARTE = [
@@ -32,7 +33,7 @@ const HR = () => (
 /**
  * Paso 2 — Clasificación e Información Básica del Sujeto Obligado / Contraparte.
  */
-export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors, alertasRazonSocial }) {
+export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors, alertasRazonSocial, alertasNit }) {
   const {
     paisesOptions, departamentosOptions, ciudadesOptions,
     selectedPais, selectedDepartamento, selectedCiudad,
@@ -90,6 +91,8 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
           onOpenHelp={onOpenHelp} error={errors.numero_identificacion}
         />
       </div>
+
+      <AlertasNit alertas={alertasNit} />
 
       <div className="form-row single">
         <FormField

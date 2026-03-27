@@ -33,7 +33,7 @@ from services.alertas.comparador_razon_social import ComparadorRazonSocial
 _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
     "certificado_existencia": {
         "campo_nombre":      "razon_social",
-        "nombre_legible":    "Certificado de Existencia y Representación Legal",
+        "nombre_legible":    "Revisa los documentos adjuntos",
         "seccion_referencia": (
             "NOMBRE, IDENTIFICACIÓN Y DOMICILIO → Razón social"
         ),
