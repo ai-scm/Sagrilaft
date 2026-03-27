@@ -29,10 +29,6 @@ import { useCallback, useState } from 'react';
 // ── Configuración de documentos monitoreados ──────────────────────────────────
 
 const CONFIG_DOCUMENTOS = {
-  cedula_representante: {
-    nombreLegible:    'Cédula del Representante Legal',
-    seccionReferencia: 'Nombre completo del titular del documento',
-  },
   certificado_existencia: {
     nombreLegible:    'Certificado de Existencia y Representación Legal',
     seccionReferencia: 'REPRESENTANTES LEGALES → NOMBRE',
