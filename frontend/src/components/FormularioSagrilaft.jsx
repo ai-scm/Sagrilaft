@@ -66,7 +66,7 @@ export default function FormularioSagrilaft() {
           />
         )}
 
-        {step === 2 && <PasoInfoBasica {...pasoProps} />}
+        {step === 2 && <PasoInfoBasica {...pasoProps} alertasRazonSocial={alertasRazonSocial} />}
 
         {step === 3 && <PasoRepresentante {...pasoProps} />}
 
