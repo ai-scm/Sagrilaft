@@ -11,7 +11,7 @@ import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
  */
 export default function PasoDocumentos({
   formData, documentos, onFileChange, onRemoveFile, onOpenHelp, uploadingDoc,
-  alertasRazonSocial, onDescartarAlertaRazonSocial,
+  alertasRazonSocial,
 }) {
   return (
     <div className="form-card">
@@ -24,10 +24,7 @@ export default function PasoDocumentos({
         <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo esté correcto).</p>
       </div>
 
-      <AlertasRazonSocial
-        alertas={alertasRazonSocial}
-        onDescartar={onDescartarAlertaRazonSocial}
-      />
+      <AlertasRazonSocial alertas={alertasRazonSocial} />
 
       {DOCUMENTOS_CONFIG
         .filter(d => !d.soloJuridica || formData.tipo_persona !== 'natural')

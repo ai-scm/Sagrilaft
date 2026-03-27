@@ -34,7 +34,7 @@ export default function FormularioSagrilaft() {
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
     handleBeneficiarioChange, addBeneficiario,
-    alertasRazonSocial, descartarAlertaRazonSocial,
+    alertasRazonSocial,
   } = useFormulario();
 
   if (submitted) {
@@ -63,7 +63,6 @@ export default function FormularioSagrilaft() {
             onRemoveFile={handleRemoveFile}
             uploadingDoc={uploadingDoc}
             alertasRazonSocial={alertasRazonSocial}
-            onDescartarAlertaRazonSocial={descartarAlertaRazonSocial}
           />
         )}
 

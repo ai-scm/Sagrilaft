@@ -1,42 +1,50 @@
 /**
  * Hook: useAlertasRazonSocial
  *
- * Gestiona el estado de alertas de inconsistencia entre la razón social
- * del formulario y la encontrada en cada documento adjunto.
+ * Gestiona el estado de inconsistencias de nombre/razón social entre el
+ * formulario y los documentos adjuntos.
  *
  * Responsabilidades:
  *  1. Almacenar la razón social extraída por IA de cada documento.
- *  2. Calcular reactivamente alertas cuando cambia formData.razon_social.
- *  3. Permitir descartar alertas individualmente.
- *  4. Limpiar la extracción si un documento es eliminado.
+ *  2. Calcular reactivamente las alertas activas cada vez que cambia
+ *     formData.razon_social o se sube/elimina un documento.
+ *  3. Limpiar la extracción cuando el usuario elimina un documento.
  *
- * SRP: única responsabilidad — producir la lista de alertas de nombre activas.
- * DRY: la normalización está centralizada en normalizarRazonSocial (espejo del
- *      backend services/alertas/normalizador_nombre.py).
+ * El bloqueo de navegación es responsabilidad de useFormulario (SRP).
+ * Este hook solo decide SI hay inconsistencias — no cómo reaccionar a ellas.
  *
- * La normalización en JS replica la lógica del backend para que la comparación
- * en tiempo real (mientras el usuario escribe) sea consistente con el backend.
+ * SRP : única responsabilidad — computar qué documentos tienen nombre distinto.
+ * DRY : normalización centralizada aquí; espeja backend/services/alertas/normalizador_nombre.py.
+ *
+ * Nota de diseño: no existe "descartar alerta". El usuario debe corregir el
+ * nombre en el formulario o reemplazar el archivo adjunto.
  */
 
 import { useCallback, useState } from 'react';
 
-// ── Nombres legibles por tipo de documento (lenguaje ubícuo) ─────────────────
+// ── Configuración de documentos monitoreados (lenguaje ubícuo) ────────────────
 
-const NOMBRES_DOCUMENTOS = {
-  certificado_existencia: 'Certificado de Existencia y Representación Legal',
-  rut:                    'RUT (Registro Único Tributario)',
-  estados_financieros:    'Estados Financieros',
-  referencias_bancarias:  'Referencias Bancarias',
-};
-
-const SECCIONES_REFERENCIA = {
-  certificado_existencia: 'NOMBRE, IDENTIFICACIÓN Y DOMICILIO → Razón social',
-  rut:                    'IDENTIFICACIÓN → campo 35. Razón social',
-  estados_financieros:    'Encabezado del documento (razón social del emisor)',
-  referencias_bancarias:  'Nombre del titular de la cuenta',
+const CONFIG_DOCUMENTOS = {
+  certificado_existencia: {
+    nombreLegible:    'Certificado de Existencia y Representación Legal',
+    seccionReferencia: 'NOMBRE, IDENTIFICACIÓN Y DOMICILIO → Razón social',
+  },
+  rut: {
+    nombreLegible:    'RUT (Registro Único Tributario)',
+    seccionReferencia: 'IDENTIFICACIÓN → campo 35. Razón social',
+  },
+  estados_financieros: {
+    nombreLegible:    'Estados Financieros',
+    seccionReferencia: 'Encabezado del documento (razón social del emisor)',
+  },
+  referencias_bancarias: {
+    nombreLegible:    'Referencias Bancarias',
+    seccionReferencia: 'Nombre del titular de la cuenta',
+  },
 };
 
 // ── Normalización (espejo de backend/services/alertas/normalizador_nombre.py) ─
+// DRY dentro del frontend: una sola función de normalización usada en calcularAlertas.
 
 const SIGLAS_SOCIETARIAS = [
   [/SOCIEDAD POR ACCIONES SIMPLIFICADA/g, 'SAS'],
@@ -57,79 +65,48 @@ const SIGLAS_SOCIETARIAS = [
   [/E\.S\.P\.?/g,  'ESP'],
   [/CÍA\.?/g,      'CIA'],
   [/CIA\.?/g,      'CIA'],
-  [/CO\.?/g,       'CO'],
 ];
 
 function normalizarRazonSocial(valor) {
   if (!valor) return '';
-
-  // 1. Quitar diacríticos
-  let texto = valor
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-
-  // 2. Mayúsculas
+  let texto = valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   texto = texto.toUpperCase();
-
-  // 3. Normalizar siglas societarias (primero formas largas)
   for (const [patron, canonica] of SIGLAS_SOCIETARIAS) {
     texto = texto.replace(patron, canonica);
   }
-
-  // 4. Eliminar puntos residuales
-  texto = texto.replace(/\./g, '');
-
-  // 5. Colapsar espacios
-  texto = texto.replace(/\s+/g, ' ').trim();
-
-  return texto;
+  return texto.replace(/\./g, '').replace(/\s+/g, ' ').trim();
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
- * @returns {{
- *   registrarExtraccion: (tipoDoc: string, razonSocialExtraida: string) => void,
- *   calcularAlertas:     (razonSocialFormulario: string) => AlertaInconsistencia[],
- *   descartarAlerta:     (tipoDoc: string) => void,
- *   limpiarExtraccion:   (tipoDoc: string) => void,
- * }}
- *
  * @typedef {{
- *   tipoDoc:         string,
- *   nombreDocumento: string,
+ *   tipoDoc:          string,
+ *   nombreDocumento:  string,
  *   seccionReferencia: string,
- *   valorFormulario: string,
- *   valorDocumento:  string,
+ *   valorFormulario:  string,
+ *   valorDocumento:   string,
  * }} AlertaInconsistencia
  */
+
 export function useAlertasRazonSocial() {
-  // Razón social extraída por IA, indexada por tipo de documento
+  /** Razón social extraída por IA, indexada por tipo de documento. */
   const [razonSocialPorDocumento, setRazonSocialPorDocumento] = useState({});
 
-  // Tipos de documento cuya alerta fue descartada manualmente por el usuario
-  const [alertasDescartadas, setAlertasDescartadas] = useState(new Set());
-
   /**
-   * Registra la razón social extraída de un documento recién subido.
-   * Reactiva la alerta si el mismo documento es reemplazado.
+   * Registra la razón social extraída tras cada carga de documento.
+   * Llamar desde handleFileChange después de recibir razon_social_extraida.
    */
   const registrarExtraccion = useCallback((tipoDoc, razonSocialExtraida) => {
     if (!razonSocialExtraida) return;
     setRazonSocialPorDocumento(prev => ({ ...prev, [tipoDoc]: razonSocialExtraida }));
-    // Reactivar alerta del documento ante una nueva carga
-    setAlertasDescartadas(prev => {
-      const siguiente = new Set(prev);
-      siguiente.delete(tipoDoc);
-      return siguiente;
-    });
   }, []);
 
   /**
    * Calcula las alertas activas comparando cada extracción con la razón social
-   * actual del formulario. Llamar en cada render pasando formData.razon_social.
+   * actual del formulario. Invocado en cada render desde useFormulario.
    *
-   * @param {string} razonSocialFormulario - Valor actual del campo razon_social.
+   * @param {string | undefined} razonSocialFormulario
    * @returns {AlertaInconsistencia[]}
    */
   const calcularAlertas = useCallback(
@@ -139,33 +116,27 @@ export function useAlertasRazonSocial() {
       const normForm = normalizarRazonSocial(razonSocialFormulario);
 
       return Object.entries(razonSocialPorDocumento)
-        .filter(([tipoDoc]) => !alertasDescartadas.has(tipoDoc))
         .map(([tipoDoc, razonSocialDoc]) => {
           const normDoc = normalizarRazonSocial(razonSocialDoc);
           if (!normDoc || normForm === normDoc) return null;
+
+          const config = CONFIG_DOCUMENTOS[tipoDoc];
           return {
             tipoDoc,
-            nombreDocumento:  NOMBRES_DOCUMENTOS[tipoDoc]    || tipoDoc,
-            seccionReferencia: SECCIONES_REFERENCIA[tipoDoc] || '',
-            valorFormulario:  razonSocialFormulario,
-            valorDocumento:   razonSocialDoc,
+            nombreDocumento:   config?.nombreLegible    ?? tipoDoc,
+            seccionReferencia: config?.seccionReferencia ?? '',
+            valorFormulario:   razonSocialFormulario,
+            valorDocumento:    razonSocialDoc,
           };
         })
         .filter(Boolean);
     },
-    [razonSocialPorDocumento, alertasDescartadas],
+    [razonSocialPorDocumento],
   );
 
   /**
-   * Marca una alerta como descartada. No borra la extracción almacenada:
-   * si el usuario corrige el nombre, la alerta desaparece sola por recálculo.
-   */
-  const descartarAlerta = useCallback((tipoDoc) => {
-    setAlertasDescartadas(prev => new Set([...prev, tipoDoc]));
-  }, []);
-
-  /**
-   * Elimina la extracción de un documento (cuando el documento es borrado).
+   * Elimina la extracción almacenada de un documento.
+   * Llamar desde handleRemoveFile cuando el usuario borra un adjunto.
    */
   const limpiarExtraccion = useCallback((tipoDoc) => {
     setRazonSocialPorDocumento(prev => {
@@ -173,17 +144,7 @@ export function useAlertasRazonSocial() {
       delete siguiente[tipoDoc];
       return siguiente;
     });
-    setAlertasDescartadas(prev => {
-      const siguiente = new Set(prev);
-      siguiente.delete(tipoDoc);
-      return siguiente;
-    });
   }, []);
 
-  return {
-    registrarExtraccion,
-    calcularAlertas,
-    descartarAlerta,
-    limpiarExtraccion,
-  };
+  return { registrarExtraccion, calcularAlertas, limpiarExtraccion };
 }

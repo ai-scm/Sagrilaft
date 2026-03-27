@@ -33,12 +33,7 @@ export function useFormulario() {
 
   const { errors, validarPaso, aplicarErrores, limpiarError } = useFormValidacion(formData);
 
-  const {
-    registrarExtraccion,
-    calcularAlertas,
-    descartarAlerta: descartarAlertaRazonSocial,
-    limpiarExtraccion,
-  } = useAlertasRazonSocial();
+  const { registrarExtraccion, calcularAlertas, limpiarExtraccion } = useAlertasRazonSocial();
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -200,6 +195,10 @@ export function useFormulario() {
 
   const handleNext = () => {
     const newErrors = validarPaso(step);
+    if (step === 1 && alertasRazonSocial.length > 0) {
+      newErrors._inconsistencias_nombre =
+        'Corrige la razón social en el formulario o reemplaza el archivo adjunto para que los nombres coincidan.';
+    }
     if (step === 4) {
       Object.assign(newErrors, validarTablasPaso4({
         juntaDirectiva, accionistas, beneficiarios,
@@ -305,6 +304,5 @@ export function useFormulario() {
     handleAccionistaChange: onAccionistaChange, addAccionista,
     handleBeneficiarioChange: onBeneficiarioChange, addBeneficiario,
     alertasRazonSocial,
-    descartarAlertaRazonSocial,
   };
 }
