@@ -23,13 +23,13 @@ export function useFormPersistencia(
   const {
     formData, step, formularioId, codigoPeticion,
     juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-    infoBancariaPagos,
+    infoBancariaPagos, documentos,
   } = snapshot;
 
   const {
     setFormData, setStep, setFormularioId, setCodigoPeticion,
     setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias,
-    setInfoBancariaPagos,
+    setInfoBancariaPagos, setDocumentos,
   } = setters;
 
   const [lastSaved, setLastSaved] = useState(null);
@@ -58,6 +58,7 @@ export function useFormPersistencia(
         setReferenciasComerciales(borrador.referenciasComerciales || [{}, {}]);
         setReferenciasBancarias(borrador.referenciasBancarias || [{}, {}]);
         setInfoBancariaPagos(borrador.infoBancariaPagos || [{}, {}]);
+        setDocumentos(borrador.documentos || {});
       }
     } catch (_) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,7 +71,7 @@ export function useFormPersistencia(
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         formData, step, formularioId, codigoPeticion,
         juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-        infoBancariaPagos,
+        infoBancariaPagos, documentos,
         savedAt: new Date().toISOString(),
       }));
       if (formularioId) {
@@ -82,7 +83,7 @@ export function useFormPersistencia(
     }, INTERVALO_AUTOSAVE_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos]);
+  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
 
   const limpiarBorrador = () => localStorage.removeItem(STORAGE_KEY);
 
@@ -90,7 +91,7 @@ export function useFormPersistencia(
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       formData, step, formularioId, codigoPeticion,
       juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-      infoBancariaPagos,
+      infoBancariaPagos, documentos,
       savedAt: new Date().toISOString(),
     }));
   };

@@ -13,6 +13,7 @@ import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
+import { useAlertasRazonSocial } from './useAlertasRazonSocial';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4,
   validarTablasPaso6, CLAVES_ERROR_PASO6,
@@ -31,6 +32,13 @@ export function useFormulario() {
   const [submitted, setSubmitted] = useState(false);
 
   const { errors, validarPaso, aplicarErrores, limpiarError } = useFormValidacion(formData);
+
+  const {
+    registrarExtraccion,
+    calcularAlertas,
+    descartarAlerta: descartarAlertaRazonSocial,
+    limpiarExtraccion,
+  } = useAlertasRazonSocial();
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -59,8 +67,8 @@ export function useFormulario() {
   });
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
-    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos },
-    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias, setInfoBancariaPagos },
+    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
+    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias, setInfoBancariaPagos, setDocumentos },
     _buildPayload,
   );
 
@@ -85,6 +93,9 @@ export function useFormulario() {
       }
       const docRes = await api.subirDocumento(currentId, tipoDoc, file);
       setDocumentos(prev => ({ ...prev, [tipoDoc]: docRes }));
+      if (docRes.razon_social_extraida) {
+        registrarExtraccion(tipoDoc, docRes.razon_social_extraida);
+      }
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
       }
@@ -102,7 +113,8 @@ export function useFormulario() {
       delete updated[tipoDoc];
       return updated;
     });
-  }, []);
+    limpiarExtraccion(tipoDoc);
+  }, [limpiarExtraccion]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -274,6 +286,10 @@ export function useFormulario() {
     setSaving(false);
   };
 
+  // ── Alertas de inconsistencia de nombre (reactivas a formData.razon_social) ─
+
+  const alertasRazonSocial = calcularAlertas(formData.razon_social);
+
   // ── Interfaz pública del hook ────────────────────────────────────────────
 
   return {
@@ -288,5 +304,7 @@ export function useFormulario() {
     handleJuntaChange: onJuntaChange, addJuntaMember,
     handleAccionistaChange: onAccionistaChange, addAccionista,
     handleBeneficiarioChange: onBeneficiarioChange, addBeneficiario,
+    alertasRazonSocial,
+    descartarAlertaRazonSocial,
   };
 }

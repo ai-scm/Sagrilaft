@@ -19,8 +19,9 @@ DRY: Consultas BD centralizadas en _buscar_formulario_o_404 y
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -32,6 +33,10 @@ from schemas import (
     FormularioCreate,
     FormularioUpdate,
     ResultadoValidacionEnvio,
+)
+from services.alertas.detector_inconsistencias_nombre import (
+    AlertaInconsistenciaNombre,
+    DetectorInconsistenciasNombre,
 )
 from services.contracts import IExtractorIA
 from services.prellenado import mapear_campos_para_formulario
@@ -46,11 +51,11 @@ DIRECTORIO_UPLOADS: Path = Path(__file__).parent.parent / "uploads"
 # Campos que se almacenan como JSON string en la BD
 _CAMPOS_JSON_ESCRITURA: List[str] = [
     "junta_directiva", "accionistas", "beneficiario_final",
-    "referencias_comerciales", "referencias_bancarias", "clasificaciones",
+    "referencias_comerciales", "referencias_bancarias", "informacion_bancaria_pagos", "clasificaciones",
 ]
 _CAMPOS_JSON_LECTURA: List[str] = [
     "junta_directiva", "accionistas", "beneficiario_final",
-    "referencias_comerciales", "referencias_bancarias", "clasificaciones",
+    "referencias_comerciales", "referencias_bancarias", "informacion_bancaria_pagos", "clasificaciones",
     "tipos_transaccion",
 ]
 
@@ -336,6 +341,32 @@ class ValidadorEnvioFormulario:
 
 
 # ═══════════════════════════════════════════════════════════════
+# Resultado de guardado de documento (Value Object)
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class ResultadoGuardadoDocumento:
+    """
+    Encapsula todo lo que produce guardar_documento en un único objeto.
+
+    SRP: evita que el router tenga que desempaquetar tuplas con semántica implícita.
+
+    Attributes:
+        documento:           Entidad ORM del documento persistido.
+        campos_sugeridos:    Campos del formulario sugeridos por la IA.
+        razon_social_extraida: Nombre/razón social encontrada en el documento
+                               (None si no aplica o no se extrajo).
+        alerta_nombre:       Alerta de inconsistencia si el nombre del documento
+                             no coincide con el formulario (None si no hay discrepancia).
+    """
+
+    documento: DocumentoAdjunto
+    campos_sugeridos: Dict[str, Any]
+    razon_social_extraida: Optional[str]
+    alerta_nombre: Optional[AlertaInconsistenciaNombre]
+
+
+# ═══════════════════════════════════════════════════════════════
 # Servicio principal
 # ═══════════════════════════════════════════════════════════════
 
@@ -360,6 +391,7 @@ class FormularioService:
         self._sesion = sesion
         self._extractor = extractor
         self._validador_envio = ValidadorEnvioFormulario()
+        self._detector_nombres = DetectorInconsistenciasNombre()
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -469,9 +501,10 @@ class FormularioService:
         contenido_bytes: bytes,
         nombre_archivo: str,
         content_type: str,
-    ) -> Tuple[DocumentoAdjunto, Dict[str, Any]]:
+    ) -> ResultadoGuardadoDocumento:
         """
-        Guarda un documento en disco y en BD, luego extrae datos con IA.
+        Guarda un documento en disco y en BD, extrae datos con IA y detecta
+        inconsistencias de nombre con respecto al formulario.
 
         Flujo event-driven: cada carga dispara UNA sola llamada al extractor
         para el tipo_documento recibido, sin iterar sobre otros documentos.
@@ -484,7 +517,8 @@ class FormularioService:
             content_type:    MIME type del archivo.
 
         Returns:
-            Tupla (DocumentoAdjunto guardado, dict de campos_sugeridos).
+            ResultadoGuardadoDocumento con documento, campos_sugeridos,
+            razon_social_extraida y alerta_nombre (si hay inconsistencia).
 
         Raises:
             HTTPException 404 si el formulario no existe.
@@ -507,10 +541,32 @@ class FormularioService:
             content_type=content_type,
             tamano=len(contenido_bytes),
         )
-        campos_sugeridos = await self._extraer_campos_sugeridos(
-            str(ruta_archivo), tipo_documento
+
+        extraccion = await self._extractor.extraer(str(ruta_archivo), tipo_documento)
+
+        campos_sugeridos: Dict[str, Any] = {}
+        razon_social_extraida: Optional[str] = None
+        alerta_nombre: Optional[AlertaInconsistenciaNombre] = None
+
+        if extraccion.extraido:
+            campos_sugeridos = mapear_campos_para_formulario(
+                tipo_documento, extraccion.datos
+            )
+            razon_social_extraida = self._detector_nombres.extraer_nombre_de_documento(
+                tipo_documento, extraccion.datos
+            )
+            alerta_nombre = self._detector_nombres.detectar(
+                tipo_documento=tipo_documento,
+                datos_extraidos=extraccion.datos,
+                razon_social_formulario=formulario.razon_social,
+            )
+
+        return ResultadoGuardadoDocumento(
+            documento=documento,
+            campos_sugeridos=campos_sugeridos,
+            razon_social_extraida=razon_social_extraida,
+            alerta_nombre=alerta_nombre,
         )
-        return documento, campos_sugeridos
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
         """
@@ -708,15 +764,6 @@ class FormularioService:
         self._sesion.commit()
         self._sesion.refresh(documento)
         return documento
-
-    async def _extraer_campos_sugeridos(
-        self, ruta_archivo: str, tipo_documento: str
-    ) -> Dict[str, Any]:
-        """Extrae datos con IA y los mapea a campos del formulario."""
-        extraccion = await self._extractor.extraer(ruta_archivo, tipo_documento)
-        if not extraccion.extraido:
-            return {}
-        return mapear_campos_para_formulario(tipo_documento, extraccion.datos)
 
     @staticmethod
     def _documentos_a_respuesta(

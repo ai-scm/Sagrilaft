@@ -30,8 +30,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 def _normalizar_tipo_persona(valor: Any) -> Optional[str]:
     """
-    Normaliza el campo "Tipo de Persona" a uno de los dos valores canónicos:
-    "Persona Jurídica" o "Persona Natural".
+    Normaliza el campo "Tipo de Persona" a los valores que usa el select del formulario:
+    "juridica" o "natural".
 
     Aplica a RUT (sección 24) y Certificado de Existencia.
     """
@@ -41,9 +41,9 @@ def _normalizar_tipo_persona(valor: Any) -> Optional[str]:
     texto = re.sub(r'\s+', ' ', str(valor)).strip().upper()
 
     if 'JURIDICA' in texto or 'JURÍDICA' in texto:
-        return 'Persona Jurídica'
+        return 'juridica'
     if 'NATURAL' in texto:
-        return 'Persona Natural'
+        return 'natural'
 
     return None
 

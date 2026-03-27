@@ -66,6 +66,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
     "estados_financieros": """Analiza estos estados financieros y extrae las siguientes cifras del último año reportado:
+- razon_social: nombre o razón social de la empresa que presenta los estados financieros (búscalo en el encabezado o membrete del documento)
 - total_activos: valor numérico del total de activos (solo número, sin separadores)
 - total_pasivos: valor numérico del total de pasivos (solo número)
 - patrimonio: valor numérico del patrimonio neto (solo número)

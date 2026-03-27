@@ -15,6 +15,7 @@ from database import get_db
 from dependencies import obtener_extractor
 from models import DocumentoAdjunto
 from schemas import (
+    AlertaInconsistenciaNombreResponse,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -23,7 +24,7 @@ from schemas import (
     ResultadoValidacionEnvio,
 )
 from services.contracts import IExtractorIA
-from services.formulario_service import FormularioService
+from services.formulario_service import FormularioService, ResultadoGuardadoDocumento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
@@ -93,14 +94,14 @@ async def subir_documento(
     para el tipo_documento recibido, sin iterar sobre otros documentos.
     """
     contenido = await archivo.read()
-    documento, campos_sugeridos = await servicio.guardar_documento(
+    resultado = await servicio.guardar_documento(
         formulario_id=formulario_id,
         tipo_documento=tipo_documento,
         contenido_bytes=contenido,
         nombre_archivo=archivo.filename,
         content_type=archivo.content_type,
     )
-    return _construir_respuesta_documento(documento, campos_sugeridos)
+    return _construir_respuesta_documento(resultado)
 
 
 @enrutador.delete("/{formulario_id}/documentos/{doc_id}")
@@ -155,16 +156,35 @@ async def prellenar_todos_documentos(
 # ─── Helpers privados ────────────────────────────────────────────────────────
 
 def _construir_respuesta_documento(
-    documento: DocumentoAdjunto,
-    campos_sugeridos: dict,
+    resultado: ResultadoGuardadoDocumento,
 ) -> DocumentoResponse:
-    """Construye un DocumentoResponse a partir del modelo ORM y los campos sugeridos."""
+    """
+    Construye un DocumentoResponse a partir de ResultadoGuardadoDocumento.
+
+    SRP: única responsabilidad — serializar el resultado del servicio al schema HTTP.
+    """
+    alerta_schema = None
+    if resultado.alerta_nombre:
+        a = resultado.alerta_nombre
+        alerta_schema = AlertaInconsistenciaNombreResponse(
+            tipo_documento=a.tipo_documento,
+            nombre_documento=a.nombre_documento,
+            seccion_referencia=a.seccion_referencia,
+            valor_formulario=a.valor_formulario,
+            valor_documento=a.valor_documento,
+            tipo_alerta=a.tipo_alerta,
+            mensaje=a.mensaje,
+        )
+
+    doc = resultado.documento
     return DocumentoResponse(
-        id=documento.id,
-        tipo_documento=documento.tipo_documento,
-        nombre_archivo=documento.nombre_archivo,
-        content_type=documento.content_type,
-        tamano=documento.tamano,
-        created_at=documento.created_at,
-        campos_sugeridos=campos_sugeridos if campos_sugeridos else None,
+        id=doc.id,
+        tipo_documento=doc.tipo_documento,
+        nombre_archivo=doc.nombre_archivo,
+        content_type=doc.content_type,
+        tamano=doc.tamano,
+        created_at=doc.created_at,
+        campos_sugeridos=resultado.campos_sugeridos or None,
+        razon_social_extraida=resultado.razon_social_extraida,
+        alerta_nombre=alerta_schema,
     )

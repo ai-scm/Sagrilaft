@@ -1,12 +1,17 @@
 import FileUploadField from '../FileUploadField';
+import AlertasRazonSocial from '../AlertasRazonSocial';
 import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
 
 /**
  * Paso 1 — Documentos Adjuntos.
- * Renderiza los campos de carga según el tipo de persona.
+ *
+ * Renderiza los campos de carga según el tipo de persona y muestra alertas
+ * de inconsistencia cuando la razón social extraída de un documento no coincide
+ * con la ingresada en el formulario.
  */
 export default function PasoDocumentos({
   formData, documentos, onFileChange, onRemoveFile, onOpenHelp, uploadingDoc,
+  alertasRazonSocial, onDescartarAlertaRazonSocial,
 }) {
   return (
     <div className="form-card">
@@ -16,8 +21,13 @@ export default function PasoDocumentos({
       </p>
 
       <div className="info-box">
-        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo este correcto).</p>
+        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo esté correcto).</p>
       </div>
+
+      <AlertasRazonSocial
+        alertas={alertasRazonSocial}
+        onDescartar={onDescartarAlertaRazonSocial}
+      />
 
       {DOCUMENTOS_CONFIG
         .filter(d => !d.soloJuridica || formData.tipo_persona !== 'natural')

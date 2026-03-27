@@ -864,6 +864,109 @@ body {
 }
 
 /* ========================================
+   Alertas de inconsistencia de nombre/razón social
+   ======================================== */
+
+.alertas-razon-social {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.alerta-inconsistencia {
+  background: var(--warning-light);
+  border-left: 4px solid var(--warning);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+
+.alerta-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.alerta-icono {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.alerta-titulo {
+  flex: 1;
+  font-size: 0.88rem;
+  color: var(--gray-800);
+}
+
+.alerta-btn-descartar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.alerta-btn-descartar:hover {
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--gray-700);
+}
+
+.alerta-descripcion {
+  font-size: 0.82rem;
+  color: var(--gray-700);
+  margin: 0 0 10px;
+}
+
+.alerta-valores {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.alerta-valor-fila {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.alerta-etiqueta {
+  font-weight: 600;
+  color: var(--gray-600);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.alerta-valor {
+  font-family: monospace;
+  font-size: 0.82rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.alerta-valor--formulario {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.alerta-valor--documento {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.alerta-referencia {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin: 0;
+}
+
+/* ========================================
    Responsive
    ======================================== */
 

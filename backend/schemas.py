@@ -187,6 +187,23 @@ class FormularioResponse(FormularioBase):
         return v
 
 
+class AlertaInconsistenciaNombreResponse(BaseModel):
+    """
+    Representa una inconsistencia detectada entre el nombre del formulario
+    y el nombre encontrado en un documento adjunto.
+
+    Presente en DocumentoResponse únicamente cuando hay discrepancia.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str    # "error"
+    mensaje: str
+
+
 class DocumentoResponse(BaseModel):
     id: str
     tipo_documento: str
@@ -194,8 +211,10 @@ class DocumentoResponse(BaseModel):
     content_type: Optional[str] = None
     tamano: Optional[int] = None
     created_at: datetime
-    # Presente solo en el response del upload, nulo en listados
+    # Presentes solo en el response del upload, nulos en listados
     campos_sugeridos: Optional[dict] = None
+    razon_social_extraida: Optional[str] = None
+    alerta_nombre: Optional[AlertaInconsistenciaNombreResponse] = None
 
     class Config:
         from_attributes = True
