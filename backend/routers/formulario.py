@@ -15,6 +15,7 @@ from database import get_db
 from dependencies import obtener_extractor
 from models import DocumentoAdjunto
 from schemas import (
+    AlertaInconsistenciaDireccionResponse,
     AlertaInconsistenciaNitResponse,
     AlertaInconsistenciaNombreRepresentanteResponse,
     AlertaInconsistenciaNombreResponse,
@@ -158,6 +159,21 @@ async def prellenar_todos_documentos(
 
 # ─── Helpers privados ────────────────────────────────────────────────────────
 
+def _serializar_alerta_direccion(alerta) -> AlertaInconsistenciaDireccionResponse | None:
+    """Serializa AlertaInconsistenciaDireccion al schema HTTP."""
+    if not alerta:
+        return None
+    return AlertaInconsistenciaDireccionResponse(
+        tipo_documento=alerta.tipo_documento,
+        nombre_documento=alerta.nombre_documento,
+        seccion_referencia=alerta.seccion_referencia,
+        valor_formulario=alerta.valor_formulario,
+        valor_documento=alerta.valor_documento,
+        tipo_alerta=alerta.tipo_alerta,
+        mensaje=alerta.mensaje,
+    )
+
+
 def _construir_respuesta_documento(
     resultado: ResultadoGuardadoDocumento,
 ) -> DocumentoResponse:
@@ -235,4 +251,6 @@ def _construir_respuesta_documento(
         alerta_nombre_representante=alerta_nombre_representante_schema,
         numero_doc_representante_extraido=resultado.numero_doc_representante_extraido,
         alerta_numero_doc_representante=alerta_numero_doc_representante_schema,
+        direccion_extraida=resultado.direccion_extraida,
+        alerta_direccion=_serializar_alerta_direccion(resultado.alerta_direccion),
     )

@@ -38,6 +38,7 @@ export default function FormularioSagrilaft() {
     alertasNit,
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
+    alertasDireccion,
   } = useFormulario();
 
   if (submitted) {
@@ -69,10 +70,11 @@ export default function FormularioSagrilaft() {
             alertasNit={alertasNit}
             alertasNombreRepresentante={alertasNombreRepresentante}
             alertasNumeroDocRepresentante={alertasNumeroDocRepresentante}
+            alertasDireccion={alertasDireccion}
           />
         )}
 
-        {step === 2 && <PasoInfoBasica {...pasoProps} alertasRazonSocial={alertasRazonSocial} alertasNit={alertasNit} />}
+        {step === 2 && <PasoInfoBasica {...pasoProps} alertasRazonSocial={alertasRazonSocial} alertasNit={alertasNit} alertasDireccion={alertasDireccion} />}
 
         {step === 3 && <PasoRepresentante {...pasoProps} alertasNombreRepresentante={alertasNombreRepresentante} alertasNumeroDocRepresentante={alertasNumeroDocRepresentante} />}
 

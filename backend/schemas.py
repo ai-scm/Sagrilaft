@@ -239,6 +239,23 @@ class AlertaInconsistenciaNombreRepresentanteResponse(BaseModel):
     mensaje: str
 
 
+class AlertaInconsistenciaDireccionResponse(BaseModel):
+    """
+    Representa una inconsistencia detectada entre la dirección del formulario
+    y la dirección encontrada en un documento adjunto.
+
+    Presente en DocumentoResponse únicamente cuando hay discrepancia de dirección.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str    # "error"
+    mensaje: str
+
+
 class AlertaInconsistenciaNumeroDocRepresentanteResponse(BaseModel):
     """
     Representa una inconsistencia detectada entre el número de documento del
@@ -274,6 +291,8 @@ class DocumentoResponse(BaseModel):
     alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentanteResponse] = None
     numero_doc_representante_extraido: Optional[str] = None
     alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentanteResponse] = None
+    direccion_extraida: Optional[str] = None
+    alerta_direccion: Optional[AlertaInconsistenciaDireccionResponse] = None
 
     class Config:
         from_attributes = True

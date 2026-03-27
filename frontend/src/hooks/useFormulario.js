@@ -17,6 +17,7 @@ import { useAlertasRazonSocial } from './useAlertasRazonSocial';
 import { useAlertasNit } from './useAlertasNit';
 import { useAlertasNombreRepresentante } from './useAlertasNombreRepresentante';
 import { useAlertasNumeroDocRepresentante } from './useAlertasNumeroDocRepresentante';
+import { useAlertasDireccion } from './useAlertasDireccion';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4,
   validarTablasPaso6, CLAVES_ERROR_PASO6,
@@ -49,6 +50,12 @@ export function useFormulario() {
     calcularAlertasNumeroDocRepresentante,
     limpiarExtraccionNumeroDocRepresentante,
   } = useAlertasNumeroDocRepresentante();
+
+  const {
+    registrarExtraccionDireccion,
+    calcularAlertasDireccion,
+    limpiarExtraccionDireccion,
+  } = useAlertasDireccion();
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -115,6 +122,9 @@ export function useFormulario() {
       if (docRes.numero_doc_representante_extraido) {
         registrarExtraccionNumeroDocRepresentante(tipoDoc, docRes.numero_doc_representante_extraido);
       }
+      if (docRes.direccion_extraida) {
+        registrarExtraccionDireccion(tipoDoc, docRes.direccion_extraida);
+      }
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
       }
@@ -136,7 +146,8 @@ export function useFormulario() {
     limpiarExtraccionNit(tipoDoc);
     limpiarExtraccionNombreRepresentante(tipoDoc);
     limpiarExtraccionNumeroDocRepresentante(tipoDoc);
-  }, [limpiarExtraccion, limpiarExtraccionNit, limpiarExtraccionNombreRepresentante, limpiarExtraccionNumeroDocRepresentante]);
+    limpiarExtraccionDireccion(tipoDoc);
+  }, [limpiarExtraccion, limpiarExtraccionNit, limpiarExtraccionNombreRepresentante, limpiarExtraccionNumeroDocRepresentante, limpiarExtraccionDireccion]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -238,6 +249,10 @@ export function useFormulario() {
       newErrors._inconsistencias_numero_doc_representante =
         'Corrige el No. de Identificación del representante en el formulario o reemplaza el archivo adjunto para que los números coincidan.';
     }
+    if (step === 1 && alertasDireccion.length > 0) {
+      newErrors._inconsistencias_direccion =
+        'Corrige la dirección en el formulario o reemplaza el archivo adjunto para que las direcciones coincidan.';
+    }
     if (step === 4) {
       Object.assign(newErrors, validarTablasPaso4({
         juntaDirectiva, accionistas, beneficiarios,
@@ -330,6 +345,7 @@ export function useFormulario() {
   const alertasNit = calcularAlertasNit(formData.numero_identificacion, formData.tipo_identificacion);
   const alertasNombreRepresentante = calcularAlertasNombreRepresentante(formData.nombre_representante);
   const alertasNumeroDocRepresentante = calcularAlertasNumeroDocRepresentante(formData.numero_doc_representante);
+  const alertasDireccion = calcularAlertasDireccion(formData.direccion);
 
   // ── Interfaz pública del hook ────────────────────────────────────────────
 
@@ -349,5 +365,6 @@ export function useFormulario() {
     alertasNit,
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
+    alertasDireccion,
   };
 }

@@ -50,6 +50,10 @@ from services.alertas.detector_inconsistencias_numero_doc_representante import (
     AlertaInconsistenciaNumeroDocRepresentante,
     DetectorInconsistenciasNumeroDocRepresentante,
 )
+from services.alertas.detector_inconsistencias_direccion import (
+    AlertaInconsistenciaDireccion,
+    DetectorInconsistenciasDireccion,
+)
 from services.contracts import IExtractorIA
 from services.prellenado import mapear_campos_para_formulario
 
@@ -392,6 +396,8 @@ class ResultadoGuardadoDocumento:
     alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
     numero_doc_representante_extraido: Optional[str] = None
     alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
+    direccion_extraida: Optional[str] = None
+    alerta_direccion: Optional[AlertaInconsistenciaDireccion] = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -423,6 +429,7 @@ class FormularioService:
         self._detector_nit = DetectorInconsistenciasNit()
         self._detector_nombre_representante = DetectorInconsistenciasNombreRepresentante()
         self._detector_numero_doc_representante = DetectorInconsistenciasNumeroDocRepresentante()
+        self._detector_direccion = DetectorInconsistenciasDireccion()
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -584,6 +591,8 @@ class FormularioService:
         alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
         numero_doc_representante_extraido: Optional[str] = None
         alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
+        direccion_extraida: Optional[str] = None
+        alerta_direccion: Optional[AlertaInconsistenciaDireccion] = None
 
         if extraccion.extraido:
             campos_sugeridos = mapear_campos_para_formulario(
@@ -626,6 +635,14 @@ class FormularioService:
                 datos_extraidos=extraccion.datos,
                 numero_doc_representante_formulario=formulario.numero_doc_representante,
             )
+            direccion_extraida = self._detector_direccion.extraer_direccion_de_documento(
+                tipo_documento, extraccion.datos
+            )
+            alerta_direccion = self._detector_direccion.detectar(
+                tipo_documento=tipo_documento,
+                datos_extraidos=extraccion.datos,
+                direccion_formulario=formulario.direccion,
+            )
 
         return ResultadoGuardadoDocumento(
             documento=documento,
@@ -638,6 +655,8 @@ class FormularioService:
             alerta_nombre_representante=alerta_nombre_representante,
             numero_doc_representante_extraido=numero_doc_representante_extraido,
             alerta_numero_doc_representante=alerta_numero_doc_representante,
+            direccion_extraida=direccion_extraida,
+            alerta_direccion=alerta_direccion,
         )
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
