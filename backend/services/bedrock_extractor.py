@@ -45,7 +45,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - direccion: dirección registrada
 - correo: correo electrónico registrado
 - telefono: número de teléfono registrado (solo dígitos, sin espacios ni guiones)
-- cedula_representante: número de cédula del representante legal o firmante (solo dígitos, si aparece en el documento; puede estar en sección de firma o representación)
+- cedula_representante: número de identificación del representante legal. Búscalo en la sección "REPRESENTACIÓN" → campo "101. Número de identificación". REGLAS ESTRICTAS: (1) El campo "100. Tipo de documento" contiene SOLO un código corto de 2 dígitos (13=CC, 22=CE, 31=NIT, 41=PAS) — ese código NUNCA forma parte del número de identificación. (2) Lee el número que aparece EXCLUSIVAMENTE después del label "101." — ignorando completamente la fila del "100.". (3) Si el valor que extrajiste empieza por 13, 22, 31 o 41 seguido de más dígitos, esos 2 primeros dígitos son el código del tipo de documento que se coló accidentalmente — descártalos y devuelve solo los dígitos restantes. (4) Devuelve únicamente dígitos, sin espacios ni guiones. Si no encuentras el campo 101, devuelve null.
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
@@ -70,6 +70,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - razon_social: nombre o razón social de la empresa que presenta los estados financieros (búscalo en el encabezado o membrete del documento)
 - nit: NIT de la empresa (solo dígitos, sin puntos, guiones ni dígito de verificación). Búscalo en el encabezado, membrete o carátula del documento.
 - nombre_representante: nombre completo del representante legal o firmante principal del documento. Búscalo en la sección de firmas, en el bloque del representante legal, o en la carátula. Si no aparece explícitamente, devuelve null.
+- cedula_representante: número de documento de identidad (cédula, pasaporte, etc.) del representante legal o firmante. Solo caracteres alfanuméricos, sin puntos, guiones ni espacios. Búscalo junto al nombre del representante en la sección de firmas o en el bloque del representante legal. Si no aparece explícitamente, devuelve null.
 - total_activos: valor numérico del total de activos (solo número, sin separadores)
 - total_pasivos: valor numérico del total de pasivos (solo número)
 - patrimonio: valor numérico del patrimonio neto (solo número)

@@ -239,6 +239,24 @@ class AlertaInconsistenciaNombreRepresentanteResponse(BaseModel):
     mensaje: str
 
 
+class AlertaInconsistenciaNumeroDocRepresentanteResponse(BaseModel):
+    """
+    Representa una inconsistencia detectada entre el número de documento del
+    representante legal en el formulario y el número encontrado en un documento adjunto.
+
+    Presente en DocumentoResponse únicamente cuando hay discrepancia de número
+    de documento del representante.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str    # "error"
+    mensaje: str
+
+
 class DocumentoResponse(BaseModel):
     id: str
     tipo_documento: str
@@ -254,6 +272,8 @@ class DocumentoResponse(BaseModel):
     alerta_nit: Optional[AlertaInconsistenciaNitResponse] = None
     nombre_representante_extraido: Optional[str] = None
     alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentanteResponse] = None
+    numero_doc_representante_extraido: Optional[str] = None
+    alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentanteResponse] = None
 
     class Config:
         from_attributes = True

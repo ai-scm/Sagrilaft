@@ -39,11 +39,6 @@ from services.alertas.comparador_razon_social import ComparadorRazonSocial
 # OCP: agregar un doc = agregar una entrada. No tocar DetectorInconsistenciasNombreRepresentante.
 
 _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
-    "cedula_representante": {
-        "campo_nombre":       "nombre",
-        "nombre_legible":     "Cédula del Representante Legal",
-        "seccion_referencia": "Nombre completo del titular del documento",
-    },
     "certificado_existencia": {
         "campo_nombre":       "representante_legal",
         "nombre_legible":     "Certificado de Existencia y Representación Legal",

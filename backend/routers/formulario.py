@@ -18,6 +18,7 @@ from schemas import (
     AlertaInconsistenciaNitResponse,
     AlertaInconsistenciaNombreRepresentanteResponse,
     AlertaInconsistenciaNombreResponse,
+    AlertaInconsistenciaNumeroDocRepresentanteResponse,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -204,6 +205,19 @@ def _construir_respuesta_documento(
             mensaje=r.mensaje,
         )
 
+    alerta_numero_doc_representante_schema = None
+    if resultado.alerta_numero_doc_representante:
+        d = resultado.alerta_numero_doc_representante
+        alerta_numero_doc_representante_schema = AlertaInconsistenciaNumeroDocRepresentanteResponse(
+            tipo_documento=d.tipo_documento,
+            nombre_documento=d.nombre_documento,
+            seccion_referencia=d.seccion_referencia,
+            valor_formulario=d.valor_formulario,
+            valor_documento=d.valor_documento,
+            tipo_alerta=d.tipo_alerta,
+            mensaje=d.mensaje,
+        )
+
     doc = resultado.documento
     return DocumentoResponse(
         id=doc.id,
@@ -219,4 +233,6 @@ def _construir_respuesta_documento(
         alerta_nit=alerta_nit_schema,
         nombre_representante_extraido=resultado.nombre_representante_extraido,
         alerta_nombre_representante=alerta_nombre_representante_schema,
+        numero_doc_representante_extraido=resultado.numero_doc_representante_extraido,
+        alerta_numero_doc_representante=alerta_numero_doc_representante_schema,
     )

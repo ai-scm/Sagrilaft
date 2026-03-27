@@ -46,6 +46,10 @@ from services.alertas.detector_inconsistencias_nombre_representante import (
     AlertaInconsistenciaNombreRepresentante,
     DetectorInconsistenciasNombreRepresentante,
 )
+from services.alertas.detector_inconsistencias_numero_doc_representante import (
+    AlertaInconsistenciaNumeroDocRepresentante,
+    DetectorInconsistenciasNumeroDocRepresentante,
+)
 from services.contracts import IExtractorIA
 from services.prellenado import mapear_campos_para_formulario
 
@@ -370,6 +374,12 @@ class ResultadoGuardadoDocumento:
                                (None si no aplica o no se extrajo).
         alerta_nit:            Alerta de inconsistencia si el NIT del documento
                                no coincide con el formulario (None si no hay discrepancia).
+        numero_doc_representante_extraido: Número de documento del representante
+                               encontrado en el documento (None si no aplica o no
+                               se extrajo).
+        alerta_numero_doc_representante: Alerta de inconsistencia si el número de
+                               documento del representante no coincide con el formulario
+                               (None si no hay discrepancia).
     """
 
     documento: DocumentoAdjunto
@@ -380,6 +390,8 @@ class ResultadoGuardadoDocumento:
     alerta_nit: Optional[AlertaInconsistenciaNit] = None
     nombre_representante_extraido: Optional[str] = None
     alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
+    numero_doc_representante_extraido: Optional[str] = None
+    alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -410,6 +422,7 @@ class FormularioService:
         self._detector_nombres = DetectorInconsistenciasNombre()
         self._detector_nit = DetectorInconsistenciasNit()
         self._detector_nombre_representante = DetectorInconsistenciasNombreRepresentante()
+        self._detector_numero_doc_representante = DetectorInconsistenciasNumeroDocRepresentante()
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -569,6 +582,8 @@ class FormularioService:
         alerta_nit: Optional[AlertaInconsistenciaNit] = None
         nombre_representante_extraido: Optional[str] = None
         alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
+        numero_doc_representante_extraido: Optional[str] = None
+        alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
 
         if extraccion.extraido:
             campos_sugeridos = mapear_campos_para_formulario(
@@ -601,6 +616,16 @@ class FormularioService:
                 datos_extraidos=extraccion.datos,
                 nombre_representante_formulario=formulario.nombre_representante,
             )
+            numero_doc_representante_extraido = (
+                self._detector_numero_doc_representante.extraer_numero_doc_de_documento(
+                    tipo_documento, extraccion.datos
+                )
+            )
+            alerta_numero_doc_representante = self._detector_numero_doc_representante.detectar(
+                tipo_documento=tipo_documento,
+                datos_extraidos=extraccion.datos,
+                numero_doc_representante_formulario=formulario.numero_doc_representante,
+            )
 
         return ResultadoGuardadoDocumento(
             documento=documento,
@@ -611,6 +636,8 @@ class FormularioService:
             alerta_nit=alerta_nit,
             nombre_representante_extraido=nombre_representante_extraido,
             alerta_nombre_representante=alerta_nombre_representante,
+            numero_doc_representante_extraido=numero_doc_representante_extraido,
+            alerta_numero_doc_representante=alerta_numero_doc_representante,
         )
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
