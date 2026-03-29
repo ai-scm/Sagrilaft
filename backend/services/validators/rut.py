@@ -11,6 +11,7 @@ Alarmas que implementa:
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from services.alertas.normalizador_nit import normalizar_nit
 from services.contracts import HallazgoValidacion, ResultadoExtraccion
 from services.validators._utils import (
     FORMATO_FECHA,
@@ -73,6 +74,7 @@ class ValidadorRut:
             campo="nit_rut",
             nombre="NIT",
             fuente=self.FUENTE,
+            normalizador=normalizar_nit,
         ))
 
         hallazgos.append(_validar_ciiu(

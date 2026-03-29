@@ -12,6 +12,9 @@ import unicodedata
 from datetime import date, datetime
 from typing import Any, Callable, Optional
 
+from services.alertas.normalizador_nombre import normalizar_razon_social
+from services.alertas.normalizador_nit import normalizar_nit
+from services.alertas.normalizador_numero_doc import normalizar_numero_doc
 from services.contracts import HallazgoValidacion
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
@@ -133,8 +136,13 @@ def comparar_texto(
     fuente: str,
 ) -> Optional[HallazgoValidacion]:
     """
-    Compara dos textos normalizados (sin diacríticos, minúsculas) y retorna
-    un HallazgoValidacion que indica si coinciden o no.
+    Compara dos textos normalizados y retorna un HallazgoValidacion.
+
+    Usa normalizar_razon_social (superset de normalizar_texto): quita tildes,
+    mayúsculas y además colapsa siglas societarias (S.A.S.→SAS, LTDA.→LTDA),
+    garantizando el mismo criterio de comparación que el sistema de alertas
+    en tiempo real (upload). Sin esta unificación, el mismo campo puede
+    resultar coincidente al subir un doc y no-coincidente en la validación final.
 
     DRY : centraliza la lógica que de otro modo se duplicaría en cada validador.
 
@@ -147,7 +155,7 @@ def comparar_texto(
     """
     if not valor_doc or not valor_form:
         return None
-    coincide = normalizar_texto(valor_doc) == normalizar_texto(valor_form)
+    coincide = normalizar_razon_social(valor_doc) == normalizar_razon_social(valor_form)
     return (
         HallazgoValidacion.ok(
             campo=campo,
@@ -169,23 +177,30 @@ def comparar_identificacion(
     campo: str,
     nombre: str,
     fuente: str,
+    normalizador: Callable[[Any], str] = normalizar_numero_doc,
 ) -> Optional[HallazgoValidacion]:
     """
-    Compara dos números de identificación normalizados (sin puntos, guiones
-    ni espacios) y retorna un HallazgoValidacion que indica si coinciden o no.
+    Compara dos números de identificación normalizados y retorna un HallazgoValidacion.
+
+    El normalizador por defecto es normalizar_numero_doc (elimina no-alfanuméricos,
+    sin truncar). Para comparar NITs se debe pasar normalizar_nit explícitamente,
+    ya que los NITs colombianos incluyen un dígito de verificación opcional que
+    debe descartarse antes de comparar (ej: "900.123.456-7" == "900123456").
 
     DRY : centraliza la lógica que de otro modo se duplicaría en cada validador.
 
     Args:
-        valor_doc:  Valor extraído del documento por IA.
-        valor_form: Valor ingresado en el formulario por el usuario.
-        campo:      Nombre del campo para el hallazgo.
-        nombre:     Nombre legible del campo (ej. "NIT").
-        fuente:     Nombre del documento de origen (ej. "certificado de Cámara de Comercio").
+        valor_doc:    Valor extraído del documento por IA.
+        valor_form:   Valor ingresado en el formulario por el usuario.
+        campo:        Nombre del campo para el hallazgo.
+        nombre:       Nombre legible del campo (ej. "NIT").
+        fuente:       Nombre del documento de origen.
+        normalizador: Función de normalización a aplicar. Por defecto
+                      normalizar_numero_doc. Pasar normalizar_nit para NITs.
     """
     if not valor_doc or not valor_form:
         return None
-    coincide = normalizar_identificacion(valor_doc) == normalizar_identificacion(valor_form)
+    coincide = normalizador(valor_doc) == normalizador(valor_form)
     return (
         HallazgoValidacion.ok(
             campo=campo,

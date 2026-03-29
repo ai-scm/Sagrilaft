@@ -19,20 +19,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Literal, Optional
 
+from services.alertas.normalizador_nit import normalizar_nit
+from services.alertas.normalizador_nombre import normalizar_razon_social
+from services.alertas.normalizador_numero_doc import normalizar_numero_doc
 from services.contracts import HallazgoValidacion
-from services.validators._utils import (
-    comparar_entre_documentos,
-    normalizar_identificacion,
-    normalizar_texto,
-)
+from services.validators._utils import comparar_entre_documentos
 
-# ─── Tipo de normalización disponible ────────────────────────────────────────
+# ─── Tipos de normalización disponibles ──────────────────────────────────────
+# "texto"         → normalizar_razon_social (siglas, tildes, mayúsculas)
+# "nit"           → normalizar_nit (solo dígitos, trunca dígito verificación)
+# "identificacion"→ normalizar_numero_doc (alfanumérico, sin truncar — para cédulas)
 
-TipoNormalizacion = Literal["texto", "identificacion"]
+TipoNormalizacion = Literal["texto", "nit", "identificacion"]
 
 _NORMALIZADORES: Dict[str, Callable[[Any], str]] = {
-    "texto": normalizar_texto,
-    "identificacion": normalizar_identificacion,
+    "texto":          normalizar_razon_social,
+    "nit":            normalizar_nit,
+    "identificacion": normalizar_numero_doc,
 }
 
 
@@ -113,7 +116,7 @@ REGLAS_CRUCE_PREDETERMINADAS: List[ReglaCruce] = [
         clave_b="nit",
         nombre_doc_b="el Certificado de Existencia",
         descripcion="NIT",
-        tipo_normalizacion="identificacion",
+        tipo_normalizacion="nit",
     ),
     ReglaCruce(
         campo="cruce_direccion",
