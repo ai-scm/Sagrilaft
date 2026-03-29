@@ -32,10 +32,10 @@ DRY: la configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador_numero_doc import ComparadorNumeroDoc
+from services.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
@@ -71,35 +71,6 @@ _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
 }
 
 
-# ── Objeto de valor (inmutable) ───────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class AlertaInconsistenciaNumeroDocRepresentante:
-    """
-    Inconsistencia detectada entre el número de documento del representante en
-    el formulario y el encontrado en un documento adjunto.
-
-    Immutable Value Object: no puede modificarse una vez creado.
-
-    Attributes:
-        tipo_documento:    Clave del tipo (ej. "certificado_existencia").
-        nombre_documento:  Nombre legible del documento.
-        seccion_referencia: Ubicación exacta del campo dentro del documento.
-        valor_formulario:  Número de documento tal como aparece en el formulario.
-        valor_documento:   Número tal como fue extraído del documento.
-        tipo_alerta:       Gravedad: "error".
-        mensaje:           Descripción legible para el usuario final.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str   # "error"
-    mensaje: str
-
-
 # ── Detector ─────────────────────────────────────────────────────────────────
 
 class DetectorInconsistenciasNumeroDocRepresentante:
@@ -128,7 +99,7 @@ class DetectorInconsistenciasNumeroDocRepresentante:
         tipo_documento: str,
         datos_extraidos: Dict[str, Any],
         numero_doc_representante_formulario: Optional[str],
-    ) -> Optional[AlertaInconsistenciaNumeroDocRepresentante]:
+    ) -> Optional[AlertaInconsistencia]:
         """
         Detecta si hay inconsistencia de número de documento del representante
         para el documento recién procesado.
@@ -156,7 +127,7 @@ class DetectorInconsistenciasNumeroDocRepresentante:
         if resultado is None or resultado.coincide:
             return None
 
-        return AlertaInconsistenciaNumeroDocRepresentante(
+        return AlertaInconsistencia(
             tipo_documento=tipo_documento,
             nombre_documento=config["nombre_legible"],
             seccion_referencia=config["seccion_referencia"],

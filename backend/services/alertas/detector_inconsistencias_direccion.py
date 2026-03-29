@@ -27,10 +27,10 @@ DRY: la configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador_direccion import ComparadorDireccion
+from services.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
@@ -48,35 +48,6 @@ _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
         "seccion_referencia": "Sección UBICACIÓN → campo 41. Dirección principal",
     },
 }
-
-
-# ── Objeto de valor (inmutable) ───────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class AlertaInconsistenciaDireccion:
-    """
-    Inconsistencia detectada entre la dirección del formulario y la encontrada
-    en un documento adjunto.
-
-    Immutable Value Object: no puede modificarse una vez creado.
-
-    Attributes:
-        tipo_documento:    Clave del tipo (ej. "certificado_existencia").
-        nombre_documento:  Nombre legible del documento.
-        seccion_referencia: Ubicación exacta del campo dentro del documento.
-        valor_formulario:  Dirección tal como aparece en el formulario.
-        valor_documento:   Dirección tal como fue extraída del documento.
-        tipo_alerta:       Gravedad: "error".
-        mensaje:           Descripción legible para el usuario final.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str   # "error"
-    mensaje: str
 
 
 # ── Detector ─────────────────────────────────────────────────────────────────
@@ -106,7 +77,7 @@ class DetectorInconsistenciasDireccion:
         tipo_documento: str,
         datos_extraidos: Dict[str, Any],
         direccion_formulario: Optional[str],
-    ) -> Optional[AlertaInconsistenciaDireccion]:
+    ) -> Optional[AlertaInconsistencia]:
         """
         Detecta si hay inconsistencia de dirección para el documento recién procesado.
 
@@ -130,7 +101,7 @@ class DetectorInconsistenciasDireccion:
         if resultado is None or resultado.coincide:
             return None
 
-        return AlertaInconsistenciaDireccion(
+        return AlertaInconsistencia(
             tipo_documento=tipo_documento,
             nombre_documento=config["nombre_legible"],
             seccion_referencia=config["seccion_referencia"],

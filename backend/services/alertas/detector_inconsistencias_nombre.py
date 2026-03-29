@@ -21,10 +21,10 @@ DRY: la configuración de cada documento (qué campo, qué nombre legible, qué
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador_razon_social import ComparadorRazonSocial
+from services.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
@@ -56,34 +56,6 @@ _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
 }
 
 
-# ── Objeto de valor (inmutable) ───────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class AlertaInconsistenciaNombre:
-    """
-    Inconsistencia detectada entre el nombre del formulario y el de un documento.
-
-    Immutable Value Object: no puede modificarse una vez creado.
-
-    Attributes:
-        tipo_documento:    Clave del tipo (ej. "certificado_existencia").
-        nombre_documento:  Nombre legible del documento (ej. "Certificado de…").
-        seccion_referencia: Ubicación exacta del campo dentro del documento.
-        valor_formulario:  Razón social tal como aparece en el formulario.
-        valor_documento:   Razón social tal como aparece en el documento.
-        tipo_alerta:       Gravedad: "error".
-        mensaje:           Descripción legible para el usuario final.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str   # "error"
-    mensaje: str
-
-
 # ── Detector ─────────────────────────────────────────────────────────────────
 
 class DetectorInconsistenciasNombre:
@@ -109,7 +81,7 @@ class DetectorInconsistenciasNombre:
         tipo_documento: str,
         datos_extraidos: Dict[str, Any],
         razon_social_formulario: Optional[str],
-    ) -> Optional[AlertaInconsistenciaNombre]:
+    ) -> Optional[AlertaInconsistencia]:
         """
         Detecta si hay inconsistencia de nombre para el documento recién procesado.
 
@@ -133,7 +105,7 @@ class DetectorInconsistenciasNombre:
         if resultado is None or resultado.coincide:
             return None
 
-        return AlertaInconsistenciaNombre(
+        return AlertaInconsistencia(
             tipo_documento=tipo_documento,
             nombre_documento=config["nombre_legible"],
             seccion_referencia=config["seccion_referencia"],

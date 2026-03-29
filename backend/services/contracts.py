@@ -86,6 +86,37 @@ class HallazgoValidacion:
         return cls("advertencia", campo, detalle, valor_formulario, valor_documento)
 
 
+@dataclass(frozen=True)
+class AlertaInconsistencia:
+    """
+    Inconsistencia detectada entre un campo del formulario y un documento adjunto.
+
+    Value Object inmutable y unificado para todos los tipos de alerta de campo.
+    Reemplaza las 5 clases específicas anteriores (AlertaInconsistenciaNombre,
+    AlertaInconsistenciaNit, etc.) con un único modelo agnóstico del campo.
+
+    Lenguaje ubicuo:
+        - tipo_documento:     clave del tipo de documento (ej. "certificado_existencia").
+        - nombre_documento:   nombre legible del documento para mostrar al usuario.
+        - seccion_referencia: ubicación exacta del campo dentro del documento.
+        - valor_formulario:   valor ingresado por el usuario en el formulario.
+        - valor_documento:    valor extraído del documento por la IA.
+        - tipo_alerta:        gravedad: "error" | "advertencia".
+        - mensaje:            descripción legible para el usuario final.
+
+    OCP: agregar un nuevo tipo de alerta no requiere crear una nueva clase,
+         solo instanciar AlertaInconsistencia con los valores correspondientes.
+    """
+
+    tipo_documento: str
+    nombre_documento: str
+    seccion_referencia: str
+    valor_formulario: str
+    valor_documento: str
+    tipo_alerta: str   # "error" | "advertencia"
+    mensaje: str
+
+
 # ═══════════════════════════════════════════════════════════════
 # Protocolos (Interfaces)
 # ═══════════════════════════════════════════════════════════════

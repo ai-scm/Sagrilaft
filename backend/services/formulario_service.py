@@ -34,27 +34,12 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from services.alertas.detector_inconsistencias_nombre import (
-    AlertaInconsistenciaNombre,
-    DetectorInconsistenciasNombre,
-)
-from services.alertas.detector_inconsistencias_nit import (
-    AlertaInconsistenciaNit,
-    DetectorInconsistenciasNit,
-)
-from services.alertas.detector_inconsistencias_nombre_representante import (
-    AlertaInconsistenciaNombreRepresentante,
-    DetectorInconsistenciasNombreRepresentante,
-)
-from services.alertas.detector_inconsistencias_numero_doc_representante import (
-    AlertaInconsistenciaNumeroDocRepresentante,
-    DetectorInconsistenciasNumeroDocRepresentante,
-)
-from services.alertas.detector_inconsistencias_direccion import (
-    AlertaInconsistenciaDireccion,
-    DetectorInconsistenciasDireccion,
-)
-from services.contracts import IExtractorIA
+from services.alertas.detector_inconsistencias_nombre import DetectorInconsistenciasNombre
+from services.alertas.detector_inconsistencias_nit import DetectorInconsistenciasNit
+from services.alertas.detector_inconsistencias_nombre_representante import DetectorInconsistenciasNombreRepresentante
+from services.alertas.detector_inconsistencias_numero_doc_representante import DetectorInconsistenciasNumeroDocRepresentante
+from services.alertas.detector_inconsistencias_direccion import DetectorInconsistenciasDireccion
+from services.contracts import AlertaInconsistencia, IExtractorIA
 from services.prellenado import mapear_campos_para_formulario
 
 DIRECTORIO_UPLOADS: Path = Path(__file__).parent.parent / "uploads"
@@ -389,15 +374,15 @@ class ResultadoGuardadoDocumento:
     documento: DocumentoAdjunto
     campos_sugeridos: Dict[str, Any]
     razon_social_extraida: Optional[str]
-    alerta_nombre: Optional[AlertaInconsistenciaNombre]
+    alerta_nombre: Optional[AlertaInconsistencia]
     nit_extraido: Optional[str] = None
-    alerta_nit: Optional[AlertaInconsistenciaNit] = None
+    alerta_nit: Optional[AlertaInconsistencia] = None
     nombre_representante_extraido: Optional[str] = None
-    alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
+    alerta_nombre_representante: Optional[AlertaInconsistencia] = None
     numero_doc_representante_extraido: Optional[str] = None
-    alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
+    alerta_numero_doc_representante: Optional[AlertaInconsistencia] = None
     direccion_extraida: Optional[str] = None
-    alerta_direccion: Optional[AlertaInconsistenciaDireccion] = None
+    alerta_direccion: Optional[AlertaInconsistencia] = None
 
 
 # ═══════════════════════════════════════════════════════════════

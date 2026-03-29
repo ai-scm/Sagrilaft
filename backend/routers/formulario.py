@@ -15,11 +15,7 @@ from database import get_db
 from dependencies import obtener_extractor
 from models import DocumentoAdjunto
 from schemas import (
-    AlertaInconsistenciaDireccionResponse,
-    AlertaInconsistenciaNitResponse,
-    AlertaInconsistenciaNombreRepresentanteResponse,
-    AlertaInconsistenciaNombreResponse,
-    AlertaInconsistenciaNumeroDocRepresentanteResponse,
+    AlertaInconsistenciaResponse,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -159,11 +155,11 @@ async def prellenar_todos_documentos(
 
 # ─── Helpers privados ────────────────────────────────────────────────────────
 
-def _serializar_alerta_direccion(alerta) -> AlertaInconsistenciaDireccionResponse | None:
-    """Serializa AlertaInconsistenciaDireccion al schema HTTP."""
+def _serializar_alerta(alerta) -> AlertaInconsistenciaResponse | None:
+    """Convierte un dominio AlertaInconsistencia al schema HTTP de transporte."""
     if not alerta:
         return None
-    return AlertaInconsistenciaDireccionResponse(
+    return AlertaInconsistenciaResponse(
         tipo_documento=alerta.tipo_documento,
         nombre_documento=alerta.nombre_documento,
         seccion_referencia=alerta.seccion_referencia,
@@ -182,58 +178,6 @@ def _construir_respuesta_documento(
 
     SRP: única responsabilidad — serializar el resultado del servicio al schema HTTP.
     """
-    alerta_schema = None
-    if resultado.alerta_nombre:
-        a = resultado.alerta_nombre
-        alerta_schema = AlertaInconsistenciaNombreResponse(
-            tipo_documento=a.tipo_documento,
-            nombre_documento=a.nombre_documento,
-            seccion_referencia=a.seccion_referencia,
-            valor_formulario=a.valor_formulario,
-            valor_documento=a.valor_documento,
-            tipo_alerta=a.tipo_alerta,
-            mensaje=a.mensaje,
-        )
-
-    alerta_nit_schema = None
-    if resultado.alerta_nit:
-        n = resultado.alerta_nit
-        alerta_nit_schema = AlertaInconsistenciaNitResponse(
-            tipo_documento=n.tipo_documento,
-            nombre_documento=n.nombre_documento,
-            seccion_referencia=n.seccion_referencia,
-            valor_formulario=n.valor_formulario,
-            valor_documento=n.valor_documento,
-            tipo_alerta=n.tipo_alerta,
-            mensaje=n.mensaje,
-        )
-
-    alerta_nombre_representante_schema = None
-    if resultado.alerta_nombre_representante:
-        r = resultado.alerta_nombre_representante
-        alerta_nombre_representante_schema = AlertaInconsistenciaNombreRepresentanteResponse(
-            tipo_documento=r.tipo_documento,
-            nombre_documento=r.nombre_documento,
-            seccion_referencia=r.seccion_referencia,
-            valor_formulario=r.valor_formulario,
-            valor_documento=r.valor_documento,
-            tipo_alerta=r.tipo_alerta,
-            mensaje=r.mensaje,
-        )
-
-    alerta_numero_doc_representante_schema = None
-    if resultado.alerta_numero_doc_representante:
-        d = resultado.alerta_numero_doc_representante
-        alerta_numero_doc_representante_schema = AlertaInconsistenciaNumeroDocRepresentanteResponse(
-            tipo_documento=d.tipo_documento,
-            nombre_documento=d.nombre_documento,
-            seccion_referencia=d.seccion_referencia,
-            valor_formulario=d.valor_formulario,
-            valor_documento=d.valor_documento,
-            tipo_alerta=d.tipo_alerta,
-            mensaje=d.mensaje,
-        )
-
     doc = resultado.documento
     return DocumentoResponse(
         id=doc.id,
@@ -244,13 +188,13 @@ def _construir_respuesta_documento(
         created_at=doc.created_at,
         campos_sugeridos=resultado.campos_sugeridos or None,
         razon_social_extraida=resultado.razon_social_extraida,
-        alerta_nombre=alerta_schema,
+        alerta_nombre=_serializar_alerta(resultado.alerta_nombre),
         nit_extraido=resultado.nit_extraido,
-        alerta_nit=alerta_nit_schema,
+        alerta_nit=_serializar_alerta(resultado.alerta_nit),
         nombre_representante_extraido=resultado.nombre_representante_extraido,
-        alerta_nombre_representante=alerta_nombre_representante_schema,
+        alerta_nombre_representante=_serializar_alerta(resultado.alerta_nombre_representante),
         numero_doc_representante_extraido=resultado.numero_doc_representante_extraido,
-        alerta_numero_doc_representante=alerta_numero_doc_representante_schema,
+        alerta_numero_doc_representante=_serializar_alerta(resultado.alerta_numero_doc_representante),
         direccion_extraida=resultado.direccion_extraida,
-        alerta_direccion=_serializar_alerta_direccion(resultado.alerta_direccion),
+        alerta_direccion=_serializar_alerta(resultado.alerta_direccion),
     )

@@ -187,12 +187,23 @@ class FormularioResponse(FormularioBase):
         return v
 
 
-class AlertaInconsistenciaNombreResponse(BaseModel):
+class AlertaInconsistenciaResponse(BaseModel):
     """
-    Representa una inconsistencia detectada entre el nombre del formulario
-    y el nombre encontrado en un documento adjunto.
+    Representa una inconsistencia detectada entre un campo del formulario
+    y el valor encontrado en un documento adjunto.
 
+    Schema HTTP unificado para todos los tipos de alerta de campo
+    (nombre, NIT, nombre representante, número documento, dirección).
     Presente en DocumentoResponse únicamente cuando hay discrepancia.
+
+    Attributes:
+        tipo_documento:     Clave del tipo de documento (ej. "certificado_existencia").
+        nombre_documento:   Nombre legible del documento para mostrar al usuario.
+        seccion_referencia: Ubicación exacta del campo dentro del documento.
+        valor_formulario:   Valor ingresado por el usuario en el formulario.
+        valor_documento:    Valor extraído del documento por la IA.
+        tipo_alerta:        Gravedad: "error" | "advertencia".
+        mensaje:            Descripción legible para el usuario final.
     """
 
     tipo_documento: str
@@ -200,77 +211,7 @@ class AlertaInconsistenciaNombreResponse(BaseModel):
     seccion_referencia: str
     valor_formulario: str
     valor_documento: str
-    tipo_alerta: str    # "error"
-    mensaje: str
-
-
-class AlertaInconsistenciaNitResponse(BaseModel):
-    """
-    Representa una inconsistencia detectada entre el NIT del formulario
-    y el NIT encontrado en un documento adjunto.
-
-    Presente en DocumentoResponse únicamente cuando hay discrepancia de NIT.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str    # "error"
-    mensaje: str
-
-
-class AlertaInconsistenciaNombreRepresentanteResponse(BaseModel):
-    """
-    Representa una inconsistencia detectada entre el nombre del representante
-    legal en el formulario y el nombre encontrado en un documento adjunto.
-
-    Presente en DocumentoResponse únicamente cuando hay discrepancia de nombre
-    de representante.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str    # "error"
-    mensaje: str
-
-
-class AlertaInconsistenciaDireccionResponse(BaseModel):
-    """
-    Representa una inconsistencia detectada entre la dirección del formulario
-    y la dirección encontrada en un documento adjunto.
-
-    Presente en DocumentoResponse únicamente cuando hay discrepancia de dirección.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str    # "error"
-    mensaje: str
-
-
-class AlertaInconsistenciaNumeroDocRepresentanteResponse(BaseModel):
-    """
-    Representa una inconsistencia detectada entre el número de documento del
-    representante legal en el formulario y el número encontrado en un documento adjunto.
-
-    Presente en DocumentoResponse únicamente cuando hay discrepancia de número
-    de documento del representante.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str    # "error"
+    tipo_alerta: str    # "error" | "advertencia"
     mensaje: str
 
 
@@ -284,15 +225,15 @@ class DocumentoResponse(BaseModel):
     # Presentes solo en el response del upload, nulos en listados
     campos_sugeridos: Optional[dict] = None
     razon_social_extraida: Optional[str] = None
-    alerta_nombre: Optional[AlertaInconsistenciaNombreResponse] = None
+    alerta_nombre: Optional[AlertaInconsistenciaResponse] = None
     nit_extraido: Optional[str] = None
-    alerta_nit: Optional[AlertaInconsistenciaNitResponse] = None
+    alerta_nit: Optional[AlertaInconsistenciaResponse] = None
     nombre_representante_extraido: Optional[str] = None
-    alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentanteResponse] = None
+    alerta_nombre_representante: Optional[AlertaInconsistenciaResponse] = None
     numero_doc_representante_extraido: Optional[str] = None
-    alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentanteResponse] = None
+    alerta_numero_doc_representante: Optional[AlertaInconsistenciaResponse] = None
     direccion_extraida: Optional[str] = None
-    alerta_direccion: Optional[AlertaInconsistenciaDireccionResponse] = None
+    alerta_direccion: Optional[AlertaInconsistenciaResponse] = None
 
     class Config:
         from_attributes = True

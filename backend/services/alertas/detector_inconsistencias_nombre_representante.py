@@ -29,10 +29,10 @@ DRY: reutiliza ComparadorRazonSocial en lugar de duplicar la normalización.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador_razon_social import ComparadorRazonSocial
+from services.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
@@ -58,35 +58,6 @@ _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
         "seccion_referencia": "Representante legal o firmante del documento",
     },
 }
-
-
-# ── Objeto de valor (inmutable) ───────────────────────────────────────────────
-
-@dataclass(frozen=True)
-class AlertaInconsistenciaNombreRepresentante:
-    """
-    Inconsistencia detectada entre el nombre del representante en el formulario
-    y el encontrado en un documento adjunto.
-
-    Immutable Value Object: no puede modificarse una vez creado.
-
-    Attributes:
-        tipo_documento:    Clave del tipo (ej. "cedula_representante").
-        nombre_documento:  Nombre legible del documento.
-        seccion_referencia: Ubicación exacta del campo dentro del documento.
-        valor_formulario:  Nombre tal como aparece en el formulario.
-        valor_documento:   Nombre tal como fue extraído del documento.
-        tipo_alerta:       Gravedad: "error".
-        mensaje:           Descripción legible para el usuario final.
-    """
-
-    tipo_documento: str
-    nombre_documento: str
-    seccion_referencia: str
-    valor_formulario: str
-    valor_documento: str
-    tipo_alerta: str   # "error"
-    mensaje: str
 
 
 # ── Detector ─────────────────────────────────────────────────────────────────
@@ -121,7 +92,7 @@ class DetectorInconsistenciasNombreRepresentante:
         tipo_documento: str,
         datos_extraidos: Dict[str, Any],
         nombre_representante_formulario: Optional[str],
-    ) -> Optional[AlertaInconsistenciaNombreRepresentante]:
+    ) -> Optional[AlertaInconsistencia]:
         """
         Detecta si hay inconsistencia de nombre de representante para el documento
         recién procesado.
@@ -149,7 +120,7 @@ class DetectorInconsistenciasNombreRepresentante:
         if resultado is None or resultado.coincide:
             return None
 
-        return AlertaInconsistenciaNombreRepresentante(
+        return AlertaInconsistencia(
             tipo_documento=tipo_documento,
             nombre_documento=config["nombre_legible"],
             seccion_referencia=config["seccion_referencia"],
