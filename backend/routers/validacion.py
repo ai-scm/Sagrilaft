@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from dependencies import obtener_orquestador, obtener_servicio_lista_cautela
 from schemas import ValidacionResponse
-from services.document_orchestrator import OrquestadorValidacionDocumentos
-from services.lista_cautela_service import ListaCautelaService
+from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.listas.lista_cautela_service import ListaCautelaService
 from services.validacion_service import FormularioNoEncontradoError, ValidacionService
 
 enrutador = APIRouter(prefix="/api/validar", tags=["validación"])

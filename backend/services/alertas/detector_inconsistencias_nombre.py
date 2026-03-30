@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador import Comparador
 from services.alertas.normalizador_nombre import normalizar_razon_social
-from services.contracts import AlertaInconsistencia
+from core.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────

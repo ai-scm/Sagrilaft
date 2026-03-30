@@ -16,7 +16,7 @@ from services.utils.texto import quitar_diacriticos
 from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.alertas.normalizador_nit import normalizar_nit
 from services.alertas.normalizador_numero_doc import normalizar_numero_doc
-from services.contracts import HallazgoValidacion
+from core.contracts import HallazgoValidacion
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
 

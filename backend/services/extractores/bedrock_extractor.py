@@ -12,8 +12,8 @@ import logging
 import mimetypes
 from typing import Any, Dict, Tuple
 
-from services.contracts import ResultadoExtraccion
-from services.prellenado import mapear_campos_para_formulario
+from core.contracts import ResultadoExtraccion
+from services.formulario.prellenado import mapear_campos_para_formulario
 
 logger = logging.getLogger(__name__)
 

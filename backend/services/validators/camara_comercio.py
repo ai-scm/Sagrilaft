@@ -12,7 +12,7 @@ Alarmas que implementa:
 from typing import Any, Dict, List, Optional
 
 from services.alertas.normalizador_nit import normalizar_nit
-from services.contracts import HallazgoValidacion, ResultadoExtraccion
+from core.contracts import HallazgoValidacion, ResultadoExtraccion
 from services.validators._utils import (
     comparar_identificacion,
     comparar_texto,

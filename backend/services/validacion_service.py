@@ -16,9 +16,9 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from models import Formulario, ResultadoValidacion
-from services.contracts import HallazgoValidacion
-from services.document_orchestrator import OrquestadorValidacionDocumentos
-from services.lista_cautela_service import ListaCautelaService
+from core.contracts import HallazgoValidacion
+from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.listas.lista_cautela_service import ListaCautelaService
 
 
 class FormularioNoEncontradoError(Exception):

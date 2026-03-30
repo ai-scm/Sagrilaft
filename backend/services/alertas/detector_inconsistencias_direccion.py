@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from services.alertas.comparador import Comparador
 from services.alertas.normalizador_direccion import normalizar_direccion
-from services.contracts import AlertaInconsistencia
+from core.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────

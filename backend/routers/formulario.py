@@ -21,9 +21,9 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from services.contracts import IExtractorIA
-from services.formulario_service import FormularioService
-from services.transformers import construir_respuesta_documento
+from core.contracts import IExtractorIA
+from services.formulario.formulario_service import FormularioService
+from routers.transformers import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 

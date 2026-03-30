@@ -14,8 +14,8 @@ OCP : agregar un nuevo campo al DocumentoResponse no requiere modificar los
 from typing import Optional
 
 from schemas import AlertaInconsistenciaResponse, DocumentoResponse
-from services.contracts import AlertaInconsistencia
-from services.formulario_service import ResultadoGuardadoDocumento
+from core.contracts import AlertaInconsistencia
+from services.formulario.formulario_service import ResultadoGuardadoDocumento
 
 
 def serializar_alerta(

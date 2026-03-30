@@ -39,8 +39,8 @@ from services.alertas.detector_inconsistencias_nit import DetectorInconsistencia
 from services.alertas.detector_inconsistencias_nombre_representante import DetectorInconsistenciasNombreRepresentante
 from services.alertas.detector_inconsistencias_numero_doc_representante import DetectorInconsistenciasNumeroDocRepresentante
 from services.alertas.detector_inconsistencias_direccion import DetectorInconsistenciasDireccion
-from services.contracts import AlertaInconsistencia, IExtractorIA
-from services.prellenado import mapear_campos_para_formulario
+from core.contracts import AlertaInconsistencia, IExtractorIA
+from services.formulario.prellenado import mapear_campos_para_formulario
 
 DIRECTORIO_UPLOADS: Path = Path(__file__).parent.parent / "uploads"
 

@@ -7,11 +7,9 @@ DIP : los routers dependen de estas abstracciones en lugar de acceder a
 """
 
 from fastapi import Request
-
-from services.contracts import IExtractorIA
-from services.document_orchestrator import OrquestadorValidacionDocumentos
-from services.lista_cautela_service import ListaCautelaService
-
+from core.contracts import IExtractorIA
+from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.listas.lista_cautela_service import ListaCautelaService
 
 def obtener_extractor(solicitud: Request) -> IExtractorIA:
     """Obtiene el extractor IA registrado en el ciclo de vida de la aplicación."""

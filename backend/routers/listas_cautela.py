@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends
 
 from dependencies import obtener_servicio_lista_cautela
 from schemas import BusquedaListaCautela, RespuestaListaCautela
-from services.lista_cautela_service import ListaCautelaService
+from services.listas.lista_cautela_service import ListaCautelaService
 
 enrutador = APIRouter(prefix="/api/listas-cautela", tags=["listas de cautela"])
 
