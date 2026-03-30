@@ -6,7 +6,7 @@
  * no hay botón de descartar. El usuario debe corregir el campo en el formulario
  * o reemplazar el archivo adjunto.
  *
- * Solo se muestra cuando tipo_identificacion === 'NIT'; el hook useAlertasNit
+ * Solo se muestra cuando tipo_identificacion === 'NIT'; calcularAlertasNit
  * ya filtra los demás tipos, por lo que si alertas está vacío el componente
  * no renderiza nada.
  *
@@ -16,7 +16,7 @@
 
 /**
  * @param {{
- *   alertas: import('../hooks/useAlertasNit').AlertaInconsistenciaNit[],
+ *   alertas: import('../utils/calcularAlertasInconsistencia').AlertaInconsistencia[],
  * }} props
  */
 export default function AlertasNit({ alertas }) {

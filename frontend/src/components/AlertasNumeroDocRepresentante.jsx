@@ -14,7 +14,7 @@
 
 /**
  * @param {{
- *   alertas: import('../hooks/useAlertasNumeroDocRepresentante').AlertaInconsistenciaNumeroDocRepresentante[],
+ *   alertas: import('../utils/calcularAlertasInconsistencia').AlertaInconsistencia[],
  * }} props
  */
 export default function AlertasNumeroDocRepresentante({ alertas }) {

@@ -14,7 +14,7 @@
 
 /**
  * @param {{
- *   alertas: import('../hooks/useAlertasNombreRepresentante').AlertaInconsistenciaNombreRepresentante[],
+ *   alertas: import('../utils/calcularAlertasInconsistencia').AlertaInconsistencia[],
  * }} props
  */
 export default function AlertasNombreRepresentante({ alertas }) {

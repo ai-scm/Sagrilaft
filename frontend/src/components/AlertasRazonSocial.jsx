@@ -12,7 +12,7 @@
 
 /**
  * @param {{
- *   alertas: import('../hooks/useAlertasRazonSocial').AlertaInconsistencia[],
+ *   alertas: import('../utils/calcularAlertasInconsistencia').AlertaInconsistencia[],
  * }} props
  */
 export default function AlertasRazonSocial({ alertas }) {

@@ -13,11 +13,7 @@ import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
-import { useAlertasRazonSocial } from './useAlertasRazonSocial';
-import { useAlertasNit } from './useAlertasNit';
-import { useAlertasNombreRepresentante } from './useAlertasNombreRepresentante';
-import { useAlertasNumeroDocRepresentante } from './useAlertasNumeroDocRepresentante';
-import { useAlertasDireccion } from './useAlertasDireccion';
+import { useAlertasInconsistencia } from './useAlertasInconsistencia';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4,
   validarTablasPaso6, CLAVES_ERROR_PASO6,
@@ -37,25 +33,13 @@ export function useFormulario() {
 
   const { errors, validarPaso, aplicarErrores, limpiarError } = useFormValidacion(formData);
 
-  const { registrarExtraccion, calcularAlertas, limpiarExtraccion } = useAlertasRazonSocial();
-  const { registrarExtraccionNit, calcularAlertasNit, limpiarExtraccionNit } = useAlertasNit();
   const {
-    registrarExtraccionNombreRepresentante,
-    calcularAlertasNombreRepresentante,
-    limpiarExtraccionNombreRepresentante,
-  } = useAlertasNombreRepresentante();
-
-  const {
-    registrarExtraccionNumeroDocRepresentante,
-    calcularAlertasNumeroDocRepresentante,
-    limpiarExtraccionNumeroDocRepresentante,
-  } = useAlertasNumeroDocRepresentante();
-
-  const {
-    registrarExtraccionDireccion,
-    calcularAlertasDireccion,
-    limpiarExtraccionDireccion,
-  } = useAlertasDireccion();
+    alertasRazonSocial,
+    alertasNit,
+    alertasNombreRepresentante,
+    alertasNumeroDocRepresentante,
+    alertasDireccion,
+  } = useAlertasInconsistencia(documentos, formData);
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -110,21 +94,6 @@ export function useFormulario() {
       }
       const docRes = await api.subirDocumento(currentId, tipoDoc, file);
       setDocumentos(prev => ({ ...prev, [tipoDoc]: docRes }));
-      if (docRes.razon_social_extraida) {
-        registrarExtraccion(tipoDoc, docRes.razon_social_extraida);
-      }
-      if (docRes.nit_extraido) {
-        registrarExtraccionNit(tipoDoc, docRes.nit_extraido);
-      }
-      if (docRes.nombre_representante_extraido) {
-        registrarExtraccionNombreRepresentante(tipoDoc, docRes.nombre_representante_extraido);
-      }
-      if (docRes.numero_doc_representante_extraido) {
-        registrarExtraccionNumeroDocRepresentante(tipoDoc, docRes.numero_doc_representante_extraido);
-      }
-      if (docRes.direccion_extraida) {
-        registrarExtraccionDireccion(tipoDoc, docRes.direccion_extraida);
-      }
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
       }
@@ -142,12 +111,7 @@ export function useFormulario() {
       delete updated[tipoDoc];
       return updated;
     });
-    limpiarExtraccion(tipoDoc);
-    limpiarExtraccionNit(tipoDoc);
-    limpiarExtraccionNombreRepresentante(tipoDoc);
-    limpiarExtraccionNumeroDocRepresentante(tipoDoc);
-    limpiarExtraccionDireccion(tipoDoc);
-  }, [limpiarExtraccion, limpiarExtraccionNit, limpiarExtraccionNombreRepresentante, limpiarExtraccionNumeroDocRepresentante, limpiarExtraccionDireccion]);
+  }, []);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -338,14 +302,6 @@ export function useFormulario() {
     }
     setSaving(false);
   };
-
-  // ── Alertas de inconsistencia de nombre (reactivas a formData.razon_social) ─
-
-  const alertasRazonSocial = calcularAlertas(formData.razon_social);
-  const alertasNit = calcularAlertasNit(formData.numero_identificacion, formData.tipo_identificacion);
-  const alertasNombreRepresentante = calcularAlertasNombreRepresentante(formData.nombre_representante);
-  const alertasNumeroDocRepresentante = calcularAlertasNumeroDocRepresentante(formData.numero_doc_representante);
-  const alertasDireccion = calcularAlertasDireccion(formData.direccion);
 
   // ── Interfaz pública del hook ────────────────────────────────────────────
 

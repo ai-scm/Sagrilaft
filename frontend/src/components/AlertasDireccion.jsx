@@ -12,7 +12,7 @@
 
 /**
  * @param {{
- *   alertas: import('../hooks/useAlertasDireccion').AlertaInconsistenciaDireccion[],
+ *   alertas: import('../utils/calcularAlertasInconsistencia').AlertaInconsistencia[],
  * }} props
  */
 export default function AlertasDireccion({ alertas }) {
