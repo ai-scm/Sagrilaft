@@ -10,7 +10,7 @@ No trunca la longitud (a diferencia de normalizador_nit.py), porque los números
 documento no tienen dígito de verificación que descartar.
 
 SRP: única responsabilidad — producir una forma canónica de un número de documento.
-DRY: función única invocada desde ComparadorNumeroDoc; no se repite la lógica.
+DRY: función única invocada desde Comparador; no se repite la lógica.
 """
 
 import re

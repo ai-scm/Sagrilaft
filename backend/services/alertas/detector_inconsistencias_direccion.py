@@ -17,19 +17,20 @@ SOLID:
 - O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
                              entrada en _DOCUMENTOS_MONITOREADOS, sin tocar la
                              lógica de DetectorInconsistenciasDireccion.
-- D (Inversión de Dependencias): depende de ComparadorDireccion (abstracción),
+- D (Inversión de Dependencias): depende de Comparador (abstracción),
                                  no de lógica de normalización directa.
 
 DRY: la configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
      única fuente de verdad. La normalización está en normalizador_direccion.py
-     y es compartida con ComparadorDireccion.
+     y es compartida con Comparador.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.alertas.comparador_direccion import ComparadorDireccion
+from services.alertas.comparador import Comparador
+from services.alertas.normalizador_direccion import normalizar_direccion
 from services.contracts import AlertaInconsistencia
 
 
@@ -63,12 +64,12 @@ class DetectorInconsistenciasDireccion:
         )
 
     SRP: única responsabilidad — producir o descartar una alerta de dirección.
-    DIP: depende de ComparadorDireccion; el comparador puede sustituirse sin
+    DIP: depende de Comparador; el comparador puede sustituirse sin
          modificar esta clase.
     """
 
     def __init__(self) -> None:
-        self._comparador = ComparadorDireccion()
+        self._comparador = Comparador(normalizar_direccion)
 
     # ── API pública ───────────────────────────────────────────────────────────
 

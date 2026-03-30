@@ -11,11 +11,11 @@ DRY : _ProveedorSimuladoBase centraliza la normalización y comparación
       que antes se repetía en cada clase proveedora.
 """
 
-import unicodedata
 from typing import List, Optional
 
 from schemas import ResultadoListaCautela
 from services.listas.contracts import IProveedorListaCautela
+from services.utils.texto import quitar_diacriticos
 
 
 # ─── Datos simulados ─────────────────────────────────────────────────────────
@@ -45,9 +45,7 @@ def _normalizar(texto: str) -> str:
 
     Evita falsos negativos al comparar nombres con y sin tilde.
     """
-    sin_tildes = unicodedata.normalize("NFD", texto)
-    solo_ascii = sin_tildes.encode("ascii", "ignore").decode("ascii")
-    return solo_ascii.lower().strip()
+    return quitar_diacriticos(texto).lower().strip()
 
 
 class _ProveedorSimuladoBase:

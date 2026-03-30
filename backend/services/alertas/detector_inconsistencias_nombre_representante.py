@@ -6,7 +6,7 @@ Sabe exactamente en qué campo de cada tipo de documento reside el nombre del
 representante legal y genera una AlertaInconsistenciaNombreRepresentante cuando
 el valor extraído no coincide con el campo nombre_representante del formulario.
 
-Reutiliza ComparadorRazonSocial porque la tolerancia que ya implementa
+Reutiliza Comparador porque la tolerancia que ya implementa
 (diacríticos, mayúsculas, espacios) es exactamente la que se necesita para
 comparar nombres de personas. Las sustituciones de siglas societarias (SAS,
 LTDA…) no causan falsos negativos en nombres personales porque no aparecen
@@ -19,10 +19,10 @@ SOLID:
 - O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
                              entrada en _DOCUMENTOS_MONITOREADOS, sin tocar
                              la lógica de DetectorInconsistenciasNombreRepresentante.
-- D (Inversión de Dependencias): depende de ComparadorRazonSocial (abstracción
+- D (Inversión de Dependencias): depende de Comparador (abstracción
                                  ya probada), no reimplementa lógica de comparación.
 
-DRY: reutiliza ComparadorRazonSocial en lugar de duplicar la normalización.
+DRY: reutiliza Comparador en lugar de duplicar la normalización.
      La configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
      única fuente de verdad.
 """
@@ -31,7 +31,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.alertas.comparador_razon_social import ComparadorRazonSocial
+from services.alertas.comparador import Comparador
+from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.contracts import AlertaInconsistencia
 
 
@@ -67,7 +68,7 @@ class DetectorInconsistenciasNombreRepresentante:
     Genera alertas cuando el nombre del representante legal extraído de un
     documento no coincide con el ingresado en el formulario.
 
-    Reutiliza ComparadorRazonSocial para la comparación tolerante: la
+    Reutiliza Comparador para la comparación tolerante: la
     normalización (quitar tildes, mayúsculas, colapsar espacios) es aplicable
     tanto a razones sociales como a nombres de personas.
 
@@ -78,12 +79,12 @@ class DetectorInconsistenciasNombreRepresentante:
 
     SRP: única responsabilidad — producir o descartar una alerta de nombre
          de representante.
-    DIP: depende de ComparadorRazonSocial; el comparador puede sustituirse sin
+    DIP: depende de Comparador; el comparador puede sustituirse sin
          modificar esta clase.
     """
 
     def __init__(self) -> None:
-        self._comparador = ComparadorRazonSocial()
+        self._comparador = Comparador(normalizar_razon_social)
 
     # ── API pública ───────────────────────────────────────────────────────────
 

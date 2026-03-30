@@ -11,7 +11,7 @@ SOLID:
 - O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
                              entrada en _DOCUMENTOS_MONITOREADOS, sin tocar
                              la lógica de DetectorInconsistenciasNombre.
-- D (Inversión de Dependencias): depende de ComparadorRazonSocial (abstracción),
+- D (Inversión de Dependencias): depende de Comparador (abstracción),
                                  no de lógica de normalización directa.
 
 DRY: la configuración de cada documento (qué campo, qué nombre legible, qué
@@ -23,7 +23,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.alertas.comparador_razon_social import ComparadorRazonSocial
+from services.alertas.comparador import Comparador
+from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.contracts import AlertaInconsistencia
 
 
@@ -67,12 +68,12 @@ class DetectorInconsistenciasNombre:
         alerta = detector.detectar(tipo_documento, datos_extraidos, razon_social_form)
 
     SRP: única responsabilidad — producir o descartar una alerta de nombre.
-    DIP: depende de ComparadorRazonSocial; el comparador puede sustituirse sin
+    DIP: depende de Comparador; el comparador puede sustituirse sin
          modificar esta clase.
     """
 
     def __init__(self) -> None:
-        self._comparador = ComparadorRazonSocial()
+        self._comparador = Comparador(normalizar_razon_social)
 
     # ── API pública ───────────────────────────────────────────────────────────
 

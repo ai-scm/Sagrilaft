@@ -23,8 +23,9 @@ DRY: tabla de abreviaciones centralizada; la misma lógica se refleja en el
 from __future__ import annotations
 
 import re
-import unicodedata
 from typing import List, Tuple
+
+from services.utils.texto import quitar_diacriticos
 
 
 # ── Tipos viales colombianos más frecuentes ───────────────────────────────────
@@ -94,8 +95,7 @@ def normalizar_direccion(valor: str) -> str:
         return ""
 
     # 1. Quitar diacríticos
-    sin_tildes = unicodedata.normalize("NFD", str(valor))
-    texto = sin_tildes.encode("ascii", "ignore").decode("ascii")
+    texto = quitar_diacriticos(str(valor))
 
     # 2. Mayúsculas
     texto = texto.upper()

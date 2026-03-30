@@ -87,6 +87,26 @@ class HallazgoValidacion:
 
 
 @dataclass(frozen=True)
+class ResultadoComparacion:
+    """
+    Resultado de comparar un campo del formulario contra el extraído de un documento.
+
+    Value Object inmutable y genérico que reemplaza los cuatro dataclasses específicos
+    anteriores (ResultadoComparacion, ResultadoComparacionNit, ResultadoComparacionNumeroDoc,
+    ResultadoComparacionDireccion). Todos tenían los mismos cinco campos.
+
+    OCP: agregar un nuevo tipo de comparación no requiere crear otro dataclass,
+         solo instanciar Comparador con el normalizador correspondiente.
+    """
+
+    coincide: bool
+    valor_formulario_original: str
+    valor_documento_original: str
+    valor_formulario_normalizado: str
+    valor_documento_normalizado: str
+
+
+@dataclass(frozen=True)
 class AlertaInconsistencia:
     """
     Inconsistencia detectada entre un campo del formulario y un documento adjunto.

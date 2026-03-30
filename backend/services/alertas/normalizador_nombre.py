@@ -20,8 +20,9 @@ DRY: tabla de siglas centralizada; la misma lista se usa tanto en el backend
 from __future__ import annotations
 
 import re
-import unicodedata
 from typing import List, Tuple
+
+from services.utils.texto import quitar_diacriticos
 
 
 # ── Siglas societarias colombianas más frecuentes ─────────────────────────────
@@ -87,8 +88,7 @@ def normalizar_razon_social(valor: str) -> str:
         return ""
 
     # 1. Quitar diacríticos
-    sin_tildes = unicodedata.normalize("NFD", str(valor))
-    texto = sin_tildes.encode("ascii", "ignore").decode("ascii")
+    texto = quitar_diacriticos(str(valor))
 
     # 2. Mayúsculas
     texto = texto.upper()

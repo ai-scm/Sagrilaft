@@ -13,9 +13,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies import obtener_extractor
-from models import DocumentoAdjunto
 from schemas import (
-    AlertaInconsistenciaResponse,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -24,7 +22,8 @@ from schemas import (
     ResultadoValidacionEnvio,
 )
 from services.contracts import IExtractorIA
-from services.formulario_service import FormularioService, ResultadoGuardadoDocumento
+from services.formulario_service import FormularioService
+from services.transformers import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
@@ -101,7 +100,7 @@ async def subir_documento(
         nombre_archivo=archivo.filename,
         content_type=archivo.content_type,
     )
-    return _construir_respuesta_documento(resultado)
+    return construir_respuesta_documento(resultado)
 
 
 @enrutador.delete("/{formulario_id}/documentos/{doc_id}")
@@ -151,50 +150,3 @@ async def prellenar_todos_documentos(
     consolidados para pre-llenado completo del formulario.
     """
     return await servicio.prellenar_todos(formulario_id)
-
-
-# ─── Helpers privados ────────────────────────────────────────────────────────
-
-def _serializar_alerta(alerta) -> AlertaInconsistenciaResponse | None:
-    """Convierte un dominio AlertaInconsistencia al schema HTTP de transporte."""
-    if not alerta:
-        return None
-    return AlertaInconsistenciaResponse(
-        tipo_documento=alerta.tipo_documento,
-        nombre_documento=alerta.nombre_documento,
-        seccion_referencia=alerta.seccion_referencia,
-        valor_formulario=alerta.valor_formulario,
-        valor_documento=alerta.valor_documento,
-        tipo_alerta=alerta.tipo_alerta,
-        mensaje=alerta.mensaje,
-    )
-
-
-def _construir_respuesta_documento(
-    resultado: ResultadoGuardadoDocumento,
-) -> DocumentoResponse:
-    """
-    Construye un DocumentoResponse a partir de ResultadoGuardadoDocumento.
-
-    SRP: única responsabilidad — serializar el resultado del servicio al schema HTTP.
-    """
-    doc = resultado.documento
-    return DocumentoResponse(
-        id=doc.id,
-        tipo_documento=doc.tipo_documento,
-        nombre_archivo=doc.nombre_archivo,
-        content_type=doc.content_type,
-        tamano=doc.tamano,
-        created_at=doc.created_at,
-        campos_sugeridos=resultado.campos_sugeridos or None,
-        razon_social_extraida=resultado.razon_social_extraida,
-        alerta_nombre=_serializar_alerta(resultado.alerta_nombre),
-        nit_extraido=resultado.nit_extraido,
-        alerta_nit=_serializar_alerta(resultado.alerta_nit),
-        nombre_representante_extraido=resultado.nombre_representante_extraido,
-        alerta_nombre_representante=_serializar_alerta(resultado.alerta_nombre_representante),
-        numero_doc_representante_extraido=resultado.numero_doc_representante_extraido,
-        alerta_numero_doc_representante=_serializar_alerta(resultado.alerta_numero_doc_representante),
-        direccion_extraida=resultado.direccion_extraida,
-        alerta_direccion=_serializar_alerta(resultado.alerta_direccion),
-    )

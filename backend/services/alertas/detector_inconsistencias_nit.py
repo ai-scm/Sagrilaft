@@ -11,7 +11,7 @@ SOLID:
 - O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
                              entrada en _DOCUMENTOS_MONITOREADOS_NIT, sin tocar
                              la lógica de DetectorInconsistenciasNit.
-- D (Inversión de Dependencias): depende de ComparadorNit (abstracción),
+- D (Inversión de Dependencias): depende de Comparador (abstracción),
                                  no de lógica de normalización directa.
 
 DRY: la configuración de cada documento (qué campo, qué nombre legible, qué
@@ -23,7 +23,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.alertas.comparador_nit import ComparadorNit
+from services.alertas.comparador import Comparador
+from services.alertas.normalizador_nit import normalizar_nit
 from services.contracts import AlertaInconsistencia
 
 
@@ -86,12 +87,12 @@ class DetectorInconsistenciasNit:
         )
 
     SRP: única responsabilidad — producir o descartar una alerta de NIT.
-    DIP: depende de ComparadorNit; el comparador puede sustituirse sin
+    DIP: depende de Comparador; el comparador puede sustituirse sin
          modificar esta clase.
     """
 
     def __init__(self) -> None:
-        self._comparador = ComparadorNit()
+        self._comparador = Comparador(normalizar_nit)
 
     # ── API pública ───────────────────────────────────────────────────────────
 

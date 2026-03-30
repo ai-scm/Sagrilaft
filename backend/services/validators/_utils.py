@@ -8,9 +8,10 @@ SRP : cada función tiene una responsabilidad única y bien delimitada.
 
 from __future__ import annotations
 
-import unicodedata
 from datetime import date, datetime
 from typing import Any, Callable, Optional
+
+from services.utils.texto import quitar_diacriticos
 
 from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.alertas.normalizador_nit import normalizar_nit
@@ -41,9 +42,7 @@ def normalizar_texto(valor: Any) -> str:
     """
     if not valor:
         return ""
-    sin_tildes = unicodedata.normalize("NFD", str(valor))
-    solo_ascii = sin_tildes.encode("ascii", "ignore").decode("ascii")
-    return solo_ascii.lower().strip()
+    return quitar_diacriticos(str(valor)).lower().strip()
 
 
 def normalizar_identificacion(valor: Any) -> str:

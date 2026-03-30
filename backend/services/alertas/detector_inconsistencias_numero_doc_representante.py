@@ -22,19 +22,20 @@ SOLID:
 - O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
                              entrada en _DOCUMENTOS_MONITOREADOS, sin tocar la
                              lógica de DetectorInconsistenciasNumeroDocRepresentante.
-- D (Inversión de Dependencias): depende de ComparadorNumeroDoc (abstracción),
+- D (Inversión de Dependencias): depende de Comparador (abstracción),
                                  no de lógica de normalización directa.
 
 DRY: la configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
      única fuente de verdad. La normalización está en normalizador_numero_doc.py
-     y es compartida con ComparadorNumeroDoc.
+     y es compartida con Comparador.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from services.alertas.comparador_numero_doc import ComparadorNumeroDoc
+from services.alertas.comparador import Comparador
+from services.alertas.normalizador_numero_doc import normalizar_numero_doc
 from services.contracts import AlertaInconsistencia
 
 
@@ -85,12 +86,12 @@ class DetectorInconsistenciasNumeroDocRepresentante:
 
     SRP: única responsabilidad — producir o descartar una alerta de número de
          documento del representante.
-    DIP: depende de ComparadorNumeroDoc; el comparador puede sustituirse sin
+    DIP: depende de Comparador; el comparador puede sustituirse sin
          modificar esta clase.
     """
 
     def __init__(self) -> None:
-        self._comparador = ComparadorNumeroDoc()
+        self._comparador = Comparador(normalizar_numero_doc)
 
     # ── API pública ───────────────────────────────────────────────────────────
 
