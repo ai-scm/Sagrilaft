@@ -27,7 +27,7 @@ venv/
 .venv/
 env/
 .env/
-
+backend/services/uploads/
 # pytest / coverage
 .pytest_cache/
 .coverage
