@@ -42,9 +42,22 @@ def _coercionar_porcentaje(v: object) -> float | None:
     return valor
 
 
+def _coercionar_porcentaje_participacion(v: object) -> float | None:
+    """
+    Coerciona porcentaje de participación accionaria o control efectivo.
+    Rango permitido: (0, 100) exclusivo — ningún titular puede ostentar el 100%,
+    pues la figura aplica solo cuando existen múltiples partes.
+    """
+    valor = _coercionar_porcentaje(v)
+    if valor is not None and valor >= 100:
+        raise ValueError('El porcentaje de participación no puede ser igual o superior al 100%')
+    return valor
+
+
 # Tipos reutilizables en cualquier schema que maneje montos o porcentajes
-MontoPositivo   = Annotated[Optional[float], BeforeValidator(_coercionar_monto)]
-PorcentajeValido = Annotated[Optional[float], BeforeValidator(_coercionar_porcentaje)]
+MontoPositivo          = Annotated[Optional[float], BeforeValidator(_coercionar_monto)]
+PorcentajeValido       = Annotated[Optional[float], BeforeValidator(_coercionar_porcentaje)]
+PorcentajeParticipacion = Annotated[Optional[float], BeforeValidator(_coercionar_porcentaje_participacion)]
 
 
 # --- Sub-schemas para datos dinámicos ---
@@ -59,7 +72,7 @@ class MiembroJunta(BaseModel):
 
 class Accionista(BaseModel):
     nombre: Optional[str] = None
-    porcentaje: PorcentajeValido = None
+    porcentaje: PorcentajeParticipacion = None
     tipo_id: Optional[str] = None
     numero_id: Optional[str] = None
     es_pep: Optional[str] = None
@@ -68,7 +81,7 @@ class Accionista(BaseModel):
 
 class BeneficiarioFinal(BaseModel):
     nombre: Optional[str] = None
-    porcentaje: PorcentajeValido = None
+    porcentaje: PorcentajeParticipacion = None
     tipo_id: Optional[str] = None
     numero_id: Optional[str] = None
     es_pep: Optional[str] = None

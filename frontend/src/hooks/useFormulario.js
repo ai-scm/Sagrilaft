@@ -11,7 +11,7 @@ import { useState, useCallback } from 'react';
 import { api } from '../services/api';
 import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
-import { useTablasDinamicas } from './useTablasDinamicas';
+import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
 import { useAlertasInconsistencia } from './useAlertasInconsistencia';
 import {
@@ -57,16 +57,27 @@ export function useFormulario() {
     handleInfoBancariaPagosChange, addInfoBancariaPagos,
   } = useTablasDinamicas();
 
-  const _buildPayload = () => sanitizarPayload({
-    ...formData,
-    pagina_actual: step,
-    junta_directiva: juntaDirectiva,
-    accionistas,
-    beneficiario_final: beneficiarios,
-    referencias_comerciales: referenciasComerciales,
-    referencias_bancarias: referenciasBancarias,
-    informacion_bancaria_pagos: infoBancariaPagos,
-  });
+  /**
+   * Construye el payload que se envía a la API.
+   *
+   * Las tablas del Paso 4 (Junta, Accionistas, Beneficiarios) son exclusivas
+   * de Persona Jurídica. Para Persona Natural se envían arrays vacíos para
+   * evitar que datos residuales contaminen la DB y generen errores de
+   * validación en el backend cuando el tipo cambia entre sesiones.
+   */
+  const _buildPayload = () => {
+    const esPersonaJuridica = formData.tipo_persona === 'juridica';
+    return sanitizarPayload({
+      ...formData,
+      pagina_actual: step,
+      junta_directiva:    esPersonaJuridica ? juntaDirectiva : [],
+      accionistas:        esPersonaJuridica ? accionistas    : [],
+      beneficiario_final: esPersonaJuridica ? beneficiarios  : [],
+      referencias_comerciales:    referenciasComerciales,
+      referencias_bancarias:      referenciasBancarias,
+      informacion_bancaria_pagos: infoBancariaPagos,
+    });
+  };
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
     { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
@@ -78,9 +89,24 @@ export function useFormulario() {
 
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const nuevoValor = type === 'checkbox' ? checked : value;
+    setFormData(prev => ({ ...prev, [name]: nuevoValor }));
     limpiarError(name);
-  }, [limpiarError]);
+
+    // Al cambiar a Persona Natural, reiniciar las tablas del Paso 4 a su
+    // estado vacío/inicial y limpiar sus errores. Evita que datos de una
+    // sesión previa como Jurídica queden activos y disparen validaciones.
+    if (name === 'tipo_persona' && nuevoValor === 'natural') {
+      setJuntaDirectiva(JUNTA_INICIAL);
+      setAccionistas([{}]);
+      setBeneficiarios([{}]);
+      aplicarErrores(prev => {
+        const sinTablasPaso4 = { ...prev };
+        for (const clave of CLAVES_ERROR_PASO4) delete sinTablasPaso4[clave];
+        return sinTablasPaso4;
+      });
+    }
+  }, [limpiarError, aplicarErrores, setJuntaDirectiva, setAccionistas, setBeneficiarios]);
 
   const handleFileChange = async (tipoDoc, file) => {
     if (!file) return;
@@ -299,7 +325,13 @@ export function useFormulario() {
       setSubmitted(true);
     } catch (err) {
       console.error('Error enviando formulario:', err);
-      alert('⚠️ Error al conectar con el servidor. Intente nuevamente.');
+      // err.message contiene los mensajes del backend cuando valido === false
+      // (ver api.js:enviarFormulario). Solo usar el texto genérico para
+      // errores reales de red donde no hay mensaje estructurado.
+      const mensaje = err?.message && err.message !== 'Failed to fetch'
+        ? `⚠️ El formulario no pudo enviarse:\n\n${err.message}`
+        : '⚠️ Error al conectar con el servidor. Intente nuevamente.';
+      alert(mensaje);
     }
     setSaving(false);
   };

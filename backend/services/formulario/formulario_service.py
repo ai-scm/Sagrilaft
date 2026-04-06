@@ -197,11 +197,24 @@ class ValidadorEnvioFormulario:
                 mensaje="Debe aceptar la declaración de origen de fondos",
             ))
 
-        errores.extend(self._validar_junta_directiva(formulario))
-        errores.extend(self._validar_accionistas(formulario))
-        errores.extend(self._validar_beneficiarios(formulario))
+        if self._es_persona_juridica(formulario):
+            errores.extend(self._validar_junta_directiva(formulario))
+            errores.extend(self._validar_accionistas(formulario))
+            errores.extend(self._validar_beneficiarios(formulario))
 
         return errores
+
+    @staticmethod
+    def _es_persona_juridica(formulario: Formulario) -> bool:
+        """
+        Determina si el formulario corresponde a una Persona Jurídica.
+
+        Las tablas de Junta Directiva, Composición Accionaria y Beneficiario
+        Final solo aplican a este tipo de persona. Centralizar esta guarda
+        aquí evita repetir la comparación de string en múltiples métodos
+        y hace explícita la regla de negocio en el dominio.
+        """
+        return (formulario.tipo_persona or "").lower() == "juridica"
 
     # ── Helper genérico (DRY) ────────────────────────────────────────────────
 
@@ -283,6 +296,20 @@ class ValidadorEnvioFormulario:
 
         return errores
 
+    # ── Helper de suma (DRY) ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _sumar_porcentajes(filas: List[dict]) -> float:
+        """Suma los porcentajes numéricos de un conjunto de filas con datos."""
+        total = 0.0
+        for fila in filas:
+            try:
+                valor = float(fila.get("porcentaje") or 0)
+                total += valor
+            except (ValueError, TypeError):
+                pass
+        return total
+
     # ── Validadores por tabla ─────────────────────────────────────────────────
 
     _CAMPOS_JUNTA: List[Tuple[str, str]] = [
@@ -314,33 +341,92 @@ class ValidadorEnvioFormulario:
         return self._validar_filas_tabla(filas, "Junta Directiva y Representantes", "junta_directiva", self._CAMPOS_JUNTA)
 
     def _validar_accionistas(self, formulario: Formulario) -> List[ErrorValidacion]:
-        def regla_porcentaje(i: int, fila: dict):
+        def regla_porcentaje_participacion(i: int, fila: dict):
             porcentaje = fila.get("porcentaje")
-            if porcentaje is not None and str(porcentaje).strip():
-                try:
-                    if float(porcentaje) <= 5:
-                        return ErrorValidacion(
-                            campo=f"accionistas[{i}].porcentaje",
-                            mensaje=f"El accionista '{fila.get('nombre', i + 1)}' debe tener participación mayor al 5%",
-                        )
-                except (ValueError, TypeError):
-                    pass
+            if porcentaje is None or not str(porcentaje).strip():
+                return None
+            try:
+                valor = float(porcentaje)
+            except (ValueError, TypeError):
+                return None
+            nombre = fila.get("nombre") or f"fila {i + 1}"
+            if valor <= 5:
+                return ErrorValidacion(
+                    campo=f"accionistas[{i}].porcentaje",
+                    mensaje=f"El accionista '{nombre}' debe tener participación mayor al 5%",
+                )
+            if valor >= 100:
+                return ErrorValidacion(
+                    campo=f"accionistas[{i}].porcentaje",
+                    mensaje=f"El accionista '{nombre}' no puede tener participación del 100% o superior",
+                )
             return None
 
         filas = self._deserializar_lista(formulario.accionistas)
-        return self._validar_filas_tabla(filas, "Composición Accionaria", "accionistas", self._CAMPOS_ACCIONISTA, [regla_porcentaje])
+        errores = self._validar_filas_tabla(
+            filas, "Composición Accionaria", "accionistas",
+            self._CAMPOS_ACCIONISTA, [regla_porcentaje_participacion],
+        )
+
+        total = self._sumar_porcentajes(filas)
+        if total > 100:
+            errores.append(ErrorValidacion(
+                campo="accionistas.porcentaje_total",
+                mensaje=(
+                    f"La suma de participaciones accionarias es {total:.2f}%, "
+                    "lo que excede el 100% permitido"
+                ),
+            ))
+
+        return errores
 
     def _validar_beneficiarios(self, formulario: Formulario) -> List[ErrorValidacion]:
+        def regla_porcentaje_control(i: int, fila: dict):
+            porcentaje = fila.get("porcentaje")
+            if porcentaje is None or not str(porcentaje).strip():
+                return None
+            try:
+                valor = float(porcentaje)
+            except (ValueError, TypeError):
+                return None
+            nombre = fila.get("nombre") or f"fila {i + 1}"
+            if valor <= 25:
+                return ErrorValidacion(
+                    campo=f"beneficiario_final[{i}].porcentaje",
+                    mensaje=f"El beneficiario '{nombre}' debe tener control mayor al 25%",
+                )
+            if valor >= 100:
+                return ErrorValidacion(
+                    campo=f"beneficiario_final[{i}].porcentaje",
+                    mensaje=f"El beneficiario '{nombre}' no puede tener control del 100% o superior",
+                )
+            return None
+
         def regla_no_nit(i: int, fila: dict):
             if str(fila.get("tipo_id") or "").upper() == "NIT":
                 return ErrorValidacion(
                     campo=f"beneficiario_final[{i}].tipo_id",
-                    mensaje=f"El beneficiario '{fila.get('nombre', i + 1)}' no puede tener NIT como Tipo ID (debe ser CC, CE o PAS)",
+                    mensaje=f"El beneficiario '{fila.get('nombre') or f'fila {i + 1}'}' no puede tener NIT como Tipo ID (debe ser CC, CE o PAS)",
                 )
             return None
 
         filas = self._deserializar_lista(formulario.beneficiario_final)
-        return self._validar_filas_tabla(filas, "Beneficiario Final", "beneficiario_final", self._CAMPOS_BENEFICIARIO, [regla_no_nit])
+        errores = self._validar_filas_tabla(
+            filas, "Beneficiario Final", "beneficiario_final",
+            self._CAMPOS_BENEFICIARIO, [regla_porcentaje_control, regla_no_nit],
+        )
+
+        total = self._sumar_porcentajes(filas)
+        if total > 100:
+            errores.append(ErrorValidacion(
+                campo="beneficiario_final.porcentaje_total",
+                mensaje=(
+                    f"La suma de porcentajes de control es {total:.2f}%, "
+                    "lo que excede el 100% permitido"
+                ),
+            ))
+
+        return errores
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -7,7 +7,12 @@
  */
 import { useState, useCallback } from 'react';
 
-const JUNTA_INICIAL = [
+/**
+ * Filas pre-cargadas para Junta Directiva: reflejan los cargos mínimos
+ * exigidos por Persona Jurídica. Se exporta para poder reinicializar
+ * el estado desde useFormulario cuando el tipo de persona cambia.
+ */
+export const JUNTA_INICIAL = [
   { cargo: 'Presidente' },
   { cargo: 'Gerente General / Rep. Legal' },
 ];

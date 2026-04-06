@@ -162,6 +162,9 @@ export default function PasoJuntaAccionistas({
       {errors.accionistas_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.accionistas_tabla}</div>
       )}
+      {errors.accionistas_suma && (
+        <div className="field-error" style={{ marginBottom: '8px' }}>{errors.accionistas_suma}</div>
+      )}
       <div className="data-table-container">
         <table className="data-table">
           <thead>
@@ -185,7 +188,7 @@ export default function PasoJuntaAccionistas({
                   </td>
                   <td>
                     <input
-                      type="number" step="0.01" min="5.01" max="100"
+                      type="number" step="0.01" min="5.01" max="99.99"
                       value={acc.porcentaje || ''} placeholder="%"
                       onChange={(e) => onAccionistaChange(idx, 'porcentaje', e.target.value)}
                       style={err.porcentaje ? ESTILO_CELDA_ERROR : undefined}
@@ -252,6 +255,9 @@ export default function PasoJuntaAccionistas({
       {errors.beneficiarios_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.beneficiarios_tabla}</div>
       )}
+      {errors.beneficiarios_suma && (
+        <div className="field-error" style={{ marginBottom: '8px' }}>{errors.beneficiarios_suma}</div>
+      )}
       <div className="data-table-container">
         <table className="data-table">
           <thead>
@@ -275,7 +281,7 @@ export default function PasoJuntaAccionistas({
                   </td>
                   <td>
                     <input
-                      type="number" step="0.01" min="25.01" max="100"
+                      type="number" step="0.01" min="25.01" max="99.99"
                       value={ben.porcentaje || ''} placeholder="%"
                       onChange={(e) => onBeneficiarioChange(idx, 'porcentaje', e.target.value)}
                       style={err.porcentaje ? ESTILO_CELDA_ERROR : undefined}

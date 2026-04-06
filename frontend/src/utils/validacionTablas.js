@@ -54,9 +54,10 @@ const mensajeObligatorio = (campo) =>
  */
 export const ESQUEMAS_TABLA = {
   juntaDirectiva: {
-    label:             'Junta Directiva y Representantes',
-    errorKey:          'junta_directiva_tabla',
-    errorKeyFilas:     'junta_directiva_filas',
+    label:              'Junta Directiva y Representantes',
+    errorKey:           'junta_directiva_tabla',
+    errorKeyFilas:      'junta_directiva_filas',
+    errorKeySuma:       null,
     camposObligatorios: ['cargo', 'nombre', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
       (fila) =>
@@ -64,12 +65,14 @@ export const ESQUEMAS_TABLA = {
           ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
           : null,
     ],
+    reglasGrupales: [],
   },
 
   accionistas: {
     label:             'Composición Accionaria',
     errorKey:          'accionistas_tabla',
     errorKeyFilas:     'accionistas_filas',
+    errorKeySuma:      'accionistas_suma',
     camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
       (fila) =>
@@ -77,9 +80,21 @@ export const ESQUEMAS_TABLA = {
           ? { campo: 'porcentaje', mensaje: 'El % de participación debe ser mayor al 5%' }
           : null,
       (fila) =>
+        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= 100
+          ? { campo: 'porcentaje', mensaje: 'El % de participación no puede ser igual o superior al 100%' }
+          : null,
+      (fila) =>
         fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
           ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
           : null,
+    ],
+    reglasGrupales: [
+      (filasActivas) => {
+        const total = sumarPorcentajes(filasActivas);
+        return total > 100
+          ? `La suma de participaciones accionarias es ${total.toFixed(2)}%, lo que excede el 100% permitido`
+          : null;
+      },
     ],
   },
 
@@ -87,11 +102,16 @@ export const ESQUEMAS_TABLA = {
     label:             'Beneficiario Final',
     errorKey:          'beneficiarios_tabla',
     errorKeyFilas:     'beneficiarios_filas',
+    errorKeySuma:      'beneficiarios_suma',
     camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
       (fila) =>
         !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 25
-          ? { campo: 'porcentaje', mensaje: 'El % de participación debe ser mayor al 25%' }
+          ? { campo: 'porcentaje', mensaje: 'El % de control debe ser mayor al 25%' }
+          : null,
+      (fila) =>
+        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= 100
+          ? { campo: 'porcentaje', mensaje: 'El % de control no puede ser igual o superior al 100%' }
           : null,
       (fila) =>
         !esCampoVacio(fila.tipo_id) && String(fila.tipo_id).toUpperCase() === 'NIT'
@@ -101,6 +121,14 @@ export const ESQUEMAS_TABLA = {
         fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
           ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
           : null,
+    ],
+    reglasGrupales: [
+      (filasActivas) => {
+        const total = sumarPorcentajes(filasActivas);
+        return total > 100
+          ? `La suma de porcentajes de control es ${total.toFixed(2)}%, lo que excede el 100% permitido`
+          : null;
+      },
     ],
   },
 };
@@ -135,13 +163,29 @@ const esFilaVacia = (fila, camposObligatorios) =>
   camposObligatorios.every((campo) => esCampoVacio(fila[campo]));
 
 /**
- * Valida una tabla completa.
- * @returns {{ erroresFilas: Array<object|null>, mensajeTabla: string|null }}
+ * Suma los porcentajes numéricos de un conjunto de filas con datos.
+ * Ignora valores no numéricos para no acumular NaN.
+ */
+const sumarPorcentajes = (filas) =>
+  filas.reduce((acumulado, fila) => {
+    const valor = Number(fila.porcentaje);
+    return acumulado + (Number.isFinite(valor) ? valor : 0);
+  }, 0);
+
+/**
+ * Valida una tabla completa: primero campo a campo (por fila),
+ * luego reglas grupales que operan sobre el conjunto de filas activas.
+ *
+ * @returns {{
+ *   erroresFilas:  Array<object|null>,
+ *   mensajeTabla:  string|null,
+ *   errorGrupal:   string|null
+ * }}
  */
 const validarTabla = (filas, esquema) => {
-  const erroresFilas = [];
-  let filasDiligenciadas = 0;
-  let filasValidas = 0;
+  const erroresFilas   = [];
+  const filasActivas   = [];   // filas con al menos un campo diligenciado
+  let filasValidas     = 0;
 
   for (const fila of filas) {
     if (esFilaVacia(fila, esquema.camposObligatorios)) {
@@ -149,22 +193,31 @@ const validarTabla = (filas, esquema) => {
       continue;
     }
 
-    filasDiligenciadas++;
+    filasActivas.push(fila);
     const erroresFila = validarFila(fila, esquema);
-    const esValida = Object.keys(erroresFila).length === 0;
+    const esValida    = Object.keys(erroresFila).length === 0;
 
     erroresFilas.push(esValida ? null : erroresFila);
     if (esValida) filasValidas++;
   }
 
   let mensajeTabla = null;
-  if (filasDiligenciadas === 0) {
+  if (filasActivas.length === 0) {
     mensajeTabla = `Debe registrar al menos un registro en ${esquema.label}`;
-  } else if (filasValidas < filasDiligenciadas) {
+  } else if (filasValidas < filasActivas.length) {
     mensajeTabla = `Complete todos los campos obligatorios en ${esquema.label}`;
   }
 
-  return { erroresFilas, mensajeTabla };
+  // Reglas grupales: se evalúan sobre el conjunto completo de filas activas.
+  // Se ejecutan siempre (independientemente de errores por fila) para que el
+  // usuario vea el problema de suma incluso si los campos individuales son válidos.
+  let errorGrupal = null;
+  for (const regla of esquema.reglasGrupales ?? []) {
+    errorGrupal = regla(filasActivas);
+    if (errorGrupal) break;
+  }
+
+  return { erroresFilas, mensajeTabla, errorGrupal };
 };
 
 // ─── Punto de entrada para el paso 4 ─────────────────────────────────────────
@@ -188,10 +241,13 @@ export const validarTablasPaso4 = ({ juntaDirectiva, accionistas, beneficiarios,
   ];
 
   for (const { filas, esquema } of tablas) {
-    const { erroresFilas, mensajeTabla } = validarTabla(filas, esquema);
+    const { erroresFilas, mensajeTabla, errorGrupal } = validarTabla(filas, esquema);
     if (mensajeTabla) {
       errores[esquema.errorKey]      = mensajeTabla;
       errores[esquema.errorKeyFilas] = erroresFilas;
+    }
+    if (errorGrupal && esquema.errorKeySuma) {
+      errores[esquema.errorKeySuma] = errorGrupal;
     }
   }
 
@@ -199,10 +255,9 @@ export const validarTablasPaso4 = ({ juntaDirectiva, accionistas, beneficiarios,
 };
 
 /** Claves de error del paso 4 (útil para limpiar errores cuando cambia una tabla). */
-export const CLAVES_ERROR_PASO4 = Object.values(ESQUEMAS_TABLA).flatMap((e) => [
-  e.errorKey,
-  e.errorKeyFilas,
-]);
+export const CLAVES_ERROR_PASO4 = Object.values(ESQUEMAS_TABLA).flatMap((e) =>
+  [e.errorKey, e.errorKeyFilas, e.errorKeySuma].filter(Boolean),
+);
 
 // ─── Esquemas y validación del paso 6 ────────────────────────────────────────
 
