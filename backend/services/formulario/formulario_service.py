@@ -34,11 +34,11 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from services.alertas.detector_inconsistencias_nombre import DetectorInconsistenciasNombre
-from services.alertas.detector_inconsistencias_nit import DetectorInconsistenciasNit
-from services.alertas.detector_inconsistencias_nombre_representante import DetectorInconsistenciasNombreRepresentante
-from services.alertas.detector_inconsistencias_numero_doc_representante import DetectorInconsistenciasNumeroDocRepresentante
-from services.alertas.detector_inconsistencias_direccion import DetectorInconsistenciasDireccion
+from services.alertas.detector_inconsistencias_nombre import detector as _detector_nombres
+from services.alertas.detector_inconsistencias_nit import detector as _detector_nit
+from services.alertas.detector_inconsistencias_nombre_representante import detector as _detector_nombre_representante
+from services.alertas.detector_inconsistencias_numero_doc_representante import detector as _detector_numero_doc_representante
+from services.alertas.detector_inconsistencias_direccion import detector as _detector_direccion
 from core.contracts import AlertaInconsistencia, IExtractorIA
 from services.formulario.prellenado import mapear_campos_para_formulario
 
@@ -441,22 +441,28 @@ class ResultadoGuardadoDocumento:
     SRP: evita que el router tenga que desempaquetar tuplas con semántica implícita.
 
     Attributes:
-        documento:             Entidad ORM del documento persistido.
-        campos_sugeridos:      Campos del formulario sugeridos por la IA.
-        razon_social_extraida: Nombre/razón social encontrada en el documento
-                               (None si no aplica o no se extrajo).
-        alerta_nombre:         Alerta de inconsistencia si el nombre del documento
-                               no coincide con el formulario (None si no hay discrepancia).
-        nit_extraido:          NIT encontrado en el documento
-                               (None si no aplica o no se extrajo).
-        alerta_nit:            Alerta de inconsistencia si el NIT del documento
-                               no coincide con el formulario (None si no hay discrepancia).
-        numero_doc_representante_extraido: Número de documento del representante
-                               encontrado en el documento (None si no aplica o no
-                               se extrajo).
-        alerta_numero_doc_representante: Alerta de inconsistencia si el número de
-                               documento del representante no coincide con el formulario
-                               (None si no hay discrepancia).
+        documento:                         Entidad ORM del documento persistido.
+        campos_sugeridos:                  Campos del formulario sugeridos por la IA.
+        razon_social_extraida:             Nombre/razón social encontrada en el documento
+                                           (None si no aplica o no se extrajo).
+        alerta_nombre:                     Alerta si el nombre del documento no coincide
+                                           con el formulario (None si no hay discrepancia).
+        nit_extraido:                      NIT encontrado en el documento
+                                           (None si no aplica o no se extrajo).
+        alerta_nit:                        Alerta si el NIT del documento no coincide
+                                           con el formulario (None si no hay discrepancia).
+        nombre_representante_extraido:     Nombre del representante legal encontrado en
+                                           el documento (None si no aplica o no se extrajo).
+        alerta_nombre_representante:       Alerta si el nombre del representante no coincide
+                                           con el formulario (None si no hay discrepancia).
+        numero_doc_representante_extraido: Número de documento del representante encontrado
+                                           en el documento (None si no aplica o no se extrajo).
+        alerta_numero_doc_representante:   Alerta si el número de documento del representante
+                                           no coincide con el formulario (None si no hay discrepancia).
+        direccion_extraida:                Dirección encontrada en el documento
+                                           (None si no aplica o no se extrajo).
+        alerta_direccion:                  Alerta si la dirección del documento no coincide
+                                           con el formulario (None si no hay discrepancia).
     """
 
     documento: DocumentoAdjunto
@@ -498,11 +504,11 @@ class FormularioService:
         self._sesion = sesion
         self._extractor = extractor
         self._validador_envio = ValidadorEnvioFormulario()
-        self._detector_nombres = DetectorInconsistenciasNombre()
-        self._detector_nit = DetectorInconsistenciasNit()
-        self._detector_nombre_representante = DetectorInconsistenciasNombreRepresentante()
-        self._detector_numero_doc_representante = DetectorInconsistenciasNumeroDocRepresentante()
-        self._detector_direccion = DetectorInconsistenciasDireccion()
+        self._detector_nombres = _detector_nombres
+        self._detector_nit = _detector_nit
+        self._detector_nombre_representante = _detector_nombre_representante
+        self._detector_numero_doc_representante = _detector_numero_doc_representante
+        self._detector_direccion = _detector_direccion
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -657,64 +663,60 @@ class FormularioService:
 
         campos_sugeridos: Dict[str, Any] = {}
         razon_social_extraida: Optional[str] = None
-        alerta_nombre: Optional[AlertaInconsistenciaNombre] = None
+        alerta_nombre: Optional[AlertaInconsistencia] = None
         nit_extraido: Optional[str] = None
-        alerta_nit: Optional[AlertaInconsistenciaNit] = None
+        alerta_nit: Optional[AlertaInconsistencia] = None
         nombre_representante_extraido: Optional[str] = None
-        alerta_nombre_representante: Optional[AlertaInconsistenciaNombreRepresentante] = None
+        alerta_nombre_representante: Optional[AlertaInconsistencia] = None
         numero_doc_representante_extraido: Optional[str] = None
-        alerta_numero_doc_representante: Optional[AlertaInconsistenciaNumeroDocRepresentante] = None
+        alerta_numero_doc_representante: Optional[AlertaInconsistencia] = None
         direccion_extraida: Optional[str] = None
-        alerta_direccion: Optional[AlertaInconsistenciaDireccion] = None
+        alerta_direccion: Optional[AlertaInconsistencia] = None
 
         if extraccion.extraido:
             campos_sugeridos = mapear_campos_para_formulario(
                 tipo_documento, extraccion.datos
             )
-            razon_social_extraida = self._detector_nombres.extraer_nombre_de_documento(
+            razon_social_extraida = self._detector_nombres.extraer_valor_de_documento(
                 tipo_documento, extraccion.datos
             )
             alerta_nombre = self._detector_nombres.detectar(
                 tipo_documento=tipo_documento,
                 datos_extraidos=extraccion.datos,
-                razon_social_formulario=formulario.razon_social,
+                valor_formulario=formulario.razon_social,
             )
-            nit_extraido = self._detector_nit.extraer_nit_de_documento(
+            nit_extraido = self._detector_nit.extraer_valor_de_documento(
                 tipo_documento, extraccion.datos
             )
             alerta_nit = self._detector_nit.detectar(
                 tipo_documento=tipo_documento,
                 datos_extraidos=extraccion.datos,
-                numero_identificacion_formulario=formulario.numero_identificacion,
+                valor_formulario=formulario.numero_identificacion,
                 tipo_identificacion_formulario=formulario.tipo_identificacion,
             )
-            nombre_representante_extraido = (
-                self._detector_nombre_representante.extraer_nombre_de_documento(
-                    tipo_documento, extraccion.datos
-                )
+            nombre_representante_extraido = self._detector_nombre_representante.extraer_valor_de_documento(
+                tipo_documento, extraccion.datos
             )
             alerta_nombre_representante = self._detector_nombre_representante.detectar(
                 tipo_documento=tipo_documento,
                 datos_extraidos=extraccion.datos,
-                nombre_representante_formulario=formulario.nombre_representante,
+                valor_formulario=formulario.nombre_representante,
             )
-            numero_doc_representante_extraido = (
-                self._detector_numero_doc_representante.extraer_numero_doc_de_documento(
-                    tipo_documento, extraccion.datos
-                )
+            numero_doc_representante_extraido = self._detector_numero_doc_representante.extraer_valor_de_documento(
+                tipo_documento, extraccion.datos
             )
             alerta_numero_doc_representante = self._detector_numero_doc_representante.detectar(
                 tipo_documento=tipo_documento,
                 datos_extraidos=extraccion.datos,
-                numero_doc_representante_formulario=formulario.numero_doc_representante,
+                valor_formulario=formulario.numero_doc_representante,
             )
-            direccion_extraida = self._detector_direccion.extraer_direccion_de_documento(
+            direccion_extraida = self._detector_direccion.extraer_valor_de_documento(
                 tipo_documento, extraccion.datos
             )
             alerta_direccion = self._detector_direccion.detectar(
                 tipo_documento=tipo_documento,
                 datos_extraidos=extraccion.datos,
-                direccion_formulario=formulario.direccion,
+                valor_formulario=formulario.direccion,
             )
 
         return ResultadoGuardadoDocumento(

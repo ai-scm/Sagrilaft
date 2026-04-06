@@ -2,172 +2,64 @@
 Detector de inconsistencias en el número de documento del representante legal
 entre el formulario y los documentos adjuntos.
 
-Sabe exactamente en qué campo de cada tipo de documento reside el número de
-identificación del representante y genera una
-AlertaInconsistenciaNumeroDocRepresentante cuando el valor extraído no coincide
-con el campo numero_doc_representante del formulario.
+Instancia de DetectorInconsistencias configurada para el campo número de
+documento del representante legal.
 
 Documentos monitoreados y ubicación del campo:
-  - certificado_existencia → NOMBRAMIENTOS > REPRESENTANTES LEGALES > IDENTIFICACIÓN
-                             (campo extraído: cedula_representante)
-  - rut                    → Representación > 101. Número de identificación
-                             (campo extraído: cedula_representante)
-  - estados_financieros    → Número de documento del representante legal o firmante
-                             (campo extraído: cedula_representante)
+  - cedula_representante    → Número del documento de identidad del titular
+  - certificado_existencia  → NOMBRAMIENTOS > REPRESENTANTES LEGALES > IDENTIFICACIÓN
+  - rut                     → Representación > 101. Número de identificación
+  - estados_financieros     → Número de documento del representante legal o firmante
 
-SOLID:
-- S (Responsabilidad Única): única responsabilidad — detectar si el número de
-                             documento del representante de un documento es
-                             inconsistente con el formulario.
-- O (Abierto/Cerrado):       soportar un nuevo tipo de documento = agregar una
-                             entrada en _DOCUMENTOS_MONITOREADOS, sin tocar la
-                             lógica de DetectorInconsistenciasNumeroDocRepresentante.
-- D (Inversión de Dependencias): depende de Comparador (abstracción),
-                                 no de lógica de normalización directa.
-
-DRY: la configuración de cada documento vive en _DOCUMENTOS_MONITOREADOS como
-     única fuente de verdad. La normalización está en normalizador_numero_doc.py
-     y es compartida con Comparador.
+OCP: soportar un nuevo documento = agregar una entrada en _DOCUMENTOS_MONITOREADOS.
+DRY: la lógica de detección vive en DetectorInconsistencias; este módulo solo
+     declara la configuración específica del campo número de documento.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
-from services.alertas.comparador import Comparador
+from services.alertas.detector_inconsistencias import DetectorInconsistencias
 from services.alertas.normalizador_numero_doc import normalizar_numero_doc
-from core.contracts import AlertaInconsistencia
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
-# OCP: agregar un doc = agregar una entrada. No modificar el detector.
+# OCP: agregar un doc = agregar una entrada. No modificar DetectorInconsistencias.
 
 _DOCUMENTOS_MONITOREADOS: Dict[str, Dict[str, str]] = {
     "cedula_representante": {
-        "campo_numero_doc":  "numero_documento",
-        "nombre_legible":    "Cédula del Representante Legal",
+        "campo_numero_doc":   "numero_documento",
+        "nombre_legible":     "Cédula del Representante Legal",
         "seccion_referencia": "Número del documento de identidad del titular",
     },
     "certificado_existencia": {
-        "campo_numero_doc":  "cedula_representante",
-        "nombre_legible":    "Certificado de Existencia y Representación Legal",
-        "seccion_referencia": (
-            "NOMBRAMIENTOS → REPRESENTANTES LEGALES → IDENTIFICACIÓN"
-        ),
+        "campo_numero_doc":   "cedula_representante",
+        "nombre_legible":     "Certificado de Existencia y Representación Legal",
+        "seccion_referencia": "NOMBRAMIENTOS → REPRESENTANTES LEGALES → IDENTIFICACIÓN",
     },
     "rut": {
-        "campo_numero_doc":  "cedula_representante",
-        "nombre_legible":    "RUT (Registro Único Tributario)",
-        "seccion_referencia": (
-            "Representación → 101. Número de identificación"
-        ),
+        "campo_numero_doc":   "cedula_representante",
+        "nombre_legible":     "RUT (Registro Único Tributario)",
+        "seccion_referencia": "Representación → 101. Número de identificación",
     },
     "estados_financieros": {
-        "campo_numero_doc":  "cedula_representante",
-        "nombre_legible":    "Estados Financieros",
+        "campo_numero_doc":   "cedula_representante",
+        "nombre_legible":     "Estados Financieros",
         "seccion_referencia": (
             "Número de documento del representante legal o firmante del documento"
         ),
     },
 }
 
+# ── Instancia pública ─────────────────────────────────────────────────────────
 
-# ── Detector ─────────────────────────────────────────────────────────────────
-
-class DetectorInconsistenciasNumeroDocRepresentante:
-    """
-    Genera alertas cuando el número de documento del representante legal
-    extraído de un documento no coincide con el ingresado en el formulario.
-
-    Uso típico (dentro de FormularioService, tras la extracción IA):
-        alerta = detector.detectar(
-            tipo_documento, datos_extraidos, numero_doc_representante_form
-        )
-
-    SRP: única responsabilidad — producir o descartar una alerta de número de
-         documento del representante.
-    DIP: depende de Comparador; el comparador puede sustituirse sin
-         modificar esta clase.
-    """
-
-    def __init__(self) -> None:
-        self._comparador = Comparador(normalizar_numero_doc)
-
-    # ── API pública ───────────────────────────────────────────────────────────
-
-    def detectar(
-        self,
-        tipo_documento: str,
-        datos_extraidos: Dict[str, Any],
-        numero_doc_representante_formulario: Optional[str],
-    ) -> Optional[AlertaInconsistencia]:
-        """
-        Detecta si hay inconsistencia de número de documento del representante
-        para el documento recién procesado.
-
-        Args:
-            tipo_documento:                      Tipo del documento subido.
-            datos_extraidos:                     Campos crudos extraídos por IA.
-            numero_doc_representante_formulario: Número de documento del representante
-                                                 actual del formulario (puede ser None
-                                                 si aún no se ha diligenciado).
-
-        Returns:
-            AlertaInconsistenciaNumeroDocRepresentante si hay discrepancia, None si
-            coinciden o si no hay datos suficientes para comparar.
-        """
-        config = _DOCUMENTOS_MONITOREADOS.get(tipo_documento)
-        if not config:
-            return None
-
-        valor_documento = datos_extraidos.get(config["campo_numero_doc"])
-        resultado = self._comparador.comparar(
-            numero_doc_representante_formulario, valor_documento
-        )
-
-        if resultado is None or resultado.coincide:
-            return None
-
-        return AlertaInconsistencia(
-            tipo_documento=tipo_documento,
-            nombre_documento=config["nombre_legible"],
-            seccion_referencia=config["seccion_referencia"],
-            valor_formulario=resultado.valor_formulario_original,
-            valor_documento=resultado.valor_documento_original,
-            tipo_alerta="error",
-            mensaje=(
-                f"El No. de Identificación del representante en el formulario "
-                f"(\"{resultado.valor_formulario_original}\") "
-                f"no coincide con el encontrado en {config['nombre_legible']} "
-                f"(\"{resultado.valor_documento_original}\")."
-            ),
-        )
-
-    def extraer_numero_doc_de_documento(
-        self,
-        tipo_documento: str,
-        datos_extraidos: Dict[str, Any],
-    ) -> Optional[str]:
-        """
-        Extrae el número de documento del representante de un documento sin comparar.
-
-        Usado para devolver numero_doc_representante_extraido al frontend, que lo
-        almacena para recomparar en tiempo real cuando el usuario edita el campo.
-
-        Args:
-            tipo_documento:  Tipo del documento.
-            datos_extraidos: Campos crudos extraídos por IA.
-
-        Returns:
-            Valor del campo de número de documento, o None si no aplica o no
-            se extrajo.
-        """
-        config = _DOCUMENTOS_MONITOREADOS.get(tipo_documento)
-        if not config:
-            return None
-        return datos_extraidos.get(config["campo_numero_doc"]) or None
-
-    @staticmethod
-    def tipos_monitoreados() -> List[str]:
-        """Retorna los tipos de documento que generan alertas de número de documento."""
-        return list(_DOCUMENTOS_MONITOREADOS.keys())
+detector = DetectorInconsistencias(
+    normalizador=normalizar_numero_doc,
+    documentos_monitoreados=_DOCUMENTOS_MONITOREADOS,
+    campo_clave="campo_numero_doc",
+    plantilla_mensaje=(
+        'El No. de Identificación del representante en el formulario ("{valor_formulario}") '
+        'no coincide con el encontrado en {nombre_legible} ("{valor_documento}").'
+    ),
+)
