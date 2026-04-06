@@ -58,17 +58,22 @@ const helpTexts = {
   },
   correo: {
     titulo: "Correo Electrónico",
-    descripcion: "Dirección de correo electrónico corporativo para comunicaciones oficiales.",
-    ejemplo: "contacto@empresa.com"
+    descripcion: "Dirección de correo electrónico corporativo/oficial para comunicaciones oficiales.",
+    ejemplo: "contacto@empresa.com o correoprincipal@dominio.com"
   },
   codigo_ica: {
     titulo: "Código Actividad ICA",
     descripcion: "Código de la actividad económica para el Impuesto de Industria y Comercio. Puede consultarse en el RUT.",
   },
+  fax: {
+    titulo: "Fax",
+    descripcion: "Número de fax de la empresa. Si la empresa no cuenta con fax, escribe NA.",
+    ejemplo: "Si no aplica, escribe NA"
+  },
   pagina_web: {
     titulo: "Página Web",
-    descripcion: "URL del sitio web de la contraparte (opcional).",
-    ejemplo: "https://www.empresa.com"
+    descripcion: "Dirección web oficial de la empresa. Si la empresa no tiene sitio web, escribe NA.",
+    ejemplo: "https://www.empresa.com — Si no aplica, escribe NA"
   },
 
   // Representante Legal
@@ -146,12 +151,12 @@ const helpTexts = {
   // Financiera
   actividad_economica: {
     titulo: "Actividad Económica Principal",
-    descripcion: "Descripción de la actividad económica principal de la contraparte según el registro mercantil.",
+    descripcion: "Descripción de la actividad económica principal de la contraparte según el registro mercantil. (Se valida con base al codigo CIIU)",
     ejemplo: "Desarrollo de aplicaciones de software"
   },
   codigo_ciiu: {
     titulo: "Código CIIU",
-    descripcion: "Código Internacional Industrial Uniforme de la actividad económica principal. Se encuentra en el RUT.",
+    descripcion: "Código Internacional Industrial Uniforme de la actividad económica principal. Se encuentra en el RUT. (Campo en el RUT: 46. Código). (Campo en el certificado de cámara de comercio: Actividad económica principal)",
     ejemplo: "6201 - Actividades de desarrollo de sistemas informáticos"
   },
   ingresos_mensuales: {

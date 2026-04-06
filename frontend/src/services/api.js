@@ -33,7 +33,12 @@ export const api = {
       method: 'POST',
     });
     if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    const resultado = await res.json();
+    if (!resultado.valido) {
+      const detalle = resultado.errores?.map(e => e.mensaje).join('\n') ?? 'El formulario no pudo enviarse';
+      throw new Error(detalle);
+    }
+    return resultado;
   },
 
   // Documentos

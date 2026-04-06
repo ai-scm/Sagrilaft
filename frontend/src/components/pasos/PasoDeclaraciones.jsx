@@ -13,7 +13,7 @@ export default function PasoDeclaraciones({ formData, onChange, onOpenHelp, erro
 
   return (
     <div className="form-card">
-      <h2 className="section-title">✍️ Autorizaciones y Firma</h2>
+      <h2 className="section-title">AUTORIZACION - DECLARACION DE FONDOS Y FIRMA REPRESENTANTE LEGAL</h2>
       <p className="section-subtitle">Declaraciones legales y firma del formulario</p>
 
       {/* Autorización tratamiento de datos */}

@@ -19,6 +19,7 @@ import {
   validarTablasPaso6, CLAVES_ERROR_PASO6,
   validarTablasPaso7, CLAVES_ERROR_PASO7,
 } from '../utils/validacionTablas';
+import { sanitizarPayload } from '../utils/normalizadores';
 
 export function useFormulario() {
   const [step, setStep] = useState(1);
@@ -56,7 +57,7 @@ export function useFormulario() {
     handleInfoBancariaPagosChange, addInfoBancariaPagos,
   } = useTablasDinamicas();
 
-  const _buildPayload = () => ({
+  const _buildPayload = () => sanitizarPayload({
     ...formData,
     pagina_actual: step,
     junta_directiva: juntaDirectiva,

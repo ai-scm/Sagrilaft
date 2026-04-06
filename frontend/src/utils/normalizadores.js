@@ -6,6 +6,27 @@
  * Espeja la lógica de backend/services/alertas/normalizador_*.py.
  */
 
+// ── Saneamiento de payload antes de enviar a la API ──────────────────────────
+
+/**
+ * Convierte recursivamente cadenas vacías a null en el payload del formulario.
+ *
+ * Evita errores 422 de Pydantic cuando el usuario borra un campo numérico
+ * opcional (ingresos, porcentaje, etc.) y el input HTML devuelve "" en lugar
+ * de null.
+ *
+ * @param {unknown} valor - Primitivo, array u objeto anidado.
+ * @returns {unknown} Mismo valor con "" reemplazado por null en todo el árbol.
+ */
+export function sanitizarPayload(valor) {
+  if (Array.isArray(valor))                   return valor.map(sanitizarPayload);
+  if (valor !== null && typeof valor === 'object')
+    return Object.fromEntries(
+      Object.entries(valor).map(([k, v]) => [k, sanitizarPayload(v)])
+    );
+  return valor === '' ? null : valor;
+}
+
 // ── Razón social y nombre de persona ─────────────────────────────────────────
 
 const SIGLAS_SOCIETARIAS = [

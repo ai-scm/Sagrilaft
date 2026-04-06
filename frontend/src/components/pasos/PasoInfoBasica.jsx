@@ -135,9 +135,9 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
           onOpenHelp={onOpenHelp} error={errors.telefono}
         />
         <FormField
-          label="Fax" name="fax" type="tel"
+          label="Fax" name="fax" required
           value={formData.fax} onChange={onChange}
-          onOpenHelp={onOpenHelp}
+          onOpenHelp={onOpenHelp} error={errors.fax}
         />
         <FormField
           label="Correo Electrónico" name="correo" type="email" required
@@ -153,9 +153,9 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
           onOpenHelp={onOpenHelp} error={errors.codigo_ica}
         />
         <FormField
-          label="Página Web" name="pagina_web" type="url"
+          label="Página Web" name="pagina_web" required
           value={formData.pagina_web} onChange={onChange}
-          onOpenHelp={onOpenHelp}
+          onOpenHelp={onOpenHelp} error={errors.pagina_web}
         />
       </div>
     </div>
