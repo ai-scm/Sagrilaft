@@ -1,8 +1,50 @@
 import json
 
-from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from pydantic import BaseModel, BeforeValidator, field_validator
+from typing import Annotated, Optional, List
 from datetime import datetime
+
+
+# ── Tipos anotados para campos numéricos del formulario ──────────────────────
+
+def _coercionar_monto(v: object) -> float | None:
+    """
+    Coerciona un valor de entrada (str o float) a float no negativo.
+    Cadenas vacías y None se interpretan como ausencia de valor (None).
+    Rechaza valores negativos ya que los montos financieros no pueden serlo.
+    """
+    if v is None or v == '':
+        return None
+    try:
+        valor = float(v)
+    except (TypeError, ValueError):
+        raise ValueError('Debe ser un número válido')
+    if valor < 0:
+        raise ValueError('El monto no puede ser negativo')
+    return valor
+
+
+def _coercionar_porcentaje(v: object) -> float | None:
+    """
+    Coerciona un valor de entrada (str o float) a float en rango [0, 100].
+    Cadenas vacías y None se interpretan como ausencia de valor (None).
+    """
+    if v is None or v == '':
+        return None
+    try:
+        valor = float(v)
+    except (TypeError, ValueError):
+        raise ValueError('Debe ser un número válido entre 0 y 100')
+    if valor < 0:
+        raise ValueError('El porcentaje no puede ser negativo')
+    if valor > 100:
+        raise ValueError('El porcentaje no puede superar 100')
+    return valor
+
+
+# Tipos reutilizables en cualquier schema que maneje montos o porcentajes
+MontoPositivo   = Annotated[Optional[float], BeforeValidator(_coercionar_monto)]
+PorcentajeValido = Annotated[Optional[float], BeforeValidator(_coercionar_porcentaje)]
 
 
 # --- Sub-schemas para datos dinámicos ---
@@ -17,7 +59,7 @@ class MiembroJunta(BaseModel):
 
 class Accionista(BaseModel):
     nombre: Optional[str] = None
-    porcentaje: Optional[float] = None
+    porcentaje: PorcentajeValido = None
     tipo_id: Optional[str] = None
     numero_id: Optional[str] = None
     es_pep: Optional[str] = None
@@ -26,7 +68,7 @@ class Accionista(BaseModel):
 
 class BeneficiarioFinal(BaseModel):
     nombre: Optional[str] = None
-    porcentaje: Optional[float] = None
+    porcentaje: PorcentajeValido = None
     tipo_id: Optional[str] = None
     numero_id: Optional[str] = None
     es_pep: Optional[str] = None
@@ -93,12 +135,12 @@ class FormularioBase(BaseModel):
     # 5. Información Financiera
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
-    ingresos_mensuales: Optional[float] = None
-    otros_ingresos: Optional[float] = None
-    egresos_mensuales: Optional[float] = None
-    total_activos: Optional[float] = None
-    total_pasivos: Optional[float] = None
-    patrimonio: Optional[float] = None
+    ingresos_mensuales: MontoPositivo = None
+    otros_ingresos:     MontoPositivo = None
+    egresos_mensuales:  MontoPositivo = None
+    total_activos:      MontoPositivo = None
+    total_pasivos:      MontoPositivo = None
+    patrimonio:         MontoPositivo = None
 
     # 7. Tipos de transacción
     tipos_transaccion: Optional[str] = None
