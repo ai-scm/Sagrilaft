@@ -32,14 +32,18 @@ const DEMORA_GUARDADO_REMOTO_MS = 10_000;
 export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
   const {
     formData, step, formularioId, codigoPeticion,
+    submitted,
     juntaDirectiva, accionistas, beneficiarios,
     referenciasComerciales, referenciasBancarias,
     infoBancariaPagos, documentos,
   } = snapshot;
 
   useEffect(() => {
-    // Sin datos o sin ID de formulario: no hay nada que sincronizar remotamente.
-    if (Object.keys(formData).length === 0 || !formularioId) return;
+    // Sin datos, sin ID o ya enviado: no sincronizar.
+    // El guard de `submitted` cancela el timer de 10s que pudo haber quedado
+    // pendiente desde la última edición. Sin él, el timer dispararía un PUT
+    // sobre un formulario en estado ENVIADO, recibiendo un 400 del backend.
+    if (Object.keys(formData).length === 0 || !formularioId || submitted) return;
 
     let cancelado = false;
 
@@ -49,8 +53,6 @@ export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
         if (!cancelado) alGuardar(new Date());
       } catch {
         // Fallo silencioso: localStorage ya tiene el snapshot reciente.
-        // El usuario no pierde datos; el servidor se sincronizará en el
-        // próximo guardado manual o en el guardado ante salida (Capa 2).
       }
     }, DEMORA_GUARDADO_REMOTO_MS);
 
@@ -58,10 +60,6 @@ export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
       clearTimeout(timer);
       cancelado = true;
     };
-    // `construirPayload` se omite: es la función _buildPayload de useFormulario,
-    // recreada en cada render pero capturada correctamente por el closure del
-    // render que disparó el efecto — semántica correcta con debounce.
-    // `alGuardar` se omite: es setLastSaved, referencia estable por React.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
+  }, [formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
 }

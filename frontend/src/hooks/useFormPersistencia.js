@@ -30,6 +30,7 @@ import { useSalidaSegura } from './useSalidaSegura';
 import {
   leerBorradorDeStorage,
   eliminarBorradorDeStorage,
+  borradorEsFormularioEnviado,
   construirMensajeRecuperacion,
 } from '../utils/borradorStorage';
 
@@ -58,6 +59,15 @@ export function useFormPersistencia(snapshot, setters, construirPayload) {
     const borrador = leerBorradorDeStorage();
     if (!borrador) return;
     if (!borrador.formularioId && !borrador.codigoPeticion) return;
+
+    // Regla de negocio: si el borrador en storage corresponde a un
+    // formulario ya enviado, significa que beforeunload lo reescribió
+    // después del envío (race condition entre limpiarBorrador y el evento
+    // del navegador). Se descarta silenciosamente y se limpia el storage.
+    if (borradorEsFormularioEnviado(borrador)) {
+      eliminarBorradorDeStorage();
+      return;
+    }
 
     if (window.confirm(construirMensajeRecuperacion(borrador))) {
       setFormData(borrador.formData ?? {});

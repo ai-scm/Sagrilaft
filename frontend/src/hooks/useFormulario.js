@@ -80,7 +80,7 @@ export function useFormulario() {
   };
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
-    { formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
+    { formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
     { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias, setInfoBancariaPagos, setDocumentos },
     _buildPayload,
   );

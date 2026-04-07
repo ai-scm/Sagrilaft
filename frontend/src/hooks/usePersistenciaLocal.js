@@ -27,6 +27,7 @@ const DEMORA_GUARDADO_LOCAL_MS = 3_000;
 export function usePersistenciaLocal(snapshot, alGuardar) {
   const {
     formData, step, formularioId, codigoPeticion,
+    submitted,
     juntaDirectiva, accionistas, beneficiarios,
     referenciasComerciales, referenciasBancarias,
     infoBancariaPagos, documentos,
@@ -34,8 +35,17 @@ export function usePersistenciaLocal(snapshot, alGuardar) {
 
   // Debounce: cada cambio reinicia el timer. El guardado ocurre solo
   // después de DEMORA_MS sin actividad — en la pausa natural del usuario.
+  //
+  // `submitted` está en las dependencias: cuando el formulario se envía
+  // React ejecuta el cleanup (clearTimeout) antes de re-ejecutar el efecto,
+  // cancelando cualquier timer pendiente. El nuevo efecto aborta de inmediato
+  // gracias al guard, por lo que nunca reescribe el borrador ya limpiado.
   useEffect(() => {
     if (Object.keys(formData).length === 0) return;
+    // Formulario enviado: no persistir. El storage ya fue limpiado por
+    // handleSubmit → limpiarBorrador(). Este guard es la segunda línea de
+    // defensa ante el timer de debounce que quedó pendiente del último cambio.
+    if (submitted) return;
 
     const timer = setTimeout(() => {
       guardarBorradorEnStorage(snapshot);
@@ -43,11 +53,8 @@ export function usePersistenciaLocal(snapshot, alGuardar) {
     }, DEMORA_GUARDADO_LOCAL_MS);
 
     return () => clearTimeout(timer);
-    // `snapshot` se omite: sus campos individuales ya están en el array y
-    // el objeto se recrea en cada render. `alGuardar` se omite porque es
-    // setLastSaved (setter de useState) — referencia estable garantizada por React.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
+  }, [formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
 
   // Guardado inmediato para uso programático (ej: fallback en error de red)
   const guardarAhora = useCallback(() => {

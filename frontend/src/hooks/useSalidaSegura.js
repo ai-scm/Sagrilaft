@@ -35,6 +35,12 @@ export function useSalidaSegura(snapshot) {
   useEffect(() => {
     const persistirAntesDeSalir = () => {
       const actual = snapshotRef.current;
+      // Regla de negocio: un formulario enviado no es un borrador.
+      // Si ya fue enviado, el storage quedó limpio (handleSubmit invoca
+      // limpiarBorrador antes de setSubmitted). No reescribir aquí evita
+      // que beforeunload rehidrate el borrador justo después del envío,
+      // que es la causa raíz del diálogo de recuperación fantasma.
+      if (actual?.submitted === true) return;
       if (Object.keys(actual?.formData ?? {}).length > 0) {
         guardarBorradorEnStorage(actual);
       }
