@@ -19,7 +19,7 @@ riesgo vivían en el router — ahora están correctamente en este servicio.
 from typing import List, Optional
 
 from schemas import ResultadoListaCautela, RespuestaListaCautela
-from services.listas.contracts import IProveedorListaCautela
+from services.listas.protocolo_listas import IProveedorListaCautela
 
 
 # ═══════════════════════════════════════════════════════════════
