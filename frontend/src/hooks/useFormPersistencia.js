@@ -1,100 +1,86 @@
 /**
  * Hook: useFormPersistencia
  *
- * Gestiona persistencia del formulario: autosave periódico en localStorage
- * y restauración de borrador al montar.
+ * Orquestador de la estrategia híbrida de autoguardado.
+ * Combina tres capas complementarias con responsabilidades distintas:
  *
- * SRP: única responsabilidad = leer/escribir el estado en localStorage y API.
+ *   Capa 1 — usePersistenciaLocal   (debounce 3s  → localStorage)
+ *     Guarda tras cada pausa natural del usuario. Rápido, offline-first.
+ *
+ *   Capa 2 — useSalidaSegura        (beforeunload + visibilitychange)
+ *     Red de seguridad: garantiza un guardado local ante cualquier cierre
+ *     abrupto, independientemente del estado del debounce.
+ *
+ *   Capa 3 — usePersistenciaRemota  (debounce 10s → API)
+ *     Sincroniza con el servidor a menor frecuencia. Fallo silencioso;
+ *     la Capa 1 actúa como respaldo si el servidor no está disponible.
+ *
+ * Al montar, detecta borradores previos en localStorage y ofrece
+ * recuperación al usuario mediante un diálogo de confirmación.
+ *
+ * Interfaz pública idéntica a la versión anterior — sin cambios en consumidores.
+ *
+ * SRP: única responsabilidad = orquestar las capas y gestionar el ciclo
+ *      de vida del borrador (detectar / restaurar / limpiar).
  */
 import { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { usePersistenciaLocal } from './usePersistenciaLocal';
+import { usePersistenciaRemota } from './usePersistenciaRemota';
+import { useSalidaSegura } from './useSalidaSegura';
+import {
+  leerBorradorDeStorage,
+  eliminarBorradorDeStorage,
+  construirMensajeRecuperacion,
+} from '../utils/borradorStorage';
 
-const STORAGE_KEY = 'sagrilaft_autosave';
-const INTERVALO_AUTOSAVE_MS = 30_000;
-
-export function useFormPersistencia(
-  /** Datos actuales del formulario para persistir */
-  snapshot,
-  /** Setters para restaurar el borrador al montar */
-  setters,
-  /** Función que construye el payload para la API */
-  construirPayload,
-) {
-  const {
-    formData, step, formularioId, codigoPeticion,
-    juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-    infoBancariaPagos, documentos,
-  } = snapshot;
-
+export function useFormPersistencia(snapshot, setters, construirPayload) {
   const {
     setFormData, setStep, setFormularioId, setCodigoPeticion,
-    setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias,
+    setJuntaDirectiva, setAccionistas, setBeneficiarios,
+    setReferenciasComerciales, setReferenciasBancarias,
     setInfoBancariaPagos, setDocumentos,
   } = setters;
 
   const [lastSaved, setLastSaved] = useState(null);
 
-  // Restaurar borrador al montar
+  // ── Capa 2: red de seguridad ante cierres abruptos ────────────────────────
+  // Se registra primero para que los listeners estén activos lo antes posible.
+  useSalidaSegura(snapshot);
+
+  // ── Capa 1: guardado local con debounce (3s) ──────────────────────────────
+  const { guardarAhora: guardarBorradorLocal } = usePersistenciaLocal(snapshot, setLastSaved);
+
+  // ── Capa 3: guardado remoto con debounce (10s) ────────────────────────────
+  usePersistenciaRemota(snapshot, construirPayload, setLastSaved);
+
+  // ── Restauración de borrador al montar ────────────────────────────────────
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    try {
-      const borrador = JSON.parse(raw);
-      if (!borrador.formularioId && !borrador.codigoPeticion) return;
-      const label = borrador.codigoPeticion
-        ? `Código: ${borrador.codigoPeticion}`
-        : 'un borrador sin código';
-      const fecha = borrador.savedAt
-        ? ` (guardado: ${new Date(borrador.savedAt).toLocaleString('es-CO')})`
-        : '';
-      if (window.confirm(`Se encontró ${label}${fecha}.\n¿Desea retomar donde lo dejó?`)) {
-        setFormData(borrador.formData || {});
-        setStep(borrador.step || 1);
-        setFormularioId(borrador.formularioId || null);
-        setCodigoPeticion(borrador.codigoPeticion || null);
-        setJuntaDirectiva(borrador.juntaDirectiva || [{ cargo: 'Presidente' }, { cargo: 'Gerente General / Rep. Legal' }]);
-        setAccionistas(borrador.accionistas || [{}]);
-        setBeneficiarios(borrador.beneficiarios || [{}]);
-        setReferenciasComerciales(borrador.referenciasComerciales || [{}, {}]);
-        setReferenciasBancarias(borrador.referenciasBancarias || [{}, {}]);
-        setInfoBancariaPagos(borrador.infoBancariaPagos || [{}, {}]);
-        setDocumentos(borrador.documentos || {});
-      }
-    } catch (_) {}
+    const borrador = leerBorradorDeStorage();
+    if (!borrador) return;
+    if (!borrador.formularioId && !borrador.codigoPeticion) return;
+
+    if (window.confirm(construirMensajeRecuperacion(borrador))) {
+      setFormData(borrador.formData ?? {});
+      setStep(borrador.step ?? 1);
+      setFormularioId(borrador.formularioId ?? null);
+      setCodigoPeticion(borrador.codigoPeticion ?? null);
+      setJuntaDirectiva(
+        borrador.juntaDirectiva ?? [{ cargo: 'Presidente' }, { cargo: 'Gerente General / Rep. Legal' }],
+      );
+      setAccionistas(borrador.accionistas ?? [{}]);
+      setBeneficiarios(borrador.beneficiarios ?? [{}]);
+      setReferenciasComerciales(borrador.referenciasComerciales ?? [{}, {}]);
+      setReferenciasBancarias(borrador.referenciasBancarias ?? [{}, {}]);
+      setInfoBancariaPagos(borrador.infoBancariaPagos ?? [{}, {}]);
+      setDocumentos(borrador.documentos ?? {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autosave cada 30 segundos
-  useEffect(() => {
-    if (Object.keys(formData).length === 0) return;
-    const interval = setInterval(async () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        formData, step, formularioId, codigoPeticion,
-        juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-        infoBancariaPagos, documentos,
-        savedAt: new Date().toISOString(),
-      }));
-      if (formularioId) {
-        try {
-          await api.actualizarFormulario(formularioId, construirPayload());
-        } catch (_) {}
-      }
-      setLastSaved(new Date());
-    }, INTERVALO_AUTOSAVE_MS);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
-
-  const limpiarBorrador = () => localStorage.removeItem(STORAGE_KEY);
-
-  const guardarBorradorLocal = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      formData, step, formularioId, codigoPeticion,
-      juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias,
-      infoBancariaPagos, documentos,
-      savedAt: new Date().toISOString(),
-    }));
+  // ── Interfaz pública ──────────────────────────────────────────────────────
+  return {
+    lastSaved,
+    limpiarBorrador: eliminarBorradorDeStorage,
+    guardarBorradorLocal,
   };
-
-  return { lastSaved, limpiarBorrador, guardarBorradorLocal };
 }
