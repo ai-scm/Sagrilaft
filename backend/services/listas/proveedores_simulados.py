@@ -150,7 +150,7 @@ class ProveedorPoliciaAntecedentes(_ProveedorSimuladoBase):
 
 # ─── Registro de proveedores por defecto ─────────────────────────────────────
 
-PROVEEDORES_MOCK: List[IProveedorListaCautela] = [
+PROVEEDORES_SIMULADOS: List[IProveedorListaCautela] = [
     ProveedorOfac(),
     ProveedorOnu(),
     ProveedorProcuraduria(),

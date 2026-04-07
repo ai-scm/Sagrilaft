@@ -2,7 +2,7 @@
 Utilidades de manipulación de texto compartidas entre subsistemas.
 
 DRY: centraliza operaciones de texto que de otro modo se duplicarían en
-     alertas/normalizadores, validators/_utils y listas/mock_providers.
+     alertas/normalizadores, validators/_utils y listas/proveedores_simulados.
 SRP: cada función tiene una única transformación bien definida.
 """
 

@@ -14,8 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from core import load_config
 from database import engine, Base
 from routers import formulario, validacion, listas_cautela
-from services.listas.lista_cautela_service import ListaCautelaService
-from services.listas.mock_providers import PROVEEDORES_MOCK
+from services.listas.servicio_listas_cautela import ListaCautelaService
+from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
 from services.extractores.bedrock_extractor import ExtractorBedrock
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.validators.camara_comercio import ValidadorCamaraComercio
@@ -71,7 +71,7 @@ async def lifespan(app: FastAPI):
 
     app.state.orchestrator = _crear_orquestador(config)
     app.state.config = config
-    app.state.lista_cautela_service = ListaCautelaService(PROVEEDORES_MOCK)
+    app.state.servicio_listas_cautela = ListaCautelaService(PROVEEDORES_SIMULADOS)
 
     logger.info("SAGRILAFT API iniciada")
     yield
