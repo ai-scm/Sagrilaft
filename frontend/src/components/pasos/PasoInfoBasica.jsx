@@ -1,8 +1,6 @@
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
-import AlertasRazonSocial from '../AlertasRazonSocial';
-import AlertasNit from '../AlertasNit';
-import AlertasDireccion from '../AlertasDireccion';
+import AlertasInconsistencia from '../AlertasInconsistencia';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_CONTRAPARTE = [
@@ -77,7 +75,7 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
         />
       </div>
 
-      <AlertasRazonSocial alertas={alertasRazonSocial} />
+      <AlertasInconsistencia alertas={alertasRazonSocial} tipoCampo="nombre sin resolver" nombreCampo="Nombre o Razón Social" />
 
       <div className="form-row">
         <FormField
@@ -93,7 +91,7 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
         />
       </div>
 
-      <AlertasNit alertas={alertasNit} />
+      <AlertasInconsistencia alertas={alertasNit} tipoCampo="NIT sin resolver" nombreCampo="Número de Identificación" />
 
       <div className="form-row single">
         <FormField
@@ -103,7 +101,7 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
         />
       </div>
 
-      <AlertasDireccion alertas={alertasDireccion} />
+      <AlertasInconsistencia alertas={alertasDireccion} tipoCampo="dirección sin resolver" nombreCampo="Dirección" />
 
       <div className="form-row">
         <LocationSelect

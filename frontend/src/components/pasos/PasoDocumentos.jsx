@@ -1,9 +1,5 @@
 import FileUploadField from '../FileUploadField';
-import AlertasRazonSocial from '../AlertasRazonSocial';
-import AlertasNit from '../AlertasNit';
-import AlertasNombreRepresentante from '../AlertasNombreRepresentante';
-import AlertasNumeroDocRepresentante from '../AlertasNumeroDocRepresentante';
-import AlertasDireccion from '../AlertasDireccion';
+import AlertasInconsistencia from '../AlertasInconsistencia';
 import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
 
 /**
@@ -28,11 +24,11 @@ export default function PasoDocumentos({
         <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo esté correcto).</p>
       </div>
 
-      <AlertasRazonSocial alertas={alertasRazonSocial} />
-      <AlertasNit alertas={alertasNit} />
-      <AlertasNombreRepresentante alertas={alertasNombreRepresentante} />
-      <AlertasNumeroDocRepresentante alertas={alertasNumeroDocRepresentante} />
-      <AlertasDireccion alertas={alertasDireccion} />
+      <AlertasInconsistencia alertas={alertasRazonSocial}           tipoCampo="nombre sin resolver"                              nombreCampo="Nombre o Razón Social" />
+      <AlertasInconsistencia alertas={alertasNit}                  tipoCampo="NIT sin resolver"                                 nombreCampo="Número de Identificación" />
+      <AlertasInconsistencia alertas={alertasNombreRepresentante}  tipoCampo="nombre del representante sin resolver"            nombreCampo="Nombres y Apellidos" />
+      <AlertasInconsistencia alertas={alertasNumeroDocRepresentante} tipoCampo="No. de Identificación del representante sin resolver" nombreCampo="No. de Identificación" />
+      <AlertasInconsistencia alertas={alertasDireccion}            tipoCampo="dirección sin resolver"                           nombreCampo="Dirección" />
 
       {DOCUMENTOS_CONFIG
         .filter(d => !d.soloJuridica || formData.tipo_persona !== 'natural')

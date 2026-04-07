@@ -3,8 +3,7 @@ import { City } from 'country-state-city';
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
 import NacionalidadSelect from '../NacionalidadSelect';
-import AlertasNombreRepresentante from '../AlertasNombreRepresentante';
-import AlertasNumeroDocRepresentante from '../AlertasNumeroDocRepresentante';
+import AlertasInconsistencia from '../AlertasInconsistencia';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
 const TIPOS_DOC = [
@@ -65,7 +64,7 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
         />
       </div>
 
-      <AlertasNombreRepresentante alertas={alertasNombreRepresentante} />
+      <AlertasInconsistencia alertas={alertasNombreRepresentante} tipoCampo="nombre del representante sin resolver" nombreCampo="Nombres y Apellidos" />
 
       <div className="form-row">
         <FormField
@@ -81,7 +80,7 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
         />
       </div>
 
-      <AlertasNumeroDocRepresentante alertas={alertasNumeroDocRepresentante} />
+      <AlertasInconsistencia alertas={alertasNumeroDocRepresentante} tipoCampo="No. de Identificación del representante sin resolver" nombreCampo="No. de Identificación" />
 
       {/* ── Fecha de expedición ─────────────────────────────────────────────── */}
       <div className="form-row">
