@@ -17,7 +17,7 @@ from routers import formulario, validacion, listas_cautela
 from services.listas.lista_cautela_service import ListaCautelaService
 from services.listas.mock_providers import PROVEEDORES_MOCK
 from services.extractores.bedrock_extractor import ExtractorBedrock
-from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.validators.camara_comercio import ValidadorCamaraComercio
 from services.validators.cruzado import ValidadorCruzadoDocumentos, REGLAS_CRUCE_PREDETERMINADAS
 from services.validators.rut import ValidadorRut

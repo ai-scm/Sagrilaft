@@ -8,7 +8,7 @@ DIP : los routers dependen de estas abstracciones en lugar de acceder a
 
 from fastapi import Request
 from core.contratos import IExtractorIA
-from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.lista_cautela_service import ListaCautelaService
 
 def obtener_extractor(solicitud: Request) -> IExtractorIA:

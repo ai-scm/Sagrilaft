@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from models import Formulario, ResultadoValidacion
 from core.contratos import HallazgoValidacion
-from services.orquestacion.document_orchestrator import OrquestadorValidacionDocumentos
+from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.lista_cautela_service import ListaCautelaService
 
 
