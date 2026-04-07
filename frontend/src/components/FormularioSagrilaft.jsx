@@ -39,6 +39,7 @@ export default function FormularioSagrilaft() {
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
     alertasDireccion,
+    hayAlertasActivas,
   } = useFormulario();
 
   if (submitted) {
@@ -128,6 +129,7 @@ export default function FormularioSagrilaft() {
           onSaveDraft={handleSaveDraft}
           onSubmit={handleSubmit}
           bloqueadoPorAnalisis={Object.values(uploadingDoc).some(Boolean)}
+          bloqueadoPorAlertas={hayAlertasActivas}
         />
       </main>
 

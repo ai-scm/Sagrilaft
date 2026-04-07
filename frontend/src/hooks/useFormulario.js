@@ -40,6 +40,7 @@ export function useFormulario() {
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
     alertasDireccion,
+    hayAlertasActivas,
   } = useAlertasInconsistencia(documentos, formData);
 
   const {
@@ -355,5 +356,6 @@ export function useFormulario() {
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
     alertasDireccion,
+    hayAlertasActivas,
   };
 }

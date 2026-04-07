@@ -52,11 +52,23 @@ export function useAlertasInconsistencia(documentos, formData) {
     [documentos, formData.direccion],
   );
 
+  const hayAlertasActivas = useMemo(
+    () => [
+      alertasRazonSocial,
+      alertasNit,
+      alertasNombreRepresentante,
+      alertasNumeroDocRepresentante,
+      alertasDireccion,
+    ].some(alertas => alertas.length > 0),
+    [alertasRazonSocial, alertasNit, alertasNombreRepresentante, alertasNumeroDocRepresentante, alertasDireccion],
+  );
+
   return {
     alertasRazonSocial,
     alertasNit,
     alertasNombreRepresentante,
     alertasNumeroDocRepresentante,
     alertasDireccion,
+    hayAlertasActivas,
   };
 }
