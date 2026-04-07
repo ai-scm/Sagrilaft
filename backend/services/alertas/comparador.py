@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from core.contracts import ResultadoComparacion
+from core.contratos import ResultadoComparacion
 
 
 class Comparador:

@@ -19,7 +19,7 @@ DRY: La extracción con log y la ejecución del validador están centralizadas
 import logging
 from typing import Any, Dict, List, Tuple
 
-from core.contracts import (
+from core.contratos import (
     HallazgoValidacion,
     IExtractorIA,
     IValidadorCruzado,

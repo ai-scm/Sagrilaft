@@ -21,7 +21,7 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from core.contracts import IExtractorIA
+from core.contratos import IExtractorIA
 from services.formulario.formulario_service import FormularioService
 from routers.transformers import construir_respuesta_documento
 

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from services.alertas.normalizador_nit import normalizar_nit
-from core.contracts import HallazgoValidacion, ResultadoExtraccion
+from core.contratos import HallazgoValidacion, ResultadoExtraccion
 from services.validators._utils import (
     FORMATO_FECHA,
     comparar_identificacion,

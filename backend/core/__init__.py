@@ -1,10 +1,33 @@
 """
-Módulo core — configuración de la aplicación.
+Módulo core — configuración y contratos de la aplicación.
 
-Exporta los símbolos públicos de core.config para que los importadores
-existentes (`from core import load_config`) sigan funcionando sin cambios.
+Re-exporta todos los símbolos públicos de configuracion.py y contratos.py
+para que los importadores puedan usar tanto `from core import X`
+como `from core.contratos import X`.
 """
 
-from core.config import AppConfig, AWSConfig, load_config
+from core.configuracion import AppConfig, AWSConfig, load_config
+from core.contratos import (
+    AlertaInconsistencia,
+    HallazgoValidacion,
+    IExtractorIA,
+    IValidadorCruzado,
+    IValidadorDocumento,
+    ResultadoComparacion,
+    ResultadoExtraccion,
+)
 
-__all__ = ["AppConfig", "AWSConfig", "load_config"]
+__all__ = [
+    # configuracion
+    "AppConfig",
+    "AWSConfig",
+    "load_config",
+    # contratos
+    "AlertaInconsistencia",
+    "HallazgoValidacion",
+    "IExtractorIA",
+    "IValidadorCruzado",
+    "IValidadorDocumento",
+    "ResultadoComparacion",
+    "ResultadoExtraccion",
+]
