@@ -17,6 +17,12 @@
 const esCampoVacio = (valor) =>
   valor === undefined || valor === null || String(valor).trim() === '';
 
+/** Valida que un ID contenga máximo 10 caracteres y solo letras y números */
+const reglaNumeroIdAlfanumerico = (fila) =>
+  !esCampoVacio(fila.numero_id) && !/^[a-zA-Z0-9]{1,10}$/.test(fila.numero_id)
+    ? { campo: 'numero_id', mensaje: 'El Número ID debe contener entre 1 y 10 caracteres alfanuméricos (letras/números sin espacios)' }
+    : null;
+
 /** Etiquetas legibles para mensajes de error (fuente única de verdad). */
 const ETIQUETAS_CAMPO = {
   cargo:                  'Cargo',
@@ -60,6 +66,7 @@ export const ESQUEMAS_TABLA = {
     errorKeySuma:       null,
     camposObligatorios: ['cargo', 'nombre', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
+      reglaNumeroIdAlfanumerico,
       (fila) =>
         fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
           ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
@@ -75,6 +82,7 @@ export const ESQUEMAS_TABLA = {
     errorKeySuma:      'accionistas_suma',
     camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
+      reglaNumeroIdAlfanumerico,
       (fila) =>
         !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 5
           ? { campo: 'porcentaje', mensaje: 'El % de participación debe ser mayor al 5%' }
@@ -105,6 +113,7 @@ export const ESQUEMAS_TABLA = {
     errorKeySuma:      'beneficiarios_suma',
     camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
     reglasCondicionales: [
+      reglaNumeroIdAlfanumerico,
       (fila) =>
         !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 25
           ? { campo: 'porcentaje', mensaje: 'El % de control debe ser mayor al 25%' }

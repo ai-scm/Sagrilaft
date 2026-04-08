@@ -321,7 +321,6 @@ class ErrorValidacion(BaseModel):
 
 class ResultadoValidacionEnvio(BaseModel):
     valido: bool
-    errores: List[ErrorValidacion] = []
 
 
 # --- Listas de cautela ---

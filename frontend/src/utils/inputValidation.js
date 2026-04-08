@@ -68,6 +68,25 @@ export const onlyAlphanumericPaste = (e) => {
   }
 };
 
+// ─── Alfanumérico Estricto (solo letras A-Z, a-z y números 0-9) ───────────────
+
+const REGEX_CHAR_ALFANUMERICO_ESTRICTO = /^[a-zA-Z0-9]$/;
+
+/** Bloquea cualquier carácter que no sea una letra no acentuada o número. */
+export const onlyAlphanumericStrictKeyDown = (e) => {
+  if (e.ctrlKey || e.metaKey) return;
+  if (!TECLAS_CONTROL.includes(e.key) && !REGEX_CHAR_ALFANUMERICO_ESTRICTO.test(e.key)) {
+    e.preventDefault();
+  }
+};
+
+/** Bloquea pegado que contenga caracteres diferentes a letras no acentuadas o números. */
+export const onlyAlphanumericStrictPaste = (e) => {
+  if (!/^[a-zA-Z0-9]+$/.test(e.clipboardData.getData('text'))) {
+    e.preventDefault();
+  }
+};
+
 /** Bloquea el signo negativo, '+' y notación científica 'e' en campos numéricos positivos. */
 const blockNegativeKeyDown = (e) => {
   if (e.ctrlKey || e.metaKey) return;

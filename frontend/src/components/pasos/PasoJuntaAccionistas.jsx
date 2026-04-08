@@ -3,6 +3,7 @@ import {
   onlyTextKeyDown, onlyTextPaste,
   onlyAlphanumericKeyDown, onlyAlphanumericPaste,
   onlyNumericKeyDown, onlyNumericPaste,
+  onlyAlphanumericStrictKeyDown, onlyAlphanumericStrictPaste
 } from '../../utils/inputValidation';
 import { HR, ESTILO_CELDA_ERROR } from '../TablaFormComponents';
 
@@ -60,7 +61,7 @@ export default function PasoJuntaAccionistas({
       <p className="section-subtitle">Registrar los datos de las personas que conforman la Junta Directiva Principal, Junta Directiva suplente y Revisores Fiscales, que se encuentran registradas en Cámara de Comercio.</p>
       <p className="section-subtitle">Para responder las preguntas respecto a PEP´s, tenga en cuenta que corresponden a personas expuestas políticamente o públicamente que: Manejan recursos públicos, tienen algún grado de poder público o gozan dereconocimiento público.</p>
       {/* Junta Directiva */}
-      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--gray-800)', marginBottom: '12px' }}>
+      <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--gray-800)', marginBottom: '12px' }}>
         Junta Directiva y Representantes
       </h3>
 
@@ -117,8 +118,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={miembro.numero_id || ''} placeholder="Número"
                       onChange={(e) => onJuntaChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
-                      inputMode="numeric"
+                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -152,7 +153,7 @@ export default function PasoJuntaAccionistas({
       <HR />
 
       {/* Composición Accionaria */}
-      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--gray-800)', marginBottom: '12px' }}>
+      <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--gray-800)', marginBottom: '12px' }}>
         Composición Accionaria
       </h3>
       <div className="info-box">
@@ -211,8 +212,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={acc.numero_id || ''} placeholder="Número"
                       onChange={(e) => onAccionistaChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
-                      inputMode="numeric"
+                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -246,7 +247,7 @@ export default function PasoJuntaAccionistas({
       <HR />
 
       {/* Beneficiario Final */}
-      <h3 style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--gray-800)', marginBottom: '12px' }}>
+      <h3 style={{ fontSize: '1rem', fontWeight: '800', color: 'var(--gray-800)', marginBottom: '12px' }}>
         Beneficiario Final
       </h3>
       <div className="info-box">
@@ -304,8 +305,8 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={ben.numero_id || ''} placeholder="Número"
                       onChange={(e) => onBeneficiarioChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyNumericKeyDown} onPaste={onlyNumericPaste}
-                      inputMode="numeric"
+                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
