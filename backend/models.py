@@ -59,6 +59,7 @@ class Formulario(Base):
     razon_social = Column(String, nullable=True)
     tipo_identificacion = Column(String, nullable=True)
     numero_identificacion = Column(String, nullable=True)
+    digito_verificacion = Column(String, nullable=True)
     direccion = Column(String, nullable=True)
     pais = Column(String, default="Colombia")
     departamento = Column(String, nullable=True)

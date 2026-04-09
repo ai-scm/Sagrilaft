@@ -118,6 +118,7 @@ class FormularioBase(BaseModel):
     razon_social: Optional[str] = None
     tipo_identificacion: Optional[str] = None
     numero_identificacion: Optional[str] = None
+    digito_verificacion: Optional[str] = None
     direccion: Optional[str] = None
     pais: Optional[str] = "Colombia"
     departamento: Optional[str] = None
@@ -205,6 +206,16 @@ class FormularioBase(BaseModel):
 
     # Metadata
     pagina_actual: Optional[int] = 1
+
+    @field_validator('digito_verificacion')
+    @classmethod
+    def validar_digito_verificacion(cls, v: object) -> str | None:
+        """El DV debe ser un único dígito numérico (0-9). Cadenas vacías se tratan como ausencia."""
+        if v is None or v == '':
+            return v
+        if len(str(v)) != 1 or not str(v).isdigit():
+            raise ValueError('El dígito de verificación debe ser un único dígito numérico (0-9)')
+        return str(v)
 
 
 class FormularioCreate(FormularioBase):

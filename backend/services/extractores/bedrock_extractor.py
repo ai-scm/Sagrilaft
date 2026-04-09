@@ -46,6 +46,7 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - correo: correo electrónico registrado
 - telefono: número de teléfono registrado (solo dígitos, sin espacios ni guiones)
 - cedula_representante: número de identificación del representante legal. Búscalo en la sección "REPRESENTACIÓN" → campo "101. Número de identificación". REGLAS ESTRICTAS: (1) El campo "100. Tipo de documento" contiene SOLO un código corto de 2 dígitos (13=CC, 22=CE, 31=NIT, 41=PAS) — ese código NUNCA forma parte del número de identificación. (2) Lee el número que aparece EXCLUSIVAMENTE después del label "101." — ignorando completamente la fila del "100.". (3) Si el valor que extrajiste empieza por 13, 22, 31 o 41 seguido de más dígitos, esos 2 primeros dígitos son el código del tipo de documento que se coló accidentalmente — descártalos y devuelve solo los dígitos restantes. (4) Devuelve únicamente dígitos, sin espacios ni guiones. Si no encuentras el campo 101, devuelve null.
+- clasificacion_dv: dígito de verificación del NIT. Búscalo en la sección "IDENTIFICACIÓN" → campo "6. DV". Devuelve ÚNICAMENTE el dígito numérico (0-9), sin puntos, guiones ni texto adicional. Si no lo encuentras o no es un único dígito numérico, devuelve null.
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
@@ -276,15 +277,29 @@ class ExtractorBedrock:
     @staticmethod
     def _parsear_respuesta_json(texto: str) -> Dict[str, Any]:
         """
-        Parsea la respuesta JSON de Claude, tolerando bloques de markdown
-        con triple comilla (```json ... ```).
+        Parsea la respuesta JSON de Claude con tolerancia a variaciones de formato.
+
+        Maneja dos casos conocidos en los que Claude no devuelve JSON puro:
+        1. Bloque markdown: ```json ... ``` — se eliminan las líneas de fence.
+        2. Texto trailing: JSON válido seguido de notas o aclaraciones del modelo
+           ("Extra data" en json.loads) — se extrae solo el primer objeto JSON.
+
+        raw_decode() parsea el primer valor JSON completo y devuelve el índice
+        donde termina, ignorando cualquier contenido posterior.
         """
         limpio = texto.strip()
+        logger.debug("Respuesta cruda de Claude:\n%s", limpio[:800])
         if limpio.startswith("```"):
             lineas = limpio.split("\n")
             lineas = [l for l in lineas if not l.strip().startswith("```")]
-            limpio = "\n".join(lineas)
-        return json.loads(limpio)
+            limpio = "\n".join(lineas).strip()
+
+        inicio = limpio.find("{")
+        if inicio == -1:
+            raise ValueError("No se encontró ningún objeto JSON en la respuesta del modelo.")
+
+        datos, _ = json.JSONDecoder().raw_decode(limpio, inicio)
+        return datos
 
     @staticmethod
     def obtener_campos_prellenado(

@@ -132,6 +132,7 @@ class ValidadorEnvioFormulario:
         ("razon_social",            "Nombre o Razón Social"),
         ("tipo_identificacion",     "Tipo de Identificación"),
         ("numero_identificacion",   "Número de Identificación"),
+        ("digito_verificacion",     "Dígito de Verificación (DV)"),
         ("direccion",               "Dirección"),
         ("departamento",            "Departamento"),
         ("ciudad",                  "Ciudad"),

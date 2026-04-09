@@ -29,6 +29,29 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _aplicar_migraciones(engine) -> None:
+    """
+    Aplica migraciones de columnas nuevas sin borrar datos existentes.
+
+    SQLAlchemy create_all() no modifica tablas ya creadas, por lo que las
+    columnas añadidas en versiones posteriores se agregan aquí con ALTER TABLE.
+    Se registra cada migración para facilitar el seguimiento en logs.
+    """
+    from sqlalchemy import text
+    columnas_nuevas = {
+        'digito_verificacion': 'TEXT',
+    }
+    with engine.connect() as conn:
+        columnas_existentes = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(formularios)"))
+        }
+        for columna, tipo in columnas_nuevas.items():
+            if columna not in columnas_existentes:
+                conn.execute(text(f"ALTER TABLE formularios ADD COLUMN {columna} {tipo}"))
+                logger.info("Migración aplicada: columna '%s' agregada a 'formularios'", columna)
+        conn.commit()
+
+
 def _crear_extractor(config) -> ExtractorBedrock:
     """Fábrica: crea el extractor Bedrock con las credenciales configuradas."""
     logger.info(
@@ -68,6 +91,7 @@ async def lifespan(app: FastAPI):
     config = load_config()
 
     Base.metadata.create_all(bind=engine)
+    _aplicar_migraciones(engine)
 
     app.state.orchestrator = _crear_orquestador(config)
     app.state.config = config

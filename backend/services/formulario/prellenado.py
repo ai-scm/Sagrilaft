@@ -28,6 +28,24 @@ from typing import Any, Callable, Dict, List, Optional
 # Normalizadores de valor (OCP: agregar aquí sin tocar el motor)
 # ═══════════════════════════════════════════════════════════════
 
+def _normalizar_digito_verificacion(valor: Any) -> Optional[str]:
+    """
+    Extrae el dígito de verificación del NIT (campo 6 del RUT).
+
+    Acepta el valor tal como lo entrega Claude y garantiza que el resultado
+    sea un único dígito numérico (0-9). Si el valor no cumple con esta
+    condición el campo se omite del pre-llenado.
+    """
+    if valor is None:
+        return None
+
+    limpio = re.sub(r'\D', '', str(valor))
+    if len(limpio) != 1:
+        return None
+
+    return limpio
+
+
 def _normalizar_tipo_persona(valor: Any) -> Optional[str]:
     """
     Normaliza el campo "Tipo de Persona" a los valores que usa el select del formulario:
@@ -104,13 +122,14 @@ class MapeadorCamposFormulario:
 
     _MAPEO_POR_TIPO: Dict[str, Dict[str, str]] = {
         "rut": {
-            "razon_social": "razon_social",
-            "nit":          "numero_identificacion",
-            "tipo_persona": "tipo_persona",
-            "direccion":    "direccion",
-            "correo":       "correo",
-            "telefono":     "telefono",
-            "codigo_ica":   "codigo_ica",
+            "razon_social":    "razon_social",
+            "nit":             "numero_identificacion",
+            "clasificacion_dv":"digito_verificacion",
+            "tipo_persona":    "tipo_persona",
+            "direccion":       "direccion",
+            "correo":          "correo",
+            "telefono":        "telefono",
+            "codigo_ica":      "codigo_ica",
         },
         "certificado_existencia": {
             "razon_social":        "razon_social",
@@ -147,7 +166,8 @@ class MapeadorCamposFormulario:
     # OCP: agregar una nueva transformación sin modificar el motor de mapeo.
     _TRANSFORMACIONES: Dict[str, Dict[str, Callable[[Any], Any]]] = {
         "rut": {
-            "tipo_persona": _normalizar_tipo_persona,
+            "tipo_persona":      _normalizar_tipo_persona,
+            "digito_verificacion": _normalizar_digito_verificacion,
         },
         "certificado_existencia": {
             "tipo_persona":        _normalizar_tipo_persona,
