@@ -118,6 +118,7 @@ export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/
  */
 export const REGLAS_INPUT = {
   numero_identificacion:    { soloNumericos: true },
+  digito_verificacion:      { soloNumericos: true, longitudMaxima: 1 },
   numero_doc_representante: { soloNumericos: true },
   telefono:                 { soloNumericos: true, longitudExacta: 10 },
   telefono_representante:   { soloNumericos: true, longitudExacta: 10 },
@@ -159,6 +160,39 @@ export function getInputProps(fieldName) {
     props.maxLength = reglas.longitudMaxima;
   }
   return props;
+}
+
+/**
+ * Retorna las props onKeyDown, onPaste e inputMode para un campo de identificación
+ * dependiendo de su tipo de documento seleccionado.
+ */
+export function getIdPropsByTipoDocumento(tipoDoc) {
+  if (['CC', 'CE', 'NIT'].includes(tipoDoc)) {
+    return {
+      onKeyDown: onlyNumericKeyDown,
+      onPaste: onlyNumericPaste,
+      inputMode: 'numeric',
+    };
+  }
+  return {
+    onKeyDown: onlyAlphanumericStrictKeyDown,
+    onPaste: onlyAlphanumericStrictPaste,
+    inputMode: 'text',
+  };
+}
+
+/**
+ * Limpia el valor ingresado asegurando que cumpla el patrón del tipo de documento.
+ * Útil para interceptar en onChange y evitar autocompletados inválidos.
+ */
+export function sanitizeIdValue(value, tipoDoc) {
+  if (!value) return '';
+  // CC, CE, NIT -> Solo dígitos
+  if (['CC', 'CE', 'NIT'].includes(tipoDoc)) {
+    return value.replace(/\D/g, '');
+  }
+  // Otros -> Alfanumérico sin caracteres especiales
+  return value.replace(/[^a-zA-Z0-9]/g, '');
 }
 
 /**

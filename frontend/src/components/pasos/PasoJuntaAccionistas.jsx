@@ -2,8 +2,7 @@ import { CARGOS_JUNTA_DIRECTIVA } from '../../data/formularioConfig';
 import {
   onlyTextKeyDown, onlyTextPaste,
   onlyAlphanumericKeyDown, onlyAlphanumericPaste,
-  onlyNumericKeyDown, onlyNumericPaste,
-  onlyAlphanumericStrictKeyDown, onlyAlphanumericStrictPaste
+  getIdPropsByTipoDocumento, sanitizeIdValue
 } from '../../utils/inputValidation';
 import { HR, ESTILO_CELDA_ERROR } from '../TablaFormComponents';
 
@@ -67,7 +66,7 @@ export default function PasoJuntaAccionistas({
 
       <div className="info-box">
         <p> PEP: Persona Expuesta Políticamente — persona que maneja recursos públicos, tiene poder público o reconocimiento público.</p>
-        <p> ¿Vínculos con PEP? Describa</p>
+        <p> ¿Vínculos con PEP? Si es asi, describa, de lo contrario colocar NO.</p>
       </div>
       {errors.junta_directiva_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.junta_directiva_tabla}</div>
@@ -117,8 +116,8 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <input
                       value={miembro.numero_id || ''} placeholder="Número"
-                      onChange={(e) => onJuntaChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      onChange={(e) => onJuntaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, miembro.tipo_id))}
+                      {...getIdPropsByTipoDocumento(miembro.tipo_id)}
                       maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
@@ -211,8 +210,8 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <input
                       value={acc.numero_id || ''} placeholder="Número"
-                      onChange={(e) => onAccionistaChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      onChange={(e) => onAccionistaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, acc.tipo_id))}
+                      {...getIdPropsByTipoDocumento(acc.tipo_id)}
                       maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
@@ -304,8 +303,8 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <input
                       value={ben.numero_id || ''} placeholder="Número"
-                      onChange={(e) => onBeneficiarioChange(idx, 'numero_id', e.target.value)}
-                      onKeyDown={onlyAlphanumericStrictKeyDown} onPaste={onlyAlphanumericStrictPaste}
+                      onChange={(e) => onBeneficiarioChange(idx, 'numero_id', sanitizeIdValue(e.target.value, ben.tipo_id))}
+                      {...getIdPropsByTipoDocumento(ben.tipo_id)}
                       maxLength={10}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />

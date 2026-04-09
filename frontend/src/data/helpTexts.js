@@ -31,8 +31,13 @@ const helpTexts = {
   },
   numero_identificacion: {
     titulo: "Número de Identificación",
-    descripcion: "Ingrese el número sin puntos ni guiones. Si es NIT, incluya el dígito de verificación.",
-    ejemplo: "Para NIT: 9007183367. Para CC: 1020345678"
+    descripcion: "Ingrese el número sin puntos ni guiones. El dígito de verificación (DV) se ingresa en el campo separado a la derecha.",
+    ejemplo: "Para NIT: 900718336. Para CC: 1020345678"
+  },
+  digito_verificacion: {
+    titulo: "Dígito de Verificación (DV)",
+    descripcion: "Este dígito se encuentra en el RUT en la casilla 6 llamada DV. Solo aplica para NIT.",
+    ejemplo: "5"
   },
   direccion: {
     titulo: "Dirección",

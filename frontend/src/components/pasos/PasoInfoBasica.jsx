@@ -89,6 +89,11 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
           value={formData.numero_identificacion} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.numero_identificacion}
         />
+        <FormField
+          label="DV" name="digito_verificacion" required
+          value={formData.digito_verificacion} onChange={onChange}
+          onOpenHelp={onOpenHelp} error={errors.digito_verificacion}
+        />
       </div>
 
       <AlertasInconsistencia alertas={alertasNit} tipoCampo="NIT sin resolver" nombreCampo="Número de Identificación" />
