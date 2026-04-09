@@ -96,7 +96,7 @@ const helpTexts = {
   },
   fecha_expedicion: {
     titulo: "Fecha de Expedición",
-    descripcion: "Fecha en que fue expedido el documento de identidad del representante legal.",
+    descripcion: "Fecha en que fue expedido el documento de identidad del representante legal. Se encuentra en el documento principal de identificacion",
   },
   ciudad_expedicion: {
     titulo: "Ciudad de Expedición",
@@ -125,7 +125,7 @@ const helpTexts = {
   },
   telefono_representante: {
     titulo: "Teléfono del Representante",
-    descripcion: "Número de contacto directo del representante legal.",
+    descripcion: "Número de contacto directo del representante legal - CELULAR 10 digitos.",
   },
   direccion_funciones: {
     titulo: "Dirección donde Ejerce Funciones",

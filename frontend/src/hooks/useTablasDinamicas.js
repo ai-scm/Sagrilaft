@@ -29,11 +29,27 @@ function usarTabla(valorInicial) {
     });
   }, []);
 
+  /**
+   * Cambia el tipo de identificación de una fila y limpia el número
+   * de identificación asociado en una única actualización de estado.
+   *
+   * La dependencia tipo_id → numero_id vive aquí y no en el componente:
+   * cualquier tabla que gestione identificaciones puede reutilizar este
+   * comportamiento sin repetir la regla en la capa de presentación.
+   */
+  const cambiarTipoIdentificacion = useCallback((index, nuevoTipo) => {
+    setFilas(prev => {
+      const actualizado = [...prev];
+      actualizado[index] = { ...actualizado[index], tipo_id: nuevoTipo, numero_id: '' };
+      return actualizado;
+    });
+  }, []);
+
   const agregarFila = useCallback((filaInicial = {}) => {
     setFilas(prev => [...prev, filaInicial]);
   }, []);
 
-  return { filas, setFilas, cambiarFila, agregarFila };
+  return { filas, setFilas, cambiarFila, cambiarTipoIdentificacion, agregarFila };
 }
 
 export function useTablasDinamicas() {
@@ -46,20 +62,23 @@ export function useTablasDinamicas() {
 
   return {
     // Junta Directiva
-    juntaDirectiva:     junta.filas,
-    setJuntaDirectiva:  junta.setFilas,
-    handleJuntaChange:  junta.cambiarFila,
-    addJuntaMember:     () => junta.agregarFila(),
+    juntaDirectiva:              junta.filas,
+    setJuntaDirectiva:           junta.setFilas,
+    handleJuntaChange:           junta.cambiarFila,
+    handleJuntaTipoIdChange:     junta.cambiarTipoIdentificacion,
+    addJuntaMember:              () => junta.agregarFila(),
     // Accionistas
-    accionistas:            accionistasTabla.filas,
-    setAccionistas:         accionistasTabla.setFilas,
-    handleAccionistaChange: accionistasTabla.cambiarFila,
-    addAccionista:          () => accionistasTabla.agregarFila({}),
+    accionistas:                     accionistasTabla.filas,
+    setAccionistas:                  accionistasTabla.setFilas,
+    handleAccionistaChange:          accionistasTabla.cambiarFila,
+    handleAccionistaTipoIdChange:    accionistasTabla.cambiarTipoIdentificacion,
+    addAccionista:                   () => accionistasTabla.agregarFila({}),
     // Beneficiarios Finales
-    beneficiarios:            beneficiariosTabla.filas,
-    setBeneficiarios:         beneficiariosTabla.setFilas,
-    handleBeneficiarioChange: beneficiariosTabla.cambiarFila,
-    addBeneficiario:          () => beneficiariosTabla.agregarFila({}),
+    beneficiarios:                    beneficiariosTabla.filas,
+    setBeneficiarios:                 beneficiariosTabla.setFilas,
+    handleBeneficiarioChange:         beneficiariosTabla.cambiarFila,
+    handleBeneficiarioTipoIdChange:   beneficiariosTabla.cambiarTipoIdentificacion,
+    addBeneficiario:                  () => beneficiariosTabla.agregarFila({}),
     // Referencias Comerciales
     referenciasComerciales:        referenciasTabla.filas,
     setReferenciasComerciales:     referenciasTabla.setFilas,

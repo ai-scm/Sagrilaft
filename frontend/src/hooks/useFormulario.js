@@ -45,11 +45,11 @@ export function useFormulario() {
 
   const {
     juntaDirectiva, setJuntaDirectiva,
-    handleJuntaChange, addJuntaMember,
+    handleJuntaChange, handleJuntaTipoIdChange, addJuntaMember,
     accionistas, setAccionistas,
-    handleAccionistaChange, addAccionista,
+    handleAccionistaChange, handleAccionistaTipoIdChange, addAccionista,
     beneficiarios, setBeneficiarios,
-    handleBeneficiarioChange, addBeneficiario,
+    handleBeneficiarioChange, handleBeneficiarioTipoIdChange, addBeneficiario,
     referenciasComerciales, setReferenciasComerciales,
     handleReferenciaChange, addReferencia,
     referenciasBancarias, setReferenciasBancarias,
@@ -176,15 +176,30 @@ export function useFormulario() {
     _limpiarErroresPaso4();
   }, [handleJuntaChange, _limpiarErroresPaso4]);
 
+  const onJuntaTipoIdChange = useCallback((index, nuevoTipo) => {
+    handleJuntaTipoIdChange(index, nuevoTipo);
+    _limpiarErroresPaso4();
+  }, [handleJuntaTipoIdChange, _limpiarErroresPaso4]);
+
   const onAccionistaChange = useCallback((...args) => {
     handleAccionistaChange(...args);
     _limpiarErroresPaso4();
   }, [handleAccionistaChange, _limpiarErroresPaso4]);
 
+  const onAccionistaTipoIdChange = useCallback((index, nuevoTipo) => {
+    handleAccionistaTipoIdChange(index, nuevoTipo);
+    _limpiarErroresPaso4();
+  }, [handleAccionistaTipoIdChange, _limpiarErroresPaso4]);
+
   const onBeneficiarioChange = useCallback((...args) => {
     handleBeneficiarioChange(...args);
     _limpiarErroresPaso4();
   }, [handleBeneficiarioChange, _limpiarErroresPaso4]);
+
+  const onBeneficiarioTipoIdChange = useCallback((index, nuevoTipo) => {
+    handleBeneficiarioTipoIdChange(index, nuevoTipo);
+    _limpiarErroresPaso4();
+  }, [handleBeneficiarioTipoIdChange, _limpiarErroresPaso4]);
 
   // ── Handlers de tablas (limpian errores del paso 6 al editar) ────────────
 
@@ -348,9 +363,9 @@ export function useFormulario() {
     infoBancariaPagos, handleInfoBancariaPagosChange: onInfoBancariaPagosChange, addInfoBancariaPagos,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
-    handleJuntaChange: onJuntaChange, addJuntaMember,
-    handleAccionistaChange: onAccionistaChange, addAccionista,
-    handleBeneficiarioChange: onBeneficiarioChange, addBeneficiario,
+    handleJuntaChange: onJuntaChange, handleJuntaTipoIdChange: onJuntaTipoIdChange, addJuntaMember,
+    handleAccionistaChange: onAccionistaChange, handleAccionistaTipoIdChange: onAccionistaTipoIdChange, addAccionista,
+    handleBeneficiarioChange: onBeneficiarioChange, handleBeneficiarioTipoIdChange: onBeneficiarioTipoIdChange, addBeneficiario,
     alertasRazonSocial,
     alertasNit,
     alertasNombreRepresentante,

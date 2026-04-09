@@ -37,9 +37,9 @@ const TIPOS_ID_BENEFICIARIO = [
 export default function PasoJuntaAccionistas({
   formData,
   errors = {},
-  juntaDirectiva, onJuntaChange, onAddJuntaMember,
-  accionistas, onAccionistaChange, onAddAccionista,
-  beneficiarios, onBeneficiarioChange, onAddBeneficiario,
+  juntaDirectiva, onJuntaChange, onJuntaTipoIdChange, onAddJuntaMember,
+  accionistas, onAccionistaChange, onAccionistaTipoIdChange, onAddAccionista,
+  beneficiarios, onBeneficiarioChange, onBeneficiarioTipoIdChange, onAddBeneficiario,
 }) {
   const erroresFilasJunta = errors.junta_directiva_filas ?? [];
   const erroresFilasAcc   = errors.accionistas_filas     ?? [];
@@ -106,7 +106,7 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <select
                       value={miembro.tipo_id || ''}
-                      onChange={(e) => onJuntaChange(idx, 'tipo_id', e.target.value)}
+                      onChange={(e) => onJuntaTipoIdChange(idx, e.target.value)}
                       style={err.tipo_id ? ESTILO_CELDA_ERROR : undefined}
                     >
                       <option value="">-</option>
@@ -119,6 +119,7 @@ export default function PasoJuntaAccionistas({
                       onChange={(e) => onJuntaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, miembro.tipo_id))}
                       {...getIdPropsByTipoDocumento(miembro.tipo_id)}
                       maxLength={10}
+                      disabled={!miembro.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -200,7 +201,7 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <select
                       value={acc.tipo_id || ''}
-                      onChange={(e) => onAccionistaChange(idx, 'tipo_id', e.target.value)}
+                      onChange={(e) => onAccionistaTipoIdChange(idx, e.target.value)}
                       style={err.tipo_id ? ESTILO_CELDA_ERROR : undefined}
                     >
                       <option value="">-</option>
@@ -213,6 +214,7 @@ export default function PasoJuntaAccionistas({
                       onChange={(e) => onAccionistaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, acc.tipo_id))}
                       {...getIdPropsByTipoDocumento(acc.tipo_id)}
                       maxLength={10}
+                      disabled={!acc.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -293,7 +295,7 @@ export default function PasoJuntaAccionistas({
                   <td>
                     <select
                       value={ben.tipo_id || ''}
-                      onChange={(e) => onBeneficiarioChange(idx, 'tipo_id', e.target.value)}
+                      onChange={(e) => onBeneficiarioTipoIdChange(idx, e.target.value)}
                       style={err.tipo_id ? ESTILO_CELDA_ERROR : undefined}
                     >
                       <option value="">-</option>
@@ -306,6 +308,7 @@ export default function PasoJuntaAccionistas({
                       onChange={(e) => onBeneficiarioChange(idx, 'numero_id', sanitizeIdValue(e.target.value, ben.tipo_id))}
                       {...getIdPropsByTipoDocumento(ben.tipo_id)}
                       maxLength={10}
+                      disabled={!ben.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>

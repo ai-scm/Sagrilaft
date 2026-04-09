@@ -32,8 +32,9 @@ export default function FormularioSagrilaft() {
     infoBancariaPagos, handleInfoBancariaPagosChange, addInfoBancariaPagos,
     handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
-    handleJuntaChange, addJuntaMember, handleAccionistaChange, addAccionista,
-    handleBeneficiarioChange, addBeneficiario,
+    handleJuntaChange, handleJuntaTipoIdChange, addJuntaMember,
+    handleAccionistaChange, handleAccionistaTipoIdChange, addAccionista,
+    handleBeneficiarioChange, handleBeneficiarioTipoIdChange, addBeneficiario,
     alertasRazonSocial,
     alertasNit,
     alertasNombreRepresentante,
@@ -84,12 +85,15 @@ export default function FormularioSagrilaft() {
             {...pasoProps}
             juntaDirectiva={juntaDirectiva}
             onJuntaChange={handleJuntaChange}
+            onJuntaTipoIdChange={handleJuntaTipoIdChange}
             onAddJuntaMember={addJuntaMember}
             accionistas={accionistas}
             onAccionistaChange={handleAccionistaChange}
+            onAccionistaTipoIdChange={handleAccionistaTipoIdChange}
             onAddAccionista={addAccionista}
             beneficiarios={beneficiarios}
             onBeneficiarioChange={handleBeneficiarioChange}
+            onBeneficiarioTipoIdChange={handleBeneficiarioTipoIdChange}
             onAddBeneficiario={addBeneficiario}
           />
         )}
