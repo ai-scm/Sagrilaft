@@ -236,6 +236,11 @@ const helpTexts = {
     titulo: "Referencias Bancarias",
     descripcion: "Certificación bancaria vigente que acredite existencia de cuenta. No debe tener más de 30 días de antigüedad.",
   },
+  realiza_operaciones_moneda_extranjera: {
+    titulo: "¿Realiza Operaciones en Moneda Extranjera?",
+    descripcion: "Indique si la empresa realiza transacciones en divisas distintas al peso colombiano (importaciones, exportaciones, inversiones en el exterior, etc.).",
+    ejemplo: "Seleccione 'Sí' si tiene pagos o cobros en dólares, euros u otra divisa.",
+  },
 };
 
 export default helpTexts;

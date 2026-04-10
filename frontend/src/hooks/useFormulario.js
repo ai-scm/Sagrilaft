@@ -109,6 +109,38 @@ export function useFormulario() {
     }
   }, [limpiarError, aplicarErrores, setJuntaDirectiva, setAccionistas, setBeneficiarios]);
 
+  /**
+   * Cambia '¿Realiza Operaciones en Moneda Extranjera?' y limpia atómicamente
+   * todos los campos dependientes cuando la respuesta pasa a ser 'no' o vacío.
+   *
+   * Centralizar aquí la lógica de cascada garantiza que el formulario nunca
+   * persista datos de campos que el usuario ya no ve.
+   */
+  const handleMonedaExtranjeraChange = useCallback((nuevoValor) => {
+    setFormData(prev => {
+      const siguiente = { ...prev, realiza_operaciones_moneda_extranjera: nuevoValor };
+      if (nuevoValor !== 'si') {
+        siguiente.paises_operaciones     = '';
+        siguiente.tipos_transaccion      = [];
+        siguiente.tipos_transaccion_otros = '';
+      }
+      return siguiente;
+    });
+    limpiarError('realiza_operaciones_moneda_extranjera');
+  }, [limpiarError]);
+
+  /**
+   * Cambia los tipos de transacción seleccionados y limpia el campo '¿Cuáles?'
+   * cuando 'Otras' deja de estar seleccionado.
+   */
+  const handleTiposTransaccionChange = useCallback((tiposSeleccionados) => {
+    setFormData(prev => ({
+      ...prev,
+      tipos_transaccion: tiposSeleccionados,
+      ...(!tiposSeleccionados.includes('otras') && { tipos_transaccion_otros: '' }),
+    }));
+  }, []);
+
   const handleFileChange = async (tipoDoc, file) => {
     if (!file) return;
     setUploadingDoc(prev => ({ ...prev, [tipoDoc]: true }));
@@ -361,7 +393,8 @@ export function useFormulario() {
     referenciasComerciales, handleReferenciaChange: onReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange: onReferenciaBancariaChange, addReferenciaBancaria,
     infoBancariaPagos, handleInfoBancariaPagosChange: onInfoBancariaPagosChange, addInfoBancariaPagos,
-    handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
+    handleChange, handleMonedaExtranjeraChange, handleTiposTransaccionChange,
+    handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange: onJuntaChange, handleJuntaTipoIdChange: onJuntaTipoIdChange, addJuntaMember,
     handleAccionistaChange: onAccionistaChange, handleAccionistaTipoIdChange: onAccionistaTipoIdChange, addAccionista,

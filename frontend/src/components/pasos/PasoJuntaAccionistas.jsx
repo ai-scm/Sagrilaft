@@ -66,7 +66,7 @@ export default function PasoJuntaAccionistas({
 
       <div className="info-box">
         <p> PEP: Persona Expuesta Políticamente — persona que maneja recursos públicos, tiene poder público o reconocimiento público.</p>
-        <p> ¿Vínculos con PEP? Si es asi, describa, de lo contrario colocar NO.</p>
+        <p> ¿Vínculos con PEP? Si es asi, describa, de lo contrario colocar No.</p>
       </div>
       {errors.junta_directiva_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.junta_directiva_tabla}</div>
@@ -158,7 +158,7 @@ export default function PasoJuntaAccionistas({
       </h3>
       <div className="info-box">
         <p>Registrar todos los accionistas o asociados que tengan directa o indirectamente mas del 5% de su capital social, aporte o participación.</p>
-        <p> ¿Vínculos con PEP? Si la respuesta es afirmativa en la casilla anterior, describa:</p>
+        <p>  ¿Vínculos con PEP? Si es asi, describa, de lo contrario colocar No.</p>
       </div>
       {errors.accionistas_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.accionistas_tabla}</div>

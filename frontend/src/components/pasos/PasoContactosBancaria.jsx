@@ -170,7 +170,9 @@ export default function PasoContactosBancaria({
       {/* ── Operaciones en Moneda Extranjera ────────────────────────────────── */}
       <div style={{ marginTop: '20px' }}>
         <div className="form-group" style={{ maxWidth: '320px' }}>
-          <label className="form-label">¿Realiza Operaciones en Moneda Extranjera?</label>
+          <label className="form-label">
+            ¿Realiza Operaciones en Moneda Extranjera? <span style={{ color: 'var(--error, #e53e3e)' }}>*</span>
+          </label>
           <Select
             inputId="realiza_operaciones_moneda_extranjera"
             value={monedaValue}
@@ -179,8 +181,9 @@ export default function PasoContactosBancaria({
             isClearable
             placeholder="Seleccione..."
             noOptionsMessage={() => 'Sin opciones'}
-            styles={buildSelectStyles(false, !!monedaValue)}
+            styles={buildSelectStyles(!!errors.realiza_operaciones_moneda_extranjera, !!monedaValue)}
           />
+          <MensajeError msg={errors.realiza_operaciones_moneda_extranjera} />
         </div>
 
         {realizaMoneda && (
