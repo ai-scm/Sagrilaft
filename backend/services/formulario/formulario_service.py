@@ -53,6 +53,7 @@ DIRECTORIO_UPLOADS: Path = Path(__file__).parent.parent / "uploads"
 _CAMPOS_JSON_ESCRITURA: List[str] = [
     "junta_directiva", "accionistas", "beneficiario_final",
     "referencias_comerciales", "referencias_bancarias", "informacion_bancaria_pagos", "clasificaciones",
+    "tipos_transaccion",
 ]
 _CAMPOS_JSON_LECTURA: List[str] = [
     "junta_directiva", "accionistas", "beneficiario_final",
@@ -160,6 +161,7 @@ class ValidadorEnvioFormulario:
         ("total_activos",           "Total Activos"),
         ("total_pasivos",           "Total Pasivos"),
         ("patrimonio",              "Patrimonio"),
+        ("realiza_operaciones_moneda_extranjera", "¿Realiza Operaciones en Moneda Extranjera?"),
         ("origen_fondos",           "Origen de Fondos"),
         ("nombre_firma",            "Nombre para Firma"),
         ("fecha_firma",             "Fecha de Firma"),
@@ -198,10 +200,44 @@ class ValidadorEnvioFormulario:
                 mensaje="Debe aceptar la declaración de origen de fondos",
             ))
 
+        errores.extend(self._validar_campos_moneda_extranjera(formulario))
+
         if self._es_persona_juridica(formulario):
             errores.extend(self._validar_junta_directiva(formulario))
             errores.extend(self._validar_accionistas(formulario))
             errores.extend(self._validar_beneficiarios(formulario))
+
+        return errores
+
+    @staticmethod
+    def _realiza_operaciones_en_moneda_extranjera(formulario: Formulario) -> bool:
+        return (formulario.realiza_operaciones_moneda_extranjera or "").lower() == "si"
+
+    def _validar_campos_moneda_extranjera(self, formulario: Formulario) -> List[ErrorValidacion]:
+        """
+        Valida los campos condicionales de la sección 'Operaciones en Moneda Extranjera'.
+
+        Solo se evalúan cuando la empresa declara que sí realiza este tipo de operaciones.
+        Espejar aquí las mismas reglas que aplica el frontend en useFormValidacion (paso 6)
+        garantiza que la BD nunca reciba un formulario inconsistente.
+        """
+        if not self._realiza_operaciones_en_moneda_extranjera(formulario):
+            return []
+
+        errores: List[ErrorValidacion] = []
+
+        if not (formulario.paises_operaciones or "").strip():
+            errores.append(ErrorValidacion(
+                campo="paises_operaciones",
+                mensaje="El campo 'Países en los que realiza operaciones' es obligatorio",
+            ))
+
+        tipos = self._deserializar_lista(formulario.tipos_transaccion)
+        if "otras" in tipos and not (formulario.tipos_transaccion_otros or "").strip():
+            errores.append(ErrorValidacion(
+                campo="tipos_transaccion_otros",
+                mensaje="El campo '¿Cuáles?' es obligatorio cuando selecciona 'Otras'",
+            ))
 
         return errores
 

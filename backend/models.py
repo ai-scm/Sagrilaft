@@ -97,8 +97,11 @@ class Formulario(Base):
     total_pasivos = Column(Float, nullable=True)
     patrimonio = Column(Float, nullable=True)
 
-    # --- 7. Tipos de transacción ---
-    tipos_transaccion = Column(Text, nullable=True)  # JSON string
+    # --- 6. Operaciones en Moneda Extranjera ---
+    realiza_operaciones_moneda_extranjera = Column(String, nullable=True)  # 'si' | 'no'
+    paises_operaciones = Column(String, nullable=True)
+    tipos_transaccion = Column(Text, nullable=True)    # JSON array ['importacion', ...]
+    tipos_transaccion_otros = Column(String, nullable=True)
 
     # --- 8. Clasificación Empresa y Régimen Tributario ---
     actividad_clasificacion = Column(String, nullable=True)

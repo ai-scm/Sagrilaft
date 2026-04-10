@@ -39,7 +39,10 @@ def _aplicar_migraciones(engine) -> None:
     """
     from sqlalchemy import text
     columnas_nuevas = {
-        'digito_verificacion': 'TEXT',
+        'digito_verificacion':                  'TEXT',
+        'realiza_operaciones_moneda_extranjera': 'TEXT',
+        'paises_operaciones':                   'TEXT',
+        'tipos_transaccion_otros':              'TEXT',
     }
     with engine.connect() as conn:
         columnas_existentes = {

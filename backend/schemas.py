@@ -185,8 +185,11 @@ class FormularioBase(BaseModel):
     total_pasivos:      MontoPositivo = None
     patrimonio:         MontoPositivo = None
 
-    # 7. Tipos de transacción
-    tipos_transaccion: Optional[str] = None
+    # 6. Operaciones en Moneda Extranjera
+    realiza_operaciones_moneda_extranjera: Optional[str] = None
+    paises_operaciones: Optional[str] = None
+    tipos_transaccion: Optional[List[str]] = None
+    tipos_transaccion_otros: Optional[str] = None
 
     # 8. Clasificación Empresa y Régimen Tributario
     actividad_clasificacion: Optional[str] = None
@@ -245,6 +248,17 @@ class FormularioBase(BaseModel):
         if len(str(v)) != 1 or not str(v).isdigit():
             raise ValueError('El dígito de verificación debe ser un único dígito numérico (0-9)')
         return str(v)
+
+    @field_validator('realiza_operaciones_moneda_extranjera')
+    @classmethod
+    def validar_realiza_operaciones_moneda_extranjera(cls, v: object) -> str | None:
+        """Solo se aceptan los valores 'si' o 'no'. Cadenas vacías se tratan como ausencia."""
+        _VALORES_VALIDOS = {'si', 'no'}
+        if v is None or v == '':
+            return None
+        if str(v).lower() not in _VALORES_VALIDOS:
+            raise ValueError("El valor debe ser 'si' o 'no'")
+        return str(v).lower()
 
 
 class FormularioCreate(FormularioBase):
