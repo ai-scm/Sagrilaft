@@ -842,7 +842,9 @@ class FormularioService:
         ruta = Path(documento.ruta_archivo)
         if ruta.exists():
             ruta.unlink()
-        self._sesion.delete(documento)
+        
+        from datetime import datetime, timezone
+        documento.deleted_at = datetime.now(timezone.utc)
         self._sesion.commit()
 
     def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
@@ -856,7 +858,8 @@ class FormularioService:
             Lista de instancias DocumentoAdjunto.
         """
         return self._sesion.query(DocumentoAdjunto).filter(
-            DocumentoAdjunto.formulario_id == formulario_id
+            DocumentoAdjunto.formulario_id == formulario_id,
+            DocumentoAdjunto.deleted_at.is_(None)
         ).all()
 
     # ─── Pre-llenado con IA ───────────────────────────────────────────────────
@@ -974,6 +977,7 @@ class FormularioService:
         documento = self._sesion.query(DocumentoAdjunto).filter(
             DocumentoAdjunto.id == doc_id,
             DocumentoAdjunto.formulario_id == formulario_id,
+            DocumentoAdjunto.deleted_at.is_(None),
         ).first()
         if not documento:
             raise HTTPException(status_code=404, detail="Documento no encontrado")

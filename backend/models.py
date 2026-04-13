@@ -150,7 +150,8 @@ class Formulario(Base):
 
     # Relaciones
     documentos = relationship("DocumentoAdjunto", back_populates="formulario",
-                              cascade="all, delete-orphan")
+                              cascade="all, delete-orphan",
+                              primaryjoin="and_(Formulario.id==DocumentoAdjunto.formulario_id, DocumentoAdjunto.deleted_at.is_(None))")
     validaciones = relationship("ResultadoValidacion", back_populates="formulario",
                                 cascade="all, delete-orphan")
 
@@ -165,6 +166,7 @@ class DocumentoAdjunto(Base):
     ruta_archivo = Column(String, nullable=False)
     content_type = Column(String, nullable=True)
     tamano = Column(Integer, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="documentos")
