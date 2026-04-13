@@ -13,6 +13,7 @@ import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
+import { useRecuperacionSesion } from './useRecuperacionSesion';
 import { useAlertasInconsistencia } from './useAlertasInconsistencia';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4,
@@ -80,11 +81,20 @@ export function useFormulario() {
     });
   };
 
+  // Setters agrupados: los consumen tanto useFormPersistencia como useRecuperacionSesion
+  const _setters = {
+    setFormData, setStep, setFormularioId, setCodigoPeticion,
+    setJuntaDirectiva, setAccionistas, setBeneficiarios,
+    setReferenciasComerciales, setReferenciasBancarias,
+    setInfoBancariaPagos, setDocumentos,
+  };
+
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
     { formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
-    { setFormData, setStep, setFormularioId, setCodigoPeticion, setJuntaDirectiva, setAccionistas, setBeneficiarios, setReferenciasComerciales, setReferenciasBancarias, setInfoBancariaPagos, setDocumentos },
     _buildPayload,
   );
+
+  const recuperacion = useRecuperacionSesion(_setters);
 
   // ── Handlers de formulario ───────────────────────────────────────────────
 
@@ -388,6 +398,7 @@ export function useFormulario() {
 
   return {
     step, formData, errors, helpField, setHelpField,
+    recuperacion,
     codigoPeticion, documentos, saving, uploadingDoc,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     referenciasComerciales, handleReferenciaChange: onReferenciaChange, addReferencia,

@@ -15,33 +15,19 @@
  *     Sincroniza con el servidor a menor frecuencia. Fallo silencioso;
  *     la Capa 1 actúa como respaldo si el servidor no está disponible.
  *
- * Al montar, detecta borradores previos en localStorage y ofrece
- * recuperación al usuario mediante un diálogo de confirmación.
+ * La detección y restauración del borrador al montar fue extraída a
+ * useRecuperacionSesion, que gestiona el flujo correo + NIT.
  *
- * Interfaz pública idéntica a la versión anterior — sin cambios en consumidores.
- *
- * SRP: única responsabilidad = orquestar las capas y gestionar el ciclo
- *      de vida del borrador (detectar / restaurar / limpiar).
+ * SRP: única responsabilidad = orquestar las tres capas de escritura y
+ *      exponer la limpieza del borrador tras un envío exitoso.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePersistenciaLocal } from './usePersistenciaLocal';
 import { usePersistenciaRemota } from './usePersistenciaRemota';
 import { useSalidaSegura } from './useSalidaSegura';
-import {
-  leerBorradorDeStorage,
-  eliminarBorradorDeStorage,
-  borradorEsFormularioEnviado,
-  construirMensajeRecuperacion,
-} from '../utils/borradorStorage';
+import { eliminarBorradorDeStorage } from '../utils/borradorStorage';
 
-export function useFormPersistencia(snapshot, setters, construirPayload) {
-  const {
-    setFormData, setStep, setFormularioId, setCodigoPeticion,
-    setJuntaDirectiva, setAccionistas, setBeneficiarios,
-    setReferenciasComerciales, setReferenciasBancarias,
-    setInfoBancariaPagos, setDocumentos,
-  } = setters;
-
+export function useFormPersistencia(snapshot, construirPayload) {
   const [lastSaved, setLastSaved] = useState(null);
 
   // ── Capa 2: red de seguridad ante cierres abruptos ────────────────────────
@@ -53,39 +39,6 @@ export function useFormPersistencia(snapshot, setters, construirPayload) {
 
   // ── Capa 3: guardado remoto con debounce (10s) ────────────────────────────
   usePersistenciaRemota(snapshot, construirPayload, setLastSaved);
-
-  // ── Restauración de borrador al montar ────────────────────────────────────
-  useEffect(() => {
-    const borrador = leerBorradorDeStorage();
-    if (!borrador) return;
-    if (!borrador.formularioId && !borrador.codigoPeticion) return;
-
-    // Regla de negocio: si el borrador en storage corresponde a un
-    // formulario ya enviado, significa que beforeunload lo reescribió
-    // después del envío (race condition entre limpiarBorrador y el evento
-    // del navegador). Se descarta silenciosamente y se limpia el storage.
-    if (borradorEsFormularioEnviado(borrador)) {
-      eliminarBorradorDeStorage();
-      return;
-    }
-
-    if (window.confirm(construirMensajeRecuperacion(borrador))) {
-      setFormData(borrador.formData ?? {});
-      setStep(borrador.step ?? 1);
-      setFormularioId(borrador.formularioId ?? null);
-      setCodigoPeticion(borrador.codigoPeticion ?? null);
-      setJuntaDirectiva(
-        borrador.juntaDirectiva ?? [{ cargo: 'Presidente' }, { cargo: 'Gerente General / Rep. Legal' }],
-      );
-      setAccionistas(borrador.accionistas ?? [{}]);
-      setBeneficiarios(borrador.beneficiarios ?? [{}]);
-      setReferenciasComerciales(borrador.referenciasComerciales ?? [{}, {}]);
-      setReferenciasBancarias(borrador.referenciasBancarias ?? [{}, {}]);
-      setInfoBancariaPagos(borrador.infoBancariaPagos ?? [{}, {}]);
-      setDocumentos(borrador.documentos ?? {});
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── Interfaz pública ──────────────────────────────────────────────────────
   return {

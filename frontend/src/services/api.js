@@ -83,6 +83,26 @@ export const api = {
     return res.json();
   },
 
+  // Recuperación de sesión
+  async recuperarSesion(correo, numeroIdentificacion) {
+    const res = await fetch(`${API_BASE}/formularios/sesion/recuperar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correo, numero_identificacion: numeroIdentificacion }),
+    });
+    // 404 = ningún formulario con esas credenciales → resultado esperado, no un error
+    if (res.status === 404) return null;
+    // 409 = formulario existe pero ya fue enviado → error de dominio conocido
+    if (res.status === 409) {
+      const err = new Error('El formulario asociado a esas credenciales ya fue enviado.');
+      err.code = 'FORMULARIO_YA_ENVIADO';
+      throw err;
+    }
+    // Cualquier otro error (400, 500, red) se propaga como excepción genérica
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   // Pre-llenado IA
   async prefillDocumento(formularioId, docId) {
     const res = await fetch(`${API_BASE}/formularios/${formularioId}/documentos/${docId}/prefill`, {

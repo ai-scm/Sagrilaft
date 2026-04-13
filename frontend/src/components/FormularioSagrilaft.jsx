@@ -8,6 +8,7 @@
 
 import HelpPanel from './HelpPanel';
 import ProgressBar from './ProgressBar';
+import ModalRecuperacionSesion from './ModalRecuperacionSesion';
 import { useFormulario } from '../hooks/useFormulario';
 import { TOTAL_STEPS } from '../data/formularioConfig';
 
@@ -25,6 +26,7 @@ import PasoDeclaraciones from './pasos/PasoDeclaraciones';
 export default function FormularioSagrilaft() {
   const {
     step, formData, errors, helpField, setHelpField,
+    recuperacion,
     codigoPeticion, documentos, saving, uploadingDoc,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     referenciasComerciales, handleReferenciaChange, addReferencia,
@@ -52,10 +54,36 @@ export default function FormularioSagrilaft() {
 
   return (
     <div className="app-container">
+      <ModalRecuperacionSesion
+        visible={recuperacion.visible}
+        error={recuperacion.error}
+        cargando={recuperacion.cargando}
+        fechaBorrador={recuperacion.fechaBorrador}
+        onRecuperar={recuperacion.recuperarSesion}
+        onDescartar={recuperacion.descartar}
+      />
+
       <header className="app-header">
         <h1>FORMULARIO DE VINCULACIÓN O ACTUALIZACIÓN DE CONTRAPARTE</h1>
         <p className="subtitle">SAGRILAFT - Sistema de Autocontrol de Riesgo de LA/FT</p>
-        {codigoPeticion && <div className="codigo-peticion">Código: {codigoPeticion}</div>}
+        {!recuperacion.visible && (
+          <button
+            type="button"
+            onClick={recuperacion.abrirModal}
+            style={{
+              marginTop: '8px',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.35)',
+              color: 'rgba(255,255,255,0.85)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '4px 14px',
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+            }}
+          >
+            ¿Tiene un formulario previo? Recuperar sesión
+          </button>
+        )}
       </header>
 
       <main className="main-content">
