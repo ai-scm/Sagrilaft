@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from models import DocumentoAdjunto, EstadoFormulario, Formulario
@@ -520,6 +521,13 @@ class ResultadoGuardadoDocumento:
 # Servicio principal
 # ═══════════════════════════════════════════════════════════════
 
+class FormularioYaEnviadoError(Exception):
+    """
+    Se lanza cuando las credenciales identifican un formulario que ya fue
+    enviado y, por tanto, no es recuperable como borrador activo.
+    """
+
+
 class FormularioService:
     """
     Servicio de negocio para la gestión de formularios SAGRILAFT.
@@ -619,6 +627,54 @@ class FormularioService:
         self._sesion.commit()
         self._sesion.refresh(formulario)
         return deserializar_campos_json(formulario)
+
+    def buscar_borrador_por_credenciales(
+        self, correo: str, numero_identificacion: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Busca el borrador activo más reciente asociado a un correo y NIT.
+
+        Permite la recuperación de sesión cross-device: el usuario se identifica
+        con sus credenciales en lugar de un código interno (SAG-XXXXXXXX).
+
+        Args:
+            correo:                Correo electrónico registrado en el formulario.
+            numero_identificacion: NIT o número de identificación de la empresa.
+
+        Returns:
+            Diccionario con datos completos (incluye documentos y validaciones)
+            si existe un borrador activo, o None si no se encontró ninguno.
+        """
+        # Acepta el NIT con o sin dígito de verificación.
+        # El formulario almacena ambos en campos separados (numero_identificacion
+        # y digito_verificacion). El usuario puede ingresar cualquiera de las dos
+        # formas: "901785328" o "9017853287".
+        _filtro_nit = or_(
+            Formulario.numero_identificacion == numero_identificacion,
+            func.concat(
+                Formulario.numero_identificacion,
+                Formulario.digito_verificacion,
+            ) == numero_identificacion,
+        )
+
+        formulario = (
+            self._sesion.query(Formulario)
+            .filter(Formulario.correo == correo, _filtro_nit)
+            .order_by(Formulario.updated_at.desc())
+            .first()
+        )
+
+        if not formulario:
+            return None
+
+        # Credenciales válidas pero el formulario ya fue enviado — no es recuperable.
+        if formulario.estado != EstadoFormulario.BORRADOR:
+            raise FormularioYaEnviadoError()
+
+        datos = deserializar_campos_json(formulario)
+        datos["documentos"] = self._documentos_a_respuesta(formulario.documentos)
+        datos["validaciones"] = self._validaciones_a_dict(formulario.validaciones)
+        return datos
 
     def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
         """

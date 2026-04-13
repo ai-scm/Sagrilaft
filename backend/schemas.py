@@ -394,3 +394,18 @@ class RespuestaListaCautela(BaseModel):
     nombre_buscado: str
     resultados: List[ResultadoListaCautela] = []
     riesgo_general: str = "bajo"  # "bajo", "medio", "alto"
+
+
+# --- Recuperación de sesión por credenciales ---
+
+class CredencialesRecuperacion(BaseModel):
+    """
+    Credenciales que identifican unívocamente al usuario para recuperar
+    un borrador activo desde cualquier dispositivo.
+
+    Reemplaza el flujo anterior basado en el código SAG- como identificador
+    expuesto al usuario. El código se mantiene internamente en la BD.
+    """
+
+    correo: str
+    numero_identificacion: str

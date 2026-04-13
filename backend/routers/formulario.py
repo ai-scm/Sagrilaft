@@ -8,12 +8,13 @@ DIP : depende de la abstracción IExtractorIA, no de la implementación Bedrock.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies import obtener_extractor
 from schemas import (
+    CredencialesRecuperacion,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -22,7 +23,7 @@ from schemas import (
     ResultadoValidacionEnvio,
 )
 from core.contratos import IExtractorIA
-from services.formulario.formulario_service import FormularioService
+from services.formulario.formulario_service import FormularioService, FormularioYaEnviadoError
 from routers.transformers import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
@@ -36,6 +37,52 @@ def obtener_servicio_formulario(
 ) -> FormularioService:
     """Crea un FormularioService con las dependencias inyectadas."""
     return FormularioService(sesion, extractor)
+
+
+# ─── Recuperación de sesión ──────────────────────────────────────────────────
+# IMPORTANTE: esta ruta debe declararse ANTES de /{formulario_id} para que
+# FastAPI no capture "/sesion/recuperar" como un valor de {formulario_id}.
+
+@enrutador.post(
+    "/sesion/recuperar",
+    response_model=FormularioConDetalles,
+    responses={
+        404: {"description": "No existe ningún formulario con esas credenciales"},
+        409: {"description": "El formulario ya fue enviado y no está disponible para recuperación"},
+    },
+)
+def recuperar_sesion_por_credenciales(
+    credenciales: CredencialesRecuperacion,
+    servicio: FormularioService = Depends(obtener_servicio_formulario),
+) -> FormularioConDetalles:
+    """
+    Busca un borrador activo por correo y número de identificación (NIT).
+
+    Permite que el usuario recupere su sesión desde cualquier dispositivo
+    sin necesidad de recordar ni exponer el código interno SAG-.
+
+    Respuestas:
+      200 — Formulario encontrado; cuerpo contiene el borrador completo.
+      404 — No existe ningún formulario con esas credenciales.
+      409 — Existe un formulario pero ya fue enviado; no es recuperable.
+    """
+    try:
+        formulario = servicio.buscar_borrador_por_credenciales(
+            credenciales.correo,
+            credenciales.numero_identificacion,
+        )
+    except FormularioYaEnviadoError:
+        raise HTTPException(
+            status_code=409,
+            detail="El formulario asociado a esas credenciales ya fue enviado.",
+        )
+
+    if formulario is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No se encontró ningún formulario con esas credenciales.",
+        )
+    return formulario
 
 
 # ─── Endpoints de formulario ─────────────────────────────────────────────────
