@@ -7,7 +7,7 @@ import helpTexts from '../data/helpTexts';
  */
 export default function FileUploadField({
   label, tipoDoc, documentos, onFileChange, onRemove,
-  onOpenHelp, accepted, hint, uploading,
+  onOpenHelp, accepted, hint, uploading, eliminando,
 }) {
   const doc = documentos[tipoDoc];
   const helpKey = `doc_${tipoDoc}`;
@@ -80,8 +80,15 @@ export default function FileUploadField({
               <div className="file-name">{fileName}</div>
               {fileSize && <div className="file-size">{(fileSize / 1024).toFixed(1)} KB</div>}
             </div>
-            <button type="button" className="file-remove" onClick={() => onRemove(tipoDoc)} title="Eliminar">
-              ✕
+            <button 
+              type="button" 
+              className="file-remove" 
+              onClick={() => onRemove(tipoDoc)} 
+              title="Eliminar"
+              disabled={eliminando}
+              style={{ opacity: eliminando ? 0.3 : 1, cursor: eliminando ? 'not-allowed' : 'pointer' }}
+            >
+              {eliminando ? '⏳' : '✕'}
             </button>
           </div>
         </div>

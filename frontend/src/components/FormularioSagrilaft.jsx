@@ -9,6 +9,7 @@
 import HelpPanel from './HelpPanel';
 import ProgressBar from './ProgressBar';
 import ModalRecuperacionSesion from './ModalRecuperacionSesion';
+import ModalConfirmacion from './ModalConfirmacion';
 import { useFormulario } from '../hooks/useFormulario';
 import { TOTAL_STEPS } from '../data/formularioConfig';
 
@@ -27,7 +28,8 @@ export default function FormularioSagrilaft() {
   const {
     step, formData, errors, helpField, setHelpField,
     recuperacion,
-    codigoPeticion, documentos, saving, uploadingDoc,
+    codigoPeticion, documentos, saving, uploadingDoc, eliminandoDoc,
+    estadoConfirmacion, confirmarEliminacion, cancelarEliminacion,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     referenciasComerciales, handleReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
@@ -63,6 +65,14 @@ export default function FormularioSagrilaft() {
         onDescartar={recuperacion.descartar}
       />
 
+      <ModalConfirmacion
+        visible={estadoConfirmacion.visible}
+        titulo="Eliminar documento"
+        mensaje="¿Está seguro de eliminar este documento? Los campos del formulario que fueron pre-llenados a partir de este documento también serán limpiados."
+        onConfirm={confirmarEliminacion}
+        onCancel={cancelarEliminacion}
+      />
+
       <header className="app-header">
         <h1>FORMULARIO DE VINCULACIÓN O ACTUALIZACIÓN DE CONTRAPARTE</h1>
         <p className="subtitle">SAGRILAFT - Sistema de Autocontrol de Riesgo de LA/FT</p>
@@ -96,6 +106,7 @@ export default function FormularioSagrilaft() {
             onFileChange={handleFileChange}
             onRemoveFile={handleRemoveFile}
             uploadingDoc={uploadingDoc}
+            eliminandoDoc={eliminandoDoc}
             alertasRazonSocial={alertasRazonSocial}
             alertasNit={alertasNit}
             alertasNombreRepresentante={alertasNombreRepresentante}
@@ -160,7 +171,7 @@ export default function FormularioSagrilaft() {
           onNext={handleNext}
           onSaveDraft={handleSaveDraft}
           onSubmit={handleSubmit}
-          bloqueadoPorAnalisis={Object.values(uploadingDoc).some(Boolean)}
+          bloqueadoPorAnalisis={Object.values(uploadingDoc).some(Boolean) || Object.values(eliminandoDoc).some(Boolean)}
           bloqueadoPorAlertas={hayAlertasActivas}
         />
       </main>

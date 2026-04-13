@@ -10,7 +10,7 @@ import { DOCUMENTOS_CONFIG } from '../../data/formularioConfig';
  * con la ingresada en el formulario.
  */
 export default function PasoDocumentos({
-  formData, documentos, onFileChange, onRemoveFile, onOpenHelp, uploadingDoc,
+  formData, documentos, onFileChange, onRemoveFile, onOpenHelp, uploadingDoc, eliminandoDoc,
   alertasRazonSocial, alertasNit, alertasNombreRepresentante, alertasNumeroDocRepresentante, alertasDireccion,
 }) {
   return (
@@ -44,6 +44,7 @@ export default function PasoDocumentos({
             accepted={d.accepted}
             hint={d.hint}
             uploading={uploadingDoc[d.tipoDoc]}
+            eliminando={eliminandoDoc && eliminandoDoc[d.tipoDoc]}
           />
         ))
       }

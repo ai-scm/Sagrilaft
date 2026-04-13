@@ -21,6 +21,7 @@ import {
   validarTablasPaso7, CLAVES_ERROR_PASO7,
 } from '../utils/validacionTablas';
 import { sanitizarPayload } from '../utils/normalizadores';
+import { obtenerCamposDeDocumento } from '../data/mapeoDocumentos';
 
 export function useFormulario() {
   const [step, setStep] = useState(1);
@@ -31,6 +32,8 @@ export function useFormulario() {
   const [documentos, setDocumentos] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState({});
+  const [eliminandoDoc, setEliminandoDoc] = useState({});
+  const [estadoConfirmacion, setEstadoConfirmacion] = useState({ visible: false, tipoDoc: null });
   const [submitted, setSubmitted] = useState(false);
 
   const { errors, validarPaso, aplicarErrores, limpiarError } = useFormValidacion(formData);
@@ -176,12 +179,58 @@ export function useFormulario() {
   };
 
   const handleRemoveFile = useCallback((tipoDoc) => {
-    setDocumentos(prev => {
-      const updated = { ...prev };
-      delete updated[tipoDoc];
-      return updated;
-    });
+    setEstadoConfirmacion({ visible: true, tipoDoc });
   }, []);
+
+  const cancelarEliminacion = useCallback(() => {
+    setEstadoConfirmacion({ visible: false, tipoDoc: null });
+  }, []);
+
+  const confirmarEliminacion = useCallback(async () => {
+    const { tipoDoc } = estadoConfirmacion;
+    if (!tipoDoc) return;
+
+    const docToDelete = documentos[tipoDoc];
+    setEstadoConfirmacion({ visible: false, tipoDoc: null });
+
+    if (!docToDelete) {
+      setDocumentos(prev => {
+        const updated = { ...prev };
+        delete updated[tipoDoc];
+        return updated;
+      });
+      return;
+    }
+
+    setEliminandoDoc(prev => ({ ...prev, [tipoDoc]: true }));
+    try {
+      if (formularioId && docToDelete.id) {
+        await api.eliminarDocumento(formularioId, docToDelete.id);
+      }
+
+      const camposALimpiar = obtenerCamposDeDocumento(tipoDoc);
+      if (camposALimpiar.length > 0) {
+        setFormData(prev => {
+          const next = { ...prev };
+          camposALimpiar.forEach(key => {
+            next[key] = "";
+          });
+          return next;
+        });
+      }
+
+      setDocumentos(prev => {
+        const updated = { ...prev };
+        delete updated[tipoDoc];
+        return updated;
+      });
+    } catch (err) {
+      console.error(`Error eliminando ${tipoDoc}:`, err);
+      alert('Error al intentar eliminar el documento. Intente nuevamente.');
+    } finally {
+      setEliminandoDoc(prev => ({ ...prev, [tipoDoc]: false }));
+    }
+  }, [estadoConfirmacion, documentos, formularioId]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -399,7 +448,8 @@ export function useFormulario() {
   return {
     step, formData, errors, helpField, setHelpField,
     recuperacion,
-    codigoPeticion, documentos, saving, uploadingDoc,
+    codigoPeticion, documentos, saving, uploadingDoc, eliminandoDoc,
+    estadoConfirmacion, confirmarEliminacion, cancelarEliminacion,
     juntaDirectiva, accionistas, beneficiarios, submitted, lastSaved,
     referenciasComerciales, handleReferenciaChange: onReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange: onReferenciaBancariaChange, addReferenciaBancaria,
