@@ -5,6 +5,9 @@ Usa variables de entorno con valores por defecto seguros.
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True)
@@ -24,8 +27,8 @@ class AWSConfig:
 @dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
-    upload_dir: str = field(
-        default_factory=lambda: os.getenv("UPLOAD_DIR", os.path.join(os.path.dirname(__file__), "..", "uploads"))
+    upload_dir: Path = field(
+        default_factory=lambda: Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads")).resolve()
     )
     aws: AWSConfig = field(default_factory=AWSConfig)
 
@@ -33,8 +36,8 @@ class AppConfig:
 def load_config() -> AppConfig:
     """Carga la configuración desde variables de entorno."""
     # Intentar cargar .env si existe
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    if os.path.exists(env_path):
+    env_path = BASE_DIR / ".env"
+    if env_path.exists():
         with open(env_path) as f:
             for line in f:
                 line = line.strip()
