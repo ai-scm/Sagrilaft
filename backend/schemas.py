@@ -72,14 +72,21 @@ class MiembroJunta(PersonaVinculadaBase):
     cargo: Optional[str] = None
 
 
-class Accionista(PersonaVinculadaBase):
-    """ Hereda nombre, id, pep y agrega campo específico: porcentaje """
+class EntidadConParticipacion(PersonaVinculadaBase):
+    """
+    Clase intermedia para entidades que poseen un porcentaje de participación o control.
+    """
     porcentaje: PorcentajeParticipacion = None
 
 
-class BeneficiarioFinal(PersonaVinculadaBase):
+class Accionista(EntidadConParticipacion):
+    """ Hereda nombre, id, pep y porcentaje de participación """
+    pass
+
+
+class BeneficiarioFinal(EntidadConParticipacion):
     """ Idéntico estructuralmente a un Accionista, diferenciable en el dominio del negocio """
-    porcentaje: PorcentajeParticipacion = None
+    pass
 
 
 class ReferenciaComercial(BaseModel):
