@@ -18,14 +18,18 @@ from services.utils.coercion import (
     coercionar_porcentaje_participacion
 )
 
+from services.formulario.validacion import (
+    _vacio_a_nulo,
+    _limpiar_numero_id_si_tipo_ausente,
+    _limpiar_vinculos_pep_si_no_es_pep,
+    ErrorValidacion
+)
+
 
 # ── Validadores Transversales y Tipos Anotados ───────────────────────────────
 
 T = TypeVar('T')
 
-def _vacio_a_nulo(v: Any) -> Any:
-    """Coerciona explícitamente strings vacíos pre-validación. Imprescindible para borradores."""
-    return None if v == "" else v
 
 EnumLimpio = Annotated[Optional[T], BeforeValidator(_vacio_a_nulo)]
 
@@ -42,27 +46,6 @@ PorcentajeParticipacion = Annotated[Optional[float], BeforeValidator(coercionar_
 
 # --- Sub-schemas para datos dinámicos ---
 
-def _limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
-    """
-    Garantiza que numero_id sea nulo cuando tipo_id no está definido.
-
-    Aplica a todos los sub-schemas de identificación (MiembroJunta,
-    Accionista, BeneficiarioFinal). Previene datos inconsistentes
-    incluso en peticiones directas a la API que eviten el flujo del frontend.
-    """
-    if isinstance(data, dict) and not data.get('tipo_id'):
-        data = {**data, 'numero_id': None}
-    return data
-
-
-def _limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
-    """
-    Garantiza que vinculos_pep sea 'NA' cuando es_pep es 'no'.
-    Consistencia con el frontend para campos dependientes.
-    """
-    if isinstance(data, dict) and data.get('es_pep') == 'no':
-        data = {**data, 'vinculos_pep': 'NA'}
-    return data
 
 
 class PersonaVinculadaBase(BaseModel):
@@ -451,10 +434,6 @@ class FormularioConDetalles(FormularioResponse):
     validaciones: List[ValidacionResponse] = []
 
 
-# --- Validación para envío final ---
-class ErrorValidacion(BaseModel):
-    campo: str
-    mensaje: str
 
 
 class ResultadoValidacionEnvio(BaseModel):

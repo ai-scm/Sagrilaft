@@ -3,10 +3,43 @@ Validador de campos requeridos para envío de formulario.
 """
 
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Any, Optional, Annotated
 
+from pydantic import BaseModel
 from models import Formulario
-from schemas import ErrorValidacion
+
+def _vacio_a_nulo(v: Any) -> Any:
+    """Coerciona explícitamente strings vacíos pre-validación. Imprescindible para borradores."""
+    return None if v == "" else v
+
+
+def _limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
+    """
+    Garantiza que numero_id sea nulo cuando tipo_id no está definido.
+
+    Aplica a todos los sub-schemas de identificación (MiembroJunta,
+    Accionista, BeneficiarioFinal). Previene datos inconsistentes
+    en peticiones directas a la API.
+    """
+    if isinstance(data, dict) and not data.get('tipo_id'):
+        data = {**data, 'numero_id': None}
+    return data
+
+
+def _limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
+    """
+    Garantiza que vinculos_pep sea 'NA' cuando es_pep es 'no'.
+    Consistencia con el frontend para campos dependientes.
+    """
+    if isinstance(data, dict) and data.get('es_pep') == 'no':
+        data = {**data, 'vinculos_pep': 'NA'}
+    return data
+
+
+class ErrorValidacion(BaseModel):
+    campo: str
+    mensaje: str
+
 
 
 class ValidadorEnvioFormulario:
