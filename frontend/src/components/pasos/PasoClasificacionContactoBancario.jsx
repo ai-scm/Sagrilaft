@@ -21,6 +21,43 @@ const OPCIONES_SI_NO = [
   { value: 'no', label: 'No' },
 ];
 
+/**
+ * Sector económico de la empresa.
+ * Fuente única de verdad — espeja los valores validados en el backend (validar_sector).
+ */
+const SECTORES_EMPRESA = [
+  { value: 'Público',  label: 'Público'  },
+  { value: 'Privado', label: 'Privado' },
+  { value: 'Mixto',   label: 'Mixto'   },
+];
+
+/**
+ * Responsabilidades impuesto sobre la renta de la empresa.
+ * Fuente única de verdad — espeja los valores validados en el backend (validar_responsabilidades_renta).
+ */
+const RESPONSABILIDADES_RENTA = [
+  { value: 'Declarante', label: 'Declarante' },
+  { value: 'No declarante', label: 'No declarante' },
+  { value: 'Declarante Regimen Especial', label: 'Declarante Regimen Especial' },
+];
+
+/**
+ * Responsabilidades en IVA.
+ */
+const RESPONSABILIDADES_IVA = [
+  { value: 'Responsable', label: 'Responsable' },
+  { value: 'No responsable', label: 'No responsable' },
+];
+
+/**
+ * Regímenes de IVA.
+ */
+const REGIMENES_IVA = [
+  { value: 'Régimen común', label: 'Régimen común' },
+  { value: 'Régimen simplificado', label: 'Régimen simplificado' },
+  { value: 'Ningún régimen', label: 'Ningún régimen' },
+];
+
 const TIPOS_CUENTA = [
   { value: 'ahorro',    label: 'Cuenta de Ahorro'   },
   { value: 'corriente', label: 'Cuenta Corriente'    },
@@ -50,9 +87,9 @@ function ClasificacionTributaria({ formData, onChange, onOpenHelp, errors }) {
           error={errors.actividad_especifica}
         />
         <FormField
-          label="Sector" name="sector" required
+          label="Sector" name="sector" type="select" required
           value={formData.sector} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.sector}
+          options={SECTORES_EMPRESA} error={errors.sector}
         />
         <FormField
           label="Vigilado por la superintendencia de" name="superintendencia" required
@@ -63,9 +100,9 @@ function ClasificacionTributaria({ formData, onChange, onOpenHelp, errors }) {
 
       <div className="form-row">
         <FormField
-          label="Responsabilidades impuesto sobre la renta" name="responsabilidades_renta" required
+          label="Responsabilidades impuesto sobre la renta" name="responsabilidades_renta" type="select" required
           value={formData.responsabilidades_renta} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.responsabilidades_renta}
+          options={RESPONSABILIDADES_RENTA} error={errors.responsabilidades_renta}
         />
         <FormField
           label="Autorretenedor" name="autorretenedor" type="select" required
@@ -73,14 +110,14 @@ function ClasificacionTributaria({ formData, onChange, onOpenHelp, errors }) {
           options={OPCIONES_SI_NO} error={errors.autorretenedor}
         />
         <FormField
-          label="Responsabilidades en el impuesto sobre las ventas (IVA)" name="responsabilidades_iva" required
+          label="Responsabilidades en el impuesto sobre las ventas (IVA)" name="responsabilidades_iva" type="select" required
           value={formData.responsabilidades_iva} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.responsabilidades_iva}
+          options={RESPONSABILIDADES_IVA} error={errors.responsabilidades_iva}
         />
         <FormField
-          label="Régimen IVA" name="regimen_iva" required
+          label="Régimen IVA" name="regimen_iva" type="select" required
           value={formData.regimen_iva} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.regimen_iva}
+          options={REGIMENES_IVA} error={errors.regimen_iva}
         />
         <FormField
           label="¿Es Gran Contribuyente?" name="gran_contribuyente" type="select" required
@@ -96,14 +133,14 @@ function ClasificacionTributaria({ formData, onChange, onOpenHelp, errors }) {
           options={OPCIONES_SI_NO} error={errors.entidad_sin_animo_lucro}
         />
         <FormField
-          label="Retención de Industria y Comercio" name="retencion_ica" required
+          label="Retención de Industria y Comercio" name="retencion_ica" type="select" required
           value={formData.retencion_ica} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.retencion_ica}
+          options={OPCIONES_SI_NO} error={errors.retencion_ica}
         />
         <FormField
-          label="Impuesto de Industria y Comercio" name="impuesto_ica" required
+          label="Impuesto de Industria y Comercio" name="impuesto_ica" type="select" required
           value={formData.impuesto_ica} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.impuesto_ica}
+          options={OPCIONES_SI_NO} error={errors.impuesto_ica}
         />
         <FormField
           label="Entidad Oficial" name="entidad_oficial" type="select" required

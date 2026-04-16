@@ -82,22 +82,26 @@ def _normalizar_tipo_identificacion(valor: Any) -> Optional[str]:
 
     _TABLA_NORMALIZACION: Dict[str, str] = {
         # NIT y variaciones
+        # TENER EN CUENTA SI SE TIENEN OTROS FORMATOS
         'NIT':                               'NIT',
         'NUMERODEIDENTIFICACIONTRIBUTARIA':  'NIT',
         'NROTRIBUTARIO':                     'NIT',
         # Cédula de Ciudadanía
+        # TENER EN CUENTA SI SE TIENEN OTROS FORMATOS
         'CC':                                'CC',
         'CEDULADECIUDADANIA':                'CC',
         'CÉDULADECIUDADANÍA':                'CC',
         'CEDULA':                            'CC',
         'CÉDULA':                            'CC',
         # Cédula de Extranjería
+        # TENER EN CUENTA SI SE TIENEN OTROS FORMATOS
         'CE':                                'CE',
         'CEDULADEEXTRANJERIA':               'CE',
         'CÉDULADEEXTRANJERÍIA':              'CE',
         'CEDULAEXTRANJERIA':                 'CE',
         'EXTRANJERIA':                       'CE',
         # Pasaporte
+        # TENER EN CUENTA SI SE TIENEN OTROS FORMATOS
         'PAS':                               'PAS',
         'PASAPORTE':                         'PAS',
         'PASSPORT':                          'PAS',

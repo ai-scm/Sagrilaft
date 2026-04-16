@@ -14,8 +14,20 @@ const TIPOS_PERSONA = [
 ];
 
 const TIPOS_SOLICITUD = [
-  { value: 'vinculacion',  label: 'Vinculación'  },
+  { value: 'vinculacion',   label: 'Vinculación'   },
   { value: 'actualizacion', label: 'Actualización' },
+];
+
+/**
+ * Clasificación de la actividad comercial de la contraparte.
+ * Fuente única de verdad — espeja los valores del enum ClasificacionActividad del backend.
+ */
+const CLASIFICACIONES_ACTIVIDAD = [
+  { value: 'C', label: 'Comercializador (C)'          },
+  { value: 'D', label: 'Distribuidor autorizado (D)'  },
+  { value: 'R', label: 'Representante (R)'            },
+  { value: 'F', label: 'Fabricante (F)'               },
+  { value: 'I', label: 'Importador (I)'               },
 ];
 
 const TIPOS_IDENTIFICACION = [
@@ -62,6 +74,12 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
           value={formData.tipo_solicitud} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.tipo_solicitud}
           options={TIPOS_SOLICITUD}
+        />
+        <FormField
+          label="Clasificación de Actividad" name="clasificacion_actividad" type="select" required
+          value={formData.clasificacion_actividad} onChange={onChange}
+          onOpenHelp={onOpenHelp} error={errors.clasificacion_actividad}
+          options={CLASIFICACIONES_ACTIVIDAD}
         />
       </div>
 

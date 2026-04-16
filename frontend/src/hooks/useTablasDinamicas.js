@@ -24,7 +24,14 @@ function usarTabla(valorInicial) {
   const cambiarFila = useCallback((index, campo, valor) => {
     setFilas(prev => {
       const actualizado = [...prev];
-      actualizado[index] = { ...actualizado[index], [campo]: valor };
+      const nuevaFila = { ...actualizado[index], [campo]: valor };
+      
+      // Lógica transversal de dependencias en tablas de Identificación
+      if (campo === 'es_pep' && valor === 'no') {
+        nuevaFila.vinculos_pep = 'NA';
+      }
+      
+      actualizado[index] = nuevaFila;
       return actualizado;
     });
   }, []);

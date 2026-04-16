@@ -23,6 +23,7 @@ class ValidadorEnvioFormulario:
         ("tipo_contraparte",        "Tipo de Contraparte"),
         ("tipo_persona",            "Tipo de Persona"),
         ("tipo_solicitud",          "Tipo de Solicitud"),
+        ("clasificacion_actividad", "Clasificación de Actividad"),
         ("razon_social",            "Nombre o Razón Social"),
         ("tipo_identificacion",     "Tipo de Identificación"),
         ("numero_identificacion",   "Número de Identificación"),
@@ -61,6 +62,23 @@ class ValidadorEnvioFormulario:
         ("ciudad_firma",            "Ciudad de Firma"),
     ]
 
+    _CAMPOS_CLASIFICACION_JURIDICA: List[Tuple[str, str]] = [
+        ("actividad_clasificacion", "Actividad"),
+        ("actividad_especifica",    "¿Cuál? Especifique"),
+        ("sector",                  "Sector"),
+        ("superintendencia",        "Vigilado por la Superintendencia de"),
+        ("responsabilidades_renta", "Responsabilidades Impuesto sobre la Renta"),
+        ("autorretenedor",          "Autorretenedor"),
+        ("responsabilidades_iva",   "Responsabilidades en el IVA"),
+        ("regimen_iva",             "Régimen IVA"),
+        ("gran_contribuyente",      "¿Es Gran Contribuyente?"),
+        ("entidad_sin_animo_lucro", "Entidad sin Ánimo de Lucro"),
+        ("retencion_ica",           "Retención de Industria y Comercio"),
+        ("impuesto_ica",            "Impuesto de Industria y Comercio"),
+        ("entidad_oficial",         "Entidad Oficial"),
+        ("exento_retencion_fuente", "Exento de Retención en la Fuente"),
+    ]
+
     def validar(self, formulario: Formulario) -> List[ErrorValidacion]:
         """
         Valida que todos los campos requeridos estén diligenciados y que
@@ -96,10 +114,26 @@ class ValidadorEnvioFormulario:
         errores.extend(self._validar_campos_moneda_extranjera(formulario))
 
         if self._es_persona_juridica(formulario):
+            errores.extend(self._validar_clasificacion_tributaria(formulario))
             errores.extend(self._validar_junta_directiva(formulario))
             errores.extend(self._validar_accionistas(formulario))
             errores.extend(self._validar_beneficiarios(formulario))
 
+        return errores
+
+    def _validar_clasificacion_tributaria(self, formulario: Formulario) -> List[ErrorValidacion]:
+        """
+        Valida los campos obligatorios de la sección 8 (Clasificación de la Empresa
+        y Régimen Tributario), que solo aplican a Persona Jurídica.
+        """
+        errores: List[ErrorValidacion] = []
+        for campo, nombre in self._CAMPOS_CLASIFICACION_JURIDICA:
+            valor = getattr(formulario, campo, None)
+            if valor is None or (isinstance(valor, str) and not valor.strip()):
+                errores.append(ErrorValidacion(
+                    campo=campo,
+                    mensaje=f"El campo '{nombre}' es obligatorio",
+                ))
         return errores
 
     @staticmethod

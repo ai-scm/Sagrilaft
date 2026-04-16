@@ -75,6 +75,16 @@ def _limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
     return data
 
 
+def _limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
+    """
+    Garantiza que vinculos_pep sea 'NA' cuando es_pep es 'no'.
+    Consistencia con el frontend para campos dependientes.
+    """
+    if isinstance(data, dict) and data.get('es_pep') == 'no':
+        data = {**data, 'vinculos_pep': 'NA'}
+    return data
+
+
 class MiembroJunta(BaseModel):
     cargo: Optional[str] = None
     nombre: Optional[str] = None
@@ -85,8 +95,10 @@ class MiembroJunta(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def validar_dependencia_identificacion(cls, data: Any) -> Any:
-        return _limpiar_numero_id_si_tipo_ausente(data)
+    def validar_dependencias(cls, data: Any) -> Any:
+        data = _limpiar_numero_id_si_tipo_ausente(data)
+        data = _limpiar_vinculos_pep_si_no_es_pep(data)
+        return data
 
 
 class Accionista(BaseModel):
@@ -99,8 +111,10 @@ class Accionista(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def validar_dependencia_identificacion(cls, data: Any) -> Any:
-        return _limpiar_numero_id_si_tipo_ausente(data)
+    def validar_dependencias(cls, data: Any) -> Any:
+        data = _limpiar_numero_id_si_tipo_ausente(data)
+        data = _limpiar_vinculos_pep_si_no_es_pep(data)
+        return data
 
 
 class BeneficiarioFinal(BaseModel):
@@ -113,8 +127,10 @@ class BeneficiarioFinal(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def validar_dependencia_identificacion(cls, data: Any) -> Any:
-        return _limpiar_numero_id_si_tipo_ausente(data)
+    def validar_dependencias(cls, data: Any) -> Any:
+        data = _limpiar_numero_id_si_tipo_ausente(data)
+        data = _limpiar_vinculos_pep_si_no_es_pep(data)
+        return data
 
 
 class ReferenciaComercial(BaseModel):
@@ -139,9 +155,10 @@ class InformacionBancariaPago(BaseModel):
 # --- Schema principal del formulario ---
 class FormularioBase(BaseModel):
     # Clasificación
-    tipo_contraparte: Optional[str] = None
-    tipo_persona: Optional[str] = None
-    tipo_solicitud: Optional[str] = None
+    tipo_contraparte:        Optional[str] = None
+    tipo_persona:            Optional[str] = None
+    tipo_solicitud:          Optional[str] = None
+    clasificacion_actividad: Optional[str] = None
 
     # 1. Info Básica
     razon_social: Optional[str] = None
@@ -259,6 +276,127 @@ class FormularioBase(BaseModel):
         if str(v).lower() not in _VALORES_VALIDOS:
             raise ValueError("El valor debe ser 'si' o 'no'")
         return str(v).lower()
+
+    @field_validator('clasificacion_actividad')
+    @classmethod
+    def validar_clasificacion_actividad(cls, v: object) -> str | None:
+        """
+        Solo se aceptan los códigos de clasificación de actividad definidos
+        en el dominio: C, D, R, F, I.
+        Cadenas vacías se tratan como ausencia de valor.
+        """
+        _VALORES_VALIDOS = {'C', 'D', 'R', 'F', 'I'}
+        if v is None or v == '':
+            return None
+        valor = str(v).upper()
+        if valor not in _VALORES_VALIDOS:
+            raise ValueError(
+                f"Clasificación de actividad inválida '{v}'. "
+                "Use uno de: C (Comercializador), D (Distribuidor), "
+                "R (Representante), F (Fabricante), I (Importador)"
+            )
+        return valor
+
+    @field_validator('sector')
+    @classmethod
+    def validar_sector(cls, v: object) -> str | None:
+        """
+        El sector de la empresa solo puede ser Público, Privado o Mixto.
+        Cadenas vacías se tratan como ausencia de valor.
+        La comparación ignora mayúsculas/minúsculas y espacios extremos
+        para tolerar variaciones tipográficas del cliente.
+        """
+        _VALORES_VALIDOS = {'Público', 'Privado', 'Mixto'}
+        if v is None or v == '':
+            return None
+        valor_normalizado = str(v).strip().capitalize()
+        # Manejar tilde: 'publico' → 'Público'
+        _NORMALIZACION = {'Publico': 'Público'}
+        valor_final = _NORMALIZACION.get(valor_normalizado, valor_normalizado)
+        if valor_final not in _VALORES_VALIDOS:
+            raise ValueError(
+                f"Sector inválido '{v}'. "
+                "Use uno de: Público, Privado, Mixto"
+            )
+        return valor_final
+
+    @field_validator('responsabilidades_renta')
+    @classmethod
+    def validar_responsabilidades_renta(cls, v: object) -> str | None:
+        """
+        Las responsabilidades en renta solo pueden ser una de tres opciones.
+        Cadenas vacías se tratan como ausencia de valor.
+        La validación es estricta frente al conjunto de opciones válidas.
+        """
+        _VALORES_VALIDOS = {'Declarante', 'No declarante', 'Declarante Regimen Especial'}
+        if v is None or v == '':
+            return None
+            
+        valor_str = str(v)
+        if valor_str not in _VALORES_VALIDOS:
+            raise ValueError(
+                f"Responsabilidad en el impuesto sobre la renta inválida '{v}'. "
+                "Use uno de: Declarante, No declarante, Declarante Regimen Especial"
+            )
+        
+        return valor_str
+
+    @field_validator('responsabilidades_iva')
+    @classmethod
+    def validar_responsabilidades_iva(cls, v: object) -> str | None:
+        """
+        Las responsabilidades en IVA solo pueden ser Responsable o No responsable.
+        Cadenas vacías se tratan como ausencia de valor.
+        La validación es estricta frente al conjunto de opciones válidas.
+        """
+        _VALORES_VALIDOS = {'Responsable', 'No responsable'}
+        if v is None or v == '':
+            return None
+            
+        if v not in _VALORES_VALIDOS:
+            raise ValueError(
+                f"Responsabilidad en IVA inválida '{v}'. "
+                "Use uno de: Responsable, No responsable"
+            )
+        
+        return v
+
+    @field_validator('regimen_iva')
+    @classmethod
+    def validar_regimen_iva(cls, v: object) -> str | None:
+        """
+        El régimen IVA solo puede ser uno de tres valores.
+        Cadenas vacías se tratan como ausencia de valor.
+        La validación es estricta frente al conjunto de opciones válidas.
+        """
+        _VALORES_VALIDOS = {'Régimen común', 'Régimen simplificado', 'Ningún régimen'}
+        if v is None or v == '':
+            return None
+            
+        if v not in _VALORES_VALIDOS:
+            raise ValueError(
+                f"Régimen IVA inválido '{v}'. "
+                "Use uno de: Régimen común, Régimen simplificado, Ningún régimen"
+            )
+        
+        return v
+
+    @field_validator('retencion_ica', 'impuesto_ica')
+    @classmethod
+    def validar_ica_si_no(cls, v: object) -> str | None:
+        """
+        Los campos de ICA retención e impuesto sólo admiten valores booleanos
+        estructurados como string desde el dropdown del frontend ('si', 'no').
+        La validación es estricta.
+        """
+        _VALORES_VALIDOS = {'si', 'no'}
+        if v is None or v == '':
+            return None
+            
+        if v not in _VALORES_VALIDOS:
+            raise ValueError("El valor de ICA debe ser estrictamente 'si' o 'no'")
+            
+        return v
 
 
 class FormularioCreate(FormularioBase):

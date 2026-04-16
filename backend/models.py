@@ -31,6 +31,18 @@ class TipoSolicitud(str, enum.Enum):
     ACTUALIZACION = "actualizacion"
 
 
+class ClasificacionActividad(str, enum.Enum):
+    """
+    Clasificación de la actividad comercial de la contraparte
+    según su rol en la cadena de valor del sector regulado.
+    """
+    COMERCIALIZADOR       = "C"
+    DISTRIBUIDOR          = "D"
+    REPRESENTANTE         = "R"
+    FABRICANTE            = "F"
+    IMPORTADOR            = "I"
+
+
 def generate_uuid():
     return str(uuid.uuid4())
 
@@ -51,9 +63,10 @@ class Formulario(Base):
                         onupdate=lambda: datetime.now(timezone.utc))
 
     # --- Clasificación ---
-    tipo_contraparte = Column(String, nullable=True)
-    tipo_persona = Column(String, nullable=True)
-    tipo_solicitud = Column(String, nullable=True)
+    tipo_contraparte         = Column(String, nullable=True)
+    tipo_persona             = Column(String, nullable=True)
+    tipo_solicitud           = Column(String, nullable=True)
+    clasificacion_actividad  = Column(String, nullable=True)
 
     # --- 1. Información Básica Empresa ---
     razon_social = Column(String, nullable=True)

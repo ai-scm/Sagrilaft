@@ -137,6 +137,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={miembro.vinculos_pep || ''} placeholder="Describa:"
                       onChange={(e) => onJuntaChange(idx, 'vinculos_pep', e.target.value)}
+                      disabled={miembro.es_pep === 'no'}
                       style={err.vinculos_pep ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -232,6 +233,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={acc.vinculos_pep || ''} placeholder="Describa:"
                       onChange={(e) => onAccionistaChange(idx, 'vinculos_pep', e.target.value)}
+                      disabled={acc.es_pep === 'no'}
                       style={err.vinculos_pep ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
@@ -326,6 +328,7 @@ export default function PasoJuntaAccionistas({
                     <input
                       value={ben.vinculos_pep || ''} placeholder="Detalle"
                       onChange={(e) => onBeneficiarioChange(idx, 'vinculos_pep', e.target.value)}
+                      disabled={ben.es_pep === 'no'}
                       style={err.vinculos_pep ? ESTILO_CELDA_ERROR : undefined}
                     />
                   </td>
