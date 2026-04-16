@@ -143,6 +143,27 @@ export function useFormulario() {
   }, [limpiarError]);
 
   /**
+   * Cambia la actividad principal y gestiona la dependencia con 'actividad_especifica'.
+   * Si no es 'otra', se fuerza el valor 'NA' para cumplir con la integridad del backend.
+   */
+  const handleActividadChange = useCallback((e) => {
+    const { value } = e.target;
+    setFormData(prev => {
+      const siguiente = { ...prev, actividad_clasificacion: value };
+      if (value === 'otra') {
+        siguiente.actividad_especifica = '';
+      } else if (value !== '') {
+        siguiente.actividad_especifica = 'NA';
+      }
+      return siguiente;
+    });
+    limpiarError('actividad_clasificacion');
+    if (value !== 'otra') {
+      limpiarError('actividad_especifica');
+    }
+  }, [limpiarError]);
+
+  /**
    * Cambia los tipos de transacción seleccionados y limpia el campo '¿Cuáles?'
    * cuando 'Otras' deja de estar seleccionado.
    */
@@ -454,7 +475,7 @@ export function useFormulario() {
     referenciasComerciales, handleReferenciaChange: onReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange: onReferenciaBancariaChange, addReferenciaBancaria,
     infoBancariaPagos, handleInfoBancariaPagosChange: onInfoBancariaPagosChange, addInfoBancariaPagos,
-    handleChange, handleMonedaExtranjeraChange, handleTiposTransaccionChange,
+    handleChange, handleMonedaExtranjeraChange, handleActividadChange, handleTiposTransaccionChange,
     handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange: onJuntaChange, handleJuntaTipoIdChange: onJuntaTipoIdChange, addJuntaMember,

@@ -10,6 +10,7 @@ from models import (
     TipoContraparte,
     TipoPersona,
     TipoSolicitud,
+    ActividadClasificacion,
 )
 
 from services.utils.coercion import (
@@ -165,7 +166,7 @@ class FormularioBase(BaseModel):
     tipos_transaccion_otros: Optional[str] = None
 
     # 8. Clasificación Empresa y Régimen Tributario
-    actividad_clasificacion: Optional[str] = None
+    actividad_clasificacion: EnumLimpio[ActividadClasificacion] = None
     actividad_especifica: Optional[str] = None
     sector: Optional[str] = None
     superintendencia: Optional[str] = None

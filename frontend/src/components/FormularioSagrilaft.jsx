@@ -34,7 +34,8 @@ export default function FormularioSagrilaft() {
     referenciasComerciales, handleReferenciaChange, addReferencia,
     referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria,
     infoBancariaPagos, handleInfoBancariaPagosChange, addInfoBancariaPagos,
-    handleChange, handleFileChange, handleRemoveFile, handleSaveDraft,
+    handleChange, handleMonedaExtranjeraChange, handleActividadChange, handleTiposTransaccionChange,
+    handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, handleSubmit,
     handleJuntaChange, handleJuntaTipoIdChange, addJuntaMember,
     handleAccionistaChange, handleAccionistaTipoIdChange, addAccionista,
@@ -154,6 +155,7 @@ export default function FormularioSagrilaft() {
         {step === 7 && (
           <PasoClasificacionContactoBancario
             {...pasoProps}
+            handleActividadChange={handleActividadChange}
             infoBancariaPagos={infoBancariaPagos}
             onInfoBancariaPagosChange={handleInfoBancariaPagosChange}
             onAddInfoBancariaPagos={addInfoBancariaPagos}

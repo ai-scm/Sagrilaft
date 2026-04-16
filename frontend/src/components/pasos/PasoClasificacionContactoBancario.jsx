@@ -58,6 +58,18 @@ const REGIMENES_IVA = [
   { value: 'Ningún régimen', label: 'Ningún régimen' },
 ];
 
+/**
+ * Actividad principal de la empresa.
+ * Mapeado con el Enum ActividadClasificacion del backend.
+ */
+const OPCIONES_ACTIVIDAD = [
+  { value: 'industrial',         label: 'Industrial'         },
+  { value: 'comercial',          label: 'Comercial'          },
+  { value: 'financiera',         label: 'Financiera'         },
+  { value: 'economia_solidaria', label: 'Economía solidaria' },
+  { value: 'otra',               label: 'Otra'               },
+];
+
 const TIPOS_CUENTA = [
   { value: 'ahorro',    label: 'Cuenta de Ahorro'   },
   { value: 'corriente', label: 'Cuenta Corriente'    },
@@ -70,21 +82,25 @@ const TIPOS_CUENTA = [
  * Sección 8 — Clasificación de la empresa y régimen tributario.
  * Solo se renderiza para Persona Jurídica (condicional recibido por prop).
  */
-function ClasificacionTributaria({ formData, onChange, onOpenHelp, errors }) {
+function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpenHelp, errors }) {
+  const actividad = formData.actividad_clasificacion;
+  const esOtraActividad = actividad === 'otra';
+
   return (
     <>
       <SectionTitle>8. CLASIFICACIÓN DE LA EMPRESA Y RÉGIMEN TRIBUTARIO</SectionTitle>
-
+      
       <div className="form-row">
         <FormField
-          label="Actividad" name="actividad_clasificacion" required
-          value={formData.actividad_clasificacion} onChange={onChange} onOpenHelp={onOpenHelp}
-          error={errors.actividad_clasificacion}
+          label="Actividad" name="actividad_clasificacion" type="select" required
+          value={actividad} onChange={onActividadChange} onOpenHelp={onOpenHelp}
+          options={OPCIONES_ACTIVIDAD} error={errors.actividad_clasificacion}
         />
         <FormField
           label="¿Cuál? Especifique" name="actividad_especifica" required
           value={formData.actividad_especifica} onChange={onChange} onOpenHelp={onOpenHelp}
           error={errors.actividad_especifica}
+          disabled={!esOtraActividad}
         />
         <FormField
           label="Sector" name="sector" type="select" required
@@ -315,7 +331,7 @@ function InfoBancariaPagos({ infoBancariaPagos, onInfoBancariaPagosChange, onAdd
 // ── Componente orquestador del paso ───────────────────────────────────────────
 
 export default function PasoClasificacionContactoBancario({
-  formData, onChange, onOpenHelp, errors = {},
+  formData, onChange, handleActividadChange, onOpenHelp, errors = {},
   infoBancariaPagos, onInfoBancariaPagosChange, onAddInfoBancariaPagos,
 }) {
   const esJuridica = formData.tipo_persona === 'juridica';
@@ -329,6 +345,7 @@ export default function PasoClasificacionContactoBancario({
         <ClasificacionTributaria
           formData={formData}
           onChange={onChange}
+          onActividadChange={handleActividadChange}
           onOpenHelp={onOpenHelp}
           errors={errors}
         />

@@ -43,6 +43,17 @@ class ClasificacionActividad(str, enum.Enum):
     IMPORTADOR            = "I"
 
 
+class ActividadClasificacion(str, enum.Enum):
+    """
+    Actividad principal de la empresa (Sección 8).
+    """
+    INDUSTRIAL         = "industrial"
+    COMERCIAL          = "comercial"
+    FINANCIERA         = "financiera"
+    ECONOMIA_SOLIDARIA = "economia_solidaria"
+    OTRA               = "otra"
+
+
 def generate_uuid():
     return str(uuid.uuid4())
 
