@@ -1,11 +1,32 @@
 import json
 
 from pydantic import BaseModel, BeforeValidator, field_validator, model_validator
-from typing import Annotated, Any, Optional, List
+from typing import Annotated, Any, Optional, List, TypeVar, Literal
 from datetime import datetime
 
+from models import (
+    ClasificacionActividad,
+    EstadoFormulario,
+    TipoContraparte,
+    TipoPersona,
+    TipoSolicitud,
+)
 
-# ── Tipos anotados para campos numéricos del formulario ──────────────────────
+
+# ── Validadores Transversales y Tipos Anotados ───────────────────────────────
+
+T = TypeVar('T')
+
+def _vacio_a_nulo(v: Any) -> Any:
+    """Coerciona explícitamente strings vacíos pre-validación. Imprescindible para borradores."""
+    return None if v == "" else v
+
+EnumLimpio = Annotated[Optional[T], BeforeValidator(_vacio_a_nulo)]
+
+# Literales para estandarización estricta de Dropdowns fijos (sin enums complejos)
+DropdownSiNo = Annotated[Literal['si', 'no'] | None, BeforeValidator(_vacio_a_nulo)]
+DropdownTipoId = Annotated[Literal['NIT', 'CC', 'CE', 'PAS'] | None, BeforeValidator(_vacio_a_nulo)]
+
 
 def _coercionar_monto(v: object) -> float | None:
     """
@@ -85,52 +106,38 @@ def _limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
     return data
 
 
-class MiembroJunta(BaseModel):
+class PersonaVinculadaBase(BaseModel):
+    """
+    Clase base para entidades dinámicas vinculadas a la empresa (Secciones Junta, Accionistas, Beneficiarios).
+    Centraliza los campos compartidos de identificación y gestión PEP y sus lógicas de dependencia.
+    """
+    nombre: Optional[str] = None
+    tipo_id: DropdownTipoId = None
+    numero_id: Optional[str] = None
+    es_pep: DropdownSiNo = None
+    vinculos_pep: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def validar_dependencias(cls, data: Any) -> Any:
+        data = _limpiar_numero_id_si_tipo_ausente(data)
+        data = _limpiar_vinculos_pep_si_no_es_pep(data)
+        return data
+
+
+class MiembroJunta(PersonaVinculadaBase):
+    """ Hereda nombre, id, pep y agrega campo específico: cargo """
     cargo: Optional[str] = None
-    nombre: Optional[str] = None
-    tipo_id: Optional[str] = None
-    numero_id: Optional[str] = None
-    es_pep: Optional[str] = None
-    vinculos_pep: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def validar_dependencias(cls, data: Any) -> Any:
-        data = _limpiar_numero_id_si_tipo_ausente(data)
-        data = _limpiar_vinculos_pep_si_no_es_pep(data)
-        return data
 
 
-class Accionista(BaseModel):
-    nombre: Optional[str] = None
+class Accionista(PersonaVinculadaBase):
+    """ Hereda nombre, id, pep y agrega campo específico: porcentaje """
     porcentaje: PorcentajeParticipacion = None
-    tipo_id: Optional[str] = None
-    numero_id: Optional[str] = None
-    es_pep: Optional[str] = None
-    vinculos_pep: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def validar_dependencias(cls, data: Any) -> Any:
-        data = _limpiar_numero_id_si_tipo_ausente(data)
-        data = _limpiar_vinculos_pep_si_no_es_pep(data)
-        return data
 
 
-class BeneficiarioFinal(BaseModel):
-    nombre: Optional[str] = None
+class BeneficiarioFinal(PersonaVinculadaBase):
+    """ Idéntico estructuralmente a un Accionista, diferenciable en el dominio del negocio """
     porcentaje: PorcentajeParticipacion = None
-    tipo_id: Optional[str] = None
-    numero_id: Optional[str] = None
-    es_pep: Optional[str] = None
-    vinculos_pep: Optional[str] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def validar_dependencias(cls, data: Any) -> Any:
-        data = _limpiar_numero_id_si_tipo_ausente(data)
-        data = _limpiar_vinculos_pep_si_no_es_pep(data)
-        return data
 
 
 class ReferenciaComercial(BaseModel):
@@ -155,10 +162,10 @@ class InformacionBancariaPago(BaseModel):
 # --- Schema principal del formulario ---
 class FormularioBase(BaseModel):
     # Clasificación
-    tipo_contraparte:        Optional[str] = None
-    tipo_persona:            Optional[str] = None
-    tipo_solicitud:          Optional[str] = None
-    clasificacion_actividad: Optional[str] = None
+    tipo_contraparte:        EnumLimpio[TipoContraparte] = None
+    tipo_persona:            EnumLimpio[TipoPersona] = None
+    tipo_solicitud:          EnumLimpio[TipoSolicitud] = None
+    clasificacion_actividad: EnumLimpio[ClasificacionActividad] = None
 
     # 1. Info Básica
     razon_social: Optional[str] = None
@@ -277,26 +284,6 @@ class FormularioBase(BaseModel):
             raise ValueError("El valor debe ser 'si' o 'no'")
         return str(v).lower()
 
-    @field_validator('clasificacion_actividad')
-    @classmethod
-    def validar_clasificacion_actividad(cls, v: object) -> str | None:
-        """
-        Solo se aceptan los códigos de clasificación de actividad definidos
-        en el dominio: C, D, R, F, I.
-        Cadenas vacías se tratan como ausencia de valor.
-        """
-        _VALORES_VALIDOS = {'C', 'D', 'R', 'F', 'I'}
-        if v is None or v == '':
-            return None
-        valor = str(v).upper()
-        if valor not in _VALORES_VALIDOS:
-            raise ValueError(
-                f"Clasificación de actividad inválida '{v}'. "
-                "Use uno de: C (Comercializador), D (Distribuidor), "
-                "R (Representante), F (Fabricante), I (Importador)"
-            )
-        return valor
-
     @field_validator('sector')
     @classmethod
     def validar_sector(cls, v: object) -> str | None:
@@ -410,7 +397,7 @@ class FormularioUpdate(FormularioBase):
 class FormularioResponse(FormularioBase):
     id: str
     codigo_peticion: str
-    estado: str
+    estado: EstadoFormulario
     created_at: datetime
     updated_at: datetime
 
