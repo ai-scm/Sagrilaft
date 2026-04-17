@@ -26,7 +26,11 @@ from core.contratos import IExtractorIA
 from services.formulario.serializacion import serializar_campos_json, deserializar_campos_json
 from services.formulario.validacion import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
-from services.formulario.analisis_service import AnalisisDocumentosService, ResultadoGuardadoDocumento
+from services.formulario.analisis_service import (
+    AnalisisDocumentosService, 
+    ResultadoGuardadoDocumento,
+    obtener_config_analisis_por_defecto
+)
 
 
 class FormularioYaEnviadoError(Exception):
@@ -48,7 +52,10 @@ class FormularioService:
         self._sesion = sesion
         self._validador_envio = ValidadorEnvioFormulario()
         self._documentos = DocumentoService(sesion)
-        self._analisis = AnalisisDocumentosService(extractor)
+        self._analisis = AnalisisDocumentosService(
+            extractor, 
+            obtener_config_analisis_por_defecto()
+        )
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 

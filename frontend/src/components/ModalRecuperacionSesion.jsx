@@ -61,7 +61,9 @@ const estilos = {
   input: {
     width: '100%',
     padding: '10px 14px',
-    border: '1.5px solid var(--gray-200)',
+    borderWidth: '1.5px',
+    borderStyle: 'solid',
+    borderColor: 'var(--gray-200)',
     borderRadius: 'var(--radius-md)',
     fontSize: '0.9rem',
     color: 'var(--gray-800)',
@@ -121,17 +123,17 @@ export default function ModalRecuperacionSesion({
   onRecuperar, onDescartar,
 }) {
   const [correo, setCorreo] = useState('');
-  const [nit, setNit]       = useState('');
+  const [nit, setNit] = useState('');
   const [correoFocus, setCorreoFocus] = useState(false);
-  const [nitFocus, setNitFocus]       = useState(false);
+  const [nitFocus, setNitFocus] = useState(false);
 
   if (!visible) return null;
 
   const fechaLegible = fechaBorrador
     ? new Date(fechaBorrador).toLocaleString('es-CO', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-      })
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
     : null;
 
   const puedeEnviar = correo.trim() && nit.trim() && !cargando;

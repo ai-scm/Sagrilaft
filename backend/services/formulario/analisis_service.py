@@ -18,7 +18,7 @@ from services.alertas.detector_inconsistencias_direccion import detector as _det
 
 
 # ---------------------------------------------------------------------------
-# Protocolo e configuración tipada
+# Protocolo y configuración tipada
 # ---------------------------------------------------------------------------
 
 class IDetector(Protocol):
@@ -48,7 +48,20 @@ class ConfigDetector:
 
 
 # ---------------------------------------------------------------------------
-# Resultado
+# DTO interno de extracción
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _ResultadoExtraccion:
+    extraido:         bool
+    datos:            Dict[str, Any] = field(default_factory=dict)
+    campos_sugeridos: Dict[str, Any] = field(default_factory=dict)
+    mensaje:          str            = ""
+    confianza:        float          = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Resultado público
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -71,17 +84,60 @@ class ResultadoGuardadoDocumento:
         alerta_direccion:                  Alerta si la dirección del documento no coincide.
     """
     documento:                         DocumentoAdjunto
-    campos_sugeridos:                  Dict[str, Any]              = field(default_factory=dict)
-    razon_social_extraida:             Optional[str]               = None
+    campos_sugeridos:                  Dict[str, Any]                 = field(default_factory=dict)
+    razon_social_extraida:             Optional[str]                  = None
     alerta_nombre:                     Optional[AlertaInconsistencia] = None
-    nit_extraido:                      Optional[str]               = None
+    nit_extraido:                      Optional[str]                  = None
     alerta_nit:                        Optional[AlertaInconsistencia] = None
-    nombre_representante_extraido:     Optional[str]               = None
+    nombre_representante_extraido:     Optional[str]                  = None
     alerta_nombre_representante:       Optional[AlertaInconsistencia] = None
-    numero_doc_representante_extraido: Optional[str]               = None
+    numero_doc_representante_extraido: Optional[str]                  = None
     alerta_numero_doc_representante:   Optional[AlertaInconsistencia] = None
-    direccion_extraida:                Optional[str]               = None
+    direccion_extraida:                Optional[str]                  = None
     alerta_direccion:                  Optional[AlertaInconsistencia] = None
+
+
+# ---------------------------------------------------------------------------
+# Configuración por defecto
+# ---------------------------------------------------------------------------
+
+def obtener_config_analisis_por_defecto() -> List[ConfigDetector]:
+    """
+    Devuelve la configuración estándar de detectores de inconsistencias.
+    """
+    return [
+        ConfigDetector(
+            campo_formulario = "razon_social",
+            detector         = _detector_nombres,
+            attr_extraido    = "razon_social_extraida",
+            attr_alerta      = "alerta_nombre",
+        ),
+        ConfigDetector(
+            campo_formulario = "numero_identificacion",
+            detector         = _detector_nit,
+            attr_extraido    = "nit_extraido",
+            attr_alerta      = "alerta_nit",
+            get_extra_kwargs = lambda f: {"tipo_identificacion_formulario": f.tipo_identificacion},
+        ),
+        ConfigDetector(
+            campo_formulario = "nombre_representante",
+            detector         = _detector_nombre_representante,
+            attr_extraido    = "nombre_representante_extraido",
+            attr_alerta      = "alerta_nombre_representante",
+        ),
+        ConfigDetector(
+            campo_formulario = "numero_doc_representante",
+            detector         = _detector_numero_doc_representante,
+            attr_extraido    = "numero_doc_representante_extraido",
+            attr_alerta      = "alerta_numero_doc_representante",
+        ),
+        ConfigDetector(
+            campo_formulario = "direccion",
+            detector         = _detector_direccion,
+            attr_extraido    = "direccion_extraida",
+            attr_alerta      = "alerta_direccion",
+        ),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -94,45 +150,41 @@ class AnalisisDocumentosService:
     detectores de inconsistencias.
     """
 
-    def __init__(self, extractor: IExtractorIA) -> None:
+    def __init__(
+        self, 
+        extractor: IExtractorIA, 
+        config_analisis: List[ConfigDetector]
+    ) -> None:
         self._extractor = extractor
+        self._config_analisis = config_analisis
 
-        # Configuración declarativa de detectores.
-        # Para agregar una nueva validación basta con añadir un ConfigDetector aquí;
-        # la lógica de analizar_nueva_carga no necesita modificarse.
-        self._config_analisis: List[ConfigDetector] = [
-            ConfigDetector(
-                campo_formulario = "razon_social",
-                detector         = _detector_nombres,
-                attr_extraido    = "razon_social_extraida",
-                attr_alerta      = "alerta_nombre",
+    # -----------------------------------------------------------------------
+    # Método privado compartido
+    # -----------------------------------------------------------------------
+
+    async def _extraer(self, documento: DocumentoAdjunto) -> _ResultadoExtraccion:
+        """Extrae y mapea los datos de un documento. Punto único de entrada a la IA."""
+        extraccion = await self._extractor.extraer(
+            str(documento.ruta_archivo), documento.tipo_documento
+        )
+        if not extraccion.extraido:
+            return _ResultadoExtraccion(
+                extraido = False,
+                mensaje  = extraccion.mensaje,
+            )
+        return _ResultadoExtraccion(
+            extraido         = True,
+            datos            = extraccion.datos,
+            campos_sugeridos = mapear_campos_para_formulario(
+                documento.tipo_documento, extraccion.datos
             ),
-            ConfigDetector(
-                campo_formulario = "numero_identificacion",
-                detector         = _detector_nit,
-                attr_extraido    = "nit_extraido",
-                attr_alerta      = "alerta_nit",
-                get_extra_kwargs = lambda f: {"tipo_identificacion_formulario": f.tipo_identificacion},
-            ),
-            ConfigDetector(
-                campo_formulario = "nombre_representante",
-                detector         = _detector_nombre_representante,
-                attr_extraido    = "nombre_representante_extraido",
-                attr_alerta      = "alerta_nombre_representante",
-            ),
-            ConfigDetector(
-                campo_formulario = "numero_doc_representante",
-                detector         = _detector_numero_doc_representante,
-                attr_extraido    = "numero_doc_representante_extraido",
-                attr_alerta      = "alerta_numero_doc_representante",
-            ),
-            ConfigDetector(
-                campo_formulario = "direccion",
-                detector         = _detector_direccion,
-                attr_extraido    = "direccion_extraida",
-                attr_alerta      = "alerta_direccion",
-            ),
-        ]
+            mensaje          = extraccion.mensaje,
+            confianza        = extraccion.confianza,
+        )
+
+    # -----------------------------------------------------------------------
+    # Métodos públicos
+    # -----------------------------------------------------------------------
 
     async def analizar_nueva_carga(
         self,
@@ -143,18 +195,13 @@ class AnalisisDocumentosService:
         Extrae datos del documento guardado y cruza contra los valores
         del formulario usando los detectores.
         """
-        extraccion = await self._extractor.extraer(
-            str(documento.ruta_archivo), documento.tipo_documento
-        )
-
-        resultado = ResultadoGuardadoDocumento(documento=documento)
+        extraccion = await self._extraer(documento)
+        resultado  = ResultadoGuardadoDocumento(documento=documento)
 
         if not extraccion.extraido:
             return resultado
 
-        resultado.campos_sugeridos = mapear_campos_para_formulario(
-            documento.tipo_documento, extraccion.datos
-        )
+        resultado.campos_sugeridos = extraccion.campos_sugeridos
 
         for config in self._config_analisis:
             # 1. Extraer valor para el frontend
@@ -165,15 +212,14 @@ class AnalisisDocumentosService:
                     documento.tipo_documento, extraccion.datos
                 ),
             )
-
             # 2. Detectar inconsistencias
             setattr(
                 resultado,
                 config.attr_alerta,
                 config.detector.detectar(
-                    tipo_documento    = documento.tipo_documento,
-                    datos_extraidos   = extraccion.datos,
-                    valor_formulario  = getattr(formulario, config.campo_formulario),
+                    tipo_documento   = documento.tipo_documento,
+                    datos_extraidos  = extraccion.datos,
+                    valor_formulario = getattr(formulario, config.campo_formulario),
                     **config.get_extra_kwargs(formulario),
                 ),
             )
@@ -186,22 +232,17 @@ class AnalisisDocumentosService:
         """
         Escanea un documento individual y devuelve campos consolidados.
         """
-        extraccion = await self._extractor.extraer(
-            ruta_archivo   = documento.ruta_archivo,
-            tipo_documento = documento.tipo_documento,
-        )
+        extraccion = await self._extraer(documento)
 
         if not extraccion.extraido:
             return {"success": False, "message": extraccion.mensaje, "campos_sugeridos": {}}
 
         return {
-            "success":         True,
-            "message":         extraccion.mensaje,
-            "confianza":       extraccion.confianza,
-            "datos_extraidos": extraccion.datos,
-            "campos_sugeridos": mapear_campos_para_formulario(
-                documento.tipo_documento, extraccion.datos
-            ),
+            "success":          True,
+            "message":          extraccion.mensaje,
+            "confianza":        extraccion.confianza,
+            "datos_extraidos":  extraccion.datos,
+            "campos_sugeridos": extraccion.campos_sugeridos,
         }
 
     async def prellenar_multiples_documentos(
@@ -211,18 +252,13 @@ class AnalisisDocumentosService:
         Escanea todos los documentos y extrae valores con IA.
         """
         campos_consolidados: Dict[str, Any] = {}
-        detalles: List[Dict[str, Any]] = []
+        detalles: List[Dict[str, Any]]      = []
 
         for doc in documentos:
-            extraccion = await self._extractor.extraer(
-                ruta_archivo   = doc.ruta_archivo,
-                tipo_documento = doc.tipo_documento,
-            )
+            extraccion = await self._extraer(doc)
 
-            campos: Dict[str, Any] = {}
             if extraccion.extraido:
-                campos = mapear_campos_para_formulario(doc.tipo_documento, extraccion.datos)
-                for clave, valor in campos.items():
+                for clave, valor in extraccion.campos_sugeridos.items():
                     if clave not in campos_consolidados and valor is not None:
                         campos_consolidados[clave] = valor
 
@@ -230,12 +266,12 @@ class AnalisisDocumentosService:
                 "documento":        doc.nombre_archivo,
                 "tipo":             doc.tipo_documento,
                 "extraido":         extraccion.extraido,
-                "campos_sugeridos": campos,
+                "campos_sugeridos": extraccion.campos_sugeridos,
                 "confianza":        extraccion.confianza,
             })
 
         return {
-            "success":True,
+            "success":                True,
             "campos_consolidados":    campos_consolidados,
             "detalles_por_documento": detalles,
         }

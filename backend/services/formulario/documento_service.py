@@ -9,6 +9,9 @@ from typing import List
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from datetime import datetime, timezone
+
+
 from models import DocumentoAdjunto
 from core.configuracion import load_config
 
@@ -90,7 +93,6 @@ class DocumentoService:
         if ruta.exists():
             ruta.unlink()
         
-        from datetime import datetime, timezone
         documento.deleted_at = datetime.now(timezone.utc)
         self._sesion.commit()
 
