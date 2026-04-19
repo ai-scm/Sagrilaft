@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import List
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from datetime import datetime, timezone
@@ -14,6 +13,7 @@ from datetime import datetime, timezone
 
 from models import DocumentoAdjunto
 from core.configuracion import load_config
+from domain.excepciones import DocumentoNoEncontradoError
 
 CONFIG = load_config()
 
@@ -69,26 +69,26 @@ class DocumentoService:
         self._sesion.refresh(documento)
         return documento
 
-    def buscar_documento_o_404(
-        self, formulario_id: str, doc_id: str
-    ) -> DocumentoAdjunto:
-        """
-        Recupera un documento adjunto por ID y formulario, o lanza HTTP 404.
-        """
-        documento = self._sesion.query(DocumentoAdjunto).filter(
-            DocumentoAdjunto.id == doc_id,
-            DocumentoAdjunto.formulario_id == formulario_id,
-            DocumentoAdjunto.deleted_at.is_(None),
-        ).first()
+    def buscar_documento(self, formulario_id: str, doc_id: str) -> DocumentoAdjunto:
+        """Recupera un documento adjunto por ID y formulario, o lanza DocumentoNoEncontradoError."""
+        documento = (
+            self._sesion.query(DocumentoAdjunto)
+            .filter(
+                DocumentoAdjunto.id == doc_id,
+                DocumentoAdjunto.formulario_id == formulario_id,
+                DocumentoAdjunto.deleted_at.is_(None),
+            )
+            .first()
+        )
         if not documento:
-            raise HTTPException(status_code=404, detail="Documento no encontrado")
+            raise DocumentoNoEncontradoError(formulario_id, doc_id)
         return documento
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
         """
         Elimina un documento adjunto de disco y de la BD de forma lógica.
         """
-        documento = self.buscar_documento_o_404(formulario_id, doc_id)
+        documento = self.buscar_documento(formulario_id, doc_id)
         ruta = Path(documento.ruta_archivo)
         if ruta.exists():
             ruta.unlink()

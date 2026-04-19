@@ -10,7 +10,7 @@ DIP : depende de ValidacionService vía inyección de dependencias.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -18,7 +18,7 @@ from dependencies import obtener_orquestador, obtener_servicio_lista_cautela
 from schemas import ValidacionResponse
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
-from services.validacion_service import FormularioNoEncontradoError, ValidacionService
+from services.validacion_service import ValidacionService
 
 enrutador = APIRouter(prefix="/api/validar", tags=["validación"])
 
@@ -48,7 +48,4 @@ async def validar_formulario(
       3. Consistencia de información financiera.
       4. Búsqueda en listas de cautela (empresa y representante legal).
     """
-    try:
-        return await servicio.ejecutar_validacion_completa(formulario_id)
-    except FormularioNoEncontradoError as exc:
-        raise HTTPException(status_code=404, detail="Formulario no encontrado") from exc
+    return await servicio.ejecutar_validacion_completa(formulario_id)

@@ -19,14 +19,7 @@ from models import Formulario, ResultadoValidacion
 from core.contratos import HallazgoValidacion
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
-
-
-class FormularioNoEncontradoError(Exception):
-    """Excepción de dominio: el formulario solicitado no existe."""
-
-    def __init__(self, formulario_id: str) -> None:
-        self.formulario_id = formulario_id
-        super().__init__(f"Formulario '{formulario_id}' no encontrado")
+from domain.excepciones import FormularioNoEncontradoError
 
 
 class ValidacionService:

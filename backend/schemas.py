@@ -1,6 +1,6 @@
 import json
 
-from pydantic import BaseModel, BeforeValidator, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
 from typing import Annotated, Any, Optional, List, TypeVar, Literal
 from datetime import datetime
 
@@ -438,14 +438,15 @@ class ValidacionResponse(BaseModel):
 
 
 class FormularioConDetalles(FormularioResponse):
-    documentos: List[DocumentoResponse] = []
-    validaciones: List[ValidacionResponse] = []
+    documentos: List[DocumentoResponse] = Field(default_factory=list)
+    validaciones: List[ValidacionResponse] = Field(default_factory=list)
 
 
 
 
 class ResultadoValidacionEnvio(BaseModel):
     valido: bool
+    errores: List[ErrorValidacion] = Field(default_factory=list)
 
 
 # --- Listas de cautela ---
@@ -463,7 +464,7 @@ class ResultadoListaCautela(BaseModel):
 
 class RespuestaListaCautela(BaseModel):
     nombre_buscado: str
-    resultados: List[ResultadoListaCautela] = []
+    resultados: List[ResultadoListaCautela] = Field(default_factory=list)
     riesgo_general: str = "bajo"  # "bajo", "medio", "alto"
 
 

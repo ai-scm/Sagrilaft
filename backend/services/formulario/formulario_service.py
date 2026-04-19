@@ -11,7 +11,6 @@ Organiza responsabilidades en capas claras:
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -22,6 +21,12 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
+from domain.excepciones import (
+    FormularioNoEditableError,
+    FormularioNoEncontradoError,
+    FormularioNoEncontradoPorCredencialesError,
+    FormularioYaEnviadoError,
+)
 from core.contratos import IExtractorIA
 from services.formulario.serializacion import serializar_campos_json, deserializar_campos_json
 from services.formulario.validacion import ValidadorEnvioFormulario
@@ -31,13 +36,6 @@ from services.formulario.analisis_service import (
     ResultadoGuardadoDocumento,
     obtener_config_analisis_por_defecto
 )
-
-
-class FormularioYaEnviadoError(Exception):
-    """
-    Se lanza cuando las credenciales identifican un formulario que ya fue
-    enviado y, por tanto, no es recuperable como borrador activo.
-    """
 
 
 class FormularioService:
@@ -72,7 +70,7 @@ class FormularioService:
             (Formulario.codigo_peticion == codigo) | (Formulario.id == codigo)
         ).first()
         if not formulario:
-            raise HTTPException(status_code=404, detail="Formulario no encontrado")
+            raise FormularioNoEncontradoError(codigo)
 
         datos = deserializar_campos_json(formulario)
         datos["documentos"] = self._documentos_a_respuesta(formulario.documentos)
@@ -80,8 +78,8 @@ class FormularioService:
         return datos
 
     def actualizar(self, formulario_id: str, datos: FormularioUpdate) -> Dict[str, Any]:
-        formulario = self._buscar_formulario_o_404(formulario_id)
-        self._verificar_estado_borrador(
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
             formulario,
             "No se puede modificar un formulario que ya fue enviado",
         )
@@ -96,7 +94,7 @@ class FormularioService:
 
     def buscar_borrador_por_credenciales(
         self, correo: str, numero_identificacion: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         _filtro_nit = or_(
             Formulario.numero_identificacion == numero_identificacion,
             func.concat(
@@ -113,7 +111,7 @@ class FormularioService:
         )
 
         if not formulario:
-            return None
+            raise FormularioNoEncontradoPorCredencialesError(correo, numero_identificacion)
 
         if formulario.estado != EstadoFormulario.BORRADOR:
             raise FormularioYaEnviadoError()
@@ -124,8 +122,12 @@ class FormularioService:
         return datos
 
     def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
-        formulario = self._buscar_formulario_o_404(formulario_id)
-        self._verificar_estado_borrador(formulario, "El formulario ya fue enviado previamente")
+        # Flujo nuevo (Semana 1): errores de dominio, sin HTTPException en la capa de servicio.
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
+            formulario,
+            "El formulario ya fue enviado previamente",
+        )
 
         errores = self._validador_envio.validar(formulario)
         if errores:
@@ -145,8 +147,8 @@ class FormularioService:
         nombre_archivo: str,
         content_type: str,
     ) -> ResultadoGuardadoDocumento:
-        formulario = self._buscar_formulario_o_404(formulario_id)
-        self._verificar_estado_borrador(
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
             formulario,
             "No se pueden agregar documentos a un formulario enviado",
         )
@@ -169,9 +171,16 @@ class FormularioService:
         )
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
+            formulario,
+            "No se pueden eliminar documentos de un formulario enviado",
+        )
         self._documentos.eliminar_documento(formulario_id, doc_id)
 
     def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
+        # Para consistencia: si el formulario no existe, se responde 404.
+        self._buscar_formulario_o_error(formulario_id)
         return self._documentos.listar_documentos(formulario_id)
 
     # ─── Pre-llenado con IA ───────────────────────────────────────────────────
@@ -179,30 +188,44 @@ class FormularioService:
     async def prellenar_documento(
         self, formulario_id: str, doc_id: str
     ) -> Dict[str, Any]:
-        documento = self._documentos.buscar_documento_o_404(formulario_id, doc_id)
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
+            formulario,
+            "No se puede prellenar un formulario que ya fue enviado",
+        )
+        # Flujo nuevo (Semana 1): el DocumentoService expone error de dominio.
+        # El router traduce DocumentoNoEncontradoError -> 404.
+        documento = self._documentos.buscar_documento(formulario_id, doc_id)
         return await self._analisis.prellenar_documento(documento)
 
     async def prellenar_todos(self, formulario_id: str) -> Dict[str, Any]:
-        """Solo es invocado en estado borrador, el router valida internamente si es posible"""
-        self._buscar_formulario_o_404(formulario_id)
+        """Solo es invocado en estado borrador."""
+        formulario = self._buscar_formulario_o_error(formulario_id)
+        self._verificar_estado_borrador_o_error(
+            formulario,
+            "No se puede prellenar un formulario que ya fue enviado",
+        )
         documentos = self._documentos.listar_documentos(formulario_id)
         return await self._analisis.prellenar_multiples_documentos(documentos)
 
     # ─── Helpers privados ─────────────────────────────────────────────────────
 
-    def _buscar_formulario_o_404(self, formulario_id: str) -> Formulario:
-        formulario = self._sesion.query(Formulario).filter(
-            Formulario.id == formulario_id
-        ).first()
+    def _buscar_formulario_o_error(self, formulario_id: str) -> Formulario:
+        """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
+        formulario = (
+            self._sesion.query(Formulario)
+            .filter(Formulario.id == formulario_id)
+            .first()
+        )
         if not formulario:
-            raise HTTPException(status_code=404, detail="Formulario no encontrado")
+            raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
-    def _verificar_estado_borrador(
-        self, formulario: Formulario, mensaje_error: str
-    ) -> None:
+    @staticmethod
+    def _verificar_estado_borrador_o_error(formulario: Formulario, mensaje_error: str) -> None:
+        """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
         if formulario.estado != EstadoFormulario.BORRADOR:
-            raise HTTPException(status_code=400, detail=mensaje_error)
+            raise FormularioNoEditableError(mensaje_error)
 
     @staticmethod
     def _documentos_a_respuesta(

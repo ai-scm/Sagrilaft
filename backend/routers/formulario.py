@@ -8,7 +8,7 @@ DIP : depende de la abstracción IExtractorIA, no de la implementación Bedrock.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -23,7 +23,7 @@ from schemas import (
     ResultadoValidacionEnvio,
 )
 from core.contratos import IExtractorIA
-from services.formulario.formulario_service import FormularioService, FormularioYaEnviadoError
+from services.formulario.formulario_service import FormularioService
 from routers.transformers import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
@@ -66,23 +66,10 @@ def recuperar_sesion_por_credenciales(
       404 — No existe ningún formulario con esas credenciales.
       409 — Existe un formulario pero ya fue enviado; no es recuperable.
     """
-    try:
-        formulario = servicio.buscar_borrador_por_credenciales(
-            credenciales.correo,
-            credenciales.numero_identificacion,
-        )
-    except FormularioYaEnviadoError:
-        raise HTTPException(
-            status_code=409,
-            detail="El formulario asociado a esas credenciales ya fue enviado.",
-        )
-
-    if formulario is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No se encontró ningún formulario con esas credenciales.",
-        )
-    return formulario
+    return servicio.buscar_borrador_por_credenciales(
+        credenciales.correo,
+        credenciales.numero_identificacion,
+    )
 
 
 # ─── Endpoints de formulario ─────────────────────────────────────────────────

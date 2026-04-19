@@ -8,12 +8,20 @@ y registra todos los validadores de documentos.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from core import load_config
 from database import engine, Base
 from routers import formulario, validacion, listas_cautela
+from domain.excepciones import (
+    DocumentoNoEncontradoError,
+    FormularioNoEditableError,
+    FormularioNoEncontradoError,
+    FormularioNoEncontradoPorCredencialesError,
+    FormularioYaEnviadoError,
+)
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
 from services.extractores.bedrock_extractor import ExtractorBedrock
@@ -123,6 +131,46 @@ app.add_middleware(
 app.include_router(formulario.enrutador)
 app.include_router(validacion.enrutador)
 app.include_router(listas_cautela.enrutador)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exception Handlers (Domain -> HTTP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.exception_handler(FormularioNoEncontradoError)
+async def _formulario_no_encontrado(_: Request, __: FormularioNoEncontradoError) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": "Formulario no encontrado"})
+
+
+@app.exception_handler(FormularioNoEditableError)
+async def _formulario_no_editable(_: Request, exc: FormularioNoEditableError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(FormularioYaEnviadoError)
+async def _formulario_ya_enviado(_: Request, __: FormularioYaEnviadoError) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "El formulario asociado a esas credenciales ya fue enviado."},
+    )
+
+
+@app.exception_handler(FormularioNoEncontradoPorCredencialesError)
+async def _formulario_no_encontrado_por_credenciales(
+    _: Request,
+    exc: FormularioNoEncontradoPorCredencialesError,
+) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(DocumentoNoEncontradoError)
+async def _documento_no_encontrado(_: Request, __: DocumentoNoEncontradoError) -> JSONResponse:
+    return JSONResponse(status_code=404, content={"detail": "Documento no encontrado"})
+
+
+@app.exception_handler(PermissionError)
+async def _permission_error(_: Request, exc: PermissionError) -> JSONResponse:
+    # Tipicamente ocurre al escribir en disco (uploads) sin permisos.
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.get("/")
