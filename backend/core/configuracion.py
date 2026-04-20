@@ -27,6 +27,12 @@ class AWSConfig:
 @dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
+    db_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DATABASE_URL",
+            f"sqlite:///{(BASE_DIR / 'sagrilaft.db').resolve()}",
+        )
+    )
     upload_dir: Path = field(
         default_factory=lambda: Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads")).resolve()
     )

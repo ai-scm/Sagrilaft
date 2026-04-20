@@ -10,6 +10,7 @@ Organiza responsabilidades en capas claras:
 """
 
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -46,10 +47,10 @@ class FormularioService:
     los documentos y el análisis de IA. Mantiene la interfaz pública intacta.
     """
 
-    def __init__(self, sesion: Session, extractor: IExtractorIA) -> None:
+    def __init__(self, sesion: Session, extractor: IExtractorIA, upload_dir: Path) -> None:
         self._sesion = sesion
         self._validador_envio = ValidadorEnvioFormulario()
-        self._documentos = DocumentoService(sesion)
+        self._documentos = DocumentoService(sesion, upload_dir)
         self._analisis = AnalisisDocumentosService(
             extractor, 
             obtener_config_analisis_por_defecto()

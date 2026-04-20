@@ -12,10 +12,7 @@ from datetime import datetime, timezone
 
 
 from models import DocumentoAdjunto
-from core.configuracion import load_config
 from domain.excepciones import DocumentoNoEncontradoError
-
-CONFIG = load_config()
 
 
 class DocumentoService:
@@ -23,9 +20,9 @@ class DocumentoService:
     CRUD y manejo de archivos en disco para los documentos adjuntos de un formulario.
     """
 
-    def __init__(self, sesion: Session) -> None:
+    def __init__(self, sesion: Session, upload_dir: Path) -> None:
         self._sesion = sesion
-        self.directorio_base = CONFIG.upload_dir
+        self.directorio_base = upload_dir
         self._validar_directorio_produccion()
 
     def _validar_directorio_produccion(self):

@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
-from dependencies import obtener_extractor
+from dependencies import obtener_config, obtener_extractor
 from schemas import (
     CredencialesRecuperacion,
     DocumentoResponse,
@@ -23,6 +23,7 @@ from schemas import (
     ResultadoValidacionEnvio,
 )
 from core.contratos import IExtractorIA
+from core.configuracion import AppConfig
 from services.formulario.formulario_service import FormularioService
 from routers.transformers import construir_respuesta_documento
 
@@ -34,9 +35,10 @@ enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 def obtener_servicio_formulario(
     sesion: Session = Depends(get_db),
     extractor: IExtractorIA = Depends(obtener_extractor),
+    config: AppConfig = Depends(obtener_config),
 ) -> FormularioService:
     """Crea un FormularioService con las dependencias inyectadas."""
-    return FormularioService(sesion, extractor)
+    return FormularioService(sesion, extractor, config.upload_dir)
 
 
 # ─── Recuperación de sesión ──────────────────────────────────────────────────
