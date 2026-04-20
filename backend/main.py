@@ -22,6 +22,7 @@ from domain.excepciones import (
     FormularioNoEncontradoPorCredencialesError,
     FormularioYaEnviadoError,
 )
+from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.ensamblaje import (
     crear_orquestador_validacion,
     crear_servicio_listas_cautela,
@@ -132,6 +133,17 @@ async def _documento_no_encontrado(_: Request, __: DocumentoNoEncontradoError) -
 async def _permission_error(_: Request, exc: PermissionError) -> JSONResponse:
     # Tipicamente ocurre al escribir en disco (uploads) sin permisos.
     return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+
+@app.exception_handler(DependenciaPdfNoInstaladaError)
+async def _dependencia_pdf_no_instalada(_: Request, exc: DependenciaPdfNoInstaladaError) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "hint": "Instala dependencias del backend (weasyprint + libs del sistema) para habilitar la exportación del PDF al radicar.",
+        },
+    )
 
 
 @app.get("/")

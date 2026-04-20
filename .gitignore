@@ -64,3 +64,6 @@ desktop.ini
 .vscode/
 *.swp
 *.swo
+
+GUIA_BACKEND_NO_TECNICA*.md
+README.md

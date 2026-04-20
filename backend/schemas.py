@@ -91,8 +91,8 @@ class BeneficiarioFinal(EntidadConParticipacion):
 
 
 class ReferenciaComercial(BaseModel):
-    nombre: Optional[str] = None
-    contacto: Optional[str] = None
+    nombre_establecimiento: Optional[str] = None
+    persona_contacto: Optional[str] = None
     telefono: Optional[str] = None
     ciudad: Optional[str] = None
 

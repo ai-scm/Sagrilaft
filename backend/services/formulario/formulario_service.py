@@ -32,6 +32,7 @@ from core.contratos import IExtractorIA
 from services.formulario.serializacion import serializar_campos_json, deserializar_campos_json
 from services.formulario.validacion import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
+from services.formulario.exportacion_pdf import ExportadorFormularioPdf
 from services.formulario.analisis_service import (
     AnalisisDocumentosService, 
     ResultadoGuardadoDocumento,
@@ -51,6 +52,7 @@ class FormularioService:
         self._sesion = sesion
         self._validador_envio = ValidadorEnvioFormulario()
         self._documentos = DocumentoService(sesion, upload_dir)
+        self._exportador_pdf = ExportadorFormularioPdf(self._documentos)
         self._analisis = AnalisisDocumentosService(
             extractor, 
             obtener_config_analisis_por_defecto()
@@ -133,6 +135,10 @@ class FormularioService:
         errores = self._validador_envio.validar(formulario)
         if errores:
             return ResultadoValidacionEnvio(valido=False, errores=errores)
+
+        # Generar el PDF "imprimible" al radicar, en la misma carpeta de uploads del formulario.
+        # Si falla (permisos/dep), se propaga como error de infraestructura (500) y NO se marca enviado.
+        self._exportador_pdf.generar_y_guardar_pdf(formulario)
 
         formulario.estado = EstadoFormulario.ENVIADO
         self._sesion.commit()
