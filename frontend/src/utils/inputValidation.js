@@ -132,6 +132,10 @@ export const REGLAS_INPUT = {
   patrimonio:               { soloNumericos: true, soloPositivo: true },
   correo:                   { formatoCorreo: true },
   correo_representante:     { formatoCorreo: true },
+  contacto_ordenes_telefono: { soloNumericos: true, longitudExacta: 10 },
+  contacto_pagos_telefono:   { soloNumericos: true, longitudExacta: 10 },
+  contacto_ordenes_correo:   { formatoCorreo: true },
+  contacto_pagos_correo:     { formatoCorreo: true },
 };
 
 /**
