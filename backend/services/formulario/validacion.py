@@ -11,7 +11,9 @@ from models import Formulario
 
 _REGEX_TELEFONO = re.compile(r'^\d{10}$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
-
+UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA   = 5
+UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL = 25
+PORCENTAJE_MAXIMO_PERMITIDO = 100
 
 def _vacio_a_nulo(v: Any) -> Any:
     """Coerciona strings vacíos a None pre-validación. Imprescindible para borradores."""
@@ -270,7 +272,7 @@ class ValidadorEnvioFormulario:
         errores = self._validar_filas_tabla(
             filas, "Composición Accionaria", "accionistas",
             self._CAMPOS_ACCIONISTA,
-            [self._crear_regla_porcentaje("accionistas", 5, "El accionista", "participación")],
+            [self._crear_regla_porcentaje("accionistas", UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA, "El accionista", "participación")],
         )
         error_total = self._error_porcentaje_excedido(
             self._sumar_porcentajes(filas),
@@ -287,7 +289,7 @@ class ValidadorEnvioFormulario:
             filas, "Beneficiario Final", "beneficiario_final",
             self._CAMPOS_BENEFICIARIO,
             [
-                self._crear_regla_porcentaje("beneficiario_final", 25, "El beneficiario", "control"),
+                self._crear_regla_porcentaje("beneficiario_final", UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL, "El beneficiario", "control"),
                 self._regla_no_nit,
             ],
         )
@@ -352,10 +354,10 @@ class ValidadorEnvioFormulario:
                     campo=f"{campo_base}[{i}].porcentaje",
                     mensaje=f"{etiqueta_entidad} '{nombre}' debe tener {nombre_porcentaje} mayor al {umbral_minimo:.0f}%",
                 )
-            if valor >= 100:
+            if valor >= PORCENTAJE_MAXIMO_PERMITIDO:
                 return ErrorValidacion(
                     campo=f"{campo_base}[{i}].porcentaje",
-                    mensaje=f"{etiqueta_entidad} '{nombre}' no puede tener {nombre_porcentaje} del 100% o superior",
+                    mensaje=f"{etiqueta_entidad} '{nombre}' no puede tener {nombre_porcentaje} del {PORCENTAJE_MAXIMO_PERMITIDO}% o superior",
                 )
             return None
         return regla
@@ -374,10 +376,10 @@ class ValidadorEnvioFormulario:
     def _error_porcentaje_excedido(
         total: float, campo: str, descripcion: str
     ) -> Optional[ErrorValidacion]:
-        if total > 100:
+        if total > PORCENTAJE_MAXIMO_PERMITIDO:
             return ErrorValidacion(
                 campo=campo,
-                mensaje=f"La suma de {descripcion} es {total:.2f}%, lo que excede el 100% permitido",
+                mensaje=f"La suma de {descripcion} es {total:.2f}%, lo que excede el {PORCENTAJE_MAXIMO_PERMITIDO}% permitido",
             )
         return None
 
