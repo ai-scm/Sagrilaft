@@ -122,7 +122,7 @@ function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpen
         />
         <FormField
           label="Autorretenedor" name="autorretenedor" type="select" required
-          value={formData.autorretenedor} onChange={onChange}
+          value={formData.autorretenedor} onChange={onChange} onOpenHelp={onOpenHelp}
           options={OPCIONES_SI_NO} error={errors.autorretenedor}
         />
         <FormField
@@ -137,7 +137,7 @@ function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpen
         />
         <FormField
           label="¿Es Gran Contribuyente?" name="gran_contribuyente" type="select" required
-          value={formData.gran_contribuyente} onChange={onChange}
+          value={formData.gran_contribuyente} onChange={onChange} onOpenHelp={onOpenHelp}
           options={OPCIONES_SI_NO} error={errors.gran_contribuyente}
         />
       </div>
@@ -145,7 +145,7 @@ function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpen
       <div className="form-row">
         <FormField
           label="Entidad sin Ánimo de Lucro" name="entidad_sin_animo_lucro" type="select" required
-          value={formData.entidad_sin_animo_lucro} onChange={onChange}
+          value={formData.entidad_sin_animo_lucro} onChange={onChange} onOpenHelp={onOpenHelp}
           options={OPCIONES_SI_NO} error={errors.entidad_sin_animo_lucro}
         />
         <FormField
@@ -160,12 +160,12 @@ function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpen
         />
         <FormField
           label="Entidad Oficial" name="entidad_oficial" type="select" required
-          value={formData.entidad_oficial} onChange={onChange}
+          value={formData.entidad_oficial} onChange={onChange} onOpenHelp={onOpenHelp}
           options={OPCIONES_SI_NO} error={errors.entidad_oficial}
         />
         <FormField
           label="Exento de Retención en la Fuente" name="exento_retencion_fuente" type="select" required
-          value={formData.exento_retencion_fuente} onChange={onChange}
+          value={formData.exento_retencion_fuente} onChange={onChange} onOpenHelp={onOpenHelp}
           options={OPCIONES_SI_NO} error={errors.exento_retencion_fuente}
         />
       </div>
