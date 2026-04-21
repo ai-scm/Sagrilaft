@@ -384,19 +384,23 @@ def _construir_html_formulario(datos: Dict[str, Any]) -> str:
 # ─── Exportador (infraestructura / IO) ───────────────────────────────────────
 
 class ExportadorFormularioPdf:
-    """Convierte un formulario a PDF y lo persiste en el directorio de uploads."""
+    """Convierte un formulario a PDF y lo persiste en el directorio indicado."""
 
     def __init__(self, documentos: DocumentoService) -> None:
         self._documentos = documentos
 
-    def generar_y_guardar_pdf(self, formulario: Formulario) -> ArchivoPdfGenerado:
+    def generar_y_guardar_pdf(
+        self, formulario: Formulario, directorio_destino: Path
+    ) -> ArchivoPdfGenerado:
         datos = deserializar_campos_json(formulario)
         codigo = _valor_a_texto(datos.get("codigo_peticion")) or formulario.id
         nombre_archivo = f"FORMULARIO_{codigo}.pdf"
 
         html = _construir_html_formulario(datos)
         pdf_bytes = self._html_a_pdf_bytes(html)
-        ruta = self._documentos.guardar_archivo_en_disco(formulario.id, nombre_archivo, pdf_bytes)
+        ruta = self._documentos.guardar_archivo_en_disco(
+            directorio_destino, nombre_archivo, pdf_bytes
+        )
         return ArchivoPdfGenerado(nombre_archivo=nombre_archivo, ruta_archivo=ruta)
 
     @staticmethod

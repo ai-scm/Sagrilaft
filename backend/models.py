@@ -185,7 +185,7 @@ class DocumentoAdjunto(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     formulario_id = Column(String, ForeignKey("formularios.id"), nullable=False)
-    tipo_documento = Column(String, nullable=False)  # e.g. "cedula_representante", "rut", etc.
+    tipo_documento = Column(String, nullable=False)
     nombre_archivo = Column(String, nullable=False)
     ruta_archivo = Column(String, nullable=False)
     content_type = Column(String, nullable=True)

@@ -43,3 +43,14 @@ class DocumentoNoEncontradoError(Exception):
         self.formulario_id = formulario_id
         self.doc_id = doc_id
         super().__init__(f"Documento '{doc_id}' no encontrado para formulario '{formulario_id}'")
+
+
+class ContraparteInvalidaError(Exception):
+    """Excepcion de dominio: el tipo de contraparte no corresponde a un valor reconocido."""
+
+    def __init__(self, tipo_contraparte: str) -> None:
+        self.tipo_contraparte = tipo_contraparte
+        super().__init__(
+            f"Tipo de contraparte no reconocido: '{tipo_contraparte}'. "
+            "Valores válidos: 'cliente', 'proveedor'."
+        )

@@ -16,6 +16,7 @@ from core import load_config
 from database import engine, Base
 from routers import formulario, validacion, listas_cautela
 from domain.excepciones import (
+    ContraparteInvalidaError,
     DocumentoNoEncontradoError,
     FormularioNoEditableError,
     FormularioNoEncontradoError,
@@ -122,6 +123,11 @@ async def _formulario_no_encontrado_por_credenciales(
     exc: FormularioNoEncontradoPorCredencialesError,
 ) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(ContraparteInvalidaError)
+async def _contraparte_invalida(_: Request, exc: ContraparteInvalidaError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(DocumentoNoEncontradoError)

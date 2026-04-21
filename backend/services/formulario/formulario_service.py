@@ -33,10 +33,14 @@ from services.formulario.serializacion import serializar_campos_json, deserializ
 from services.formulario.validacion import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
 from services.formulario.exportacion_pdf import ExportadorFormularioPdf
+from services.formulario.almacenamiento_contraparte import (
+    resolver_ruta_contraparte,
+    crear_carpeta_contraparte,
+)
 from services.formulario.analisis_service import (
-    AnalisisDocumentosService, 
+    AnalisisDocumentosService,
     ResultadoGuardadoDocumento,
-    obtener_config_analisis_por_defecto
+    obtener_config_analisis_por_defecto,
 )
 
 
@@ -125,7 +129,6 @@ class FormularioService:
         return datos
 
     def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
-        # Flujo nuevo (Semana 1): errores de dominio, sin HTTPException en la capa de servicio.
         formulario = self._buscar_formulario_o_error(formulario_id)
         self._verificar_estado_borrador_o_error(
             formulario,
@@ -136,9 +139,14 @@ class FormularioService:
         if errores:
             return ResultadoValidacionEnvio(valido=False, errores=errores)
 
-        # Generar el PDF "imprimible" al radicar, en la misma carpeta de uploads del formulario.
-        # Si falla (permisos/dep), se propaga como error de infraestructura (500) y NO se marca enviado.
-        self._exportador_pdf.generar_y_guardar_pdf(formulario)
+        ruta_contraparte = resolver_ruta_contraparte(
+            formulario.tipo_contraparte,
+            formulario.razon_social,
+            self._documentos.directorio_base,
+        )
+        crear_carpeta_contraparte(ruta_contraparte)
+        self._documentos.mover_archivos_formulario_a_contraparte(formulario.id, ruta_contraparte)
+        self._exportador_pdf.generar_y_guardar_pdf(formulario, ruta_contraparte)
 
         formulario.estado = EstadoFormulario.ENVIADO
         self._sesion.commit()
@@ -160,8 +168,11 @@ class FormularioService:
             "No se pueden agregar documentos a un formulario enviado",
         )
 
+        directorio_borrador = self._documentos.ruta_directorio_borrador(
+            formulario.codigo_peticion
+        )
         ruta_archivo = self._documentos.guardar_archivo_en_disco(
-            formulario_id, nombre_archivo, contenido_bytes
+            directorio_borrador, nombre_archivo, contenido_bytes
         )
         documento = self._documentos.registrar_documento_en_bd(
             formulario_id=formulario_id,
@@ -200,7 +211,6 @@ class FormularioService:
             formulario,
             "No se puede prellenar un formulario que ya fue enviado",
         )
-        # Flujo nuevo (Semana 1): el DocumentoService expone error de dominio.
         # El router traduce DocumentoNoEncontradoError -> 404.
         documento = self._documentos.buscar_documento(formulario_id, doc_id)
         return await self._analisis.prellenar_documento(documento)
