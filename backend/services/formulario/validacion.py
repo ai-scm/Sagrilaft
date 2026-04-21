@@ -3,13 +3,18 @@ Validador de campos requeridos para envío de formulario.
 """
 
 import json
-from typing import List, Tuple, Any, Optional, Annotated
+import re
+from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel
 from models import Formulario
 
+_REGEX_TELEFONO = re.compile(r'^\d{10}$')
+_REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+
+
 def _vacio_a_nulo(v: Any) -> Any:
-    """Coerciona explícitamente strings vacíos pre-validación. Imprescindible para borradores."""
+    """Coerciona strings vacíos a None pre-validación. Imprescindible para borradores."""
     return None if v == "" else v
 
 
@@ -36,10 +41,14 @@ def _limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
     return data
 
 
+def _esta_vacio(valor: Any) -> bool:
+    """Fuente única de verdad para detectar un campo sin diligenciar."""
+    return valor is None or (isinstance(valor, str) and not valor.strip())
+
+
 class ErrorValidacion(BaseModel):
     campo: str
     mensaje: str
-
 
 
 class ValidadorEnvioFormulario:
@@ -47,10 +56,11 @@ class ValidadorEnvioFormulario:
     Verifica que el formulario tenga todos los campos obligatorios diligenciados
     antes de permitir el envío final.
 
-    SOLID - S: Responsabilidad única — validar la completitud del formulario.
-    SOLID - O: Agregar o quitar campos requeridos solo modifica _CAMPOS_REQUERIDOS
-               sin tocar FormularioService ni el router.
+    SOLID-S: única responsabilidad — validar la completitud del formulario.
+    SOLID-O: agregar o quitar campos solo modifica las listas _CAMPOS_*.
     """
+
+    # ── Declaraciones de campos requeridos ────────────────────────────────────
 
     _CAMPOS_REQUERIDOS: List[Tuple[str, str]] = [
         ("tipo_contraparte",        "Tipo de Contraparte"),
@@ -89,6 +99,14 @@ class ValidadorEnvioFormulario:
         ("total_pasivos",           "Total Pasivos"),
         ("patrimonio",              "Patrimonio"),
         ("realiza_operaciones_moneda_extranjera", "¿Realiza Operaciones en Moneda Extranjera?"),
+        ("contacto_ordenes_nombre",   "Nombre (Órdenes de Compra)"),
+        ("contacto_ordenes_cargo",    "Cargo (Órdenes de Compra)"),
+        ("contacto_ordenes_telefono", "Teléfono (Órdenes de Compra)"),
+        ("contacto_ordenes_correo",   "Correo (Órdenes de Compra)"),
+        ("contacto_pagos_nombre",     "Nombre (Reportes de Pago)"),
+        ("contacto_pagos_cargo",      "Cargo (Reportes de Pago)"),
+        ("contacto_pagos_telefono",   "Teléfono (Reportes de Pago)"),
+        ("contacto_pagos_correo",     "Correo (Reportes de Pago)"),
         ("origen_fondos",           "Origen de Fondos"),
         ("nombre_firma",            "Nombre para Firma"),
         ("fecha_firma",             "Fecha de Firma"),
@@ -112,26 +130,55 @@ class ValidadorEnvioFormulario:
         ("exento_retencion_fuente", "Exento de Retención en la Fuente"),
     ]
 
+    _CAMPOS_FORMATO_TELEFONO: List[Tuple[str, str]] = [
+        ("telefono",                  "Teléfono"),
+        ("telefono_representante",    "Teléfono del Representante"),
+        ("contacto_ordenes_telefono", "Teléfono (Órdenes de Compra)"),
+        ("contacto_pagos_telefono",   "Teléfono (Reportes de Pago)"),
+    ]
+
+    _CAMPOS_FORMATO_CORREO: List[Tuple[str, str]] = [
+        ("correo",                  "Correo Electrónico"),
+        ("correo_representante",    "Correo del Representante"),
+        ("contacto_ordenes_correo", "Correo (Órdenes de Compra)"),
+        ("contacto_pagos_correo",   "Correo (Reportes de Pago)"),
+    ]
+
+    _CAMPOS_JUNTA: List[Tuple[str, str]] = [
+        ("cargo",     "Cargo"),
+        ("nombre",    "Nombre"),
+        ("tipo_id",   "Tipo ID"),
+        ("numero_id", "Número ID"),
+        ("es_pep",    "¿PEP?"),
+    ]
+
+    _CAMPOS_ACCIONISTA: List[Tuple[str, str]] = [
+        ("nombre",     "Nombre"),
+        ("porcentaje", "% Participación"),
+        ("tipo_id",    "Tipo ID"),
+        ("numero_id",  "Número ID"),
+        ("es_pep",     "¿PEP?"),
+    ]
+
+    _CAMPOS_BENEFICIARIO: List[Tuple[str, str]] = [
+        ("nombre",     "Nombre"),
+        ("porcentaje", "% Control"),
+        ("tipo_id",    "Tipo ID"),
+        ("numero_id",  "Número ID"),
+        ("es_pep",     "¿PEP?"),
+    ]
+
+    # ── Orquestador principal ─────────────────────────────────────────────────
+
     def validar(self, formulario: Formulario) -> List[ErrorValidacion]:
         """
         Valida que todos los campos requeridos estén diligenciados y que
         las declaraciones obligatorias estén aceptadas.
 
-        Args:
-            formulario: Instancia ORM del formulario a validar.
-
         Returns:
             Lista de ErrorValidacion. Vacía si el formulario está completo.
         """
-        errores: List[ErrorValidacion] = []
-
-        for campo, nombre in self._CAMPOS_REQUERIDOS:
-            valor = getattr(formulario, campo, None)
-            if valor is None or (isinstance(valor, str) and not valor.strip()):
-                errores.append(ErrorValidacion(
-                    campo=campo,
-                    mensaje=f"El campo '{nombre}' es obligatorio",
-                ))
+        errores = self._errores_presencia(formulario, self._CAMPOS_REQUERIDOS)
 
         if not formulario.autorizacion_datos:
             errores.append(ErrorValidacion(
@@ -145,6 +192,7 @@ class ValidadorEnvioFormulario:
             ))
 
         errores.extend(self._validar_campos_moneda_extranjera(formulario))
+        errores.extend(self._validar_formatos(formulario))
 
         if self._es_persona_juridica(formulario):
             errores.extend(self._validar_clasificacion_tributaria(formulario))
@@ -154,46 +202,30 @@ class ValidadorEnvioFormulario:
 
         return errores
 
-    def _validar_clasificacion_tributaria(self, formulario: Formulario) -> List[ErrorValidacion]:
-        """
-        Valida los campos obligatorios de la sección 8 (Clasificación de la Empresa
-        y Régimen Tributario), que solo aplican a Persona Jurídica.
-        """
-        errores: List[ErrorValidacion] = []
-        for campo, nombre in self._CAMPOS_CLASIFICACION_JURIDICA:
-            valor = getattr(formulario, campo, None)
-            if valor is None or (isinstance(valor, str) and not valor.strip()):
-                errores.append(ErrorValidacion(
-                    campo=campo,
-                    mensaje=f"El campo '{nombre}' es obligatorio",
-                ))
-        return errores
+    # ── Validadores por sección ───────────────────────────────────────────────
 
-    @staticmethod
-    def _realiza_operaciones_en_moneda_extranjera(formulario: Formulario) -> bool:
-        return (formulario.realiza_operaciones_moneda_extranjera or "").lower() == "si"
+    def _validar_clasificacion_tributaria(self, formulario: Formulario) -> List[ErrorValidacion]:
+        return self._errores_presencia(formulario, self._CAMPOS_CLASIFICACION_JURIDICA)
 
     def _validar_campos_moneda_extranjera(self, formulario: Formulario) -> List[ErrorValidacion]:
         """
-        Valida los campos condicionales de la sección 'Operaciones en Moneda Extranjera'.
-
+        Valida los campos condicionales de operaciones en moneda extranjera.
         Solo se evalúan cuando la empresa declara que sí realiza este tipo de operaciones.
-        Espejar aquí las mismas reglas que aplica el frontend en useFormValidacion (paso 6)
-        garantiza que la BD nunca reciba un formulario inconsistente.
+        Espejar aquí las reglas del frontend garantiza que la BD nunca reciba datos inconsistentes.
         """
         if not self._realiza_operaciones_en_moneda_extranjera(formulario):
             return []
 
         errores: List[ErrorValidacion] = []
 
-        if not (formulario.paises_operaciones or "").strip():
+        if _esta_vacio(formulario.paises_operaciones):
             errores.append(ErrorValidacion(
                 campo="paises_operaciones",
                 mensaje="El campo 'Países en los que realiza operaciones' es obligatorio",
             ))
 
         tipos = self._deserializar_lista(formulario.tipos_transaccion)
-        if "otras" in tipos and not (formulario.tipos_transaccion_otros or "").strip():
+        if "otras" in tipos and _esta_vacio(formulario.tipos_transaccion_otros):
             errores.append(ErrorValidacion(
                 campo="tipos_transaccion_otros",
                 mensaje="El campo '¿Cuáles?' es obligatorio cuando selecciona 'Otras'",
@@ -201,23 +233,186 @@ class ValidadorEnvioFormulario:
 
         return errores
 
+    def _validar_formatos(self, formulario: Formulario) -> List[ErrorValidacion]:
+        """
+        Valida que teléfonos y correos tengan el formato correcto.
+        Solo corre en envío final — los borradores aceptan valores parciales.
+        """
+        errores = [
+            *self._errores_formato(
+                formulario, self._CAMPOS_FORMATO_TELEFONO, _REGEX_TELEFONO,
+                "El campo '{nombre}' debe tener exactamente 10 dígitos numéricos",
+            ),
+            *self._errores_formato(
+                formulario, self._CAMPOS_FORMATO_CORREO, _REGEX_CORREO,
+                "El campo '{nombre}' debe ser un correo electrónico válido (ej: nombre@dominio.com)",
+            ),
+        ]
+
+        for i, fila in enumerate(self._deserializar_lista(formulario.referencias_comerciales)):
+            tel = str(fila.get("telefono") or "").strip()
+            if tel and not _REGEX_TELEFONO.match(tel):
+                errores.append(ErrorValidacion(
+                    campo=f"referencias_comerciales[{i}].telefono",
+                    mensaje=f"El teléfono de la referencia comercial {i + 1} debe tener exactamente 10 dígitos numéricos",
+                ))
+
+        return errores
+
+    def _validar_junta_directiva(self, formulario: Formulario) -> List[ErrorValidacion]:
+        filas = self._deserializar_lista(formulario.junta_directiva)
+        return self._validar_filas_tabla(
+            filas, "Junta Directiva y Representantes", "junta_directiva", self._CAMPOS_JUNTA,
+        )
+
+    def _validar_accionistas(self, formulario: Formulario) -> List[ErrorValidacion]:
+        filas = self._deserializar_lista(formulario.accionistas)
+        errores = self._validar_filas_tabla(
+            filas, "Composición Accionaria", "accionistas",
+            self._CAMPOS_ACCIONISTA,
+            [self._crear_regla_porcentaje("accionistas", 5, "El accionista", "participación")],
+        )
+        error_total = self._error_porcentaje_excedido(
+            self._sumar_porcentajes(filas),
+            "accionistas.porcentaje_total",
+            "participaciones accionarias",
+        )
+        if error_total:
+            errores.append(error_total)
+        return errores
+
+    def _validar_beneficiarios(self, formulario: Formulario) -> List[ErrorValidacion]:
+        filas = self._deserializar_lista(formulario.beneficiario_final)
+        errores = self._validar_filas_tabla(
+            filas, "Beneficiario Final", "beneficiario_final",
+            self._CAMPOS_BENEFICIARIO,
+            [
+                self._crear_regla_porcentaje("beneficiario_final", 25, "El beneficiario", "control"),
+                self._regla_no_nit,
+            ],
+        )
+        error_total = self._error_porcentaje_excedido(
+            self._sumar_porcentajes(filas),
+            "beneficiario_final.porcentaje_total",
+            "porcentajes de control",
+        )
+        if error_total:
+            errores.append(error_total)
+        return errores
+
+    # ── Helpers de presencia ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _errores_presencia(
+        formulario: Formulario, campos: List[Tuple[str, str]]
+    ) -> List[ErrorValidacion]:
+        return [
+            ErrorValidacion(campo=campo, mensaje=f"El campo '{nombre}' es obligatorio")
+            for campo, nombre in campos
+            if _esta_vacio(getattr(formulario, campo, None))
+        ]
+
+    # ── Helpers de formato ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _errores_formato(
+        formulario: Formulario,
+        campos: List[Tuple[str, str]],
+        regex: re.Pattern,
+        mensaje: str,
+    ) -> List[ErrorValidacion]:
+        errores = []
+        for campo, nombre in campos:
+            valor = str(getattr(formulario, campo, None) or "").strip()
+            if valor and not regex.match(valor):
+                errores.append(ErrorValidacion(campo=campo, mensaje=mensaje.format(nombre=nombre)))
+        return errores
+
+    # ── Helpers de porcentaje ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _crear_regla_porcentaje(
+        campo_base: str,
+        umbral_minimo: float,
+        etiqueta_entidad: str,
+        nombre_porcentaje: str,
+    ) -> Callable[[int, dict], Optional[ErrorValidacion]]:
+        """Fábrica de reglas de validación de porcentaje para tablas dinámicas."""
+        def regla(i: int, fila: dict) -> Optional[ErrorValidacion]:
+            raw = fila.get("porcentaje")
+            if raw is None or not str(raw).strip():
+                return None
+            try:
+                valor = float(raw)
+            except (ValueError, TypeError):
+                return None
+            nombre = fila.get("nombre") or f"fila {i + 1}"
+            if valor <= umbral_minimo:
+                return ErrorValidacion(
+                    campo=f"{campo_base}[{i}].porcentaje",
+                    mensaje=f"{etiqueta_entidad} '{nombre}' debe tener {nombre_porcentaje} mayor al {umbral_minimo:.0f}%",
+                )
+            if valor >= 100:
+                return ErrorValidacion(
+                    campo=f"{campo_base}[{i}].porcentaje",
+                    mensaje=f"{etiqueta_entidad} '{nombre}' no puede tener {nombre_porcentaje} del 100% o superior",
+                )
+            return None
+        return regla
+
+    @staticmethod
+    def _sumar_porcentajes(filas: List[dict]) -> float:
+        total = 0.0
+        for fila in filas:
+            try:
+                total += float(fila.get("porcentaje") or 0)
+            except (ValueError, TypeError):
+                pass
+        return total
+
+    @staticmethod
+    def _error_porcentaje_excedido(
+        total: float, campo: str, descripcion: str
+    ) -> Optional[ErrorValidacion]:
+        if total > 100:
+            return ErrorValidacion(
+                campo=campo,
+                mensaje=f"La suma de {descripcion} es {total:.2f}%, lo que excede el 100% permitido",
+            )
+        return None
+
+    # ── Reglas de negocio específicas ─────────────────────────────────────────
+
+    @staticmethod
+    def _regla_no_nit(i: int, fila: dict) -> Optional[ErrorValidacion]:
+        if str(fila.get("tipo_id") or "").upper() == "NIT":
+            nombre = fila.get("nombre") or f"fila {i + 1}"
+            return ErrorValidacion(
+                campo=f"beneficiario_final[{i}].tipo_id",
+                mensaje=f"El beneficiario '{nombre}' no puede tener NIT como Tipo ID (debe ser CC, CE o PAS)",
+            )
+        return None
+
+    # ── Helpers de estado del formulario ─────────────────────────────────────
+
     @staticmethod
     def _es_persona_juridica(formulario: Formulario) -> bool:
         """
         Determina si el formulario corresponde a una Persona Jurídica.
-
-        Las tablas de Junta Directiva, Composición Accionaria y Beneficiario
-        Final solo aplican a este tipo de persona. Centralizar esta guarda
-        aquí evita repetir la comparación de string en múltiples métodos
+        Centralizar esta guarda evita repetir la comparación de string
         y hace explícita la regla de negocio en el dominio.
         """
         return (formulario.tipo_persona or "").lower() == "juridica"
 
-    # ── Helper genérico (DRY) ────────────────────────────────────────────────
+    @staticmethod
+    def _realiza_operaciones_en_moneda_extranjera(formulario: Formulario) -> bool:
+        return (formulario.realiza_operaciones_moneda_extranjera or "").lower() == "si"
+
+    # ── Helpers de deserialización ────────────────────────────────────────────
 
     @staticmethod
-    def _deserializar_lista(valor) -> List[dict]:
-        """Convierte un JSON string o lista a lista de dicts."""
+    def _deserializar_lista(valor: Any) -> List[dict]:
+        """Convierte un JSON string o lista Python a lista de dicts."""
         if isinstance(valor, list):
             return valor
         if isinstance(valor, str):
@@ -234,19 +429,19 @@ class ValidadorEnvioFormulario:
         nombre_tabla: str,
         campo_formulario: str,
         campos_obligatorios: List[Tuple[str, str]],
-        reglas_adicionales: List = None,
+        reglas_adicionales: Optional[List[Callable]] = None,
     ) -> List[ErrorValidacion]:
         """
-        Motor genérico de validación de tablas.
+        Motor genérico de validación de tablas dinámicas.
 
         Verifica:
           - Al menos una fila con datos.
           - Todos los campos obligatorios completos en filas con datos.
           - Vínculos PEP obligatorio cuando es_pep == 'si'.
-          - Reglas de negocio específicas por tabla (reglas_adicionales).
+          - Reglas de negocio adicionales por tabla (reglas_adicionales).
 
         OCP: nuevas tablas solo agregan entradas de configuración.
-        DRY: no duplicar lógica entre junta, accionistas y beneficiarios.
+        DRY: lógica compartida entre junta, accionistas y beneficiarios.
         """
         errores: List[ErrorValidacion] = []
         campos = [c for c, _ in campos_obligatorios]
@@ -273,14 +468,13 @@ class ValidadorEnvioFormulario:
             nombre_fila = fila.get("nombre") or fila.get("cargo") or f"fila {i + 1}"
 
             for campo, etiqueta in campos_obligatorios:
-                valor = fila.get(campo)
-                if valor is None or str(valor).strip() == "":
+                if _esta_vacio(fila.get(campo)):
                     errores.append(ErrorValidacion(
                         campo=f"{campo_formulario}[{i}].{campo}",
                         mensaje=f"{etiqueta} es obligatorio para '{nombre_fila}' en {nombre_tabla}",
                     ))
 
-            if fila.get("es_pep") == "si" and not str(fila.get("vinculos_pep") or "").strip():
+            if fila.get("es_pep") == "si" and _esta_vacio(fila.get("vinculos_pep")):
                 errores.append(ErrorValidacion(
                     campo=f"{campo_formulario}[{i}].vinculos_pep",
                     mensaje=f"Vínculos PEP es obligatorio para '{nombre_fila}' cuando ¿PEP? es 'Sí'",
@@ -290,137 +484,5 @@ class ValidadorEnvioFormulario:
                 resultado = regla(i, fila)
                 if resultado:
                     errores.append(resultado)
-
-        return errores
-
-    # ── Helper de suma (DRY) ─────────────────────────────────────────────────
-
-    @staticmethod
-    def _sumar_porcentajes(filas: List[dict]) -> float:
-        """Suma los porcentajes numéricos de un conjunto de filas con datos."""
-        total = 0.0
-        for fila in filas:
-            try:
-                valor = float(fila.get("porcentaje") or 0)
-                total += valor
-            except (ValueError, TypeError):
-                pass
-        return total
-
-    # ── Validadores por tabla ─────────────────────────────────────────────────
-
-    _CAMPOS_JUNTA: List[Tuple[str, str]] = [
-        ("cargo",      "Cargo"),
-        ("nombre",     "Nombre"),
-        ("tipo_id",    "Tipo ID"),
-        ("numero_id",  "Número ID"),
-        ("es_pep",     "¿PEP?"),
-    ]
-
-    _CAMPOS_ACCIONISTA: List[Tuple[str, str]] = [
-        ("nombre",     "Nombre"),
-        ("porcentaje", "% Participación"),
-        ("tipo_id",    "Tipo ID"),
-        ("numero_id",  "Número ID"),
-        ("es_pep",     "¿PEP?"),
-    ]
-
-    _CAMPOS_BENEFICIARIO: List[Tuple[str, str]] = [
-        ("nombre",     "Nombre"),
-        ("porcentaje", "% Control"),
-        ("tipo_id",    "Tipo ID"),
-        ("numero_id",  "Número ID"),
-        ("es_pep",     "¿PEP?"),
-    ]
-
-    def _validar_junta_directiva(self, formulario: Formulario) -> List[ErrorValidacion]:
-        filas = self._deserializar_lista(formulario.junta_directiva)
-        return self._validar_filas_tabla(filas, "Junta Directiva y Representantes", "junta_directiva", self._CAMPOS_JUNTA)
-
-    def _validar_accionistas(self, formulario: Formulario) -> List[ErrorValidacion]:
-        def regla_porcentaje_participacion(i: int, fila: dict):
-            porcentaje = fila.get("porcentaje")
-            if porcentaje is None or not str(porcentaje).strip():
-                return None
-            try:
-                valor = float(porcentaje)
-            except (ValueError, TypeError):
-                return None
-            nombre = fila.get("nombre") or f"fila {i + 1}"
-            if valor <= 5:
-                return ErrorValidacion(
-                    campo=f"accionistas[{i}].porcentaje",
-                    mensaje=f"El accionista '{nombre}' debe tener participación mayor al 5%",
-                )
-            if valor >= 100:
-                return ErrorValidacion(
-                    campo=f"accionistas[{i}].porcentaje",
-                    mensaje=f"El accionista '{nombre}' no puede tener participación del 100% o superior",
-                )
-            return None
-
-        filas = self._deserializar_lista(formulario.accionistas)
-        errores = self._validar_filas_tabla(
-            filas, "Composición Accionaria", "accionistas",
-            self._CAMPOS_ACCIONISTA, [regla_porcentaje_participacion],
-        )
-
-        total = self._sumar_porcentajes(filas)
-        if total > 100:
-            errores.append(ErrorValidacion(
-                campo="accionistas.porcentaje_total",
-                mensaje=(
-                    f"La suma de participaciones accionarias es {total:.2f}%, "
-                    "lo que excede el 100% permitido"
-                ),
-            ))
-
-        return errores
-
-    def _validar_beneficiarios(self, formulario: Formulario) -> List[ErrorValidacion]:
-        def regla_porcentaje_control(i: int, fila: dict):
-            porcentaje = fila.get("porcentaje")
-            if porcentaje is None or not str(porcentaje).strip():
-                return None
-            try:
-                valor = float(porcentaje)
-            except (ValueError, TypeError):
-                return None
-            nombre = fila.get("nombre") or f"fila {i + 1}"
-            if valor <= 25:
-                return ErrorValidacion(
-                    campo=f"beneficiario_final[{i}].porcentaje",
-                    mensaje=f"El beneficiario '{nombre}' debe tener control mayor al 25%",
-                )
-            if valor >= 100:
-                return ErrorValidacion(
-                    campo=f"beneficiario_final[{i}].porcentaje",
-                    mensaje=f"El beneficiario '{nombre}' no puede tener control del 100% o superior",
-                )
-            return None
-
-        def regla_no_nit(i: int, fila: dict):
-            if str(fila.get("tipo_id") or "").upper() == "NIT":
-                return ErrorValidacion(
-                    campo=f"beneficiario_final[{i}].tipo_id",
-                    mensaje=f"El beneficiario '{fila.get('nombre') or f'fila {i + 1}'}' no puede tener NIT como Tipo ID (debe ser CC, CE o PAS)",
-                )
-            return None
-
-        filas = self._deserializar_lista(formulario.beneficiario_final)
-        errores = self._validar_filas_tabla(
-            filas, "Beneficiario Final", "beneficiario_final",
-            self._CAMPOS_BENEFICIARIO, [regla_porcentaje_control, regla_no_nit],
-        )
-
-        total = self._sumar_porcentajes(filas)
-        if total > 100:
-            errores.append(ErrorValidacion(
-                campo="beneficiario_final.porcentaje_total",
-                mensaje=(
-                    f"La suma de porcentajes de control es {total:.2f}%, "
-                    "lo que excede el 100% permitido"
-                ),
-            ))
 
         return errores
