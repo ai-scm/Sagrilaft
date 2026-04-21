@@ -238,11 +238,11 @@ La clasificación se relaciona con el CIIU
   // Contactos
   contacto_ordenes_nombre: { titulo: "Nombre (Órdenes de Compra)", descripcion: "Persona autorizada para recibir órdenes de compra y de servicio." },
   contacto_ordenes_cargo: { titulo: "Cargo (Órdenes de Compra)", descripcion: "Cargo de la persona para órdenes de compra." },
-  contacto_ordenes_telefono: { titulo: "Teléfono (Órdenes de Compra)", descripcion: "Teléfono de contacto para órdenes de compra." },
+  contacto_ordenes_telefono: { titulo: "Teléfono (Órdenes de Compra)", descripcion: "Teléfono de contacto para órdenes de compra.", ejemplo: "310 2345678" },
   contacto_ordenes_correo: { titulo: "Correo (Órdenes de Compra)", descripcion: "Correo electrónico para órdenes de compra." },
   contacto_pagos_nombre: { titulo: "Nombre (Reportes de Pago)", descripcion: "Persona autorizada para recibir reportes y comunicaciones de pago." },
   contacto_pagos_cargo: { titulo: "Cargo (Reportes de Pago)", descripcion: "Cargo de la persona para reportes de pago." },
-  contacto_pagos_telefono: { titulo: "Teléfono (Reportes de Pago)", descripcion: "Teléfono de contacto para reportes de pago." },
+  contacto_pagos_telefono: { titulo: "Teléfono (Reportes de Pago)", descripcion: "Teléfono de contacto para reportes de pago.", ejemplo: "310 2345678" },
   contacto_pagos_correo: { titulo: "Correo (Reportes de Pago)", descripcion: "Correo electrónico para reportes de pago." },
 
   // Documentos
