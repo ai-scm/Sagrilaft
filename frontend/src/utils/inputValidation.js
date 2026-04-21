@@ -7,6 +7,8 @@
  * Para agregar reglas a un campo nuevo, solo editar REGLAS_INPUT.
  */
 
+  import { LONGITUD_TELEFONO, REGEX_CORREO } from './constantes';
+
 /** Teclas de control que siempre se permiten en cualquier input restringido. */
 const TECLAS_CONTROL = [
   'Backspace', 'Delete', 'Tab',
@@ -94,21 +96,6 @@ const blockNegativeKeyDown = (e) => {
 };
 
 /**
- * Expresión regular para validar correos electrónicos.
- *
- * Acepta:   usuario@dominio.com  |  nombre.apellido@empresa.co  |  user+tag@sub.domain.org
- * Rechaza:  brayar  |  @sin-usuario  |  sin-arroba.com  |  usuario@  |  usuario@dominio
- *
- * Desglose:
- *   ^[a-zA-Z0-9._%+\-]+   → parte local: letras, números y caracteres especiales permitidos
- *   @                      → arroba obligatoria
- *   [a-zA-Z0-9.\-]+        → dominio: letras, números, puntos y guiones
- *   \.                     → punto separador antes de la extensión
- *   [a-zA-Z]{2,}$          → extensión de al menos 2 letras (.com, .co, .org, .info…)
- */
-export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-
-/**
  * Reglas por nombre de campo.
  *   soloNumericos  → bloquea teclas y paste no numéricos.
  *   longitudExacta → valida longitud exacta en N dígitos.
@@ -118,10 +105,11 @@ export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/
  */
 export const REGLAS_INPUT = {
   numero_identificacion:    { soloNumericos: true },
-  digito_verificacion:      { soloNumericos: true, longitudMaxima: 1 },
+  digito_verificacion:      { soloNumericos: true, longitudMaxima: 1
+ },
   numero_doc_representante: { soloNumericos: true },
-  telefono:                 { soloNumericos: true, longitudExacta: 10 },
-  telefono_representante:   { soloNumericos: true, longitudExacta: 10 },
+  telefono:                 { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
+  telefono_representante:   { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
   codigo_ciiu:              { soloNumericos: true, longitudMaxima: 4 },
   codigo_ica:               { soloNumericos: true, longitudMaxima: 4 },
   ingresos_mensuales:       { soloNumericos: true, soloPositivo: true },
@@ -132,8 +120,8 @@ export const REGLAS_INPUT = {
   patrimonio:               { soloNumericos: true, soloPositivo: true },
   correo:                   { formatoCorreo: true },
   correo_representante:     { formatoCorreo: true },
-  contacto_ordenes_telefono: { soloNumericos: true, longitudExacta: 10 },
-  contacto_pagos_telefono:   { soloNumericos: true, longitudExacta: 10 },
+  contacto_ordenes_telefono: { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
+  contacto_pagos_telefono:   { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
   contacto_ordenes_correo:   { formatoCorreo: true },
   contacto_pagos_correo:     { formatoCorreo: true },
 };

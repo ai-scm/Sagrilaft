@@ -4,6 +4,12 @@ import {
   onlyAlphanumericKeyDown, onlyAlphanumericPaste,
   getIdPropsByTipoDocumento, sanitizeIdValue
 } from '../../utils/inputValidation';
+import {
+  UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA,
+  UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL,
+  PORCENTAJE_MAXIMO_PERMITIDO,
+  LONGITUD_MAXIMA_ID,
+} from '../../utils/constantes';
 import { HR, ESTILO_CELDA_ERROR } from '../TablaFormComponents';
 
 const TIPOS_ID_JUNTA = [
@@ -118,7 +124,7 @@ export default function PasoJuntaAccionistas({
                       value={miembro.numero_id || ''} placeholder="Número"
                       onChange={(e) => onJuntaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, miembro.tipo_id))}
                       {...getIdPropsByTipoDocumento(miembro.tipo_id)}
-                      maxLength={10}
+                      maxLength={LONGITUD_MAXIMA_ID}
                       disabled={!miembro.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
@@ -158,7 +164,7 @@ export default function PasoJuntaAccionistas({
         Composición Accionaria
       </h3>
       <div className="info-box">
-        <p>Registrar todos los accionistas o asociados que tengan directa o indirectamente mas del 5% de su capital social, aporte o participación.</p>
+        <p>Registrar todos los accionistas o asociados que tengan directa o indirectamente mas del {UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA}% de su capital social, aporte o participación.</p>
         <p>  ¿Vínculos con PEP? Si es asi, describa, de lo contrario colocar No.</p>
       </div>
       {errors.accionistas_tabla && (
@@ -190,7 +196,9 @@ export default function PasoJuntaAccionistas({
                   </td>
                   <td>
                     <input
-                      type="number" step="0.01" min="5.01" max="99.99"
+                      type="number" step="0.01"
+                      min={UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA + 0.01}
+                      max={PORCENTAJE_MAXIMO_PERMITIDO - 0.01}
                       value={acc.porcentaje || ''} placeholder="%"
                       onChange={(e) => onAccionistaChange(idx, 'porcentaje', e.target.value)}
                       style={err.porcentaje ? ESTILO_CELDA_ERROR : undefined}
@@ -214,7 +222,7 @@ export default function PasoJuntaAccionistas({
                       value={acc.numero_id || ''} placeholder="Número"
                       onChange={(e) => onAccionistaChange(idx, 'numero_id', sanitizeIdValue(e.target.value, acc.tipo_id))}
                       {...getIdPropsByTipoDocumento(acc.tipo_id)}
-                      maxLength={10}
+                      maxLength={LONGITUD_MAXIMA_ID}
                       disabled={!acc.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />
@@ -254,7 +262,7 @@ export default function PasoJuntaAccionistas({
         Beneficiario Final
       </h3>
       <div className="info-box">
-        <p>En caso de que los socios sean personas jurídicas, describa la(s) persona(s) natural(es) que ejercen el control efectivo directo o indirecto sobre los socios persona(s) jurídica(s), o que sea titular del <strong>25% o más del capital</strong> de los socios.</p>
+        <p>En caso de que los socios sean personas jurídicas, describa la(s) persona(s) natural(es) que ejercen el control efectivo directo o indirecto sobre los socios persona(s) jurídica(s), o que sea titular del <strong>{UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL}% o más del capital</strong> de los socios.</p>
       </div>
       {errors.beneficiarios_tabla && (
         <div className="field-error" style={{ marginBottom: '8px' }}>{errors.beneficiarios_tabla}</div>
@@ -285,7 +293,9 @@ export default function PasoJuntaAccionistas({
                   </td>
                   <td>
                     <input
-                      type="number" step="0.01" min="25.01" max="99.99"
+                      type="number" step="0.01"
+                      min={UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL + 0.01}
+                      max={PORCENTAJE_MAXIMO_PERMITIDO - 0.01}
                       value={ben.porcentaje || ''} placeholder="%"
                       onChange={(e) => onBeneficiarioChange(idx, 'porcentaje', e.target.value)}
                       style={err.porcentaje ? ESTILO_CELDA_ERROR : undefined}
@@ -309,7 +319,7 @@ export default function PasoJuntaAccionistas({
                       value={ben.numero_id || ''} placeholder="Número"
                       onChange={(e) => onBeneficiarioChange(idx, 'numero_id', sanitizeIdValue(e.target.value, ben.tipo_id))}
                       {...getIdPropsByTipoDocumento(ben.tipo_id)}
-                      maxLength={10}
+                      maxLength={LONGITUD_MAXIMA_ID}
                       disabled={!ben.tipo_id}
                       style={err.numero_id ? ESTILO_CELDA_ERROR : undefined}
                     />

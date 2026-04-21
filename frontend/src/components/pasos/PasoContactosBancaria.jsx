@@ -2,6 +2,7 @@ import Select from 'react-select';
 import FormField from '../FormField';
 import { buildSelectStyles } from '../../utils/selectStyles';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
+import { LONGITUD_TELEFONO } from '../../utils/constantes';
 import { HR, SectionTitle, SubLabel, ESTILO_CELDA_ERROR, MensajeError } from '../TablaFormComponents';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ export default function PasoContactosBancaria({
                       value={ref.telefono || ''}
                       placeholder="Teléfono"
                       inputMode="numeric"
-                      maxLength={10}
+                      maxLength={LONGITUD_TELEFONO}
                       onKeyDown={onlyNumericKeyDown}
                       onPaste={onlyNumericPaste}
                       onChange={(e) => onReferenciaChange(idx, 'telefono', e.target.value)}

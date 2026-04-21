@@ -14,13 +14,23 @@
 
 // ─── Primitivas ──────────────────────────────────────────────────────────────
 
+export {
+  UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA,
+  UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL,
+  PORCENTAJE_MAXIMO_PERMITIDO,
+  LONGITUD_MAXIMA_ID,
+  LONGITUD_TELEFONO,
+} from './constantes';
+
+
 const esCampoVacio = (valor) =>
   valor === undefined || valor === null || String(valor).trim() === '';
 
-/** Valida que un ID contenga máximo 10 caracteres y solo letras y números */
+const REGEX_NUMERO_ID = new RegExp(`^[a-zA-Z0-9]{1,${LONGITUD_MAXIMA_ID}}$`);
+
 const reglaNumeroIdAlfanumerico = (fila) =>
-  !esCampoVacio(fila.numero_id) && !/^[a-zA-Z0-9]{1,10}$/.test(fila.numero_id)
-    ? { campo: 'numero_id', mensaje: 'El Número ID debe contener entre 1 y 10 caracteres alfanuméricos (letras/números sin espacios)' }
+  !esCampoVacio(fila.numero_id) && !REGEX_NUMERO_ID.test(fila.numero_id)
+    ? { campo: 'numero_id', mensaje: `El Número ID debe contener entre 1 y ${LONGITUD_MAXIMA_ID} caracteres alfanuméricos (letras/números sin espacios)` }
     : null;
 
 /** Etiquetas legibles para mensajes de error (fuente única de verdad). */
@@ -75,71 +85,71 @@ export const ESQUEMAS_TABLA = {
     reglasGrupales: [],
   },
 
-  accionistas: {
-    label:             'Composición Accionaria',
-    errorKey:          'accionistas_tabla',
-    errorKeyFilas:     'accionistas_filas',
-    errorKeySuma:      'accionistas_suma',
-    camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
-    reglasCondicionales: [
-      reglaNumeroIdAlfanumerico,
-      (fila) =>
-        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 5
-          ? { campo: 'porcentaje', mensaje: 'El % de participación debe ser mayor al 5%' }
-          : null,
-      (fila) =>
-        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= 100
-          ? { campo: 'porcentaje', mensaje: 'El % de participación no puede ser igual o superior al 100%' }
-          : null,
-      (fila) =>
-        fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
-          ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
-          : null,
-    ],
-    reglasGrupales: [
-      (filasActivas) => {
-        const total = sumarPorcentajes(filasActivas);
-        return total > 100
-          ? `La suma de participaciones accionarias es ${total.toFixed(2)}%, lo que excede el 100% permitido`
-          : null;
-      },
-    ],
-  },
+	  accionistas: {
+	    label:             'Composición Accionaria',
+	    errorKey:          'accionistas_tabla',
+	    errorKeyFilas:     'accionistas_filas',
+	    errorKeySuma:      'accionistas_suma',
+	    camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
+	    reglasCondicionales: [
+	      reglaNumeroIdAlfanumerico,
+	      (fila) =>
+	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA
+	          ? { campo: 'porcentaje', mensaje: `El % de participación debe ser mayor al ${UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA}%` }
+	          : null,
+	      (fila) =>
+	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= PORCENTAJE_MAXIMO_PERMITIDO
+	          ? { campo: 'porcentaje', mensaje: `El % de participación no puede ser igual o superior al ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
+	          : null,
+	      (fila) =>
+	        fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
+	          ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
+	          : null,
+	    ],
+	    reglasGrupales: [
+	      (filasActivas) => {
+	        const total = sumarPorcentajes(filasActivas);
+	        return total > PORCENTAJE_MAXIMO_PERMITIDO
+	          ? `La suma de participaciones accionarias es ${total.toFixed(2)}%, lo que excede el ${PORCENTAJE_MAXIMO_PERMITIDO}% permitido`
+	          : null;
+	      },
+	    ],
+	  },
 
-  beneficiarios: {
-    label:             'Beneficiario Final',
-    errorKey:          'beneficiarios_tabla',
-    errorKeyFilas:     'beneficiarios_filas',
-    errorKeySuma:      'beneficiarios_suma',
-    camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
-    reglasCondicionales: [
-      reglaNumeroIdAlfanumerico,
-      (fila) =>
-        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= 25
-          ? { campo: 'porcentaje', mensaje: 'El % de control debe ser mayor al 25%' }
-          : null,
-      (fila) =>
-        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= 100
-          ? { campo: 'porcentaje', mensaje: 'El % de control no puede ser igual o superior al 100%' }
-          : null,
-      (fila) =>
-        !esCampoVacio(fila.tipo_id) && String(fila.tipo_id).toUpperCase() === 'NIT'
-          ? { campo: 'tipo_id', mensaje: 'El Tipo ID del beneficiario final no puede ser NIT (debe ser CC, CE o PAS)' }
-          : null,
+	  beneficiarios: {
+	    label:             'Beneficiario Final',
+	    errorKey:          'beneficiarios_tabla',
+	    errorKeyFilas:     'beneficiarios_filas',
+	    errorKeySuma:      'beneficiarios_suma',
+	    camposObligatorios: ['nombre', 'porcentaje', 'tipo_id', 'numero_id', 'es_pep'],
+	    reglasCondicionales: [
+	      reglaNumeroIdAlfanumerico,
+	      (fila) =>
+	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL
+	          ? { campo: 'porcentaje', mensaje: `El % de control debe ser mayor al ${UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL}%` }
+	          : null,
+	      (fila) =>
+	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= PORCENTAJE_MAXIMO_PERMITIDO
+	          ? { campo: 'porcentaje', mensaje: `El % de control no puede ser igual o superior al ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
+	          : null,
+	      (fila) =>
+	        !esCampoVacio(fila.tipo_id) && String(fila.tipo_id).toUpperCase() === 'NIT'
+	          ? { campo: 'tipo_id', mensaje: 'El Tipo ID del beneficiario final no puede ser NIT (debe ser CC, CE o PAS)' }
+	          : null,
       (fila) =>
         fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
           ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
           : null,
     ],
-    reglasGrupales: [
-      (filasActivas) => {
-        const total = sumarPorcentajes(filasActivas);
-        return total > 100
-          ? `La suma de porcentajes de control es ${total.toFixed(2)}%, lo que excede el 100% permitido`
-          : null;
-      },
-    ],
-  },
+	    reglasGrupales: [
+	      (filasActivas) => {
+	        const total = sumarPorcentajes(filasActivas);
+	        return total > PORCENTAJE_MAXIMO_PERMITIDO
+	          ? `La suma de porcentajes de control es ${total.toFixed(2)}%, lo que excede el ${PORCENTAJE_MAXIMO_PERMITIDO}% permitido`
+	          : null;
+	      },
+	    ],
+	  },
 };
 
 // ─── Motor genérico ──────────────────────────────────────────────────────────
@@ -277,10 +287,9 @@ const ESQUEMAS_PASO6 = {
     errorKeyFilas:      'referencias_comerciales_filas',
     camposObligatorios: ['nombre_establecimiento', 'persona_contacto', 'telefono', 'ciudad'],
     reglasCondicionales: [
-      // Reutiliza la misma regla de longitud exacta que REGLAS_INPUT.telefono (10 dígitos)
       (fila) =>
-        !esCampoVacio(fila.telefono) && String(fila.telefono).length !== 10
-          ? { campo: 'telefono', mensaje: 'Debe tener exactamente 10 dígitos' }
+        !esCampoVacio(fila.telefono) && String(fila.telefono).length !== LONGITUD_TELEFONO
+          ? { campo: 'telefono', mensaje: `Debe tener exactamente ${LONGITUD_TELEFONO} dígitos` }
           : null,
     ],
   },
