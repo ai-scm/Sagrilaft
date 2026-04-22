@@ -169,7 +169,7 @@ _CSS_BASE = """
     .content{ margin-top:14px; }
     .card{
       background:#fff; border:1px solid var(--gray-200);
-      border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+      border-radius: var(--radius-lg); box-shadow: 0 4px 6px -1px rgba(0,0,0,.10),0 2px 4px -1px rgba(0,0,0,.06);
       padding:14px 16px; margin: 12px 0;
     }
     .card h2{ margin:0 0 10px 0; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--gray-600); }
