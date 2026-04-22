@@ -30,6 +30,8 @@ from infrastructure.ensamblaje import (
 )
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("fontTools").setLevel(logging.WARNING)
+logging.getLogger("weasyprint").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
