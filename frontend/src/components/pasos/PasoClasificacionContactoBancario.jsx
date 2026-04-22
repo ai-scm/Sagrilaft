@@ -13,22 +13,14 @@
 import FormField from '../FormField';
 import { HR, SectionTitle, ESTILO_CELDA_ERROR, MensajeError } from '../TablaFormComponents';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
+import { SECTORES_EMPRESA } from '../../utils/constantes';
+
 
 // ── Constantes de dominio ──────────────────────────────────────────────────────
 
 const OPCIONES_SI_NO = [
   { value: 'si', label: 'Sí' },
   { value: 'no', label: 'No' },
-];
-
-/**
- * Sector económico de la empresa.
- * Fuente única de verdad — espeja los valores validados en el backend (validar_sector).
- */
-const SECTORES_EMPRESA = [
-  { value: 'Público',  label: 'Público'  },
-  { value: 'Privado', label: 'Privado' },
-  { value: 'Mixto',   label: 'Mixto'   },
 ];
 
 /**

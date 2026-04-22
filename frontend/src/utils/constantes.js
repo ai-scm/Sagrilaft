@@ -1,9 +1,10 @@
 /**
  * Constantes de validación compartidas — fuente única de verdad del frontend.
  *
- * Sincronizadas con las constantes homólogas en:
+ * Sincronizadas con:
  *   backend/services/formulario/validacion.py
  *   backend/services/utils/coercion.py
+ *   backend/models.py (enums como SectorEmpresa)
  *
  * Al cambiar cualquier valor aquí, actualizar el equivalente en el backend.
  */
@@ -22,4 +23,13 @@ export const LONGITUD_MAXIMA_ID = 10;
 // ─── Expresiones regulares ────────────────────────────────────────────────────
 
 export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+
+// ─── Opciones de dropdown — espejo de enums del backend (models.py) ───────────
+
+/** Espeja SectorEmpresa en backend/models.py */
+export const SECTORES_EMPRESA = [
+  { value: 'Público', label: 'Público' },
+  { value: 'Privado', label: 'Privado' },
+  { value: 'Mixto',   label: 'Mixto'   },
+];
 
