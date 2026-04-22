@@ -289,8 +289,7 @@ class ValidadorEnvioFormulario:
             filas, "Beneficiario Final", "beneficiario_final",
             self._CAMPOS_BENEFICIARIO,
             [
-                self._crear_regla_porcentaje("beneficiario_final", UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL, "El beneficiario", "control"),
-                self._regla_no_nit,
+                self._crear_regla_porcentaje("beneficiario_final", UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL, "El beneficiario", "control")
             ],
         )
         error_total = self._error_porcentaje_excedido(
@@ -382,19 +381,7 @@ class ValidadorEnvioFormulario:
                 mensaje=f"La suma de {descripcion} es {total:.2f}%, lo que excede el {PORCENTAJE_MAXIMO_PERMITIDO}% permitido",
             )
         return None
-
-    # ── Reglas de negocio específicas ─────────────────────────────────────────
-
-    @staticmethod
-    def _regla_no_nit(i: int, fila: dict) -> Optional[ErrorValidacion]:
-        if str(fila.get("tipo_id") or "").upper() == "NIT":
-            nombre = fila.get("nombre") or f"fila {i + 1}"
-            return ErrorValidacion(
-                campo=f"beneficiario_final[{i}].tipo_id",
-                mensaje=f"El beneficiario '{nombre}' no puede tener NIT como Tipo ID (debe ser CC, CE o PAS)",
-            )
-        return None
-
+    
     # ── Helpers de estado del formulario ─────────────────────────────────────
 
     @staticmethod
