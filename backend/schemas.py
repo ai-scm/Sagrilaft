@@ -15,6 +15,9 @@ from models import (
     ResponsabilidadRenta,
     ResponsabilidadIva,
     RegimenIva,
+    OperacionesMonedaExtranjera,
+    Autorretenedor,
+    GranContribuyente
 )
 
 from services.utils.coercion import (
@@ -46,7 +49,9 @@ SectorEmpresaLimpio       = EnumLimpio[SectorEmpresa]
 ResponsabilidadRentaLimpio = EnumLimpio[ResponsabilidadRenta]
 ResponsabilidadIvaLimpio   = EnumLimpio[ResponsabilidadIva]
 RegimenIvaLimpio           = EnumLimpio[RegimenIva]
-
+OperacionesMonedaExtranjeraLimpio = EnumLimpio[OperacionesMonedaExtranjera]
+AutorretenedorLimpio = EnumLimpio[Autorretenedor]
+GranContribuyenteLimpio = EnumLimpio[GranContribuyente]
 
 # Tipos reutilizables en cualquier schema que maneje montos o porcentajes
 MontoPositivo          = Annotated[Optional[float], BeforeValidator(coercionar_monto)]
@@ -169,7 +174,7 @@ class FormularioBase(BaseModel):
     patrimonio:         MontoPositivo = None
 
     # 6. Operaciones en Moneda Extranjera
-    realiza_operaciones_moneda_extranjera: Optional[str] = None
+    realiza_operaciones_moneda_extranjera: EnumLimpio[OperacionesMonedaExtranjera] = None
     paises_operaciones: Optional[str] = None
     tipos_transaccion: Optional[List[str]] = None
     tipos_transaccion_otros: Optional[str] = None
@@ -180,10 +185,10 @@ class FormularioBase(BaseModel):
     sector: SectorEmpresaLimpio = None
     superintendencia: Optional[str] = None
     responsabilidades_renta: ResponsabilidadRentaLimpio = None
-    autorretenedor: Optional[str] = None
+    autorretenedor: EnumLimpio[Autorretenedor] = None
     responsabilidades_iva: ResponsabilidadIvaLimpio = None
     regimen_iva: RegimenIvaLimpio = None
-    gran_contribuyente: Optional[str] = None
+    gran_contribuyente: EnumLimpio[GranContribuyente] = None
     entidad_sin_animo_lucro: Optional[str] = None
     retencion_ica: Optional[str] = None
     impuesto_ica: Optional[str] = None
@@ -231,17 +236,6 @@ class FormularioBase(BaseModel):
         if len(str(v)) != 1 or not str(v).isdigit():
             raise ValueError('El dígito de verificación debe ser un único dígito numérico (0-9)')
         return str(v)
-
-    @field_validator('realiza_operaciones_moneda_extranjera')
-    @classmethod
-    def validar_realiza_operaciones_moneda_extranjera(cls, v: object) -> str | None:
-        """Solo se aceptan los valores 'si' o 'no'. Cadenas vacías se tratan como ausencia."""
-        _VALORES_VALIDOS = {'si', 'no'}
-        if v is None or v == '':
-            return None
-        if str(v).lower() not in _VALORES_VALIDOS:
-            raise ValueError("El valor debe ser 'si' o 'no'")
-        return str(v).lower()
 
     @field_validator('retencion_ica', 'impuesto_ica')
     @classmethod

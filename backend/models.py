@@ -81,7 +81,7 @@ class ResponsabilidadIva(str, enum.Enum):
     RESPONSABLE    = "Responsable"
     NO_RESPONSABLE = "No responsable"
 
-
+        
 class RegimenIva(str, enum.Enum):
     """
     Régimen de IVA al que pertenece el contribuyente (Sección 8).
@@ -90,6 +90,27 @@ class RegimenIva(str, enum.Enum):
     REGIMEN_SIMPLIFICADO = "Régimen simplificado"
     NINGUN_REGIMEN       = "Ningún régimen"
 
+class OperacionesMonedaExtranjera(str, enum.Enum):
+    """
+    Operaciones en Moneda Extranjera - Seccion 6.
+    """
+
+    OPERACIONES_SI = "si"
+    OPERACIONES_NO = "no"
+
+class Autorretenedor(str, enum.Enum):
+    """
+    Indica si el contribuyente es autorretenedor (Paso 7).
+    """
+    AUTORRETENEDOR_SI = "si"
+    AUTORRETENEDOR_NO = "no"
+
+class GranContribuyente(str, enum.Enum):
+    """
+    Indica si el contribuyente es gran contribuyente (Paso 7).
+    """
+    GRAN_CONTRIBUYENTE_SI = "si"
+    GRAN_CONTRIBUYENTE_NO = "no"
 
 def generate_uuid():
     return str(uuid.uuid4())
@@ -159,7 +180,7 @@ class Formulario(Base):
     patrimonio = Column(Float, nullable=True)
 
     # --- 6. Operaciones en Moneda Extranjera ---
-    realiza_operaciones_moneda_extranjera = Column(String, nullable=True)  # 'si' | 'no'
+    realiza_operaciones_moneda_extranjera = Column(String, nullable=True)
     paises_operaciones = Column(String, nullable=True)
     tipos_transaccion = Column(Text, nullable=True)    # JSON array ['importacion', ...]
     tipos_transaccion_otros = Column(String, nullable=True)
