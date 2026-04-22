@@ -23,6 +23,12 @@ export const LONGITUD_MAXIMA_ID = 10;
 // ─── Expresiones regulares ────────────────────────────────────────────────────
 
 export const REGEX_CORREO = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+// ─── Solo texto (letras, tildes, espacios, guiones, puntos) ──────────────────
+export const REGEX_CHAR_TEXTO = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
+// ─── Alfanumérico (letras, números, espacios, guiones, puntos) ────────────────
+export const REGEX_CHAR_ALFANUMERICO = /^[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
+// ─── Alfanumérico Estricto (solo letras A-Z, a-z y números 0-9) ───────────────
+export const REGEX_CHAR_ALFANUMERICO_ESTRICTO = /^[a-zA-Z0-9]$/;
 
 // ─── Opciones de dropdown — espejo de enums del backend (models.py) ───────────
 

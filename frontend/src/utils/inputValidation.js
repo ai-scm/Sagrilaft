@@ -8,6 +8,7 @@
  */
 
   import { LONGITUD_TELEFONO, REGEX_CORREO } from './constantes';
+  import { REGEX_CHAR_TEXTO, REGEX_CHAR_ALFANUMERICO_ESTRICTO, REGEX_CHAR_ALFANUMERICO} from './constantes';
 
 /** Teclas de control que siempre se permiten en cualquier input restringido. */
 const TECLAS_CONTROL = [
@@ -32,9 +33,6 @@ export const onlyNumericPaste = (e) => {
   }
 };
 
-// ─── Solo texto (letras, tildes, espacios, guiones, puntos) ──────────────────
-
-const REGEX_CHAR_TEXTO = /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
 
 /** Bloquea dígitos y símbolos no textuales. */
 export const onlyTextKeyDown = (e) => {
@@ -51,9 +49,6 @@ export const onlyTextPaste = (e) => {
   }
 };
 
-// ─── Alfanumérico (letras, números, espacios, guiones, puntos) ────────────────
-
-const REGEX_CHAR_ALFANUMERICO = /^[a-zA-Z0-9áéíóúÁÉÍÓÚüÜñÑ\s'.\-,]$/;
 
 /** Bloquea símbolos no alfanuméricos. */
 export const onlyAlphanumericKeyDown = (e) => {
@@ -70,9 +65,7 @@ export const onlyAlphanumericPaste = (e) => {
   }
 };
 
-// ─── Alfanumérico Estricto (solo letras A-Z, a-z y números 0-9) ───────────────
 
-const REGEX_CHAR_ALFANUMERICO_ESTRICTO = /^[a-zA-Z0-9]$/;
 
 /** Bloquea cualquier carácter que no sea una letra no acentuada o número. */
 export const onlyAlphanumericStrictKeyDown = (e) => {
