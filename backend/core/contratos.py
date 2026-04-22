@@ -142,7 +142,7 @@ class AlertaInconsistencia:
 # ═══════════════════════════════════════════════════════════════
 
 @runtime_checkable
-class IExtractorIA(Protocol):
+class ExtractorIAImp(Protocol):
     """
     Interfaz para la extracción de datos desde documentos usando IA.
 
@@ -160,7 +160,7 @@ class IExtractorIA(Protocol):
 
 
 @runtime_checkable
-class IValidadorDocumento(Protocol):
+class ValidadorDocumentoImp(Protocol):
     """
     Interfaz para validadores de documentos específicos.
 
@@ -186,12 +186,12 @@ class IValidadorDocumento(Protocol):
 
 
 @runtime_checkable
-class IValidadorCruzado(Protocol):
+class ValidadorCruzadoImp(Protocol):
     """
     Interfaz para la validación de consistencia entre documentos.
 
     SOLID - S: Responsabilidad única: verificar coherencia entre documentos.
-    SOLID - I: Interfaz mínima y enfocada, separada de IValidadorDocumento.
+    SOLID - I: Interfaz mínima y enfocada, separada de ValidadorDocumentoImp.
     SOLID - D: El orquestador depende de esta abstracción, no de implementaciones.
     """
 

@@ -3,7 +3,7 @@ Router de formularios — responsabilidades HTTP exclusivamente.
 
 SRP : parsea solicitudes, delega al servicio y devuelve respuestas.
       Toda la lógica de negocio vive en FormularioService.
-DIP : depende de la abstracción IExtractorIA, no de la implementación Bedrock.
+DIP : depende de la abstracción ExtractorIAImp, no de la implementación Bedrock.
 """
 
 from typing import List
@@ -22,7 +22,7 @@ from schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from core.contratos import IExtractorIA
+from core.contratos import ExtractorIAImp
 from core.configuracion import AppConfig
 from services.formulario.formulario_service import FormularioService
 from routers.transformers import construir_respuesta_documento
@@ -34,7 +34,7 @@ enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
 def obtener_servicio_formulario(
     sesion: Session = Depends(get_db),
-    extractor: IExtractorIA = Depends(obtener_extractor),
+    extractor: ExtractorIAImp = Depends(obtener_extractor),
     config: AppConfig = Depends(obtener_config),
 ) -> FormularioService:
     """Crea un FormularioService con las dependencias inyectadas."""

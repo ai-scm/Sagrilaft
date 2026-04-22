@@ -121,7 +121,7 @@ class ExtractorBedrock:
     Nota: boto3 es síncrono; se envuelve con asyncio.to_thread
     para no bloquear el event loop de FastAPI.
 
-    DIP : implementa IExtractorIA — el orquestador depende de la abstracción,
+    DIP : implementa ExtractorImp — el orquestador depende de la abstracción,
           no de esta clase directamente.
     """
 

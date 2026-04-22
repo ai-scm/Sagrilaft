@@ -27,7 +27,7 @@ class ValidadorCamaraComercio:
 
     SRP : única responsabilidad — contrastar datos del certificado vs formulario.
     OCP : extensible con nuevas reglas sin modificar las existentes.
-    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    LSP : intercambiable con cualquier ValidadorDocumentoImp sin romper el orquestador.
     """
 
     FUENTE = "certificado de Cámara de Comercio"

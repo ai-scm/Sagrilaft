@@ -2,12 +2,12 @@
 Orquestador de validación de documentos.
 
 Coordina la extracción IA y la validación por tipo de documento.
-Depende exclusivamente de abstracciones (IExtractorIA, IValidadorDocumento,
-IValidadorCruzado), nunca de implementaciones concretas.
+Depende exclusivamente de abstracciones (ExtractorIAImp, ValidadorDocumentoImp,
+ValidadorCruzadoImp), nunca de implementaciones concretas.
 
 SOLID:
 - S (Responsabilidad Única): Solo coordina el flujo; la lógica de cruce
-  vive en IValidadorCruzado; cada validador individual en IValidadorDocumento.
+  vive en ValidadorCruzadoImp; cada validador individual en ValidadorDocumentoImp.
 - O (Abierto/Cerrado): Agregar nuevos validadores o reglas de cruce no
   requiere modificar este orquestador.
 - D (Inversión de Dependencias): Recibe todas las dependencias vía constructor.
@@ -21,9 +21,9 @@ from typing import Any, Dict, List, Tuple
 
 from core.contratos import (
     HallazgoValidacion,
-    IExtractorIA,
-    IValidadorCruzado,
-    IValidadorDocumento,
+    ExtractorIAImp,
+    ValidadorCruzadoImp,
+    ValidadorDocumentoImp,
     ResultadoExtraccion,
 )
 
@@ -35,13 +35,13 @@ class OrquestadorValidacionDocumentos:
     Punto central de validación de documentos.
 
     Para cada documento: extrae datos con IA → selecciona validador → ejecuta.
-    Al final, delega la validación cruzada al IValidadorCruzado inyectado.
+    Al final, delega la validación cruzada al ValidadorCruzadoImp inyectado.
     """
 
     def __init__(
         self,
-        extractor: IExtractorIA,
-        validador_cruzado: IValidadorCruzado,
+        extractor: ExtractorIAImp,
+        validador_cruzado: ValidadorCruzadoImp,
     ) -> None:
         """
         Args:
@@ -50,14 +50,14 @@ class OrquestadorValidacionDocumentos:
         """
         self._extractor = extractor
         self._validador_cruzado = validador_cruzado
-        self._validadores: Dict[str, IValidadorDocumento] = {}
+        self._validadores: Dict[str, ValidadorDocumentoImp] = {}
 
     @property
-    def extractor(self) -> IExtractorIA:
+    def extractor(self) -> ExtractorIAImp:
         """Expone el extractor IA para uso directo (ej. pre-llenado de formulario)."""
         return self._extractor
 
-    def registrar_validador(self, validador: IValidadorDocumento) -> None:
+    def registrar_validador(self, validador: ValidadorDocumentoImp) -> None:
         """Registra un validador para un tipo de documento."""
         self._validadores[validador.tipo_documento] = validador
 

@@ -1,7 +1,7 @@
 """
 Proveedores simulados de listas de cautela.
 
-Cada clase implementa IProveedorListaCautela usando datos en memoria.
+Cada clase implementa ProveedorListaCautelaImp usando datos en memoria.
 En producción, reemplazar (o complementar) con proveedores reales que
 consuman las APIs/servicios oficiales indicados en cada clase.
 
@@ -14,7 +14,7 @@ DRY : _ProveedorSimuladoBase centraliza la normalización y comparación
 from typing import List, Optional
 
 from schemas import ResultadoListaCautela
-from services.listas.protocolo_listas import IProveedorListaCautela
+from services.listas.protocolo_listas import ProveedorListaCautelaImp
 from services.utils.texto import quitar_diacriticos
 
 
@@ -150,7 +150,7 @@ class ProveedorPoliciaAntecedentes(_ProveedorSimuladoBase):
 
 # ─── Registro de proveedores por defecto ─────────────────────────────────────
 
-PROVEEDORES_SIMULADOS: List[IProveedorListaCautela] = [
+PROVEEDORES_SIMULADOS: List[ProveedorListaCautelaImp] = [
     ProveedorOfac(),
     ProveedorOnu(),
     ProveedorProcuraduria(),

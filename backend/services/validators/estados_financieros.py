@@ -37,7 +37,7 @@ class ValidadorEstadosFinancieros:
 
     SRP : cada regla de negocio está aislada en su propio método privado.
     OCP : se extiende con nuevas reglas añadiendo métodos, sin tocar los existentes.
-    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    LSP : intercambiable con cualquier ValidadorDocumentoImp sin romper el orquestador.
     """
 
     TOLERANCIA_PORCENTUAL: float = 0.05  # 5 % de margen por redondeo o diferencia de unidades

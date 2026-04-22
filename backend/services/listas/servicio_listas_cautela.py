@@ -8,7 +8,7 @@ Organiza responsabilidades en dos clases cohesivas:
 SOLID:
 - S (Responsabilidad Única): búsqueda y cálculo de riesgo en clases separadas.
 - O (Abierto/Cerrado): umbrales de riesgo configurables; nuevas listas se agregan
-  registrando un IProveedorListaCautela en main.py sin tocar estas clases.
+  registrando un ProveedorListaCautelaImp en main.py sin tocar estas clases.
 - D (Inversión de Dependencias): ListaCautelaService recibe CalculadorNivelRiesgo
   por constructor; ambos dependen de abstracciones, no de implementaciones.
 
@@ -19,7 +19,7 @@ riesgo vivían en el router — ahora están correctamente en este servicio.
 from typing import List, Optional
 
 from schemas import ResultadoListaCautela, RespuestaListaCautela
-from services.listas.protocolo_listas import IProveedorListaCautela
+from services.listas.protocolo_listas import ProveedorListaCautelaImp
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -77,16 +77,16 @@ class ListaCautelaService:
     """
     Coordina la búsqueda en listas de cautela y la evaluación de riesgo.
 
-    Para integrar una lista real, registrar un nuevo IProveedorListaCautela
+    Para integrar una lista real, registrar un nuevo ProveedorListaCautelaImp
     en main.py — sin modificar esta clase (OCP).
 
-    SOLID - D: Recibe IProveedorListaCautela y CalculadorNivelRiesgo por
+    SOLID - D: Recibe ProveedorListaCautelaImp y CalculadorNivelRiesgo por
                constructor; no depende de implementaciones concretas.
     """
 
     def __init__(
         self,
-        proveedores: List[IProveedorListaCautela],
+        proveedores: List[ProveedorListaCautelaImp],
         calculador_riesgo: Optional[CalculadorNivelRiesgo] = None,
     ) -> None:
         """

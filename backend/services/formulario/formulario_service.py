@@ -28,7 +28,7 @@ from domain.excepciones import (
     FormularioNoEncontradoPorCredencialesError,
     FormularioYaEnviadoError,
 )
-from core.contratos import IExtractorIA
+from core.contratos import ExtractorIAImp
 from services.formulario.serializacion import serializar_campos_json, deserializar_campos_json
 from services.formulario.validacion import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
@@ -52,7 +52,7 @@ class FormularioService:
     los documentos y el análisis de IA. Mantiene la interfaz pública intacta.
     """
 
-    def __init__(self, sesion: Session, extractor: IExtractorIA, upload_dir: Path) -> None:
+    def __init__(self, sesion: Session, extractor: ExtractorIAImp, upload_dir: Path) -> None:
         self._sesion = sesion
         self._validador_envio = ValidadorEnvioFormulario()
         self._documentos = DocumentoService(sesion, upload_dir)

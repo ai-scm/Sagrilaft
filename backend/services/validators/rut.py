@@ -27,7 +27,7 @@ class ValidadorRut:
 
     SRP : única responsabilidad — contrastar datos del RUT vs formulario.
     OCP : extensible con nuevas reglas sin modificar las existentes.
-    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    LSP : intercambiable con cualquier ValidadorDocumentoImp sin romper el orquestador.
     """
 
     FUENTE = "RUT"

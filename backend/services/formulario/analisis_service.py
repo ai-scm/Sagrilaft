@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from models import DocumentoAdjunto, Formulario
-from core.contratos import AlertaInconsistencia, IExtractorIA
+from core.contratos import AlertaInconsistencia, ExtractorIAImp
 from services.formulario.prellenado import mapear_campos_para_formulario
 
 from services.alertas.detector_inconsistencias_nombre import detector as _detector_nombres
@@ -152,7 +152,7 @@ class AnalisisDocumentosService:
 
     def __init__(
         self, 
-        extractor: IExtractorIA, 
+        extractor: ExtractorIAImp, 
         config_analisis: List[ConfigDetector]
     ) -> None:
         self._extractor = extractor

@@ -8,7 +8,7 @@ DIP : los routers dependen de estas abstracciones en lugar de acceder a
 
 from fastapi import Request
 from core.configuracion import AppConfig
-from core.contratos import IExtractorIA
+from core.contratos import ExtractorIAImp
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
 
@@ -16,7 +16,7 @@ def obtener_config(solicitud: Request) -> AppConfig:
     """Obtiene la configuración registrada en el ciclo de vida de la aplicación."""
     return solicitud.app.state.config
 
-def obtener_extractor(solicitud: Request) -> IExtractorIA:
+def obtener_extractor(solicitud: Request) -> ExtractorIAImp:
     """Obtiene el extractor IA registrado en el ciclo de vida de la aplicación."""
     return solicitud.app.state.orchestrator.extractor
 

@@ -24,7 +24,7 @@ class ValidadorCedula:
 
     SRP : única responsabilidad — contrastar datos de la cédula vs formulario.
     OCP : extensible con nuevas reglas sin modificar las existentes.
-    LSP : intercambiable con cualquier IValidadorDocumento sin romper el orquestador.
+    LSP : intercambiable con cualquier ValidadorDocumentoImp sin romper el orquestador.
     """
 
     FUENTE = "cédula del representante"

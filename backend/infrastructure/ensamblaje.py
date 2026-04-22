@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from core.configuracion import AppConfig
 from services.extractores.bedrock_extractor import ExtractorBedrock
-from services.listas.protocolo_listas import IProveedorListaCautela
+from services.listas.protocolo_listas import ProveedorListaCautelaImp
 from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
@@ -60,7 +60,7 @@ def crear_orquestador_validacion(config: AppConfig) -> OrquestadorValidacionDocu
 
 
 def crear_servicio_listas_cautela(
-    proveedores: Optional[List[IProveedorListaCautela]] = None,
+    proveedores: Optional[List[ProveedorListaCautelaImp]] = None,
 ) -> ListaCautelaService:
     """
     Construye el servicio de listas de cautela con los proveedores disponibles.

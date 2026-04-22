@@ -2,7 +2,7 @@
 Contrato (Protocol) para proveedores de listas de cautela.
 
 OCP : agregar nuevas listas (SARLAFT, GAFILAT, etc.) solo requiere
-      implementar IProveedorListaCautela — sin modificar el servicio.
+      implementar ProveedorListaCautelaImp — sin modificar el servicio.
 DIP : ListaCautelaService depende de esta abstracción, no de implementaciones concretas.
 """
 
@@ -12,7 +12,7 @@ from schemas import ResultadoListaCautela
 
 
 @runtime_checkable
-class IProveedorListaCautela(Protocol):
+class ProveedorListaCautelaImp(Protocol):
     """
     Interfaz para proveedores de listas de cautela.
 

@@ -8,7 +8,7 @@ SOLID:
 - S (Responsabilidad Única): Esta clase solo valida cruces entre documentos.
 - O (Abierto/Cerrado): Nuevas reglas se agregan en REGLAS_CRUCE_PREDETERMINADAS
   sin modificar la lógica de ValidadorCruzadoDocumentos.
-- D (Inversión de Dependencias): Implementa IValidadorCruzado; el orquestador
+- D (Inversión de Dependencias): Implementa ValidadorCruzadoImp; el orquestador
   depende de la abstracción, no de esta clase concreta.
 
 DRY: La lógica de comparación está centralizada en comparar_entre_documentos.
@@ -142,7 +142,7 @@ class ValidadorCruzadoDocumentos:
     OCP: Nuevas reglas se inyectan en el constructor; la lógica de aplicación
     no cambia al agregar o quitar reglas.
 
-    Implementa el protocolo IValidadorCruzado.
+    Implementa el protocolo ValidadorCruzadoImp.
     """
 
     def __init__(self, reglas: List[ReglaCruce]) -> None:

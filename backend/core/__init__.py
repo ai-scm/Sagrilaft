@@ -12,9 +12,9 @@ from core.contratos import (
     HallazgoValidacion,
     ResultadoComparacion,
     AlertaInconsistencia,
-    IExtractorIA,
-    IValidadorDocumento,
-    IValidadorCruzado,
+    ExtractorIAImp,
+    ValidadorDocumentoImp,
+    ValidadorCruzadoImp,
 )
 
 __all__ = [
@@ -27,7 +27,7 @@ __all__ = [
     "HallazgoValidacion",
     "ResultadoComparacion",
     "AlertaInconsistencia",
-    "IExtractorIA",
-    "IValidadorDocumento",
-    "IValidadorCruzado",
+    "ExtractorIAImp",
+    "ValidadorDocumentoImp",
+    "ValidadorCruzadoImp",
 ]
