@@ -12,6 +12,9 @@ from models import (
     TipoSolicitud,
     ActividadClasificacion,
     SectorEmpresa,
+    ResponsabilidadRenta,
+    ResponsabilidadIva,
+    RegimenIva,
 )
 
 from services.utils.coercion import (
@@ -39,7 +42,10 @@ EnumLimpio = Annotated[Optional[T], BeforeValidator(_vacio_a_nulo)]
 DropdownSiNo = Annotated[Literal['si', 'no'] | None, BeforeValidator(_vacio_a_nulo)]
 DropdownTipoId = Annotated[Literal['NIT', 'CC', 'CE', 'PAS'] | None, BeforeValidator(_vacio_a_nulo)]
 
-SectorEmpresaLimpio = EnumLimpio[SectorEmpresa]
+SectorEmpresaLimpio       = EnumLimpio[SectorEmpresa]
+ResponsabilidadRentaLimpio = EnumLimpio[ResponsabilidadRenta]
+ResponsabilidadIvaLimpio   = EnumLimpio[ResponsabilidadIva]
+RegimenIvaLimpio           = EnumLimpio[RegimenIva]
 
 
 # Tipos reutilizables en cualquier schema que maneje montos o porcentajes
@@ -173,10 +179,10 @@ class FormularioBase(BaseModel):
     actividad_especifica: Optional[str] = None
     sector: SectorEmpresaLimpio = None
     superintendencia: Optional[str] = None
-    responsabilidades_renta: Optional[str] = None
+    responsabilidades_renta: ResponsabilidadRentaLimpio = None
     autorretenedor: Optional[str] = None
-    responsabilidades_iva: Optional[str] = None
-    regimen_iva: Optional[str] = None
+    responsabilidades_iva: ResponsabilidadIvaLimpio = None
+    regimen_iva: RegimenIvaLimpio = None
     gran_contribuyente: Optional[str] = None
     entidad_sin_animo_lucro: Optional[str] = None
     retencion_ica: Optional[str] = None
@@ -236,67 +242,6 @@ class FormularioBase(BaseModel):
         if str(v).lower() not in _VALORES_VALIDOS:
             raise ValueError("El valor debe ser 'si' o 'no'")
         return str(v).lower()
-
-    @field_validator('responsabilidades_renta')
-    @classmethod
-    def validar_responsabilidades_renta(cls, v: object) -> str | None:
-        """
-        Las responsabilidades en renta solo pueden ser una de tres opciones.
-        Cadenas vacías se tratan como ausencia de valor.
-        La validación es estricta frente al conjunto de opciones válidas.
-        """
-        _VALORES_VALIDOS = {'Declarante', 'No declarante', 'Declarante Regimen Especial'}
-        if v is None or v == '':
-            return None
-            
-        valor_str = str(v)
-        if valor_str not in _VALORES_VALIDOS:
-            raise ValueError(
-                f"Responsabilidad en el impuesto sobre la renta inválida '{v}'. "
-                "Use uno de: Declarante, No declarante, Declarante Regimen Especial"
-            )
-        
-        return valor_str
-
-    @field_validator('responsabilidades_iva')
-    @classmethod
-    def validar_responsabilidades_iva(cls, v: object) -> str | None:
-        """
-        Las responsabilidades en IVA solo pueden ser Responsable o No responsable.
-        Cadenas vacías se tratan como ausencia de valor.
-        La validación es estricta frente al conjunto de opciones válidas.
-        """
-        _VALORES_VALIDOS = {'Responsable', 'No responsable'}
-        if v is None or v == '':
-            return None
-            
-        if v not in _VALORES_VALIDOS:
-            raise ValueError(
-                f"Responsabilidad en IVA inválida '{v}'. "
-                "Use uno de: Responsable, No responsable"
-            )
-        
-        return v
-
-    @field_validator('regimen_iva')
-    @classmethod
-    def validar_regimen_iva(cls, v: object) -> str | None:
-        """
-        El régimen IVA solo puede ser uno de tres valores.
-        Cadenas vacías se tratan como ausencia de valor.
-        La validación es estricta frente al conjunto de opciones válidas.
-        """
-        _VALORES_VALIDOS = {'Régimen común', 'Régimen simplificado', 'Ningún régimen'}
-        if v is None or v == '':
-            return None
-            
-        if v not in _VALORES_VALIDOS:
-            raise ValueError(
-                f"Régimen IVA inválido '{v}'. "
-                "Use uno de: Régimen común, Régimen simplificado, Ningún régimen"
-            )
-        
-        return v
 
     @field_validator('retencion_ica', 'impuesto_ica')
     @classmethod

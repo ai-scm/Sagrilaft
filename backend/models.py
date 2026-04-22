@@ -65,6 +65,32 @@ class SectorEmpresa(str, enum.Enum):
     MIXTO = "Mixto"
 
 
+class ResponsabilidadRenta(str, enum.Enum):
+    """
+    Responsabilidad del contribuyente frente al impuesto sobre la renta (Sección 8).
+    """
+    DECLARANTE                  = "Declarante"
+    NO_DECLARANTE               = "No declarante"
+    DECLARANTE_REGIMEN_ESPECIAL = "Declarante Regimen Especial"
+
+
+class ResponsabilidadIva(str, enum.Enum):
+    """
+    Responsabilidad del contribuyente frente al IVA (Sección 8).
+    """
+    RESPONSABLE    = "Responsable"
+    NO_RESPONSABLE = "No responsable"
+
+
+class RegimenIva(str, enum.Enum):
+    """
+    Régimen de IVA al que pertenece el contribuyente (Sección 8).
+    """
+    REGIMEN_COMUN        = "Régimen común"
+    REGIMEN_SIMPLIFICADO = "Régimen simplificado"
+    NINGUN_REGIMEN       = "Ningún régimen"
+
+
 def generate_uuid():
     return str(uuid.uuid4())
 
