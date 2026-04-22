@@ -54,6 +54,17 @@ class ActividadClasificacion(str, enum.Enum):
     OTRA               = "otra"
 
 
+class SectorEmpresa(str, enum.Enum):
+    """
+    Sector de la empresa (Sección 8).
+
+    Valores canónicos: "Público", "Privado", "Mixto".
+    """
+    PUBLICO = "Público"
+    PRIVADO = "Privado"
+    MIXTO = "Mixto"
+
+
 def generate_uuid():
     return str(uuid.uuid4())
 

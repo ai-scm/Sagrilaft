@@ -11,6 +11,7 @@ from models import (
     TipoPersona,
     TipoSolicitud,
     ActividadClasificacion,
+    SectorEmpresa,
 )
 
 from services.utils.coercion import (
@@ -37,6 +38,8 @@ EnumLimpio = Annotated[Optional[T], BeforeValidator(_vacio_a_nulo)]
 # Literales para estandarización estricta de Dropdowns fijos (sin enums complejos)
 DropdownSiNo = Annotated[Literal['si', 'no'] | None, BeforeValidator(_vacio_a_nulo)]
 DropdownTipoId = Annotated[Literal['NIT', 'CC', 'CE', 'PAS'] | None, BeforeValidator(_vacio_a_nulo)]
+
+SectorEmpresaLimpio = EnumLimpio[SectorEmpresa]
 
 
 # Tipos reutilizables en cualquier schema que maneje montos o porcentajes
@@ -168,7 +171,7 @@ class FormularioBase(BaseModel):
     # 8. Clasificación Empresa y Régimen Tributario
     actividad_clasificacion: EnumLimpio[ActividadClasificacion] = None
     actividad_especifica: Optional[str] = None
-    sector: Optional[str] = None
+    sector: SectorEmpresaLimpio = None
     superintendencia: Optional[str] = None
     responsabilidades_renta: Optional[str] = None
     autorretenedor: Optional[str] = None
@@ -233,29 +236,6 @@ class FormularioBase(BaseModel):
         if str(v).lower() not in _VALORES_VALIDOS:
             raise ValueError("El valor debe ser 'si' o 'no'")
         return str(v).lower()
-
-    @field_validator('sector')
-    @classmethod
-    def validar_sector(cls, v: object) -> str | None:
-        """
-        El sector de la empresa solo puede ser Público, Privado o Mixto.
-        Cadenas vacías se tratan como ausencia de valor.
-        La comparación ignora mayúsculas/minúsculas y espacios extremos
-        para tolerar variaciones tipográficas del cliente.
-        """
-        _VALORES_VALIDOS = {'Público', 'Privado', 'Mixto'}
-        if v is None or v == '':
-            return None
-        valor_normalizado = str(v).strip().capitalize()
-        # Manejar tilde: 'publico' → 'Público'
-        _NORMALIZACION = {'Publico': 'Público'}
-        valor_final = _NORMALIZACION.get(valor_normalizado, valor_normalizado)
-        if valor_final not in _VALORES_VALIDOS:
-            raise ValueError(
-                f"Sector inválido '{v}'. "
-                "Use uno de: Público, Privado, Mixto"
-            )
-        return valor_final
 
     @field_validator('responsabilidades_renta')
     @classmethod
