@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime,
     ForeignKey, Enum as SAEnum
@@ -90,6 +90,15 @@ class RegimenIva(str, enum.Enum):
     REGIMEN_SIMPLIFICADO = "Régimen simplificado"
     NINGUN_REGIMEN       = "Ningún régimen"
 
+class AreaResponsable(str, enum.Enum):
+    """
+    Área interna responsable de gestionar el acceso manual al formulario SAGRILAFT.
+    """
+    VENTAS   = "ventas"
+    LEGAL    = "legal"
+    FINANZAS = "finanzas"
+
+
 class OperacionesMonedaExtranjera(str, enum.Enum):
     """
     Operaciones en Moneda Extranjera - Seccion 6.
@@ -118,6 +127,13 @@ def generate_uuid():
 
 def generate_codigo():
     return f"SAG-{uuid.uuid4().hex[:8].upper()}"
+
+
+_DIAS_VIGENCIA_ACCESO = 30
+
+
+def generate_expires_at() -> datetime:
+    return datetime.now(timezone.utc) + timedelta(days=_DIAS_VIGENCIA_ACCESO)
 
 
 class Formulario(Base):
@@ -268,3 +284,30 @@ class ResultadoValidacion(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="validaciones")
+
+
+class AccesoManual(Base):
+    """
+    Credenciales generadas por equipos internos para que clientes y proveedores
+    accedan al formulario SAGRILAFT mediante un enlace tokenizado único.
+
+    Invariantes:
+    - formulario_id es único: un Formulario tiene a lo sumo un AccesoManual.
+    - token_diligenciamiento es único: cada enlace apunta a un solo formulario.
+    - pin_hash nunca almacena el PIN en texto plano (Argon2).
+    """
+    __tablename__ = "accesos_manuales"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    pin_hash = Column(String, nullable=False)
+    token_diligenciamiento = Column(String, unique=True, nullable=False)
+    correo_destinatario = Column(String, nullable=False)
+    razon_social = Column(String, nullable=False)
+    tipo_contraparte = Column(String, nullable=False)
+    area_responsable = Column(String, nullable=False)
+    formulario_id = Column(String, ForeignKey("formularios.id"), unique=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime, nullable=False, default=generate_expires_at)
+    consumed_at = Column(DateTime, nullable=True)
+
+    formulario = relationship("Formulario", foreign_keys=[formulario_id])

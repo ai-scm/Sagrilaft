@@ -36,6 +36,13 @@ class AppConfig:
     upload_dir: Path = field(
         default_factory=lambda: Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads")).resolve()
     )
+    frontend_urls: list[str] = field(
+        default_factory=lambda: [
+            u.strip()
+            for u in os.getenv("FRONTEND_URL", "http://localhost:5173").split(",")
+            if u.strip()
+        ]
+    )
     aws: AWSConfig = field(default_factory=AWSConfig)
 
 

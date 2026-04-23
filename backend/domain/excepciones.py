@@ -27,15 +27,6 @@ class FormularioYaEnviadoError(Exception):
     """
 
 
-class FormularioNoEncontradoPorCredencialesError(Exception):
-    """Excepcion de dominio: no existe un formulario borrador para las credenciales dadas."""
-
-    def __init__(self, correo: str, numero_identificacion: str) -> None:
-        self.correo = correo
-        self.numero_identificacion = numero_identificacion
-        super().__init__("No se encontró ningún formulario con esas credenciales.")
-
-
 class DocumentoNoEncontradoError(Exception):
     """Excepcion de dominio: el documento solicitado no existe o fue eliminado."""
 
@@ -54,3 +45,37 @@ class ContraparteInvalidaError(Exception):
             f"Tipo de contraparte no reconocido: '{tipo_contraparte}'. "
             "Valores válidos: 'cliente', 'proveedor'."
         )
+                                                                                                                    
+
+class CredencialesAccesoInvalidasError(Exception):
+    """
+    Excepcion de dominio: el código de petición no existe o el PIN no coincide.
+
+    Se usa un único tipo de excepción para ambos casos (código no encontrado y PIN
+    incorrecto) con el fin de no revelar cuál de las dos condiciones falló y así
+    prevenir ataques de enumeración de códigos de petición válidos.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Código de petición o PIN incorrecto.")
+
+
+class TokenDiligenciamientoInvalidoError(Exception):
+    """Excepcion de dominio: el token de diligenciamiento no existe o ya fue consumido."""
+
+    def __init__(self, token: str) -> None:
+        self.token = token
+        super().__init__(f"El enlace de diligenciamiento no es válido.")
+
+
+class AccesoExpiradoError(Exception):
+    """
+    Excepcion de dominio: el AccesoManual superó su fecha de vigencia.
+
+    Se distingue de TokenDiligenciamientoInvalidoError (token nunca existió)
+    y de CredencialesAccesoInvalidasError (PIN incorrecto): aquí las credenciales
+    existieron y eran correctas, pero el plazo de 30 días ya venció.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("El acceso ha expirado. Solicite un nuevo enlace al área responsable.")

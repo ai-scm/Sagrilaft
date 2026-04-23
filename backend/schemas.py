@@ -5,6 +5,7 @@ from typing import Annotated, Any, Optional, List, TypeVar, Literal
 from datetime import datetime
 
 from models import (
+    AreaResponsable,
     ClasificacionActividad,
     EstadoFormulario,
     TipoContraparte,
@@ -387,16 +388,71 @@ class RespuestaListaCautela(BaseModel):
     riesgo_general: str = "bajo"  # "bajo", "medio", "alto"
 
 
-# --- Recuperación de sesión por credenciales ---
+# --- Acceso manual (portal interno) ---
 
-class CredencialesRecuperacion(BaseModel):
+class SolicitudAccesoManual(BaseModel):
     """
-    Credenciales que identifican unívocamente al usuario para recuperar
-    un borrador activo desde cualquier dispositivo.
-
-    Reemplaza el flujo anterior basado en el código SAG- como identificador
-    expuesto al usuario. El código se mantiene internamente en la BD.
+    Datos que un usuario interno (Ventas, Legal, Finanzas) provee para
+    generar un acceso manual al formulario SAGRILAFT.
     """
 
-    correo: str
-    numero_identificacion: str
+    tipo_contraparte:   TipoContraparte
+    razon_social:       str
+    correo_destinatario: str
+    area_responsable:   AreaResponsable
+
+
+class AccesoManualCreado(BaseModel):
+    """
+    Respuesta tras crear un acceso manual. Incluye el PIN en texto plano
+    ÚNICAMENTE en este momento; nunca se vuelve a exponer desde el backend.
+    """
+
+    formulario_id:           str
+    codigo_peticion:         str
+    pin:                     str
+    token_diligenciamiento:  str
+    enlace_diligenciamiento: str
+    correo_destinatario:     str
+    razon_social:            str
+    tipo_contraparte:        str
+    area_responsable:        str
+    created_at:              datetime
+
+
+class AccesoManualResumen(BaseModel):
+    """Vista de listado sin PIN (nunca exponer el hash)."""
+
+    id:                  str
+    formulario_id:       str
+    codigo_peticion:     str
+    correo_destinatario: str
+    razon_social:        str
+    tipo_contraparte:    str
+    area_responsable:    str
+    estado_formulario:   str
+    created_at:          datetime
+
+
+class CredencialesAccesoManual(BaseModel):
+    """
+    Credenciales para recuperar un formulario generado por acceso manual.
+    Reemplaza flujos de recuperación anteriores.
+    """
+
+    codigo_peticion: str
+    pin:             str
+
+
+class CredencialesEnvioFormulario(BaseModel):
+    """
+    Credenciales opcionales que el frontend envía al radicar un formulario con acceso manual.
+
+    Acepta token de diligenciamiento (flujo enlace por correo) O código+PIN
+    (flujo recuperación de sesión). Para formularios regulares (sin AccesoManual)
+    este cuerpo no es necesario.
+    """
+
+    token_diligenciamiento: Optional[str] = None
+    codigo_peticion:        Optional[str] = None
+    pin:                    Optional[str] = None
