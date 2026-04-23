@@ -2,21 +2,19 @@
  * ModalRecuperacionSesion
  *
  * Diálogo de recuperación de sesión. Permite al usuario identificarse con
- * correo electrónico + NIT para retomar un formulario guardado anteriormente,
- * desde cualquier dispositivo.
- *
- * Reemplaza el diálogo nativo window.confirm() del flujo anterior.
+ * código de petición + PIN para retomar un formulario SAGRILAFT generado
+ * mediante acceso manual, desde cualquier dispositivo.
  *
  * Props:
  *   visible        {boolean}  Controla la visibilidad del modal.
  *   error          {string}   Mensaje de error de la última búsqueda (o null).
  *   cargando       {boolean}  Indica que la búsqueda está en curso.
  *   fechaBorrador  {string}   ISO timestamp del borrador local detectado (o null).
- *   onRecuperar    {Function} Callback (correo, nit) => void.
+ *   onRecuperar    {Function} Callback (codigoPeticion, pin) => void.
  *   onDescartar    {Function} Callback sin parámetros; cierra y descarta el borrador.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const estilos = {
   overlay: {
@@ -70,6 +68,8 @@ const estilos = {
     outline: 'none',
     marginBottom: '16px',
     transition: 'border-color 0.15s',
+    fontFamily: 'monospace',
+    letterSpacing: '0.05em',
   },
   inputFocus: {
     borderColor: 'var(--primary-500)',
@@ -119,13 +119,29 @@ const estilos = {
 };
 
 export default function ModalRecuperacionSesion({
-  visible, error, cargando, fechaBorrador,
+  visible, error, cargando, fechaBorrador, codigoInicial,
   onRecuperar, onDescartar,
 }) {
-  const [correo, setCorreo] = useState('');
-  const [nit, setNit] = useState('');
-  const [correoFocus, setCorreoFocus] = useState(false);
-  const [nitFocus, setNitFocus] = useState(false);
+  const [codigoPeticion, setCodigoPeticion] = useState('');
+  const [pin, setPin]                       = useState('');
+  const [codigoFocus, setCodigoFocus]       = useState(false);
+  const [pinFocus, setPinFocus]             = useState(false);
+  const pinRef                              = useRef(null);
+
+  // Sincroniza el input de código cuando el modal se abre con un código conocido
+  // (post-refresh o sesión expirada). Resetea ambos campos al cerrar.
+  useEffect(() => {
+    if (visible) {
+      if (codigoInicial) {
+        setCodigoPeticion(codigoInicial);
+        // Código ya conocido: enfocar directamente el PIN
+        setTimeout(() => pinRef.current?.focus(), 50);
+      }
+    } else {
+      setCodigoPeticion('');
+      setPin('');
+    }
+  }, [visible, codigoInicial]);
 
   if (!visible) return null;
 
@@ -136,11 +152,11 @@ export default function ModalRecuperacionSesion({
     })
     : null;
 
-  const puedeEnviar = correo.trim() && nit.trim() && !cargando;
+  const puedeEnviar = codigoPeticion.trim() && pin.trim() && !cargando;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (puedeEnviar) onRecuperar(correo, nit);
+    if (puedeEnviar) onRecuperar(codigoPeticion.trim().toUpperCase(), pin.trim().toUpperCase());
   };
 
   return (
@@ -156,47 +172,55 @@ export default function ModalRecuperacionSesion({
           <>
             <div style={estilos.chip}>Borrador guardado: {fechaLegible}</div>
             <p style={estilos.descripcion}>
-              Encontramos un formulario guardado en este dispositivo.
-              Confirme sus credenciales para retomar donde lo dejó.
+              {codigoInicial
+                ? 'Por seguridad, ingrese su PIN para continuar donde lo dejó.'
+                : 'Encontramos un formulario guardado en este dispositivo. Ingrese sus credenciales de acceso para retomar donde lo dejó.'}
             </p>
           </>
         ) : (
           <p style={estilos.descripcion}>
-            Ingrese el correo electrónico y el NIT registrados en su formulario
-            para recuperar su sesión.
+            {codigoInicial
+              ? 'Su sesión ha expirado. Ingrese su PIN para continuar.'
+              : 'Ingrese el código de petición y PIN que recibió por correo electrónico para recuperar su formulario desde cualquier dispositivo.'}
           </p>
         )}
 
         <form onSubmit={handleSubmit}>
-          <label style={estilos.label} htmlFor="rec-correo">
-            Correo electrónico
+          <label style={estilos.label} htmlFor="rec-codigo">
+            Código de petición
           </label>
           <input
-            id="rec-correo"
-            type="email"
-            autoComplete="email"
-            placeholder="empresa@dominio.com"
-            value={correo}
-            onChange={e => setCorreo(e.target.value)}
-            onFocus={() => setCorreoFocus(true)}
-            onBlur={() => setCorreoFocus(false)}
-            style={{ ...estilos.input, ...(correoFocus ? estilos.inputFocus : {}) }}
-            disabled={cargando}
-          />
-
-          <label style={estilos.label} htmlFor="rec-nit">
-            Número de identificación (NIT)
-          </label>
-          <input
-            id="rec-nit"
+            id="rec-codigo"
             type="text"
             autoComplete="off"
-            placeholder="Ej. 900123456"
-            value={nit}
-            onChange={e => setNit(e.target.value)}
-            onFocus={() => setNitFocus(true)}
-            onBlur={() => setNitFocus(false)}
-            style={{ ...estilos.input, ...(nitFocus ? estilos.inputFocus : {}) }}
+            placeholder="Ej. SAG-3A7F2B1C"
+            value={codigoPeticion}
+            onChange={e => setCodigoPeticion(e.target.value)}
+            onFocus={() => setCodigoFocus(true)}
+            onBlur={() => setCodigoFocus(false)}
+            style={{
+              ...estilos.input,
+              ...(codigoFocus ? estilos.inputFocus : {}),
+              ...(codigoInicial ? { background: 'var(--gray-50)', color: 'var(--gray-500)' } : {}),
+            }}
+            disabled={cargando}
+            readOnly={!!codigoInicial}
+          />
+
+          <label style={estilos.label} htmlFor="rec-pin">
+            PIN de acceso
+          </label>
+          <input
+            id="rec-pin"
+            ref={pinRef}
+            type="password"
+            autoComplete="off"
+            placeholder="PIN de 8 caracteres"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            onFocus={() => setPinFocus(true)}
+            onBlur={() => setPinFocus(false)}
+            style={{ ...estilos.input, ...(pinFocus ? estilos.inputFocus : {}) }}
             disabled={cargando}
           />
 
@@ -211,7 +235,7 @@ export default function ModalRecuperacionSesion({
             }}
             disabled={!puedeEnviar}
           >
-            {cargando ? 'Buscando formulario…' : 'Recuperar sesión'}
+            {cargando ? 'Verificando credenciales…' : 'Recuperar sesión'}
           </button>
         </form>
 

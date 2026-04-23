@@ -62,6 +62,7 @@ export default function FormularioSagrilaft() {
         error={recuperacion.error}
         cargando={recuperacion.cargando}
         fechaBorrador={recuperacion.fechaBorrador}
+        codigoInicial={codigoPeticion || recuperacion.codigoPeticionBorrador}
         onRecuperar={recuperacion.recuperarSesion}
         onDescartar={recuperacion.descartar}
       />
