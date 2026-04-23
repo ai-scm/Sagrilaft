@@ -440,26 +440,35 @@ export function useFormulario() {
 
     setSaving(true);
     try {
+      const credenciales = recuperacion.credencialesRef?.current ?? null;
       if (!formularioId) {
         const result = await api.crearFormulario(_buildPayload());
         setFormularioId(result.id);
         setCodigoPeticion(result.codigo_peticion);
-        await api.enviarFormulario(result.id);
+        await api.enviarFormulario(result.id, credenciales);
       } else {
         await api.actualizarFormulario(formularioId, _buildPayload());
-        await api.enviarFormulario(formularioId);
+        await api.enviarFormulario(formularioId, credenciales);
       }
       limpiarBorrador();
       setSubmitted(true);
     } catch (err) {
       console.error('Error enviando formulario:', err);
-      // err.message contiene los mensajes del backend cuando valido === false
-      // (ver api.js:enviarFormulario). Solo usar el texto genérico para
-      // errores reales de red donde no hay mensaje estructurado.
-      const mensaje = err?.message && err.message !== 'Failed to fetch'
-        ? `⚠️ El formulario no pudo enviarse:\n\n${err.message}`
-        : '⚠️ Error al conectar con el servidor. Intente nuevamente.';
-      alert(mensaje);
+      if (err.status === 401) {
+        // Credenciales ausentes o incorrectas: re-abrir modal con código pre-llenado.
+        recuperacion.abrirConError('Su sesión ha expirado. Ingrese su PIN para continuar.');
+      } else if (err.status === 410) {
+        // El AccesoManual venció: el usuario debe solicitar un nuevo enlace al área interna.
+        alert('⚠️ El acceso ha expirado. Solicite un nuevo enlace al área responsable.');
+      } else {
+        // err.message contiene los mensajes del backend cuando valido === false
+        // (ver api.js:enviarFormulario). Solo usar el texto genérico para
+        // errores reales de red donde no hay mensaje estructurado.
+        const mensaje = err?.message && err.message !== 'Failed to fetch'
+          ? `⚠️ El formulario no pudo enviarse:\n\n${err.message}`
+          : '⚠️ Error al conectar con el servidor. Intente nuevamente.';
+        alert(mensaje);
+      }
     }
     setSaving(false);
   };

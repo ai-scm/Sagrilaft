@@ -28,11 +28,18 @@ export const api = {
     return res.json();
   },
 
-  async enviarFormulario(id) {
-    const res = await fetch(`${API_BASE}/formularios/${id}/enviar`, {
-      method: 'POST',
-    });
-    if (!res.ok) throw new Error(await res.text());
+  async enviarFormulario(id, credenciales = null) {
+    const opciones = { method: 'POST' };
+    if (credenciales) {
+      opciones.headers = { 'Content-Type': 'application/json' };
+      opciones.body = JSON.stringify(credenciales);
+    }
+    const res = await fetch(`${API_BASE}/formularios/${id}/enviar`, opciones);
+    if (!res.ok) {
+      const err = new Error(await res.text());
+      err.status = res.status;
+      throw err;
+    }
     const resultado = await res.json();
     if (!resultado.valido) {
       const detalle = resultado.errores?.map(e => e.mensaje).join('\n') ?? 'El formulario no pudo enviarse';
@@ -83,22 +90,62 @@ export const api = {
     return res.json();
   },
 
-  // Recuperación de sesión
-  async recuperarSesion(correo, numeroIdentificacion) {
-    const res = await fetch(`${API_BASE}/formularios/sesion/recuperar`, {
+  // Recuperación de sesión por acceso manual (código de petición + PIN)
+  async recuperarSesionPorAcceso(codigoPeticion, pin) {
+    const res = await fetch(`${API_BASE}/formularios/sesion/recuperar-por-acceso`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ correo, numero_identificacion: numeroIdentificacion }),
+      body: JSON.stringify({ codigo_peticion: codigoPeticion, pin }),
     });
-    // 404 = ningún formulario con esas credenciales → resultado esperado, no un error
-    if (res.status === 404) return null;
-    // 409 = formulario existe pero ya fue enviado → error de dominio conocido
+    if (res.status === 401) {
+      const err = new Error('Código de petición o PIN incorrecto.');
+      err.code = 'CREDENCIALES_INVALIDAS';
+      throw err;
+    }
     if (res.status === 409) {
-      const err = new Error('El formulario asociado a esas credenciales ya fue enviado.');
+      const err = new Error('El formulario asociado a ese código ya fue enviado.');
       err.code = 'FORMULARIO_YA_ENVIADO';
       throw err;
     }
-    // Cualquier otro error (400, 500, red) se propaga como excepción genérica
+    if (res.status === 410) {
+      const err = new Error('El acceso ha expirado. Solicite un nuevo enlace al área responsable.');
+      err.code = 'ACCESO_EXPIRADO';
+      throw err;
+    }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  // Acceso via token de diligenciamiento (enlace recibido por correo)
+  async resolverTokenDiligenciamiento(token) {
+    const res = await fetch(`${API_BASE}/accesos-manuales/token/${token}`);
+    if (res.status === 404) {
+      const err = new Error('El enlace de diligenciamiento no es válido o ya expiró.');
+      err.code = 'TOKEN_INVALIDO';
+      throw err;
+    }
+    if (res.status === 410) {
+      const err = new Error('El enlace de diligenciamiento ha expirado.');
+      err.code = 'ACCESO_EXPIRADO';
+      throw err;
+    }
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  // Portal interno — accesos manuales
+  async crearAccesoManual(datos) {
+    const res = await fetch(`${API_BASE}/accesos-manuales/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async listarAccesosManuales() {
+    const res = await fetch(`${API_BASE}/accesos-manuales/`);
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },

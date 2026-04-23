@@ -1,24 +1,23 @@
 /**
  * Hook: useRecuperacionSesion
  *
- * Gestiona el flujo de recuperación de sesión identificado por correo + NIT.
+ * Gestiona el flujo de recuperación de sesión identificado por código de petición + PIN.
  *
- * Estrategia de recuperación por prioridad:
- *   1. Rápida (local)  — verifica las credenciales contra el borrador en
- *                        localStorage. Sin llamada de red, respuesta inmediata.
- *   2. Remota (API)    — cuando no hay borrador local o las credenciales no
- *                        coinciden, consulta el backend para encontrar un
- *                        borrador activo con esas credenciales.
+ * La verificación del PIN requiere siempre una llamada de red al backend (el hash
+ * Argon2 nunca se almacena en localStorage por razones de seguridad). El borrador
+ * local se usa para detectar la existencia de una sesión previa y mostrar el modal,
+ * pero las credenciales siempre se validan contra el servidor.
  *
- * Flujos de apertura del modal:
- *   - Automático: al montar detecta un borrador local con sesión previa.
- *   - Manual:     el usuario pulsa "Recuperar sesión" desde el encabezado.
+ * Flujos de inicialización:
+ *   - Token URL (?token=...): resuelve el enlace de diligenciamiento y carga el formulario.
+ *   - Borrador local: detecta sesión previa y muestra el modal de recuperación.
+ *   - Manual: el usuario pulsa "Recuperar sesión" desde el encabezado.
  *
  * SRP: única responsabilidad = detectar, identificar y restaurar sesiones previas.
  * DIP: depende de borradorStorage y api, no de implementaciones de persistencia.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 import {
   leerBorradorDeStorage,
@@ -35,10 +34,6 @@ const _CAMPOS_EXCLUIR_DE_FORMDATA = new Set([
   'clasificaciones', 'documentos', 'validaciones',
 ]);
 
-/**
- * Convierte el array de documentos del servidor al mapa por tipo_documento
- * que maneja el estado del cliente.
- */
 function _normalizarDocumentos(documentosArray) {
   if (!Array.isArray(documentosArray)) return {};
   return documentosArray.reduce((acc, doc) => {
@@ -47,15 +42,10 @@ function _normalizarDocumentos(documentosArray) {
   }, {});
 }
 
-/**
- * Adapta la respuesta plana del servidor (FormularioConDetalles) al formato
- * de snapshot que esperan los setters del cliente.
- */
 function _adaptarRespuestaServidor(formulario) {
   const formData = Object.fromEntries(
     Object.entries(formulario).filter(([k]) => !_CAMPOS_EXCLUIR_DE_FORMDATA.has(k)),
   );
-
   return {
     formData,
     step:               formulario.pagina_actual ?? 1,
@@ -84,26 +74,13 @@ export function useRecuperacionSesion(setters) {
   const [error, setError]               = useState(null);
   const [cargando, setCargando]         = useState(false);
 
-  // ── Detección de borrador al montar ────────────────────────────────────────
-  useEffect(() => {
-    const borrador = leerBorradorDeStorage();
-    if (!borrador) return;
-
-    // Un formulario ya enviado no es recuperable; limpiar residuos del storage.
-    if (borradorEsFormularioEnviado(borrador)) {
-      eliminarBorradorDeStorage();
-      return;
-    }
-
-    // Solo vale la pena mostrar el modal si existe una sesión en el servidor
-    // (hay formularioId). Sin él, no hay nada que recuperar de forma cruzada.
-    if (!borrador.formularioId && !borrador.codigoPeticion) return;
-
-    setBorradorLocal(borrador);
-    setVisible(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Credenciales en memoria para autorizar el envío del formulario.
+  // Nunca se persisten en localStorage. Se populan tras token resolution o PIN recovery.
+  const credencialesRef = useRef(null);
 
   // ── Restauración de estado ─────────────────────────────────────────────────
+  // Declarado antes de los effects para que las closures capturen la referencia
+  // estable via ref y siempre usen la versión más reciente del callback.
   const _restaurarDesdeSnapshot = useCallback((snap) => {
     setFormData(snap.formData ?? {});
     setStep(snap.step ?? 1);
@@ -127,62 +104,80 @@ export function useRecuperacionSesion(setters) {
     setInfoBancariaPagos, setDocumentos,
   ]);
 
-  // ── Recuperar sesión (correo + NIT) ────────────────────────────────────────
-  /**
-   * Intenta recuperar la sesión con las credenciales provistas.
-   *
-   * Prioridad 1: coincidencia con el borrador local (sin llamada de red).
-   * Prioridad 2: búsqueda en el servidor si no hay coincidencia local.
-   */
-  const recuperarSesion = useCallback(async (correo, nit) => {
+  // Ref para que los effects de inicialización (dependencia []) siempre
+  // tengan acceso a la versión más reciente de _restaurarDesdeSnapshot.
+  const restaurarRef = useRef(_restaurarDesdeSnapshot);
+  useEffect(() => { restaurarRef.current = _restaurarDesdeSnapshot; });
+
+  // ── Resolución de token de diligenciamiento (enlace por correo) ───────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (!token) return;
+
+    api.resolverTokenDiligenciamiento(token)
+      .then(formulario => {
+        credencialesRef.current = { token_diligenciamiento: token };
+        window.history.replaceState({}, '', window.location.pathname);
+        restaurarRef.current(_adaptarRespuestaServidor(formulario));
+      })
+      .catch((err) => {
+        if (err.code === 'ACCESO_EXPIRADO') {
+          setError('El enlace de acceso ha expirado. Ingrese su código de petición y PIN, o solicite un nuevo enlace.');
+          setVisible(true);
+        }
+        // TOKEN_INVALIDO y otros errores: el formulario se muestra vacío sin modal.
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Detección de borrador al montar ────────────────────────────────────────
+  useEffect(() => {
+    // Si llegamos via token, no hay borrador local relevante que restaurar.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token')) return;
+
+    const borrador = leerBorradorDeStorage();
+    if (!borrador) return;
+
+    if (borradorEsFormularioEnviado(borrador)) {
+      eliminarBorradorDeStorage();
+      return;
+    }
+
+    if (!borrador.formularioId && !borrador.codigoPeticion) return;
+
+    setBorradorLocal(borrador);
+    setVisible(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Recuperar sesión (código de petición + PIN) ────────────────────────────
+  const recuperarSesion = useCallback(async (codigoPeticion, pin) => {
     setCargando(true);
     setError(null);
 
-    // Estrategia rápida: verificar contra borrador local
-    if (borradorLocal) {
-      const correoLocal  = (borradorLocal.formData?.correo ?? '').trim().toLowerCase();
-      const nitLocal     = (borradorLocal.formData?.numero_identificacion ?? '').trim();
-      const dvLocal      = (borradorLocal.formData?.digito_verificacion   ?? '').trim();
-      const nitConDvLocal = nitLocal + dvLocal;
-      const nitIngresado  = nit.trim();
-
-      // Acepta el NIT con o sin dígito de verificación (campo separado en el formulario)
-      if (correo.trim().toLowerCase() === correoLocal &&
-          (nitIngresado === nitLocal || nitIngresado === nitConDvLocal)) {
-        _restaurarDesdeSnapshot(borradorLocal);
-        setVisible(false);
-        setCargando(false);
-        return;
-      }
-    }
-
-    // Estrategia remota: consultar el servidor
-    // api.recuperarSesion devuelve:
-    //   FormularioConDetalles (objeto) → borrador encontrado  [HTTP 200]
-    //   null                           → sin borrador activo  [HTTP 404]
-    //   lanza excepción                → error de servidor    [HTTP 4xx/5xx o red]
     try {
-      const formulario = await api.recuperarSesion(correo.trim(), nit.trim());
+      const formulario = await api.recuperarSesionPorAcceso(codigoPeticion, pin);
       if (formulario) {
+        credencialesRef.current = { codigo_peticion: codigoPeticion, pin };
         const snap = _adaptarRespuestaServidor(formulario);
         _restaurarDesdeSnapshot(snap);
-        eliminarBorradorDeStorage(); // descartar borrador local obsoleto si existía
+        eliminarBorradorDeStorage();
         setVisible(false);
-      } else {
-        // 404: credenciales correctas pero sin borrador activo
-        setError('No se encontró un formulario activo con esas credenciales.');
       }
     } catch (err) {
-      if (err.code === 'FORMULARIO_YA_ENVIADO') {
+      if (err.code === 'CREDENCIALES_INVALIDAS') {
+        setError('Código de petición o PIN incorrecto. Verifique los datos');
+      } else if (err.code === 'FORMULARIO_YA_ENVIADO') {
         setError('Este formulario ya fue enviado y no puede recuperarse.');
+      } else if (err.code === 'ACCESO_EXPIRADO') {
+        setError('El acceso ha expirado. Solicite un nuevo enlace al área responsable.');
       } else {
-        // Error real de servidor o de red (500, timeout, etc.)
         setError('Error al conectar con el servidor. Intente nuevamente.');
       }
     } finally {
       setCargando(false);
     }
-  }, [borradorLocal, _restaurarDesdeSnapshot]);
+  }, [_restaurarDesdeSnapshot]);
 
   // ── Descartar recuperación (comenzar desde cero) ───────────────────────────
   const descartar = useCallback(() => {
@@ -198,15 +193,23 @@ export function useRecuperacionSesion(setters) {
     setVisible(true);
   }, []);
 
+  // ── Apertura programática con mensaje de error (ej: 401 en submit) ─────────
+  const abrirConError = useCallback((mensaje) => {
+    setError(mensaje);
+    setVisible(true);
+  }, []);
+
   // ── Interfaz pública ───────────────────────────────────────────────────────
   return {
     visible,
     error,
     cargando,
-    /** Fecha del último guardado del borrador local (para mostrar en el modal). */
-    fechaBorrador: borradorLocal?.guardadoEn ?? null,
+    fechaBorrador:          borradorLocal?.guardadoEn ?? null,
+    codigoPeticionBorrador: borradorLocal?.codigoPeticion ?? null,
     abrirModal,
+    abrirConError,
     recuperarSesion,
     descartar,
+    credencialesRef,
   };
 }

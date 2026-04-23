@@ -16,7 +16,8 @@
  *     la Capa 1 actúa como respaldo si el servidor no está disponible.
  *
  * La detección y restauración del borrador al montar fue extraída a
- * useRecuperacionSesion, que gestiona el flujo correo + NIT.
+ * useRecuperacionSesion, que gestiona el flujo de recuperación por acceso manual
+ * (código de petición + PIN) y la resolución por token (?token=...).
  *
  * SRP: única responsabilidad = orquestar las tres capas de escritura y
  *      exponer la limpieza del borrador tras un envío exitoso.
