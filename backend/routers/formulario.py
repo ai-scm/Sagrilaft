@@ -6,15 +6,16 @@ SRP : parsea solicitudes, delega al servicio y devuelve respuestas.
 DIP : depende de la abstracción ExtractorIAImp, no de la implementación Bedrock.
 """
 
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
 from dependencies import obtener_config, obtener_extractor
 from schemas import (
-    CredencialesRecuperacion,
+    CredencialesAccesoManual,
+    CredencialesEnvioFormulario,
     DocumentoResponse,
     FormularioConDetalles,
     FormularioCreate,
@@ -24,7 +25,9 @@ from schemas import (
 )
 from core.contratos import ExtractorIAImp
 from core.configuracion import AppConfig
+from core.limitador import limitador
 from services.formulario.formulario_service import FormularioService
+from services.acceso_manual.acceso_manual_service import AccesoManualService
 from routers.transformers import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
@@ -41,36 +44,48 @@ def obtener_servicio_formulario(
     return FormularioService(sesion, extractor, config.upload_dir)
 
 
+def obtener_servicio_acceso(
+    sesion: Session = Depends(get_db),
+    config: AppConfig = Depends(obtener_config),
+) -> AccesoManualService:
+    return AccesoManualService(sesion, config.frontend_urls[0])
+
+
 # ─── Recuperación de sesión ──────────────────────────────────────────────────
 # IMPORTANTE: esta ruta debe declararse ANTES de /{formulario_id} para que
-# FastAPI no capture "/sesion/recuperar" como un valor de {formulario_id}.
+# FastAPI no capture "/sesion/recuperar-por-acceso" como un valor de {formulario_id}.
+
 
 @enrutador.post(
-    "/sesion/recuperar",
+    "/sesion/recuperar-por-acceso",
     response_model=FormularioConDetalles,
     responses={
-        404: {"description": "No existe ningún formulario con esas credenciales"},
+        401: {"description": "Código de petición o PIN incorrecto"},
         409: {"description": "El formulario ya fue enviado y no está disponible para recuperación"},
+        410: {"description": "El acceso ha expirado"},
+        429: {"description": "Demasiados intentos. Espere un momento antes de reintentar"},
     },
 )
-def recuperar_sesion_por_credenciales(
-    credenciales: CredencialesRecuperacion,
-    servicio: FormularioService = Depends(obtener_servicio_formulario),
+@limitador.limit("5/minute")
+def recuperar_sesion_por_acceso_manual(
+    request: Request,
+    credenciales: CredencialesAccesoManual,
+    servicio: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> FormularioConDetalles:
     """
-    Busca un borrador activo por correo y número de identificación (NIT).
+    Recupera un borrador activo mediante el par (código de petición + PIN).
 
-    Permite que el usuario recupere su sesión desde cualquier dispositivo
-    sin necesidad de recordar ni exponer el código interno SAG-.
+    Flujo de recuperación soportado para formularios creados a través del
+    portal interno de acceso manual.
 
     Respuestas:
       200 — Formulario encontrado; cuerpo contiene el borrador completo.
-      404 — No existe ningún formulario con esas credenciales.
-      409 — Existe un formulario pero ya fue enviado; no es recuperable.
+      401 — Código de petición o PIN incorrecto (error intencionalmente genérico).
+      409 — El formulario ya fue enviado; no es recuperable como borrador.
     """
-    return servicio.buscar_borrador_por_credenciales(
-        credenciales.correo,
-        credenciales.numero_identificacion,
+    return servicio.buscar_formulario_por_credenciales(
+        credenciales.codigo_peticion,
+        credenciales.pin,
     )
 
 
@@ -104,13 +119,45 @@ def actualizar_formulario(
     return servicio.actualizar(formulario_id, datos)
 
 
-@enrutador.post("/{formulario_id}/enviar", response_model=ResultadoValidacionEnvio)
+@enrutador.post(
+    "/{formulario_id}/enviar",
+    response_model=ResultadoValidacionEnvio,
+    responses={
+        410: {"description": "El acceso ha expirado"},
+        429: {"description": "Demasiados intentos. Espere un momento antes de reintentar"},
+    },
+)
+@limitador.limit("10/minute")
 def enviar_formulario(
+    request: Request,
     formulario_id: str,
+    credenciales: Optional[CredencialesEnvioFormulario] = Body(None),
+    servicio_acceso: AccesoManualService = Depends(obtener_servicio_acceso),
     servicio: FormularioService = Depends(obtener_servicio_formulario),
 ) -> ResultadoValidacionEnvio:
-    """Envío final del formulario. Valida campos requeridos y bloquea edición posterior."""
-    return servicio.enviar(formulario_id)
+    """
+    Envío final del formulario. Valida campos requeridos y bloquea edición posterior.
+
+    Si el formulario fue creado via acceso manual, requiere credenciales
+    (token de diligenciamiento o código+PIN) para autorizar el envío.
+    """
+    servicio_acceso.verificar_credenciales_si_aplica(
+        formulario_id,
+        token=credenciales.token_diligenciamiento if credenciales else None,
+        codigo_peticion=credenciales.codigo_peticion if credenciales else None,
+        pin=credenciales.pin if credenciales else None,
+    )
+    resultado = servicio.enviar(formulario_id)
+    if (
+        resultado.valido
+        and credenciales is not None
+        and credenciales.token_diligenciamiento is not None
+    ):
+        servicio_acceso.consumir_token_al_enviar(
+            formulario_id,
+            credenciales.token_diligenciamiento,
+        )
+    return resultado
 
 
 # ─── Endpoints de documentos adjuntos ────────────────────────────────────────

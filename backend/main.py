@@ -11,29 +11,36 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from core.configuracion import AppConfig
 from core import load_config
+from core.limitador import limitador
 from database import engine, Base
 from routers import formulario, validacion, listas_cautela
+from routers import acceso_manual
 from domain.excepciones import (
+    AccesoExpiradoError,
     ContraparteInvalidaError,
+    CredencialesAccesoInvalidasError,
     DocumentoNoEncontradoError,
     FormularioNoEditableError,
     FormularioNoEncontradoError,
-    FormularioNoEncontradoPorCredencialesError,
     FormularioYaEnviadoError,
+    TokenDiligenciamientoInvalidoError,
 )
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.ensamblaje import (
     crear_orquestador_validacion,
     crear_servicio_listas_cautela,
 )
+from sqlalchemy import text
+
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("fontTools").setLevel(logging.WARNING)
 logging.getLogger("weasyprint").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
-
 
 def _aplicar_migraciones(engine) -> None:
     """
@@ -43,21 +50,32 @@ def _aplicar_migraciones(engine) -> None:
     columnas añadidas en versiones posteriores se agregan aquí con ALTER TABLE.
     Se registra cada migración para facilitar el seguimiento en logs.
     """
-    from sqlalchemy import text
-    columnas_nuevas = {
+    columnas_nuevas_formularios = {
         'digito_verificacion':                  'TEXT',
         'realiza_operaciones_moneda_extranjera': 'TEXT',
         'paises_operaciones':                   'TEXT',
         'tipos_transaccion_otros':              'TEXT',
     }
     with engine.connect() as conn:
-        columnas_existentes = {
+        columnas_existentes_formularios = {
             row[1] for row in conn.execute(text("PRAGMA table_info(formularios)"))
         }
-        for columna, tipo in columnas_nuevas.items():
-            if columna not in columnas_existentes:
+        for columna, tipo in columnas_nuevas_formularios.items():
+            if columna not in columnas_existentes_formularios:
                 conn.execute(text(f"ALTER TABLE formularios ADD COLUMN {columna} {tipo}"))
                 logger.info("Migración aplicada: columna '%s' agregada a 'formularios'", columna)
+
+        columnas_existentes_accesos = {
+            row[1] for row in conn.execute(text("PRAGMA table_info(accesos_manuales)"))
+        }
+        if "expires_at" not in columnas_existentes_accesos:
+            conn.execute(text("ALTER TABLE accesos_manuales ADD COLUMN expires_at TEXT"))
+            conn.execute(text("UPDATE accesos_manuales SET expires_at = datetime('now', '+30 days')"))
+            logger.info("Migración aplicada: columna 'expires_at' agregada a 'accesos_manuales'")
+        if "consumed_at" not in columnas_existentes_accesos:
+            conn.execute(text("ALTER TABLE accesos_manuales ADD COLUMN consumed_at TEXT"))
+            logger.info("Migración aplicada: columna 'consumed_at' agregada a 'accesos_manuales'")
+
         conn.commit()
 
 
@@ -65,7 +83,6 @@ def _aplicar_migraciones(engine) -> None:
 async def lifespan(app: FastAPI):
     """Ciclo de vida: inicialización y limpieza de la aplicación."""
     config = load_config()
-
     Base.metadata.create_all(bind=engine)
     _aplicar_migraciones(engine)
 
@@ -85,9 +102,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limitador
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=load_config().frontend_urls,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,6 +116,7 @@ app.add_middleware(
 app.include_router(formulario.enrutador)
 app.include_router(validacion.enrutador)
 app.include_router(listas_cautela.enrutador)
+app.include_router(acceso_manual.enrutador)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Exception Handlers (Domain -> HTTP)
@@ -119,14 +140,6 @@ async def _formulario_ya_enviado(_: Request, __: FormularioYaEnviadoError) -> JS
     )
 
 
-@app.exception_handler(FormularioNoEncontradoPorCredencialesError)
-async def _formulario_no_encontrado_por_credenciales(
-    _: Request,
-    exc: FormularioNoEncontradoPorCredencialesError,
-) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
 @app.exception_handler(ContraparteInvalidaError)
 async def _contraparte_invalida(_: Request, exc: ContraparteInvalidaError) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": str(exc)})
@@ -135,6 +148,34 @@ async def _contraparte_invalida(_: Request, exc: ContraparteInvalidaError) -> JS
 @app.exception_handler(DocumentoNoEncontradoError)
 async def _documento_no_encontrado(_: Request, __: DocumentoNoEncontradoError) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": "Documento no encontrado"})
+
+
+@app.exception_handler(CredencialesAccesoInvalidasError)
+async def _credenciales_acceso_invalidas(
+    _: Request, exc: CredencialesAccesoInvalidasError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=401,
+        content={"detail": str(exc)},
+    )
+
+
+@app.exception_handler(TokenDiligenciamientoInvalidoError)
+async def _token_diligenciamiento_invalido(
+    _: Request, exc: TokenDiligenciamientoInvalidoError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "El enlace de diligenciamiento no es válido o ya expiró."},
+    )
+
+
+@app.exception_handler(AccesoExpiradoError)
+async def _acceso_expirado(_: Request, exc: AccesoExpiradoError) -> JSONResponse:
+    return JSONResponse(
+        status_code=410,
+        content={"detail": str(exc)},
+    )
 
 
 @app.exception_handler(PermissionError)
