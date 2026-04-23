@@ -12,12 +12,10 @@ Organiza responsabilidades en capas claras:
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from models import DocumentoAdjunto, EstadoFormulario, Formulario
 from schemas import (
-    DocumentoResponse,
     FormularioCreate,
     FormularioUpdate,
     ResultadoValidacionEnvio,
@@ -25,11 +23,14 @@ from schemas import (
 from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,
-    FormularioNoEncontradoPorCredencialesError,
     FormularioYaEnviadoError,
 )
 from core.contratos import ExtractorIAImp
-from services.formulario.serializacion import serializar_campos_json, deserializar_campos_json
+from services.formulario.serializacion import (
+    serializar_campos_json,
+    deserializar_campos_json,
+    construir_snapshot_formulario,
+)
 from services.formulario.validacion import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
 from services.formulario.exportacion_pdf import ExportadorFormularioPdf
@@ -79,10 +80,7 @@ class FormularioService:
         if not formulario:
             raise FormularioNoEncontradoError(codigo)
 
-        datos = deserializar_campos_json(formulario)
-        datos["documentos"] = self._documentos_a_respuesta(formulario.documentos)
-        datos["validaciones"] = self._validaciones_a_dict(formulario.validaciones)
-        return datos
+        return construir_snapshot_formulario(formulario)
 
     def actualizar(self, formulario_id: str, datos: FormularioUpdate) -> Dict[str, Any]:
         formulario = self._buscar_formulario_o_error(formulario_id)
@@ -98,35 +96,6 @@ class FormularioService:
         self._sesion.commit()
         self._sesion.refresh(formulario)
         return deserializar_campos_json(formulario)
-
-    def buscar_borrador_por_credenciales(
-        self, correo: str, numero_identificacion: str
-    ) -> Dict[str, Any]:
-        _filtro_nit = or_(
-            Formulario.numero_identificacion == numero_identificacion,
-            func.concat(
-                Formulario.numero_identificacion,
-                Formulario.digito_verificacion,
-            ) == numero_identificacion,
-        )
-
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(Formulario.correo == correo, _filtro_nit)
-            .order_by(Formulario.updated_at.desc())
-            .first()
-        )
-
-        if not formulario:
-            raise FormularioNoEncontradoPorCredencialesError(correo, numero_identificacion)
-
-        if formulario.estado != EstadoFormulario.BORRADOR:
-            raise FormularioYaEnviadoError()
-
-        datos = deserializar_campos_json(formulario)
-        datos["documentos"] = self._documentos_a_respuesta(formulario.documentos)
-        datos["validaciones"] = self._validaciones_a_dict(formulario.validaciones)
-        return datos
 
     def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
         formulario = self._buscar_formulario_o_error(formulario_id)
@@ -243,35 +212,3 @@ class FormularioService:
         """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
         if formulario.estado != EstadoFormulario.BORRADOR:
             raise FormularioNoEditableError(mensaje_error)
-
-    @staticmethod
-    def _documentos_a_respuesta(
-        documentos: List[DocumentoAdjunto],
-    ) -> List[DocumentoResponse]:
-        return [
-            DocumentoResponse(
-                id=d.id,
-                tipo_documento=d.tipo_documento,
-                nombre_archivo=d.nombre_archivo,
-                content_type=d.content_type,
-                tamano=d.tamano,
-                created_at=d.created_at,
-            )
-            for d in documentos if d.deleted_at is None
-        ]
-
-    @staticmethod
-    def _validaciones_a_dict(validaciones: List[Any]) -> List[Dict[str, Any]]:
-        return [
-            {
-                "id":              v.id,
-                "tipo":            v.tipo,
-                "campo":           v.campo,
-                "resultado":       v.resultado,
-                "detalle":         v.detalle,
-                "valor_formulario":v.valor_formulario,
-                "valor_documento": v.valor_documento,
-                "created_at":      v.created_at,
-            }
-            for v in validaciones
-        ]

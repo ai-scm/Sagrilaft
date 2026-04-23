@@ -1,10 +1,12 @@
 """
 Utilidades para serialización y deserialización de estructuras complejas a JSON string.
+Incluye conversores de entidades ORM a schemas de respuesta compartidos por
+FormularioService y AccesoManualService.
 """
 
 import json
 from typing import Any, Dict, List
-
+from schemas import DocumentoResponse
 from models import Formulario
 
 
@@ -43,6 +45,46 @@ def serializar_campos_json(datos: Dict[str, Any]) -> Dict[str, Any]:
             for item in elementos
         ]
         datos[campo] = json.dumps(serializados, ensure_ascii=False)
+    return datos
+
+
+def documentos_a_respuesta(documentos: List[Any]) -> List[Any]:
+    """Convierte documentos ORM a lista de DocumentoResponse, excluyendo eliminados."""
+    return [
+        DocumentoResponse(
+            id=d.id,
+            tipo_documento=d.tipo_documento,
+            nombre_archivo=d.nombre_archivo,
+            content_type=d.content_type,
+            tamano=d.tamano,
+            created_at=d.created_at,
+        )
+        for d in documentos if d.deleted_at is None
+    ]
+
+
+def validaciones_a_dict(validaciones: List[Any]) -> List[Dict[str, Any]]:
+    """Convierte validaciones ORM a lista de dicts para la respuesta."""
+    return [
+        {
+            "id":               v.id,
+            "tipo":             v.tipo,
+            "campo":            v.campo,
+            "resultado":        v.resultado,
+            "detalle":          v.detalle,
+            "valor_formulario": v.valor_formulario,
+            "valor_documento":  v.valor_documento,
+            "created_at":       v.created_at,
+        }
+        for v in validaciones
+    ]
+
+
+def construir_snapshot_formulario(formulario: Formulario) -> Dict[str, Any]:
+    """Deserializa el formulario ORM y adjunta documentos y validaciones listos para respuesta."""
+    datos = deserializar_campos_json(formulario)
+    datos["documentos"] = documentos_a_respuesta(formulario.documentos)
+    datos["validaciones"] = validaciones_a_dict(formulario.validaciones)
     return datos
 
 
