@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime,
     ForeignKey, Enum as SAEnum
 )
 from sqlalchemy.orm import relationship
 from database import Base
+from services.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 import enum
 
 
@@ -129,22 +130,8 @@ def generate_codigo():
     return f"SAG-{uuid.uuid4().hex[:8].upper()}"
 
 
-_DIAS_HABILES_VIGENCIA_ACCESO = 5
-
-
-def _sumar_dias_habiles(desde: datetime, n_dias: int) -> datetime:
-    """Suma n días hábiles (lunes–viernes) a partir de la fecha dada."""
-    fecha = desde
-    contados = 0
-    while contados < n_dias:
-        fecha += timedelta(days=1)
-        if fecha.weekday() < 5:  # 0=lunes … 4=viernes
-            contados += 1
-    return fecha
-
-
 def generate_expires_at() -> datetime:
-    return _sumar_dias_habiles(datetime.now(timezone.utc), _DIAS_HABILES_VIGENCIA_ACCESO)
+    return sumar_dias_habiles(datetime.now(timezone.utc), DIAS_HABILES_VIGENCIA_ACCESO)
 
 
 class Formulario(Base):

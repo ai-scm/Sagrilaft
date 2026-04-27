@@ -398,6 +398,18 @@ class RespuestaListaCautela(BaseModel):
 
 # --- Acceso manual (portal interno) ---
 
+def _a_iso_utc(valor: Optional[datetime]) -> Optional[str]:
+    """Serializa un datetime a ISO-8601 con zona UTC explícita ('Z').
+
+    SQLite devuelve datetimes naive; se asumen UTC para evitar que el frontend
+    interprete la fecha en hora local y muestre días u horas corridas.
+    """
+    if valor is None:
+        return None
+    if valor.tzinfo is None:
+        valor = valor.replace(tzinfo=timezone.utc)
+    return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
 class SolicitudAccesoManual(BaseModel):
     """
     Datos que un usuario interno (Ventas, Legal, Finanzas) provee para
@@ -429,16 +441,8 @@ class AccesoManualCreado(BaseModel):
     expires_at:              datetime
 
     @field_serializer("created_at", "expires_at", when_used="json")
-    def _serializar_fechas_utc_z(self, valor: datetime) -> str:
-        """
-        Serializa fechas en ISO-8601 con zona horaria explícita (UTC + 'Z').
-
-        SQLite suele devolver datetimes naive; se asumen UTC para evitar que el
-        frontend interprete la fecha en hora local y muestre días/horas corridas.
-        """
-        if valor.tzinfo is None:
-            valor = valor.replace(tzinfo=timezone.utc)
-        return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    def _serializar_fechas(self, valor: datetime) -> str:
+        return _a_iso_utc(valor)
 
 
 class AccesoManualResumen(BaseModel):
@@ -457,18 +461,8 @@ class AccesoManualResumen(BaseModel):
     consumed_at:         Optional[datetime] = None
 
     @field_serializer("created_at", "expires_at", "consumed_at", when_used="json")
-    def _serializar_fechas_utc_z(self, valor: Optional[datetime]) -> Optional[str]:
-        """
-        Serializa fechas en ISO-8601 con zona horaria explícita (UTC + 'Z').
-
-        Importante para que JS (new Date(...)) no asuma hora local cuando el
-        backend produce datetimes naive (común en SQLite).
-        """
-        if valor is None:
-            return None
-        if valor.tzinfo is None:
-            valor = valor.replace(tzinfo=timezone.utc)
-        return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    def _serializar_fechas(self, valor: Optional[datetime]) -> Optional[str]:
+        return _a_iso_utc(valor)
 
 
 class CredencialesAccesoManual(BaseModel):

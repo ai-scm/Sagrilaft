@@ -16,8 +16,6 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
-from models import _sumar_dias_habiles, _DIAS_HABILES_VIGENCIA_ACCESO
-
 from core import load_config
 from core.limitador import limitador
 from database import engine, Base
@@ -34,6 +32,7 @@ from domain.excepciones import (
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
 from routers import acceso_manual, formulario, listas_cautela, validacion
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
+from services.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 
 
 logging.basicConfig(level=logging.INFO)
@@ -113,7 +112,7 @@ def _migrar_accesos_manuales(conn) -> None:
     )
 
     if expires_at_agregada:
-        nueva_fecha = _sumar_dias_habiles(datetime.now(timezone.utc), _DIAS_HABILES_VIGENCIA_ACCESO)
+        nueva_fecha = sumar_dias_habiles(datetime.now(timezone.utc), DIAS_HABILES_VIGENCIA_ACCESO)
         conn.execute(text("UPDATE accesos_manuales SET expires_at = :f"), {"f": nueva_fecha.isoformat()})
 
 
