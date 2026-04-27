@@ -15,27 +15,38 @@
  * SRP: solo gestiona creación de accesos manuales y visualización del resultado.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '../../services/api';
+import ListaAccesosManuales from './ListaAccesosManuales';
+import {
+  TIPOS_CONTRAPARTE,
+  AREAS_RESPONSABLES,
+  formatearFechaLarga,
+  ETIQUETA_TIPO_CONTRAPARTE,
+} from './constantes';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-
-const TIPOS_CONTRAPARTE = [
-  { valor: 'cliente',   etiqueta: 'Cliente'   },
-  { valor: 'proveedor', etiqueta: 'Proveedor' },
-];
-
-const AREAS_RESPONSABLES = [
-  { valor: 'ventas',   etiqueta: 'Ventas'   },
-  { valor: 'legal',    etiqueta: 'Legal'    },
-  { valor: 'finanzas', etiqueta: 'Finanzas' },
-];
 
 const ESTADO_INICIAL_FORM = {
   tipo_contraparte:    '',
   razon_social:        '',
   correo_destinatario: '',
   area_responsable:    '',
+};
+
+const TEXTOS_VISTA = {
+  crear: {
+    titulo:    'Crear acceso manual',
+    subtitulo: 'Genere credenciales únicas para que un cliente o proveedor pueda diligenciar el formulario SAGRILAFT.',
+  },
+  exito: {
+    titulo:    'Acceso creado',
+    subtitulo: 'Comparta las credenciales con el destinatario de forma segura.',
+  },
+  listar: {
+    titulo:    'Accesos creados',
+    subtitulo: 'Consulte el estado de todos los accesos manuales generados.',
+  },
 };
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
@@ -253,6 +264,28 @@ const s = {
     cursor: 'pointer',
     marginTop: '8px',
   },
+  // Navegación por tabs
+  navTabs: {
+    display:       'flex',
+    gap:           '4px',
+    background:    'var(--gray-100, #f1f5f9)',
+    borderRadius:  'var(--radius-md, 8px)',
+    padding:       '4px',
+    marginBottom:  '24px',
+  },
+  tab: (activo) => ({
+    flex:         1,
+    padding:      '8px 0',
+    background:   activo ? '#fff' : 'transparent',
+    color:        activo ? 'var(--gray-900, #0f172a)' : 'var(--gray-500, #64748b)',
+    border:       'none',
+    borderRadius: 'var(--radius-sm, 6px)',
+    fontSize:     '0.85rem',
+    fontWeight:   activo ? '700' : '500',
+    cursor:       'pointer',
+    boxShadow:    activo ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+    transition:   'all 0.15s',
+  }),
   errorGlobal: {
     background: '#fef2f2',
     border: '1px solid #fca5a5',
@@ -264,9 +297,57 @@ const s = {
   },
 };
 
+// ── Validación de formulario ──────────────────────────────────────────────────
+
+function validarCamposAcceso(formData) {
+  const errores = {};
+  if (!formData.tipo_contraparte)          errores.tipo_contraparte    = 'Seleccione el tipo de contraparte';
+  if (!formData.razon_social.trim())       errores.razon_social        = 'Ingrese la razón social';
+  if (!formData.correo_destinatario.trim()) errores.correo_destinatario = 'Ingrese el correo del destinatario';
+  if (!formData.area_responsable)          errores.area_responsable    = 'Seleccione el área responsable';
+
+  const correoRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  if (formData.correo_destinatario && !correoRegex.test(formData.correo_destinatario)) {
+    errores.correo_destinatario = 'Formato de correo inválido';
+  }
+  return errores;
+}
+
+// ── Sub-componentes ───────────────────────────────────────────────────────────
+
+function EncabezadoConTabs({ vistaEfectiva, onCambiarVista }) {
+  return (
+    <>
+      <div style={s.encabezado}>
+        <div style={s.badge}>Portal Interno</div>
+        <h1 style={s.titulo}>{TEXTOS_VISTA[vistaEfectiva].titulo}</h1>
+        <p style={s.subtitulo}>{TEXTOS_VISTA[vistaEfectiva].subtitulo}</p>
+      </div>
+
+      <div style={s.navTabs}>
+        <button
+          style={s.tab(vistaEfectiva === 'crear' || vistaEfectiva === 'exito')}
+          onClick={() => onCambiarVista('crear')}
+          type="button"
+        >
+          Crear acceso
+        </button>
+        <button
+          style={s.tab(vistaEfectiva === 'listar')}
+          onClick={() => onCambiarVista('listar')}
+          type="button"
+        >
+          Ver accesos
+        </button>
+      </div>
+    </>
+  );
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function CrearAccesoManual() {
+  const [vistaActual, setVistaActual]   = useState('crear');
   const [formData, setFormData]         = useState(ESTADO_INICIAL_FORM);
   const [erroresCampo, setErroresCampo] = useState({});
   const [errorGlobal, setErrorGlobal]   = useState(null);
@@ -275,29 +356,31 @@ export default function CrearAccesoManual() {
   const [copiado, setCopiado]           = useState(false);
   const [focusField, setFocusField]     = useState(null);
 
+  const timeoutRef = useRef(null);
+
+  const vistaEfectiva = vistaActual === 'crear' && resultado ? 'exito' : vistaActual;
+
+  useEffect(() => () => clearTimeout(timeoutRef.current), []);
+
+  const handleCambiarVista = useCallback((vista) => {
+    if (vista === 'crear' && resultado) {
+      setResultado(null);
+      setFormData(ESTADO_INICIAL_FORM);
+      setErroresCampo({});
+      setErrorGlobal(null);
+    }
+    setVistaActual(vista);
+  }, [resultado]);
+
   const handleChange = useCallback((campo, valor) => {
     setFormData(prev => ({ ...prev, [campo]: valor }));
     setErroresCampo(prev => ({ ...prev, [campo]: null }));
     setErrorGlobal(null);
   }, []);
 
-  const _validar = () => {
-    const errores = {};
-    if (!formData.tipo_contraparte)    errores.tipo_contraparte    = 'Seleccione el tipo de contraparte';
-    if (!formData.razon_social.trim()) errores.razon_social        = 'Ingrese la razón social';
-    if (!formData.correo_destinatario.trim()) errores.correo_destinatario = 'Ingrese el correo del destinatario';
-    if (!formData.area_responsable)    errores.area_responsable    = 'Seleccione el área responsable';
-
-    const correoRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-    if (formData.correo_destinatario && !correoRegex.test(formData.correo_destinatario)) {
-      errores.correo_destinatario = 'Formato de correo inválido';
-    }
-    return errores;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const errores = _validar();
+    const errores = validarCamposAcceso(formData);
     if (Object.keys(errores).length > 0) {
       setErroresCampo(errores);
       return;
@@ -319,15 +402,9 @@ export default function CrearAccesoManual() {
     if (!resultado) return;
     navigator.clipboard.writeText(resultado.enlace_diligenciamiento).then(() => {
       setCopiado(true);
-      setTimeout(() => setCopiado(false), 2500);
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopiado(false), 2500);
     });
-  };
-
-  const handleNuevoAcceso = () => {
-    setResultado(null);
-    setFormData(ESTADO_INICIAL_FORM);
-    setErroresCampo({});
-    setErrorGlobal(null);
   };
 
   const estiloInput = (campo) => ({
@@ -336,22 +413,30 @@ export default function CrearAccesoManual() {
     ...(erroresCampo[campo] ? s.inputError : {}),
   });
 
-  // ── Resultado exitoso ─────────────────────────────────────────────────────
-  if (resultado) {
+  // ── Vista: listado ────────────────────────────────────────────────────────
+  if (vistaEfectiva === 'listar') {
     return (
       <div style={s.pagina}>
         <div style={s.contenedor}>
-          <div style={s.encabezado}>
-            <div style={s.badge}>Portal Interno</div>
-            <h1 style={s.titulo}>Acceso creado</h1>
-            <p style={s.subtitulo}>Comparta las credenciales con el destinatario de forma segura.</p>
-          </div>
+          <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
+          <ListaAccesosManuales mensajeVacio="No hay accesos creados aún. Crea el primero desde la pestaña Crear acceso." />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Vista: resultado exitoso ──────────────────────────────────────────────
+  if (vistaEfectiva === 'exito') {
+    return (
+      <div style={s.pagina}>
+        <div style={s.contenedor}>
+          <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
 
           <div style={s.panelExito}>
             <div style={s.encabezadoExito}>
               <p style={s.tituloExito}>Acceso manual generado exitosamente</p>
               <p style={s.subtituloExito}>
-                {resultado.razon_social} · {resultado.tipo_contraparte === 'cliente' ? 'Cliente' : 'Proveedor'}
+                {resultado.razon_social} · {ETIQUETA_TIPO_CONTRAPARTE[resultado.tipo_contraparte] ?? resultado.tipo_contraparte}
               </p>
             </div>
 
@@ -378,6 +463,13 @@ export default function CrearAccesoManual() {
                 </span>
               </div>
 
+              <div style={s.credencial}>
+                <span style={s.credencialLabel}>Válido hasta</span>
+                <span style={{ ...s.credencialValor, fontFamily: 'inherit', letterSpacing: 0 }}>
+                  {formatearFechaLarga(resultado.expires_at)}
+                </span>
+              </div>
+
               <div style={s.enlaceBox}>
                 <p style={s.enlaceLabel}>Enlace de diligenciamiento</p>
                 <p style={s.enlaceTexto}>{resultado.enlace_diligenciamiento}</p>
@@ -386,7 +478,14 @@ export default function CrearAccesoManual() {
                 </button>
               </div>
 
-              <button style={s.btnNuevo} onClick={handleNuevoAcceso} type="button">
+              <button
+                style={s.btnPrincipal}
+                onClick={() => handleCambiarVista('listar')}
+                type="button"
+              >
+                Ver todos los accesos
+              </button>
+              <button style={s.btnNuevo} onClick={() => handleCambiarVista('crear')} type="button">
                 Crear otro acceso
               </button>
             </div>
@@ -396,18 +495,11 @@ export default function CrearAccesoManual() {
     );
   }
 
-  // ── Formulario de creación ────────────────────────────────────────────────
+  // ── Vista: formulario de creación ─────────────────────────────────────────
   return (
     <div style={s.pagina}>
       <div style={s.contenedor}>
-        <div style={s.encabezado}>
-          <div style={s.badge}>Portal Interno</div>
-          <h1 style={s.titulo}>Crear acceso manual</h1>
-          <p style={s.subtitulo}>
-            Genere credenciales únicas para que un cliente o proveedor pueda
-            diligenciar el formulario SAGRILAFT.
-          </p>
-        </div>
+        <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
 
         <form onSubmit={handleSubmit} noValidate>
           <div style={s.tarjeta}>

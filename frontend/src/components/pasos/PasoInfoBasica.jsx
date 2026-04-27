@@ -3,17 +3,17 @@ import LocationSelect from '../LocationSelect';
 import AlertasInconsistencia from '../AlertasInconsistencia';
 import { useUbicacion } from '../../hooks/useUbicacion';
 
-const TIPOS_CONTRAPARTE = [
+const OPCIONES_TIPO_CONTRAPARTE = [
   { value: 'proveedor', label: 'Proveedor' },
   { value: 'cliente',   label: 'Cliente'   },
 ];
 
-const TIPOS_PERSONA = [
+const OPCIONES_TIPO_PERSONA = [
   { value: 'juridica', label: 'Persona Jurídica' },
   { value: 'natural',  label: 'Persona Natural'  },
 ];
 
-const TIPOS_SOLICITUD = [
+const OPCIONES_TIPO_SOLICITUD = [
   { value: 'vinculacion',   label: 'Vinculación'   },
   { value: 'actualizacion', label: 'Actualización' },
 ];
@@ -22,7 +22,7 @@ const TIPOS_SOLICITUD = [
  * Clasificación de la actividad comercial de la contraparte.
  * Fuente única de verdad — espeja los valores del enum ClasificacionActividad del backend.
  */
-const CLASIFICACIONES_ACTIVIDAD = [
+const OPCIONES_CLASIFICACION_ACTIVIDAD = [
   { value: 'C', label: 'Comercializador (C)'          },
   { value: 'D', label: 'Distribuidor autorizado (D)'  },
   { value: 'R', label: 'Representante (R)'            },
@@ -30,26 +30,67 @@ const CLASIFICACIONES_ACTIVIDAD = [
   { value: 'I', label: 'Importador (I)'               },
 ];
 
-const TIPOS_IDENTIFICACION = [
+const OPCIONES_TIPO_IDENTIFICACION = [
   { value: 'NIT', label: 'NIT'                  },
   { value: 'CC',  label: 'Cédula de Ciudadanía' },
   { value: 'CE',  label: 'Cédula de Extranjería'},
   { value: 'PAS', label: 'Pasaporte'            },
 ];
 
-const HR = () => (
-  <hr style={{ border: 'none', borderTop: '1px solid var(--gray-200)', margin: '24px 0' }} />
-);
+const ESTILO_SEPARADOR_SECCION = {
+  border: 'none',
+  borderTop: '1px solid var(--gray-200)',
+  margin: '24px 0',
+};
+
+function SeparadorSeccion() {
+  return <hr style={ESTILO_SEPARADOR_SECCION} />;
+}
+
+function AlertasCampo({ alertas, tipoCampo, nombreCampo }) {
+  return (
+    <AlertasInconsistencia
+      alertas={alertas}
+      tipoCampo={tipoCampo}
+      nombreCampo={nombreCampo}
+    />
+  );
+}
 
 /**
  * Paso 2 — Clasificación e Información Básica del Sujeto Obligado / Contraparte.
  */
-export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors, alertasRazonSocial, alertasNit, alertasDireccion }) {
+export default function PasoInfoBasica(props) {
+  const {
+    formData,
+    onChange,
+    onOpenHelp,
+    errors,
+    alertasRazonSocial,
+    alertasNit,
+    alertasDireccion,
+  } = props;
+
   const {
     paisesOptions, departamentosOptions, ciudadesOptions,
     selectedPais, selectedDepartamento, selectedCiudad,
     handlePaisChange, handleDepartamentoChange, handleCiudadChange,
   } = useUbicacion(formData, onChange);
+
+  const renderCampo = ({ label, name, type, required, options }) => (
+    <FormField
+      key={name}
+      label={label}
+      name={name}
+      type={type}
+      required={required}
+      value={formData[name]}
+      onChange={onChange}
+      onOpenHelp={onOpenHelp}
+      error={errors[name]}
+      options={options}
+    />
+  );
 
   return (
     <div className="form-card">
@@ -57,74 +98,95 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
       <p className="section-subtitle">Datos generales de la empresa</p>
 
       <div className="form-row">
-        <FormField
-          label="Tipo de Contraparte" name="tipo_contraparte" type="select" required
-          value={formData.tipo_contraparte} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.tipo_contraparte}
-          options={TIPOS_CONTRAPARTE}
-        />
-        <FormField
-          label="Tipo de Persona" name="tipo_persona" type="select" required
-          value={formData.tipo_persona} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.tipo_persona}
-          options={TIPOS_PERSONA}
-        />
-        <FormField
-          label="Tipo de Solicitud" name="tipo_solicitud" type="select" required
-          value={formData.tipo_solicitud} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.tipo_solicitud}
-          options={TIPOS_SOLICITUD}
-        />
-        <FormField
-          label="Clasificación de Actividad" name="clasificacion_actividad" type="select" required
-          value={formData.clasificacion_actividad} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.clasificacion_actividad}
-          options={CLASIFICACIONES_ACTIVIDAD}
-        />
+        {[
+          {
+            label: 'Tipo de Contraparte',
+            name: 'tipo_contraparte',
+            type: 'select',
+            required: true,
+            options: OPCIONES_TIPO_CONTRAPARTE,
+          },
+          {
+            label: 'Tipo de Persona',
+            name: 'tipo_persona',
+            type: 'select',
+            required: true,
+            options: OPCIONES_TIPO_PERSONA,
+          },
+          {
+            label: 'Tipo de Solicitud',
+            name: 'tipo_solicitud',
+            type: 'select',
+            required: true,
+            options: OPCIONES_TIPO_SOLICITUD,
+          },
+          {
+            label: 'Clasificación de Actividad',
+            name: 'clasificacion_actividad',
+            type: 'select',
+            required: true,
+            options: OPCIONES_CLASIFICACION_ACTIVIDAD,
+          },
+        ].map(renderCampo)}
       </div>
 
-      <HR />
+      <SeparadorSeccion />
 
       <div className="form-row single">
-        <FormField
-          label="Nombre o Razón Social" name="razon_social" required
-          value={formData.razon_social} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.razon_social}
-        />
+        {renderCampo({
+          label: 'Nombre o Razón Social',
+          name: 'razon_social',
+          required: true,
+        })}
       </div>
 
-      <AlertasInconsistencia alertas={alertasRazonSocial} tipoCampo="nombre sin resolver" nombreCampo="Nombre o Razón Social" />
+      <AlertasCampo
+        alertas={alertasRazonSocial}
+        tipoCampo="nombre sin resolver"
+        nombreCampo="Nombre o Razón Social"
+      />
 
       <div className="form-row">
-        <FormField
-          label="Tipo de Identificación" name="tipo_identificacion" type="select" required
-          value={formData.tipo_identificacion} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.tipo_identificacion}
-          options={TIPOS_IDENTIFICACION}
-        />
-        <FormField
-          label="Número de Identificación" name="numero_identificacion" required
-          value={formData.numero_identificacion} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.numero_identificacion}
-        />
-        <FormField
-          label="DV" name="digito_verificacion" required
-          value={formData.digito_verificacion} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.digito_verificacion}
-        />
+        {[
+          {
+            label: 'Tipo de Identificación',
+            name: 'tipo_identificacion',
+            type: 'select',
+            required: true,
+            options: OPCIONES_TIPO_IDENTIFICACION,
+          },
+          {
+            label: 'Número de Identificación',
+            name: 'numero_identificacion',
+            required: true,
+          },
+          {
+            label: 'DV',
+            name: 'digito_verificacion',
+            required: true,
+          },
+        ].map(renderCampo)}
       </div>
 
-      <AlertasInconsistencia alertas={alertasNit} tipoCampo="NIT sin resolver" nombreCampo="Número de Identificación" />
+      <AlertasCampo
+        alertas={alertasNit}
+        tipoCampo="NIT sin resolver"
+        nombreCampo="Número de Identificación"
+      />
 
       <div className="form-row single">
-        <FormField
-          label="Dirección" name="direccion" required
-          value={formData.direccion} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.direccion}
-        />
+        {renderCampo({
+          label: 'Dirección',
+          name: 'direccion',
+          required: true,
+        })}
       </div>
 
-      <AlertasInconsistencia alertas={alertasDireccion} tipoCampo="dirección sin resolver" nombreCampo="Dirección" />
+      <AlertasCampo
+        alertas={alertasDireccion}
+        tipoCampo="dirección sin resolver"
+        nombreCampo="Dirección"
+      />
 
       <div className="form-row">
         <LocationSelect
@@ -150,34 +212,40 @@ export default function PasoInfoBasica({ formData, onChange, onOpenHelp, errors,
       </div>
 
       <div className="form-row">
-        <FormField
-          label="Teléfono" name="telefono" type="tel" required
-          value={formData.telefono} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.telefono}
-        />
-        <FormField
-          label="Fax" name="fax" required
-          value={formData.fax} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.fax}
-        />
-        <FormField
-          label="Correo Electrónico" name="correo" type="email" required
-          value={formData.correo} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.correo}
-        />
+        {[
+          {
+            label: 'Teléfono',
+            name: 'telefono',
+            type: 'tel',
+            required: true,
+          },
+          {
+            label: 'Fax',
+            name: 'fax',
+            required: true,
+          },
+          {
+            label: 'Correo Electrónico',
+            name: 'correo',
+            type: 'email',
+            required: true,
+          },
+        ].map(renderCampo)}
       </div>
 
       <div className="form-row">
-        <FormField
-          label="Código Actividad ICA" name="codigo_ica" required
-          value={formData.codigo_ica} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.codigo_ica}
-        />
-        <FormField
-          label="Página Web" name="pagina_web" required
-          value={formData.pagina_web} onChange={onChange}
-          onOpenHelp={onOpenHelp} error={errors.pagina_web}
-        />
+        {[
+          {
+            label: 'Código Actividad ICA',
+            name: 'codigo_ica',
+            required: true,
+          },
+          {
+            label: 'Página Web',
+            name: 'pagina_web',
+            required: true,
+          },
+        ].map(renderCampo)}
       </div>
     </div>
   );

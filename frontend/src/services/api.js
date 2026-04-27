@@ -120,12 +120,12 @@ export const api = {
   async resolverTokenDiligenciamiento(token) {
     const res = await fetch(`${API_BASE}/accesos-manuales/token/${token}`);
     if (res.status === 404) {
-      const err = new Error('El enlace de diligenciamiento no es válido o ya expiró.');
+      const err = new Error('El enlace de diligenciamiento no es válido o ya fue consumido.');
       err.code = 'TOKEN_INVALIDO';
       throw err;
     }
     if (res.status === 410) {
-      const err = new Error('El enlace de diligenciamiento ha expirado.');
+      const err = new Error('El acceso ha expirado. Solicite un nuevo enlace al área responsable.');
       err.code = 'ACCESO_EXPIRADO';
       throw err;
     }
