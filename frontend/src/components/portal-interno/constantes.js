@@ -27,6 +27,12 @@ function formatearFecha(isoString, { month }) {
 // Fuente de verdad: TipoContraparte y AreaResponsable en backend/models.py.
 // Actualizar ambos archivos si se añaden o eliminan valores del enum.
 
+export const ESTADOS_ACCESO = [
+  { valor: 'activo',    etiqueta: 'Activo'    },
+  { valor: 'consumido', etiqueta: 'Consumido' },
+  { valor: 'expirado',  etiqueta: 'Expirado'  },
+];
+
 export const TIPOS_CONTRAPARTE = [
   { valor: 'cliente',   etiqueta: 'Cliente'   },
   { valor: 'proveedor', etiqueta: 'Proveedor' },

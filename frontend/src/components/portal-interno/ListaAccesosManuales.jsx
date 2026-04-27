@@ -1,26 +1,35 @@
-/**
- * ListaAccesosManuales — vista de todos los accesos manuales creados.
- *
- * Muestra código de petición, razón social, estado del acceso, fecha de
- * expiración y correo del destinatario. Se recarga al montar y permite
- * refresco manual.
- *
- * Props:
- *   mensajeVacio {string} Texto a mostrar cuando no hay accesos (opcional).
- *
- * SRP: únicamente gestiona la carga y presentación del listado.
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../services/api';
 import BadgeEstadoAcceso from './BadgeEstadoAcceso';
 import {
+  ESTADOS_ACCESO,
+  TIPOS_CONTRAPARTE,
+  AREAS_RESPONSABLES,
   ETIQUETA_TIPO_CONTRAPARTE,
   ETIQUETA_AREA_RESPONSABLE,
   formatearFechaCorta,
 } from './constantes';
 
-// ── Utilidades de dominio ─────────────────────────────────────────────────────
+// ── Constantes de filtrado ────────────────────────────────────────────────────
+
+const FILTRO_TODOS = '';
+
+const FILTROS_VACIOS = { estado: FILTRO_TODOS, area: FILTRO_TODOS, tipo: FILTRO_TODOS };
+
+// ── Lógica de filtrado ────────────────────────────────────────────────────────
+
+function aplicarFiltros(accesos, { estado, area, tipo }) {
+  return accesos
+    .filter(a => !estado || a.estado_acceso    === estado)
+    .filter(a => !area   || a.area_responsable === area)
+    .filter(a => !tipo   || a.tipo_contraparte === tipo);
+}
+
+function hayFiltrosActivos(filtros) {
+  return Object.values(filtros).some(v => v !== FILTRO_TODOS);
+}
+
+// ── Utilidades de presentación ────────────────────────────────────────────────
 
 function obtenerEtiqueta(mapaEtiquetas, valor) {
   return mapaEtiquetas[valor] ?? valor;
@@ -39,9 +48,12 @@ function formatearEtiquetaFechaLimite(acceso) {
   }
 }
 
-function textoConteoAccesos(cantidad) {
-  const plural = cantidad !== 1;
-  return `${cantidad} acceso${plural ? 's' : ''} creado${plural ? 's' : ''}`;
+function textoConteoAccesos(filtrados, total) {
+  if (filtrados === total) {
+    const plural = total !== 1;
+    return `${total} acceso${plural ? 's' : ''} creado${plural ? 's' : ''}`;
+  }
+  return `${filtrados} de ${total} acceso${total !== 1 ? 's' : ''}`;
 }
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
@@ -72,6 +84,31 @@ const s = {
     borderRadius: 'var(--radius-sm, 6px)',
     fontSize:     '0.8rem',
     fontWeight:   '600',
+    cursor:       'pointer',
+  },
+  barraFiltros: {
+    display:    'flex',
+    gap:        '8px',
+    flexWrap:   'wrap',
+    alignItems: 'center',
+    paddingBottom: '4px',
+  },
+  selectFiltro: {
+    padding:      '6px 10px',
+    border:       '1.5px solid var(--gray-200, #e2e8f0)',
+    borderRadius: 'var(--radius-sm, 6px)',
+    fontSize:     '0.8rem',
+    color:        'var(--gray-700, #334155)',
+    background:   '#fff',
+    cursor:       'pointer',
+  },
+  btnLimpiarFiltros: {
+    padding:      '6px 12px',
+    background:   'transparent',
+    color:        'var(--gray-500, #64748b)',
+    border:       '1.5px solid var(--gray-200, #e2e8f0)',
+    borderRadius: 'var(--radius-sm, 6px)',
+    fontSize:     '0.8rem',
     cursor:       'pointer',
   },
   tarjeta: {
@@ -156,15 +193,60 @@ const s = {
   },
 };
 
-// ── Sub-componente: tarjeta de un acceso ──────────────────────────────────────
+// ── Sub-componente: barra de filtros ──────────────────────────────────────────
+
+function BarraFiltros({ filtros, onCambiar, onLimpiar }) {
+  return (
+    <div style={s.barraFiltros}>
+      <select
+        style={s.selectFiltro}
+        value={filtros.estado}
+        onChange={e => onCambiar('estado', e.target.value)}
+      >
+        <option value={FILTRO_TODOS}>Todos los estados</option>
+        {ESTADOS_ACCESO.map(({ valor, etiqueta }) => (
+          <option key={valor} value={valor}>{etiqueta}</option>
+        ))}
+      </select>
+
+      <select
+        style={s.selectFiltro}
+        value={filtros.area}
+        onChange={e => onCambiar('area', e.target.value)}
+      >
+        <option value={FILTRO_TODOS}>Todas las áreas</option>
+        {AREAS_RESPONSABLES.map(({ valor, etiqueta }) => (
+          <option key={valor} value={valor}>{etiqueta}</option>
+        ))}
+      </select>
+
+      <select
+        style={s.selectFiltro}
+        value={filtros.tipo}
+        onChange={e => onCambiar('tipo', e.target.value)}
+      >
+        <option value={FILTRO_TODOS}>Todos los tipos</option>
+        {TIPOS_CONTRAPARTE.map(({ valor, etiqueta }) => (
+          <option key={valor} value={valor}>{etiqueta}</option>
+        ))}
+      </select>
+
+      {hayFiltrosActivos(filtros) && (
+        <button style={s.btnLimpiarFiltros} type="button" onClick={onLimpiar}>
+          Limpiar filtros
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-componente: tarjeta individual ───────────────────────────────────────
 
 function TarjetaAccesoManual({ acceso }) {
-  const tipoLabel = obtenerEtiqueta(ETIQUETA_TIPO_CONTRAPARTE, acceso.tipo_contraparte);
-  const areaLabel = obtenerEtiqueta(ETIQUETA_AREA_RESPONSABLE, acceso.area_responsable);
+  const tipoLabel      = obtenerEtiqueta(ETIQUETA_TIPO_CONTRAPARTE, acceso.tipo_contraparte);
+  const areaLabel      = obtenerEtiqueta(ETIQUETA_AREA_RESPONSABLE, acceso.area_responsable);
   const accesoExpirado = acceso.estado_acceso === 'expirado';
-  const estiloTarjeta = accesoExpirado
-    ? { ...s.tarjeta, ...s.tarjetaExpirada }
-    : s.tarjeta;
+  const estiloTarjeta  = accesoExpirado ? { ...s.tarjeta, ...s.tarjetaExpirada } : s.tarjeta;
 
   return (
     <div style={estiloTarjeta}>
@@ -190,12 +272,14 @@ function TarjetaAccesoManual({ acceso }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-const MENSAJE_VACIO_DEFAULT = 'No hay accesos creados aún.';
+const MENSAJE_VACIO_DEFAULT  = 'No hay accesos creados aún.';
+const MENSAJE_SIN_RESULTADOS = 'Ningún acceso coincide con los filtros seleccionados.';
 
 export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFAULT }) {
   const [accesosManuales, setAccesosManuales] = useState([]);
   const [cargando, setCargando]               = useState(true);
   const [error, setError]                     = useState(null);
+  const [filtros, setFiltros]                 = useState(FILTROS_VACIOS);
 
   const cargarAccesos = useCallback(async () => {
     setCargando(true);
@@ -212,33 +296,46 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
 
   useEffect(() => { cargarAccesos(); }, [cargarAccesos]);
 
-  const mostrarConteo = !cargando;
-  const textoConteo = textoConteoAccesos(accesosManuales.length);
+  function actualizarFiltro(campo, valor) {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
+  }
+  function actualizarFiltro(campo, valor) {
+    setFiltros(prev => ({ ...prev, [campo]: valor }));
+  }
+
+  function limpiarFiltros() {
+    setFiltros(FILTROS_VACIOS);
+
+  function limpiarFiltros() {
+    setFiltros(FILTROS_VACIOS);
+  }
+
+  const accesosFiltrados = aplicarFiltros(accesosManuales, filtros);
+  const listaVacia       = !cargando && !error && accesosManuales.length === 0;
+  const sinResultados    = !cargando && !error && accesosManuales.length > 0 && accesosFiltrados.length === 0;
 
   return (
     <div style={s.contenedor}>
       <div style={s.encabezado}>
         <p style={s.titulo}>
-          {mostrarConteo && textoConteo}
+          {!cargando && textoConteoAccesos(accesosFiltrados.length, accesosManuales.length)}
         </p>
         <button style={s.btnActualizar} onClick={cargarAccesos} disabled={cargando} type="button">
           {cargando ? 'Cargando…' : 'Actualizar'}
         </button>
       </div>
 
-      {error && <div style={s.errorCarga}>{error}</div>}
+      <BarraFiltros filtros={filtros} onCambiar={actualizarFiltro} onLimpiar={limpiarFiltros} />
 
-      {cargando && !error && (
-        <div style={s.spinner}>Cargando accesos…</div>
-      )}
+      {error      && <div style={s.errorCarga}>{error}</div>}
+      {cargando   && !error && <div style={s.spinner}>Cargando accesos…</div>}
+      {listaVacia && <div style={s.estadoVacio}>{mensajeVacio}</div>}
+      {sinResultados && <div style={s.estadoVacio}>{MENSAJE_SIN_RESULTADOS}</div>}
 
-      {!cargando && !error && accesosManuales.length === 0 && (
-        <div style={s.estadoVacio}>{mensajeVacio}</div>
-      )}
-
-      {!cargando && accesosManuales.map((acceso) => (
+      {!cargando && accesosFiltrados.map(acceso => (
         <TarjetaAccesoManual key={acceso.id} acceso={acceso} />
       ))}
     </div>
   );
+}
 }
