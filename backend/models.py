@@ -129,11 +129,22 @@ def generate_codigo():
     return f"SAG-{uuid.uuid4().hex[:8].upper()}"
 
 
-_DIAS_VIGENCIA_ACCESO = 30
+_DIAS_HABILES_VIGENCIA_ACCESO = 5
+
+
+def _sumar_dias_habiles(desde: datetime, n_dias: int) -> datetime:
+    """Suma n días hábiles (lunes–viernes) a partir de la fecha dada."""
+    fecha = desde
+    contados = 0
+    while contados < n_dias:
+        fecha += timedelta(days=1)
+        if fecha.weekday() < 5:  # 0=lunes … 4=viernes
+            contados += 1
+    return fecha
 
 
 def generate_expires_at() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(days=_DIAS_VIGENCIA_ACCESO)
+    return _sumar_dias_habiles(datetime.now(timezone.utc), _DIAS_HABILES_VIGENCIA_ACCESO)
 
 
 class Formulario(Base):
@@ -141,7 +152,7 @@ class Formulario(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     codigo_peticion = Column(String, unique=True, default=generate_codigo)
-    estado = Column(String, default=EstadoFormulario.BORRADOR)
+    estado = Column(String, default=EstadoFormulario.BORRADOR.value)
     pagina_actual = Column(Integer, default=1)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),

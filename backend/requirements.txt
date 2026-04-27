@@ -7,3 +7,4 @@ boto3==1.35.0
 weasyprint==62.3
 argon2-cffi==23.1.0
 slowapi==0.1.9
+email-validator==2.0.0

@@ -65,7 +65,7 @@ class TokenDiligenciamientoInvalidoError(Exception):
 
     def __init__(self, token: str) -> None:
         self.token = token
-        super().__init__(f"El enlace de diligenciamiento no es válido.")
+        super().__init__("El enlace de diligenciamiento no es válido o ya fue consumido.")
 
 
 class AccesoExpiradoError(Exception):
@@ -74,7 +74,7 @@ class AccesoExpiradoError(Exception):
 
     Se distingue de TokenDiligenciamientoInvalidoError (token nunca existió)
     y de CredencialesAccesoInvalidasError (PIN incorrecto): aquí las credenciales
-    existieron y eran correctas, pero el plazo de 30 días ya venció.
+    existieron y eran correctas, pero el plazo de 5 días hábiles ya venció.
     """
 
     def __init__(self) -> None:

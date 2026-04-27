@@ -43,6 +43,7 @@ from services.formulario.analisis_service import (
     ResultadoGuardadoDocumento,
     obtener_config_analisis_por_defecto,
 )
+from services.utils.estado_formulario import es_estado_borrador
 
 
 class FormularioService:
@@ -117,7 +118,7 @@ class FormularioService:
         self._documentos.mover_archivos_formulario_a_contraparte(formulario.id, ruta_contraparte)
         self._exportador_pdf.generar_y_guardar_pdf(formulario, ruta_contraparte)
 
-        formulario.estado = EstadoFormulario.ENVIADO
+        formulario.estado = EstadoFormulario.ENVIADO.value
         self._sesion.commit()
         return ResultadoValidacionEnvio(valido=True, errores=[])
 
@@ -210,5 +211,5 @@ class FormularioService:
     @staticmethod
     def _verificar_estado_borrador_o_error(formulario: Formulario, mensaje_error: str) -> None:
         """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
-        if formulario.estado != EstadoFormulario.BORRADOR:
+        if not es_estado_borrador(formulario.estado):
             raise FormularioNoEditableError(mensaje_error)
