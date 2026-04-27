@@ -1,8 +1,16 @@
 import json
 
-from pydantic import BaseModel, BeforeValidator, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    EmailStr,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 from typing import Annotated, Any, Optional, List, TypeVar, Literal
-from datetime import datetime
+from datetime import datetime, timezone
 
 from models import (
     AreaResponsable,
@@ -396,10 +404,10 @@ class SolicitudAccesoManual(BaseModel):
     generar un acceso manual al formulario SAGRILAFT.
     """
 
-    tipo_contraparte:   TipoContraparte
-    razon_social:       str
-    correo_destinatario: str
-    area_responsable:   AreaResponsable
+    tipo_contraparte:    TipoContraparte
+    razon_social:        str = Field(min_length=1, strip_whitespace=True)
+    correo_destinatario: EmailStr
+    area_responsable:    AreaResponsable
 
 
 class AccesoManualCreado(BaseModel):
@@ -415,9 +423,22 @@ class AccesoManualCreado(BaseModel):
     enlace_diligenciamiento: str
     correo_destinatario:     str
     razon_social:            str
-    tipo_contraparte:        str
-    area_responsable:        str
+    tipo_contraparte:        TipoContraparte
+    area_responsable:        AreaResponsable
     created_at:              datetime
+    expires_at:              datetime
+
+    @field_serializer("created_at", "expires_at", when_used="json")
+    def _serializar_fechas_utc_z(self, valor: datetime) -> str:
+        """
+        Serializa fechas en ISO-8601 con zona horaria explícita (UTC + 'Z').
+
+        SQLite suele devolver datetimes naive; se asumen UTC para evitar que el
+        frontend interprete la fecha en hora local y muestre días/horas corridas.
+        """
+        if valor.tzinfo is None:
+            valor = valor.replace(tzinfo=timezone.utc)
+        return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class AccesoManualResumen(BaseModel):
@@ -428,10 +449,26 @@ class AccesoManualResumen(BaseModel):
     codigo_peticion:     str
     correo_destinatario: str
     razon_social:        str
-    tipo_contraparte:    str
-    area_responsable:    str
-    estado_formulario:   str
+    tipo_contraparte:    TipoContraparte
+    area_responsable:    AreaResponsable
+    estado_acceso:       Literal["activo", "consumido", "expirado"]
     created_at:          datetime
+    expires_at:          datetime
+    consumed_at:         Optional[datetime] = None
+
+    @field_serializer("created_at", "expires_at", "consumed_at", when_used="json")
+    def _serializar_fechas_utc_z(self, valor: Optional[datetime]) -> Optional[str]:
+        """
+        Serializa fechas en ISO-8601 con zona horaria explícita (UTC + 'Z').
+
+        Importante para que JS (new Date(...)) no asuma hora local cuando el
+        backend produce datetimes naive (común en SQLite).
+        """
+        if valor is None:
+            return None
+        if valor.tzinfo is None:
+            valor = valor.replace(tzinfo=timezone.utc)
+        return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class CredencialesAccesoManual(BaseModel):

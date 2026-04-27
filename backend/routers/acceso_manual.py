@@ -63,7 +63,7 @@ def crear_acceso_manual(
     "/",
     response_model=List[AccesoManualResumen],
     summary="Listar accesos manuales",
-    description="Devuelve todos los accesos creados con su estado de formulario asociado.",
+    description="Devuelve todos los accesos creados ordenados del más reciente al más antiguo, con su estado calculado (activo, consumido o expirado).",
 )
 def listar_accesos_manuales(
     servicio: AccesoManualService = Depends(_obtener_servicio),
@@ -84,7 +84,7 @@ def listar_accesos_manuales(
     ),
     responses={
         404: {"description": "Token inválido, no encontrado o ya consumido"},
-        410: {"description": "El enlace de diligenciamiento ha expirado"},
+        410: {"description": "El acceso ha expirado"},
     },
 )
 def resolver_token_diligenciamiento(

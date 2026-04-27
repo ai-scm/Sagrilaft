@@ -148,15 +148,10 @@ def enviar_formulario(
         pin=credenciales.pin if credenciales else None,
     )
     resultado = servicio.enviar(formulario_id)
-    if (
-        resultado.valido
-        and credenciales is not None
-        and credenciales.token_diligenciamiento is not None
-    ):
-        servicio_acceso.consumir_token_al_enviar(
-            formulario_id,
-            credenciales.token_diligenciamiento,
-        )
+    if resultado.valido and credenciales is not None:
+        # Si el formulario tiene AccesoManual, dejar evidencia consistente de consumo
+        # independientemente del tipo de credencial usada (token o código+PIN).
+        servicio_acceso.marcar_consumido_al_enviar(formulario_id)
     return resultado
 
 
