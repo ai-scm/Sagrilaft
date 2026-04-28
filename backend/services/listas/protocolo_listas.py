@@ -8,7 +8,7 @@ DIP : ListaCautelaService depende de esta abstracción, no de implementaciones c
 
 from typing import Optional, Protocol, runtime_checkable
 
-from schemas import ResultadoListaCautela
+from api.schemas import ResultadoListaCautela
 
 
 @runtime_checkable

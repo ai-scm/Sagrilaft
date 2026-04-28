@@ -13,7 +13,7 @@ DIP : delega completamente en ListaCautelaService mediante inyección de depende
 from fastapi import APIRouter, Depends
 
 from infrastructure.dependencies import obtener_servicio_lista_cautela
-from schemas import BusquedaListaCautela, RespuestaListaCautela
+from api.schemas import BusquedaListaCautela, RespuestaListaCautela
 from services.listas.servicio_listas_cautela import ListaCautelaService
 
 enrutador = APIRouter(prefix="/api/listas-cautela", tags=["listas de cautela"])

@@ -6,7 +6,7 @@ FormularioService y AccesoManualService.
 
 import json
 from typing import Any, Dict, List
-from schemas import DocumentoResponse
+from api.schemas import DocumentoResponse
 from infrastructure.persistencia.models import Formulario
 
 

@@ -13,7 +13,7 @@ OCP : agregar un nuevo campo al DocumentoResponse no requiere modificar los
 
 from typing import Optional
 
-from schemas import AlertaInconsistenciaResponse, DocumentoResponse
+from api.schemas import AlertaInconsistenciaResponse, DocumentoResponse
 from core.contratos import AlertaInconsistencia
 from services.formulario.formulario_service import ResultadoGuardadoDocumento
 

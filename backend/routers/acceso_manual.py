@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from core.configuracion import AppConfig
 from infrastructure.persistencia.database import get_db
 from infrastructure.dependencies import obtener_config
-from schemas import (
+from api.schemas import (
     AccesoManualCreado,
     AccesoManualResumen,
     FormularioConDetalles,

@@ -15,7 +15,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from infrastructure.persistencia.models import DocumentoAdjunto, EstadoFormulario, Formulario
-from schemas import (
+from api.schemas import (
     FormularioCreate,
     FormularioUpdate,
     ResultadoValidacionEnvio,

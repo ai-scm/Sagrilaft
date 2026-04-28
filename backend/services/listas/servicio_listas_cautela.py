@@ -18,7 +18,7 @@ riesgo vivían en el router — ahora están correctamente en este servicio.
 
 from typing import List, Optional
 
-from schemas import ResultadoListaCautela, RespuestaListaCautela
+from api.schemas import ResultadoListaCautela, RespuestaListaCautela
 from services.listas.protocolo_listas import ProveedorListaCautelaImp
 
 

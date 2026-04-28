@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from infrastructure.persistencia.database import get_db
 from infrastructure.dependencies import obtener_config, obtener_extractor
-from schemas import (
+from api.schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
     DocumentoResponse,
