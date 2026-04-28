@@ -5,7 +5,7 @@ from sqlalchemy import (
     ForeignKey, Enum as SAEnum
 )
 from sqlalchemy.orm import relationship
-from database import Base
+from infrastructure.persistencia.database import Base
 from services.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 import enum
 
@@ -82,7 +82,7 @@ class ResponsabilidadIva(str, enum.Enum):
     RESPONSABLE    = "Responsable"
     NO_RESPONSABLE = "No responsable"
 
-        
+
 class RegimenIva(str, enum.Enum):
     """
     Régimen de IVA al que pertenece el contribuyente (Sección 8).

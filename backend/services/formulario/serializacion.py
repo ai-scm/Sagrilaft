@@ -7,7 +7,7 @@ FormularioService y AccesoManualService.
 import json
 from typing import Any, Dict, List
 from schemas import DocumentoResponse
-from models import Formulario
+from infrastructure.persistencia.models import Formulario
 
 
 # Campos que se almacenan como JSON string en la BD

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from models import DocumentoAdjunto, EstadoFormulario, Formulario
+from infrastructure.persistencia.models import DocumentoAdjunto, EstadoFormulario, Formulario
 from schemas import (
     FormularioCreate,
     FormularioUpdate,
@@ -31,7 +31,7 @@ from services.formulario.serializacion import (
     deserializar_campos_json,
     construir_snapshot_formulario,
 )
-from services.formulario.validacion import ValidadorEnvioFormulario
+from services.formulario.validacion_envio import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
 from services.formulario.exportacion_pdf import ExportadorFormularioPdf
 from services.formulario.almacenamiento_contraparte import (

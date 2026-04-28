@@ -13,8 +13,8 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from database import get_db
-from dependencies import obtener_orquestador, obtener_servicio_lista_cautela
+from infrastructure.persistencia.database import get_db
+from infrastructure.dependencies import obtener_orquestador, obtener_servicio_lista_cautela
 from schemas import ValidacionResponse
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService

@@ -10,7 +10,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
-from models import DocumentoAdjunto
+from infrastructure.persistencia.models import DocumentoAdjunto
 from domain.excepciones import DocumentoNoEncontradoError
 
 

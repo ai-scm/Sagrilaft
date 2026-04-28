@@ -28,7 +28,7 @@ from domain.excepciones import (
     FormularioYaEnviadoError,
     TokenDiligenciamientoInvalidoError,
 )
-from models import AccesoManual, Formulario
+from infrastructure.persistencia.models import AccesoManual, Formulario
 from schemas import SolicitudAccesoManual
 from services.formulario.serializacion import construir_snapshot_formulario
 from services.utils.estado_formulario import es_estado_borrador

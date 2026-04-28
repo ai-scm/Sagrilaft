@@ -18,7 +18,7 @@ from sqlalchemy import text
 
 from core import load_config
 from core.limitador import limitador
-from database import engine, Base
+from infrastructure.persistencia.database import engine, Base
 from domain.excepciones import (
     AccesoExpiradoError,
     ContraparteInvalidaError,

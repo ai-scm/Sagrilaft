@@ -7,7 +7,7 @@ mezcla de tipos (string vs enum) y mantener lenguaje ubicuo en el dominio.
 
 from typing import Any, Optional
 
-from models import EstadoFormulario
+from infrastructure.persistencia.models import EstadoFormulario
 
 
 def normalizar_estado_formulario(estado: Any) -> Optional[str]:

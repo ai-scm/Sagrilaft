@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from models import Formulario, ResultadoValidacion
+from infrastructure.persistencia.models import Formulario, ResultadoValidacion
 from core.contratos import HallazgoValidacion
 from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService

@@ -4,7 +4,7 @@
  * Sincronizadas con:
  *   backend/services/formulario/validacion.py
  *   backend/services/utils/coercion.py
- *   backend/models.py (enums como SectorEmpresa)
+ *   backend/infrastructure/persistencia/models.py (enums como SectorEmpresa)
  *
  * Al cambiar cualquier valor aquí, actualizar el equivalente en el backend.
  */
@@ -32,7 +32,7 @@ export const REGEX_CHAR_ALFANUMERICO_ESTRICTO = /^[a-zA-Z0-9]$/;
 
 // ─── Opciones de dropdown — espejo de enums del backend (models.py) ───────────
 
-/** Espeja SectorEmpresa en backend/models.py */
+/** Espeja SectorEmpresa en backend/infrastructure/persistencia/models.py */
 export const SECTORES_EMPRESA = [
   { value: 'Público', label: 'Público' },
   { value: 'Privado', label: 'Privado' },

@@ -24,7 +24,7 @@ function formatearFecha(isoString, { month }) {
 }
 
 // ── Datos de dominio ──────────────────────────────────────────────────────────
-// Fuente de verdad: TipoContraparte y AreaResponsable en backend/models.py.
+// Fuente de verdad: TipoContraparte y AreaResponsable en backend/infrastructure/persistencia/models.py.
 // Actualizar ambos archivos si se añaden o eliminan valores del enum.
 
 export const ESTADOS_ACCESO = [

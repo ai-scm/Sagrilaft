@@ -12,7 +12,7 @@ from pydantic import (
 from typing import Annotated, Any, Optional, List, TypeVar, Literal
 from datetime import datetime
 
-from models import (
+from infrastructure.persistencia.models import (
     AreaResponsable,
     ClasificacionActividad,
     EstadoFormulario,
@@ -35,7 +35,7 @@ from services.utils.coercion import (
     coercionar_porcentaje_participacion
 )
 
-from services.formulario.validacion import (
+from services.formulario.validacion_envio import (
     _vacio_a_nulo,
     _limpiar_numero_id_si_tipo_ausente,
     _limpiar_vinculos_pep_si_no_es_pep,

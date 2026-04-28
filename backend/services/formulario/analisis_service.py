@@ -6,7 +6,7 @@ documentos adjuntos, y detección de inconsistencias.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from models import DocumentoAdjunto, Formulario
+from infrastructure.persistencia.models import DocumentoAdjunto, Formulario
 from core.contratos import AlertaInconsistencia, ExtractorIAImp
 from services.formulario.prellenado import mapear_campos_para_formulario
 
