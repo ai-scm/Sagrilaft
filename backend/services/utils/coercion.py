@@ -1,5 +1,5 @@
 
-from services.formulario.validacion import PORCENTAJE_MAXIMO_PERMITIDO
+from services.formulario.validacion_envio import PORCENTAJE_MAXIMO_PERMITIDO
 
 def coercionar_monto(v: object) -> float | None:
     """

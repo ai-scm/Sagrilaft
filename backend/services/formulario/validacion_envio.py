@@ -7,7 +7,7 @@ import re
 from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel
-from models import Formulario
+from infrastructure.persistencia.models import Formulario
 
 _REGEX_TELEFONO = re.compile(r'^\d{10}$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
