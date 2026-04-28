@@ -299,12 +299,6 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
   function actualizarFiltro(campo, valor) {
     setFiltros(prev => ({ ...prev, [campo]: valor }));
   }
-  function actualizarFiltro(campo, valor) {
-    setFiltros(prev => ({ ...prev, [campo]: valor }));
-  }
-
-  function limpiarFiltros() {
-    setFiltros(FILTROS_VACIOS);
 
   function limpiarFiltros() {
     setFiltros(FILTROS_VACIOS);
@@ -337,5 +331,4 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
       ))}
     </div>
   );
-}
 }
