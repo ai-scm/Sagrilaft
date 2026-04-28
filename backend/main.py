@@ -30,9 +30,9 @@ from domain.excepciones import (
     TokenDiligenciamientoInvalidoError,
 )
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
-from routers import acceso_manual, formulario, listas_cautela, validacion
+from api.routers import acceso_manual, formulario, listas_cautela, validacion
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
-from services.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
+from core.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 
 
 logging.basicConfig(level=logging.INFO)
