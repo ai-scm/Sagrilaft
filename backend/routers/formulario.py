@@ -11,8 +11,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
 from sqlalchemy.orm import Session
 
-from database import get_db
-from dependencies import obtener_config, obtener_extractor
+from infrastructure.persistencia.database import get_db
+from infrastructure.dependencies import obtener_config, obtener_extractor
 from schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
@@ -28,7 +28,7 @@ from core.configuracion import AppConfig
 from core.limitador import limitador
 from services.formulario.formulario_service import FormularioService
 from services.acceso_manual.acceso_manual_service import AccesoManualService
-from routers.transformers import construir_respuesta_documento
+from routers.presentacion import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
