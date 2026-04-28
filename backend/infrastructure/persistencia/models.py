@@ -6,7 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
-from services.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
+from core.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 import enum
 
 

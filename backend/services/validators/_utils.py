@@ -12,7 +12,7 @@ from datetime import date, datetime
 from typing import Any, Callable, Optional
 
 from services.utils.texto import quitar_diacriticos
-from services.utils.fechas import parsear_fecha_colombia
+from core.fechas import parsear_fecha_colombia
 
 from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.alertas.normalizador_nit import normalizar_nit

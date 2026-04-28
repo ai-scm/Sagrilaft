@@ -18,7 +18,7 @@ from services.utils.coercion import (
     coercionar_porcentaje,
     coercionar_porcentaje_participacion,
 )
-from services.utils.fechas import a_iso_utc_z
+from core.fechas import a_iso_utc_z
 
 T = TypeVar("T")
 
@@ -38,4 +38,3 @@ PorcentajeParticipacion = Annotated[Optional[float], BeforeValidator(coercionar_
 def a_iso_utc(valor: Optional[datetime]) -> Optional[str]:
     """Serializa un datetime a ISO-8601 con zona UTC explícita ('Z')."""
     return a_iso_utc_z(valor)
-
