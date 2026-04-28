@@ -12,6 +12,7 @@ from datetime import date, datetime
 from typing import Any, Callable, Optional
 
 from services.utils.texto import quitar_diacriticos
+from services.utils.fechas import parsear_fecha_colombia
 
 from services.alertas.normalizador_nombre import normalizar_razon_social
 from services.alertas.normalizador_nit import normalizar_nit
@@ -22,12 +23,6 @@ from core.contratos import HallazgoValidacion
 
 FORMATO_FECHA = "%Y-%m-%d"
 VIGENCIA_MAX_DIAS = 30
-
-# Meses en español usados en cédulas colombianas (formato DD-MMM-AAAA)
-_MESES_ES: dict[str, int] = {
-    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
-    "jul": 7, "ago": 8, "sep": 9, "oct": 10, "nov": 11, "dic": 12,
-}
 
 
 # ─── Normalización ───────────────────────────────────────────────────────────
@@ -62,29 +57,7 @@ def parsear_fecha(valor: Any) -> Optional[date]:
 
     Retorna un objeto `date` o `None` si el formato no es reconocido.
     """
-    if not valor:
-        return None
-
-    cadena = str(valor).strip()
-
-    # Formato ISO: YYYY-MM-DD
-    try:
-        return datetime.strptime(cadena, "%Y-%m-%d").date()
-    except ValueError:
-        pass
-
-    # Formato cédula: DD-MMM-AAAA (mes abreviado en español)
-    partes = cadena.split("-")
-    if len(partes) == 3:
-        dia_str, mes_str, anio_str = partes
-        mes_num = _MESES_ES.get(mes_str.lower())
-        if mes_num:
-            try:
-                return date(int(anio_str), mes_num, int(dia_str))
-            except ValueError:
-                pass
-
-    return None
+    return parsear_fecha_colombia(valor)
 
 
 # ─── Verificación de vigencia ─────────────────────────────────────────────────

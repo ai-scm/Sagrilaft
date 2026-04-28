@@ -15,7 +15,7 @@ solo reglas de acceso (vigencia, consumo y autorización del envío).
 
 import logging
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from argon2 import PasswordHasher
@@ -32,6 +32,7 @@ from models import AccesoManual, Formulario
 from schemas import SolicitudAccesoManual
 from services.formulario.serializacion import construir_snapshot_formulario
 from services.utils.estado_formulario import es_estado_borrador
+from services.utils.fechas import ahora_utc, normalizar_datetime_utc
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +73,11 @@ def _normalizar_datetime_utc(valor: datetime) -> datetime:
     Nota SQLite: suele devolver datetimes naive que representan UTC. En ese caso,
     se asume UTC y se añade tzinfo para evitar comparaciones naive/aware.
     """
-    if valor.tzinfo is None:
-        return valor.replace(tzinfo=timezone.utc)
-    return valor.astimezone(timezone.utc)
+    return normalizar_datetime_utc(valor)
 
 
 def _ahora_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return ahora_utc()
 
 
 def _esta_expirado(acceso: "AccesoManual") -> bool:

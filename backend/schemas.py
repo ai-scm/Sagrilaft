@@ -10,7 +10,7 @@ from pydantic import (
     model_validator,
 )
 from typing import Annotated, Any, Optional, List, TypeVar, Literal
-from datetime import datetime, timezone
+from datetime import datetime
 
 from models import (
     AreaResponsable,
@@ -41,6 +41,7 @@ from services.formulario.validacion import (
     _limpiar_vinculos_pep_si_no_es_pep,
     ErrorValidacion
 )
+from services.utils.fechas import a_iso_utc_z
 
 
 # ── Validadores Transversales y Tipos Anotados ───────────────────────────────
@@ -404,11 +405,7 @@ def _a_iso_utc(valor: Optional[datetime]) -> Optional[str]:
     SQLite devuelve datetimes naive; se asumen UTC para evitar que el frontend
     interprete la fecha en hora local y muestre días u horas corridas.
     """
-    if valor is None:
-        return None
-    if valor.tzinfo is None:
-        valor = valor.replace(tzinfo=timezone.utc)
-    return valor.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return a_iso_utc_z(valor)
 
 class SolicitudAccesoManual(BaseModel):
     """
