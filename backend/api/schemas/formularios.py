@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from infrastructure.persistencia.models import (
     ActividadClasificacion,
@@ -33,6 +33,7 @@ from .comunes import (
     EnumLimpio,
     MontoPositivo,
     PorcentajeParticipacion,
+    a_iso_utc,
 )
 from .documentos import DocumentoResponse
 from .validaciones import ValidacionResponse
@@ -241,6 +242,10 @@ class FormularioResponse(FormularioBase):
 
     class Config:
         from_attributes = True
+
+    @field_serializer("created_at", "updated_at", when_used="json")
+    def _serializar_fechas(self, valor: datetime) -> str:
+        return a_iso_utc(valor) or ""
 
     @field_validator(
         "junta_directiva",

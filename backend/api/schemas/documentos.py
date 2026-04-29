@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
+
+from .comunes import a_iso_utc
 
 
 class AlertaInconsistenciaResponse(BaseModel):
@@ -41,6 +43,10 @@ class DocumentoResponse(BaseModel):
     alerta_numero_doc_representante: Optional[AlertaInconsistenciaResponse] = None
     direccion_extraida: Optional[str] = None
     alerta_direccion: Optional[AlertaInconsistenciaResponse] = None
+
+    @field_serializer("created_at", when_used="json")
+    def _serializar_fechas(self, valor: datetime) -> str:
+        return a_iso_utc(valor) or ""
 
     class Config:
         from_attributes = True
