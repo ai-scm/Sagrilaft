@@ -26,6 +26,7 @@ from domain.excepciones import (
     AccesoExpiradoError,
     CredencialesAccesoInvalidasError,
     FormularioYaEnviadoError,
+    TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
 )
 from infrastructure.persistencia.models import AccesoManual, Formulario
@@ -68,11 +69,6 @@ def _verificar_pin(pin_hash: str, pin: str) -> None:
 
 
 def _normalizar_datetime_utc(valor: datetime) -> datetime:
-    """Normaliza un datetime a UTC aware.
-
-    Nota SQLite: suele devolver datetimes naive que representan UTC. En ese caso,
-    se asume UTC y se añade tzinfo para evitar comparaciones naive/aware.
-    """
     return normalizar_datetime_utc(valor)
 
 
@@ -93,14 +89,10 @@ def _verificar_vigencia(acceso: "AccesoManual") -> None:
         raise AccesoExpiradoError()
 
 
-def _verificar_no_consumido(acceso: "AccesoManual", token: str) -> None:
-    """
-    Lanza TokenDiligenciamientoInvalidoError si el token ya fue consumido.
-
-    Se usa un error genérico para no revelar detalles adicionales al consumidor del enlace.
-    """
+def _verificar_no_consumido(acceso: "AccesoManual") -> None:
+    """Lanza TokenConsumidoError si el acceso ya fue utilizado."""
     if acceso.consumed_at is not None:
-        raise TokenDiligenciamientoInvalidoError(token)
+        raise TokenConsumidoError()
 
 
 def _calcular_estado_acceso(acceso: "AccesoManual") -> Literal["activo", "consumido", "expirado"]:
@@ -296,9 +288,9 @@ class AccesoManualService:
     @staticmethod
     def _validar_acceso_para_token(acceso: AccesoManual, token: str) -> None:
         _verificar_vigencia(acceso)
-        _verificar_no_consumido(acceso, token)
+        _verificar_no_consumido(acceso)
         if not es_estado_borrador(acceso.formulario.estado):
-            raise TokenDiligenciamientoInvalidoError(token)
+            raise TokenConsumidoError()
 
     def resolver_token(self, token: str) -> Dict[str, Any]:
         """
@@ -349,6 +341,8 @@ class AccesoManualService:
     @staticmethod
     def _verificar_por_token(acceso: AccesoManual, token: str) -> None:
         if acceso.consumed_at is not None:
+            raise FormularioYaEnviadoError()
+        if not es_estado_borrador(acceso.formulario.estado):
             raise FormularioYaEnviadoError()
         if not secrets.compare_digest(acceso.token_diligenciamiento, token):
             raise CredencialesAccesoInvalidasError()

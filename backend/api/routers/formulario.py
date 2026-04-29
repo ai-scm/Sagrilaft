@@ -123,7 +123,10 @@ def actualizar_formulario(
     "/{formulario_id}/enviar",
     response_model=ResultadoValidacionEnvio,
     responses={
-        410: {"description": "El acceso ha expirado"},
+        400: {"description": "El formulario no puede modificarse en su estado actual"},
+        401: {"description": "Credenciales ausentes o incorrectas"},
+        409: {"description": "El formulario ya fue enviado anteriormente"},
+        410: {"description": "El acceso expiró o el token ya fue consumido"},
         429: {"description": "Demasiados intentos. Espere un momento antes de reintentar"},
     },
 )

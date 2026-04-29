@@ -61,11 +61,25 @@ class CredencialesAccesoInvalidasError(Exception):
 
 
 class TokenDiligenciamientoInvalidoError(Exception):
-    """Excepcion de dominio: el token de diligenciamiento no existe o ya fue consumido."""
+    """El token nunca existió en el sistema."""
 
     def __init__(self, token: str) -> None:
         self.token = token
-        super().__init__("El enlace de diligenciamiento no es válido o ya fue consumido.")
+        super().__init__("El enlace de diligenciamiento no es válido.")
+
+
+class TokenConsumidoError(Exception):
+    """
+    El token existió y fue consumido: el formulario asociado ya fue enviado.
+
+    Semánticamente distinto de TokenDiligenciamientoInvalidoError (token nunca existió).
+    Aquí el token fue válido y usado — el recurso está 'gone' (HTTP 410), no 'not found' (HTTP 404).
+    Esto permite al frontend diferenciar "link inválido" de "formulario ya completado"
+    y mostrar el mensaje apropiado en cada caso.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Este formulario ya fue completado y no puede ser modificado.")
 
 
 class AccesoExpiradoError(Exception):
