@@ -28,22 +28,14 @@ def ahora_utc() -> datetime:
 
 
 def normalizar_datetime_utc(valor: datetime) -> datetime:
-    """Normaliza un datetime a UTC aware.
-
-    Nota SQLite: suele devolver datetimes naive que representan UTC. En ese caso,
-    se asume UTC y se añade tzinfo para evitar comparaciones naive/aware.
-    """
+    """Normaliza cualquier datetime a UTC aware (naive se asume UTC)."""
     if valor.tzinfo is None:
         return valor.replace(tzinfo=timezone.utc)
     return valor.astimezone(timezone.utc)
 
 
 def a_iso_utc_z(valor: Optional[datetime]) -> Optional[str]:
-    """Serializa un datetime a ISO-8601 con zona UTC explícita ('Z').
-
-    Si `valor` es naive se asume UTC para evitar interpretaciones en hora local
-    (común al leer desde SQLite).
-    """
+    """Serializa un datetime a ISO-8601 con zona UTC explícita ('Z')."""
     if valor is None:
         return None
     return normalizar_datetime_utc(valor).isoformat().replace("+00:00", "Z")

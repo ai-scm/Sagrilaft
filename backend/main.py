@@ -7,18 +7,15 @@ y registra todos los validadores de documentos.
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from sqlalchemy import text
 
 from core import load_config
 from core.limitador import limitador
-from infrastructure.persistencia.database import engine, Base
 from domain.excepciones import (
     AccesoExpiradoError,
     ContraparteInvalidaError,
@@ -27,12 +24,12 @@ from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,
     FormularioYaEnviadoError,
+    TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
 )
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
 from api.routers import acceso_manual, formulario, listas_cautela, validacion
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
-from core.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 
 
 logging.basicConfig(level=logging.INFO)
@@ -55,87 +52,10 @@ def _respuesta_error_desde_excepcion(status_code: int, exc: Exception) -> JSONRe
     return _respuesta_error(status_code, str(exc))
 
 
-def _obtener_columnas_existentes(conn, tabla: str) -> set[str]:
-    return {row[1] for row in conn.execute(text(f"PRAGMA table_info({tabla})"))}
-
-
-def _agregar_columna_si_falta(
-    conn,
-    tabla: str,
-    columna: str,
-    tipo: str,
-    *,
-    columnas_existentes: set[str] | None = None,
-) -> bool:
-    existentes = columnas_existentes or _obtener_columnas_existentes(conn, tabla)
-    if columna in existentes:
-        return False
-    conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"))
-    logger.info("Migración aplicada: columna '%s' agregada a '%s'", columna, tabla)
-    return True
-
-
-def _migrar_formularios(conn) -> None:
-    columnas_nuevas_formularios = {
-        "digito_verificacion": "TEXT",
-        "realiza_operaciones_moneda_extranjera": "TEXT",
-        "paises_operaciones": "TEXT",
-        "tipos_transaccion_otros": "TEXT",
-    }
-    columnas_existentes = _obtener_columnas_existentes(conn, "formularios")
-    for columna, tipo in columnas_nuevas_formularios.items():
-        _agregar_columna_si_falta(
-            conn,
-            "formularios",
-            columna,
-            tipo,
-            columnas_existentes=columnas_existentes,
-        )
-
-
-def _migrar_accesos_manuales(conn) -> None:
-    columnas_existentes = _obtener_columnas_existentes(conn, "accesos_manuales")
-
-    expires_at_agregada = _agregar_columna_si_falta(
-        conn,
-        "accesos_manuales",
-        "expires_at",
-        "TEXT",
-        columnas_existentes=columnas_existentes,
-    )
-    _agregar_columna_si_falta(
-        conn,
-        "accesos_manuales",
-        "consumed_at",
-        "TEXT",
-        columnas_existentes=columnas_existentes,
-    )
-
-    if expires_at_agregada:
-        nueva_fecha = sumar_dias_habiles(datetime.now(timezone.utc), DIAS_HABILES_VIGENCIA_ACCESO)
-        conn.execute(text("UPDATE accesos_manuales SET expires_at = :f"), {"f": nueva_fecha.isoformat()})
-
-
-def _aplicar_migraciones(engine) -> None:
-    """
-    Aplica migraciones de columnas nuevas sin borrar datos existentes.
-
-    SQLAlchemy create_all() no modifica tablas ya creadas, por lo que las
-    columnas añadidas en versiones posteriores se agregan aquí con ALTER TABLE.
-    Se registra cada migración para facilitar el seguimiento en logs.
-    """
-    with engine.connect() as conn:
-        _migrar_formularios(conn)
-        _migrar_accesos_manuales(conn)
-        conn.commit()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida: inicialización y limpieza de la aplicación."""
     config = load_config()
-    Base.metadata.create_all(bind=engine)
-    _aplicar_migraciones(engine)
 
     app.state.orchestrator = crear_orquestador_validacion(config)
     app.state.config = config
@@ -182,7 +102,8 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
     app.add_exception_handler(DocumentoNoEncontradoError, handler(404, "Documento no encontrado"))
     app.add_exception_handler(CredencialesAccesoInvalidasError, handler_from_exception(401))
     app.add_exception_handler(TokenDiligenciamientoInvalidoError, handler_from_exception(404))
-    app.add_exception_handler(AccesoExpiradoError, handler_from_exception(410))
+    app.add_exception_handler(TokenConsumidoError,                handler_from_exception(410))
+    app.add_exception_handler(AccesoExpiradoError,                handler_from_exception(410))
     app.add_exception_handler(PermissionError, handler_from_exception(500))
     app.add_exception_handler(
         DependenciaPdfNoInstaladaError,

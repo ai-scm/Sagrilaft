@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime,
-    ForeignKey, Enum as SAEnum
+    ForeignKey, Index,
 )
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
@@ -141,8 +141,8 @@ class Formulario(Base):
     codigo_peticion = Column(String, unique=True, default=generate_codigo)
     estado = Column(String, default=EstadoFormulario.BORRADOR.value)
     pagina_actual = Column(Integer, default=1)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                         onupdate=lambda: datetime.now(timezone.utc))
 
     # --- Clasificación ---
@@ -254,32 +254,38 @@ class Formulario(Base):
 
 class DocumentoAdjunto(Base):
     __tablename__ = "documentos_adjuntos"
+    __table_args__ = (
+        Index("ix_documentos_adjuntos_formulario_id", "formulario_id"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    formulario_id = Column(String, ForeignKey("formularios.id"), nullable=False)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
     tipo_documento = Column(String, nullable=False)
     nombre_archivo = Column(String, nullable=False)
     ruta_archivo = Column(String, nullable=False)
     content_type = Column(String, nullable=True)
     tamano = Column(Integer, nullable=True)
-    deleted_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="documentos")
 
 
 class ResultadoValidacion(Base):
     __tablename__ = "resultados_validacion"
+    __table_args__ = (
+        Index("ix_resultados_validacion_formulario_id", "formulario_id"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    formulario_id = Column(String, ForeignKey("formularios.id"), nullable=False)
-    tipo = Column(String, nullable=False)  # "documento", "lista_cautela", "financiero"
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    tipo = Column(String, nullable=False)
     campo = Column(String, nullable=True)
-    resultado = Column(String, nullable=False)  # "ok", "error", "advertencia"
+    resultado = Column(String, nullable=False)
     detalle = Column(Text, nullable=True)
     valor_formulario = Column(String, nullable=True)
     valor_documento = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="validaciones")
 
@@ -303,9 +309,9 @@ class AccesoManual(Base):
     razon_social = Column(String, nullable=False)
     tipo_contraparte = Column(String, nullable=False)
     area_responsable = Column(String, nullable=False)
-    formulario_id = Column(String, ForeignKey("formularios.id"), unique=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, nullable=False, default=generate_expires_at)
-    consumed_at = Column(DateTime, nullable=True)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    expires_at = Column(DateTime(timezone=True), nullable=False, default=generate_expires_at)
+    consumed_at = Column(DateTime(timezone=True), nullable=True)
 
     formulario = relationship("Formulario", foreign_keys=[formulario_id])

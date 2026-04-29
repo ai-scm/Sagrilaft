@@ -24,15 +24,20 @@ class AWSConfig:
     temperature: float = 0.0  # Determinístico para extracción de datos
 
 
+def _require_db_url() -> str:
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError(
+            "La variable de entorno DATABASE_URL no está definida. "
+            "Ejemplo: postgresql+psycopg://usuario:contraseña@localhost:5432/sagrilaft"
+        )
+    return url
+
+
 @dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
-    db_url: str = field(
-        default_factory=lambda: os.getenv(
-            "DATABASE_URL",
-            f"sqlite:///{(BASE_DIR / 'sagrilaft.db').resolve()}",
-        )
-    )
+    db_url: str = field(default_factory=_require_db_url)
     upload_dir: Path = field(
         default_factory=lambda: Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads")).resolve()
     )
