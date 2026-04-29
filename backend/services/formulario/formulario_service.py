@@ -147,7 +147,7 @@ class FormularioService:
         documento = self._documentos.registrar_documento_en_bd(
             formulario_id=formulario_id,
             tipo_documento=tipo_documento,
-            nombre_archivo=nombre_archivo,
+            nombre_archivo=ruta_archivo.name,  # nombre ya sanitizado por guardar_archivo_en_disco
             ruta_archivo=ruta_archivo,
             content_type=content_type,
             tamano=len(contenido_bytes),

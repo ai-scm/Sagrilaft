@@ -3,6 +3,7 @@ Persistencia de documentos en base de datos y sistema de archivos.
 """
 
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import List
@@ -12,6 +13,20 @@ from datetime import datetime, timezone
 
 from infrastructure.persistencia.models import DocumentoAdjunto
 from domain.excepciones import DocumentoNoEncontradoError
+
+
+def _sanitizar_nombre_archivo(nombre: str) -> str:
+    """
+    Elimina vectores de path traversal y caracteres peligrosos del nombre de archivo.
+
+    OWASP A05 — Security Misconfiguration / Path Traversal:
+    Un cliente puede enviar '../../etc/passwd' como filename. Path.name extrae
+    solo la parte final, y la expresión regular retiene únicamente caracteres
+    seguros para el sistema de archivos.
+    """
+    nombre_base = Path(nombre).name
+    nombre_limpio = re.sub(r"[^\w.\-]", "_", nombre_base)
+    return nombre_limpio or "archivo"
 
 
 class DocumentoService:
@@ -40,9 +55,14 @@ class DocumentoService:
     def guardar_archivo_en_disco(
         self, directorio_destino: Path, nombre_archivo: str, contenido: bytes
     ) -> Path:
-        """Persiste el contenido binario en el directorio indicado."""
+        """Persiste el contenido binario en el directorio indicado.
+
+        El nombre de archivo se sanitiza antes de construir la ruta para
+        prevenir path traversal (OWASP A05).
+        """
+        nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)
         directorio_destino.mkdir(parents=True, exist_ok=True)
-        ruta = directorio_destino / nombre_archivo
+        ruta = directorio_destino / nombre_seguro
         ruta.write_bytes(contenido)
         return ruta
 
