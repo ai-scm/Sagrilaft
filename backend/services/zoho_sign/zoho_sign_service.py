@@ -9,6 +9,7 @@ Responsabilidades:
 Referencia API: https://www.zoho.com/sign/api/
 """
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass
@@ -190,6 +191,126 @@ class ZohoSignService:
 
         logger.info(
             "Solicitud ZohoSign enviada a firma: request_id=%s → %s",
+            request_id, correo_firmante,
+        )
+        return SolicitudFirmaCreada(request_id=request_id)
+
+    def crear_solicitud_firma_multiple(
+        self,
+        pdf_paths: list[Path],
+        nombre_documento: str,
+        correo_firmante: str,
+        nombre_firmante: str,
+    ) -> SolicitudFirmaCreada:
+        """
+        Sube varios PDFs a ZohoSign como un paquete unificado y envía la solicitud
+        de firma en dos pasos (idéntico a crear_solicitud_firma pero multi-archivo).
+
+        El firmante recibe un solo email y firma todos los documentos en una sesión.
+        El orden de pdf_paths determina el orden visual en ZohoSign.
+
+        ZohoSign detecta el tag {{S:R1*...}} embebido en cada PDF y posiciona
+        el campo de firma automáticamente en cada documento.
+        """
+        if not pdf_paths:
+            raise ValueError("Se requiere al menos un PDF.")
+
+        for p in pdf_paths:
+            if not p.exists():
+                raise FileNotFoundError(f"PDF no encontrado: {p}")
+
+        data_crear = {
+            "requests": {
+                "request_name":    nombre_documento,
+                "expiration_days": 5,
+                "is_sequential":   True,
+                "actions": [
+                    {
+                        "action_type":     "SIGN",
+                        "recipient_email": correo_firmante,
+                        "recipient_name":  nombre_firmante,
+                        "signing_order":   0,
+                    }
+                ],
+            }
+        }
+        params = {"testing": "true"} if self._config.modo_prueba else {}
+
+        logger.info(
+            "Paso 1/2 ZohoSign (paquete %d docs) — '%s' → %s [modo_prueba=%s]",
+            len(pdf_paths), nombre_documento, correo_firmante, self._config.modo_prueba,
+        )
+
+        # ExitStack garantiza el cierre de todos los archivos aunque falle alguno
+        with contextlib.ExitStack() as stack:
+            archivos = [
+                ("file", (p.name, stack.enter_context(open(p, "rb")), "application/pdf"))
+                for p in pdf_paths
+            ]
+            resp_crear = httpx.post(
+                f"{_API_BASE}/requests",
+                headers=self._headers(),
+                params=params,
+                data={"data": json.dumps(data_crear)},
+                files=archivos,
+                timeout=30,
+            )
+
+        if not resp_crear.is_success:
+            raise RuntimeError(
+                f"ZohoSign rechazó la creación del paquete (HTTP {resp_crear.status_code}): "
+                f"{resp_crear.text[:500]}"
+            )
+        datos_crear = resp_crear.json()
+
+        if datos_crear.get("code") != 0:
+            raise RuntimeError(
+                f"ZohoSign rechazó el paquete (code={datos_crear.get('code')}): "
+                f"{datos_crear.get('message', 'sin detalle')}"
+            )
+
+        solicitud  = datos_crear["requests"]
+        request_id = solicitud["request_id"]
+        action_id  = solicitud["actions"][0]["action_id"]
+        n_docs     = len(solicitud.get("document_ids", []))
+
+        logger.info(
+            "Borrador ZohoSign creado (paquete): request_id=%s action_id=%s documentos=%d",
+            request_id, action_id, n_docs,
+        )
+
+        # ── Paso 2: submit ────────────────────────────────────────────────────
+        data_enviar = {
+            "requests": {
+                "actions": [{"action_id": action_id, "action_type": "SIGN"}]
+            }
+        }
+
+        logger.info("Paso 2/2 ZohoSign — enviando paquete a firma: request_id=%s", request_id)
+
+        resp_enviar = httpx.post(
+            f"{_API_BASE}/requests/{request_id}/submit",
+            headers=self._headers(),
+            params=params,
+            data={"data": json.dumps(data_enviar)},
+            timeout=30,
+        )
+
+        if not resp_enviar.is_success:
+            raise RuntimeError(
+                f"ZohoSign rechazó el submit del paquete (HTTP {resp_enviar.status_code}): "
+                f"{resp_enviar.text[:500]}"
+            )
+        datos_enviar = resp_enviar.json()
+
+        if datos_enviar.get("code", 0) != 0:
+            raise RuntimeError(
+                f"ZohoSign rechazó el envío del paquete (code={datos_enviar.get('code')}): "
+                f"{datos_enviar.get('message', 'sin detalle')}"
+            )
+
+        logger.info(
+            "Paquete ZohoSign enviado a firma: request_id=%s → %s",
             request_id, correo_firmante,
         )
         return SolicitudFirmaCreada(request_id=request_id)
