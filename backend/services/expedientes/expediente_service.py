@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from domain.constantes import TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
 from domain.excepciones import DocumentoNoEncontradoError, FormularioNoEditableError, FormularioNoEncontradoError
 from infrastructure.persistencia.models import (
     DocumentoAdjunto,
@@ -100,7 +101,12 @@ class ExpedienteService:
         )
 
     def _conteos_documentos_por_formulario(self, ids_formularios: list[str]) -> dict[str, int]:
-        """Cuenta documentos activos en una sola query GROUP BY — evita N+1."""
+        """Cuenta documentos activos en una sola query GROUP BY — evita N+1.
+
+        Excluye el certificado SAGRILAFT porque es un artefacto de firma generado
+        automáticamente, no un documento subido por el usuario. El contador debe
+        coincidir con lo que el operador ve en el detalle del expediente.
+        """
         filas = (
             self._sesion.query(
                 DocumentoAdjunto.formulario_id,
@@ -109,6 +115,7 @@ class ExpedienteService:
             .filter(
                 DocumentoAdjunto.formulario_id.in_(ids_formularios),
                 DocumentoAdjunto.deleted_at.is_(None),
+                DocumentoAdjunto.tipo_documento != TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
             )
             .group_by(DocumentoAdjunto.formulario_id)
             .all()

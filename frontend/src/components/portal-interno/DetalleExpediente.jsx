@@ -20,6 +20,7 @@ import {
   formatearFechaCorta,
   formatearBytes,
   TIPO_DOCUMENTO_FORMULARIO_PDF,
+  TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
 } from './constantes';
 
 const ESTADO_ENVIADO         = 'enviado';
@@ -27,6 +28,8 @@ const ESTADO_EN_CORRECCION   = 'en_correccion';
 const ESTADO_VALIDADO        = 'validado';
 const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
 const ESTADO_FIRMADO         = 'firmado';
+
+const TIPOS_EXCLUIDOS_DE_ADJUNTOS = [TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT];
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -523,8 +526,8 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
     return (
       <div style={{ ...s.bannerFirma, ...s.bannerFirmaFirmado }}>
         <div style={s.bannerFirmaTextos}>
-          <p style={s.bannerFirmaTitulo}>Documento firmado electrónicamente</p>
-          <p style={s.bannerFirmaSubtitulo}>La contraparte firmó el formulario vía ZohoSign.</p>
+          <p style={s.bannerFirmaTitulo}>Documentos firmados electrónicamente</p>
+          <p style={s.bannerFirmaSubtitulo}>La contraparte firmó el formulario y Certificado vía ZohoSign.</p>
         </div>
         <a
           href={urlFirmado}
@@ -550,7 +553,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
   const todosDocumentos   = expediente?.documentos ?? [];
   const pdfFormulario     = todosDocumentos.find(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF) ?? null;
-  const documentosAdjuntos = todosDocumentos.filter(d => d.tipo_documento !== TIPO_DOCUMENTO_FORMULARIO_PDF);
+  const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));
 
   return (
     <div style={s.overlay}>
