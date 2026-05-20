@@ -71,9 +71,10 @@ export const ETIQUETA_ESTADO_FORMULARIO = crearMapaEtiquetas(ESTADOS_FORMULARIO)
 export const ESTILO_ESTADO_FORMULARIO   = crearMapaEstilos(ESTADOS_FORMULARIO);
 
 // ── Constantes de documentos ──────────────────────────────────────────────────
-// Sincronizar con: backend/domain/constantes.py → TIPO_DOCUMENTO_FORMULARIO_PDF
+// Sincronizar con: backend/domain/constantes.py
 
-export const TIPO_DOCUMENTO_FORMULARIO_PDF = 'FORMULARIO_PDF';
+export const TIPO_DOCUMENTO_FORMULARIO_PDF       = 'FORMULARIO_PDF';
+export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';
 
 // ── Estilos reutilizables ─────────────────────────────────────────────────────
 
