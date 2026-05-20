@@ -41,6 +41,11 @@ def a_iso_utc_z(valor: Optional[datetime]) -> Optional[str]:
     return normalizar_datetime_utc(valor).isoformat().replace("+00:00", "Z")
 
 
+NOMBRES_MESES_ES: list[str] = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
 # Meses en español usados en cédulas colombianas (formato DD-MMM-AAAA)
 _MESES_ES: dict[str, int] = {
     "ene": 1,

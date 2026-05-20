@@ -15,6 +15,7 @@ from html import escape
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from core.fechas import NOMBRES_MESES_ES
 from infrastructure.persistencia.models import Formulario
 from services.formulario.documento_service import DocumentoService
 from services.formulario.serializacion import deserializar_campos_json
@@ -221,12 +222,6 @@ class _SeccionNarrativaFirma:
 _SeccionFormulario = Union[_SeccionCampos, _SeccionTabla, _SeccionNarrativaFirma]
 
 
-_MESES_ES = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-]
-
-
 def _componer_texto_firma(datos: Dict[str, Any]) -> str:
     dia    = datos.get('dia_firma')
     mes    = datos.get('mes_firma')
@@ -234,7 +229,7 @@ def _componer_texto_firma(datos: Dict[str, Any]) -> str:
     ciudad = (datos.get('ciudad_firma') or '').strip()
 
     dia_str    = str(int(dia))  if dia    else '____'
-    mes_str    = _MESES_ES[int(mes) - 1] if mes and 1 <= int(mes) <= 12 else '_____________'
+    mes_str    = NOMBRES_MESES_ES[int(mes) - 1] if mes and 1 <= int(mes) <= 12 else '_____________'
     year_str   = str(int(year)) if year   else '_______'
     ciudad_str = ciudad         if ciudad else '___________________'
 
