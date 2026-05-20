@@ -18,7 +18,10 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
+from domain.constantes import (
+    TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+    TIPO_DOCUMENTO_FORMULARIO_PDF,
+)
 from domain.excepciones import (
     DocumentoNoEncontradoError,
     FirmaNoDisponibleError,
@@ -32,6 +35,7 @@ from infrastructure.persistencia.models import (
     EstadoFormulario,
     Formulario,
 )
+from services.firma.certificado_pdf import generar_certificado_pdf
 from services.formulario.almacenamiento_contraparte import resolver_ruta_contraparte
 from services.zoho_sign.zoho_sign_service import ZohoSignService
 
@@ -86,6 +90,32 @@ class FirmaService:
             raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
         return doc
 
+    def _registrar_certificado(self, formulario: Formulario, ruta_certificado: Path) -> None:
+        """
+        Registra el certificado SAGRILAFT en documentos_adjuntos para trazabilidad.
+
+        Si ya existe un registro previo (re-envío tras cancelación de firma), actualiza
+        la ruta en lugar de crear un duplicado. El commit lo hace el llamador.
+        """
+        existente = (
+            self._sesion.query(DocumentoAdjunto)
+            .filter(
+                DocumentoAdjunto.formulario_id == formulario.id,
+                DocumentoAdjunto.tipo_documento == TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+                DocumentoAdjunto.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if existente:
+            existente.ruta_archivo = str(ruta_certificado)
+        else:
+            self._sesion.add(DocumentoAdjunto(
+                formulario_id=formulario.id,
+                tipo_documento=TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+                nombre_archivo=ruta_certificado.name,
+                ruta_archivo=str(ruta_certificado),
+            ))
+
     def _ruta_documento_firmado(self, formulario: Formulario) -> Path:
         directorio_contraparte = resolver_ruta_contraparte(
             tipo_contraparte=formulario.tipo_contraparte or "",
@@ -129,8 +159,9 @@ class FirmaService:
 
         1. Verifica que el formulario esté en estado VALIDADO.
         2. Obtiene el correo del firmante desde el AccesoManual asociado.
-        3. Envía el PDF a ZohoSign y crea la solicitud de firma.
-        4. Actualiza el estado a PENDIENTE_FIRMA y guarda el zoho_request_id.
+        3. Genera el Certificado de Terceros SAGRILAFT con los datos del formulario.
+        4. Envía el formulario PDF + el certificado como paquete a ZohoSign.
+        5. Actualiza el estado a PENDIENTE_FIRMA y guarda el zoho_request_id.
 
         Returns:
             {"request_id": str, "estado": str, "correo_firmante": str}
@@ -158,14 +189,20 @@ class FirmaService:
         pdf_path = Path(pdf_doc.ruta_archivo)
         if not pdf_path.exists():
             raise FormularioNoEditableError(
-                f"El archivo PDF no existe en disco: {pdf_path}"
+                f"El archivo PDF del formulario no existe en disco: {pdf_path}"
             )
+
+        ruta_certificado = pdf_path.parent / "certificado_sagrilaft.pdf"
+        generar_certificado_pdf(formulario, ruta_certificado)
+        self._registrar_certificado(formulario, ruta_certificado)
 
         nombre_firmante  = formulario.nombre_representante or acceso.razon_social
         nombre_documento = f"SAGRILAFT — {acceso.razon_social}"
 
-        resultado = self._zoho.crear_solicitud_firma(
-            pdf_path=pdf_path,
+        # El formulario va primero; el certificado segundo. ZohoSign presenta
+        # los documentos en ese orden al firmante durante la sesión de firma.
+        resultado = self._zoho.crear_solicitud_firma_multiple(
+            pdf_paths=[pdf_path, ruta_certificado],
             nombre_documento=nombre_documento,
             correo_firmante=acceso.correo_destinatario,
             nombre_firmante=nombre_firmante,
@@ -176,14 +213,13 @@ class FirmaService:
         self._sesion.commit()
 
         logger.info(
-            "Formulario %s enviado a firma. ZohoSign request_id=%s → %s",
-            formulario_id,
-            resultado.request_id,
-            acceso.correo_destinatario,
+            "Formulario %s enviado a firma (paquete: formulario + certificado). "
+            "ZohoSign request_id=%s → %s",
+            formulario_id, resultado.request_id, acceso.correo_destinatario,
         )
         return {
-            "request_id":     resultado.request_id,
-            "estado":         formulario.estado,
+            "request_id":      resultado.request_id,
+            "estado":          formulario.estado,
             "correo_firmante": acceso.correo_destinatario,
         }
 
