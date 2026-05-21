@@ -12,7 +12,8 @@ Organiza responsabilidades en capas claras:
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from infrastructure.persistencia.models import EstadoFormulario, Formulario
+from domain.formulario.tipos import EstadoFormulario
+from infrastructure.persistencia.models import Formulario
 from api.schemas import (
     FormularioCreate,
     FormularioUpdate,
@@ -25,7 +26,7 @@ from domain.excepciones import (
     FormularioYaEnviadoError,
 )
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
-from core.contratos import ExtractorIAImp
+from domain.contratos import ExtractorIAImp
 from services.formulario.serializacion import (
     serializar_campos_json,
     deserializar_campos_json,

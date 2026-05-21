@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from core.fechas import NOMBRES_MESES_ES
+from domain.utils.fechas import NOMBRES_MESES_ES
 from infrastructure.persistencia.models import Formulario
 
 logger = logging.getLogger(__name__)

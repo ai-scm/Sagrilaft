@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from infrastructure.persistencia.models import DocumentoAdjunto, Formulario
-from core.contratos import AlertaInconsistencia, ExtractorIAImp
+from domain.contratos import AlertaInconsistencia, ExtractorIAImp
 from services.formulario.prellenado import mapear_campos_para_formulario
 
 from services.validacion.comparadores.detector_inconsistencias_nombre import detector as _detector_nombres

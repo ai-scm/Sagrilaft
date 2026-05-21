@@ -15,7 +15,7 @@ from html import escape
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
-from core.fechas import NOMBRES_MESES_ES
+from domain.utils.fechas import NOMBRES_MESES_ES
 from infrastructure.persistencia.models import Formulario
 from services.formulario.documento_service import DocumentoService
 from services.formulario.serializacion import deserializar_campos_json

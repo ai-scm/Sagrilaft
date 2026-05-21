@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from domain.excepciones import DocumentoNoEncontradoError, FormularioNoEditableError, FormularioNoEncontradoError
 from domain.puertos.repositorios import RepositorioExpediente
-from infrastructure.persistencia.models import EstadoFormulario
+from domain.formulario.tipos import EstadoFormulario
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService

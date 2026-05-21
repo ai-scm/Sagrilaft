@@ -32,7 +32,7 @@ from infrastructure.persistencia.models import AccesoManual, Formulario, generat
 from api.schemas import SolicitudAccesoManual
 from services.formulario.serializacion import construir_snapshot_formulario
 from domain.utils.estado_formulario import es_estado_borrador, es_estado_editable
-from core.fechas import ahora_utc, normalizar_datetime_utc
+from domain.utils.fechas import ahora_utc, normalizar_datetime_utc
 
 logger = logging.getLogger(__name__)
 
