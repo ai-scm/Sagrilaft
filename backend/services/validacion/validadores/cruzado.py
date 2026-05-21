@@ -19,11 +19,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Literal, Optional
 
-from services.alertas.normalizador_nit import normalizar_nit
-from services.alertas.normalizador_nombre import normalizar_razon_social
-from services.alertas.normalizador_numero_doc import normalizar_numero_doc
+from services.validacion.comparadores.normalizador_nit import normalizar_nit
+from services.validacion.comparadores.normalizador_nombre import normalizar_razon_social
+from services.validacion.comparadores.normalizador_numero_doc import normalizar_numero_doc
 from core.contratos import HallazgoValidacion
-from services.validators._utils import comparar_entre_documentos
+from services.validacion.validadores._utils import comparar_entre_documentos
 
 # ─── Tipos de normalización disponibles ──────────────────────────────────────
 # "texto"         → normalizar_razon_social (siglas, tildes, mayúsculas)

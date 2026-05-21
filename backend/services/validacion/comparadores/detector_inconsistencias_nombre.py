@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from typing import Dict
 
-from services.alertas.detector_inconsistencias import DetectorInconsistencias
-from services.alertas.normalizador_nombre import normalizar_razon_social
+from services.validacion.comparadores.detector_inconsistencias import DetectorInconsistencias
+from services.validacion.comparadores.normalizador_nombre import normalizar_razon_social
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────

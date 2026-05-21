@@ -22,7 +22,7 @@ from __future__ import annotations
 import re
 from typing import List, Tuple
 
-from services.utils.texto import quitar_diacriticos
+from domain.utils.texto import quitar_diacriticos
 
 
 # ── Siglas societarias colombianas más frecuentes ─────────────────────────────

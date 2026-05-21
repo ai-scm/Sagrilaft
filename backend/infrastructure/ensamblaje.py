@@ -14,17 +14,17 @@ import logging
 from typing import List, Optional
 
 from core.configuracion import AppConfig
-from services.extractores.bedrock_extractor import ExtractorBedrock
+from infrastructure.ia.bedrock_extractor import ExtractorBedrock
 from services.listas.protocolo_listas import ProveedorListaCautelaImp
 from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
 from services.listas.servicio_listas_cautela import ListaCautelaService
-from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
-from services.validators.camara_comercio import ValidadorCamaraComercio
-from services.validators.cedula import ValidadorCedula
-from services.validators.cruzado import ValidadorCruzadoDocumentos, REGLAS_CRUCE_PREDETERMINADAS
-from services.validators.estados_financieros import ValidadorEstadosFinancieros
-from services.validators.referencia_bancaria import ValidadorReferenciaBancaria
-from services.validators.rut import ValidadorRut
+from services.validacion.orquestador import OrquestadorValidacionDocumentos
+from services.validacion.validadores.camara_comercio import ValidadorCamaraComercio
+from services.validacion.validadores.cedula import ValidadorCedula
+from services.validacion.validadores.cruzado import ValidadorCruzadoDocumentos, REGLAS_CRUCE_PREDETERMINADAS
+from services.validacion.validadores.estados_financieros import ValidadorEstadosFinancieros
+from services.validacion.validadores.referencia_bancaria import ValidadorReferenciaBancaria
+from services.validacion.validadores.rut import ValidadorRut
 
 logger = logging.getLogger(__name__)
 

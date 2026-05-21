@@ -10,11 +10,11 @@ from infrastructure.persistencia.models import DocumentoAdjunto, Formulario
 from core.contratos import AlertaInconsistencia, ExtractorIAImp
 from services.formulario.prellenado import mapear_campos_para_formulario
 
-from services.alertas.detector_inconsistencias_nombre import detector as _detector_nombres
-from services.alertas.detector_inconsistencias_nit import detector as _detector_nit
-from services.alertas.detector_inconsistencias_nombre_representante import detector as _detector_nombre_representante
-from services.alertas.detector_inconsistencias_numero_doc_representante import detector as _detector_numero_doc_representante
-from services.alertas.detector_inconsistencias_direccion import detector as _detector_direccion
+from services.validacion.comparadores.detector_inconsistencias_nombre import detector as _detector_nombres
+from services.validacion.comparadores.detector_inconsistencias_nit import detector as _detector_nit
+from services.validacion.comparadores.detector_inconsistencias_nombre_representante import detector as _detector_nombre_representante
+from services.validacion.comparadores.detector_inconsistencias_numero_doc_representante import detector as _detector_numero_doc_representante
+from services.validacion.comparadores.detector_inconsistencias_direccion import detector as _detector_direccion
 
 
 # ---------------------------------------------------------------------------

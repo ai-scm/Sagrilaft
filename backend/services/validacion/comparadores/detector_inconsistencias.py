@@ -31,7 +31,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional
 
 from core.contratos import AlertaInconsistencia
-from services.alertas.comparador import Comparador
+from services.validacion.comparadores.comparador import Comparador
 
 
 class DetectorInconsistencias:

@@ -11,12 +11,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Callable, Optional
 
-from services.utils.texto import quitar_diacriticos
+from domain.utils.texto import quitar_diacriticos
 from core.fechas import parsear_fecha_colombia
 
-from services.alertas.normalizador_nombre import normalizar_razon_social
-from services.alertas.normalizador_nit import normalizar_nit
-from services.alertas.normalizador_numero_doc import normalizar_numero_doc
+from services.validacion.comparadores.normalizador_nombre import normalizar_razon_social
+from services.validacion.comparadores.normalizador_nit import normalizar_nit
+from services.validacion.comparadores.normalizador_numero_doc import normalizar_numero_doc
 from core.contratos import HallazgoValidacion
 
 # ─── Constantes ──────────────────────────────────────────────────────────────

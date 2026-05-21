@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from typing import Dict
 
-from services.alertas.detector_inconsistencias import DetectorInconsistencias
-from services.alertas.normalizador_numero_doc import normalizar_numero_doc
+from services.validacion.comparadores.detector_inconsistencias import DetectorInconsistencias
+from services.validacion.comparadores.normalizador_numero_doc import normalizar_numero_doc
 
 
 # ── Configuración declarativa de documentos monitoreados ─────────────────────
