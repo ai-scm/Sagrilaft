@@ -6,7 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
-from core.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
+from domain.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 
 # Los enums de negocio viven en el dominio. Se re-exportan aquí para que
 # todos los imports existentes (api/schemas, services) sigan funcionando

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 
-from core.configuracion import ZohoSignConfig
+from infrastructure.configuracion import ZohoSignConfig
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,8 @@ DIP : los routers dependen de estas abstracciones en lugar de acceder a
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from core.configuracion import AppConfig
-from core.contratos import ExtractorIAImp
+from infrastructure.configuracion import AppConfig
+from domain.contratos import ExtractorIAImp
 from infrastructure.persistencia.database import get_db
 from infrastructure.persistencia.repositorios import (
     RepositorioAccesoManualSQLAlchemy,

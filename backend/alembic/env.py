@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-from core import load_config
+from infrastructure.configuracion import load_config
 from infrastructure.persistencia.database import Base
 import infrastructure.persistencia.models  # noqa: F401 — registra todos los modelos en Base.metadata
 

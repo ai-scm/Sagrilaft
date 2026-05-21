@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
-from core.configuracion import AppConfig
+from infrastructure.configuracion import AppConfig
 from infrastructure.ia.bedrock_extractor import ExtractorBedrock
 from services.listas.protocolo_listas import ProveedorListaCautelaImp
 from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
