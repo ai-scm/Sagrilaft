@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional
 from services.validacion.comparadores.normalizador_nit import normalizar_nit
 from services.validacion.comparadores.normalizador_nombre import normalizar_razon_social
 from services.validacion.comparadores.normalizador_numero_doc import normalizar_numero_doc
-from core.contratos import HallazgoValidacion
+from domain.contratos import HallazgoValidacion
 from services.validacion.validadores._utils import comparar_entre_documentos
 
 # ─── Tipos de normalización disponibles ──────────────────────────────────────

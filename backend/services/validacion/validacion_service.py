@@ -14,8 +14,9 @@ DIP: depende del orquestador y del servicio de listas vía sus interfaces,
 from typing import Any, Literal
 
 from infrastructure.persistencia.models import ResultadoValidacion
-from core.contratos import HallazgoValidacion
+from domain.contratos import HallazgoValidacion
 from domain.puertos.repositorios import RepositorioValidacion
+from domain.validacion.resultado import ResultadoValidacionDominio
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from domain.excepciones import FormularioNoEncontradoError
@@ -43,7 +44,7 @@ class ValidacionService:
 
     async def ejecutar_validacion_completa(
         self, formulario_id: str
-    ) -> list[ResultadoValidacion]:
+    ) -> list[ResultadoValidacionDominio]:
         """
         Ejecuta el flujo completo de validación y retorna los resultados persistidos.
 
@@ -61,7 +62,7 @@ class ValidacionService:
         for resultado in resultados:
             self._repo.refrescar(resultado)
 
-        return resultados
+        return [self._orm_a_dominio(r) for r in resultados]
 
     # ── Helpers de orquestación ──────────────────────────────────────────────────
 
@@ -212,5 +213,20 @@ class ValidacionService:
             detalle=hallazgo.detalle,
             valor_formulario=hallazgo.valor_formulario,
             valor_documento=hallazgo.valor_documento,
+        )
+
+    @staticmethod
+    def _orm_a_dominio(resultado: ResultadoValidacion) -> ResultadoValidacionDominio:
+        """Mapea un ResultadoValidacion ORM a su Value Object de dominio."""
+        return ResultadoValidacionDominio(
+            id=resultado.id,
+            formulario_id=resultado.formulario_id,
+            tipo=resultado.tipo,
+            campo=resultado.campo,
+            resultado=resultado.resultado,
+            detalle=resultado.detalle,
+            valor_formulario=resultado.valor_formulario,
+            valor_documento=resultado.valor_documento,
+            created_at=resultado.created_at,
         )
 

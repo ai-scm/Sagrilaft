@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from core.contratos import AlertaInconsistencia
+from domain.contratos import AlertaInconsistencia
 from services.validacion.comparadores.comparador import Comparador
 
 

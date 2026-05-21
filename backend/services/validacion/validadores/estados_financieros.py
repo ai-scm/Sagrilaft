@@ -13,7 +13,7 @@ Alarmas que implementa:
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.contratos import HallazgoValidacion, ResultadoExtraccion
+from domain.contratos import HallazgoValidacion, ResultadoExtraccion
 
 
 # ─── Constantes ──────────────────────────────────────────────────────────────

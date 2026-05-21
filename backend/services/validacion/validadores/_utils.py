@@ -12,12 +12,12 @@ from datetime import date, datetime
 from typing import Any, Callable, Optional
 
 from domain.utils.texto import quitar_diacriticos
-from core.fechas import parsear_fecha_colombia
+from domain.utils.fechas import parsear_fecha_colombia
 
 from services.validacion.comparadores.normalizador_nombre import normalizar_razon_social
 from services.validacion.comparadores.normalizador_nit import normalizar_nit
 from services.validacion.comparadores.normalizador_numero_doc import normalizar_numero_doc
-from core.contratos import HallazgoValidacion
+from domain.contratos import HallazgoValidacion
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
 

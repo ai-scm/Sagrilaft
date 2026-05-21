@@ -8,7 +8,7 @@ Alarmas que implementa:
 
 from typing import Any, Dict, List, Optional
 
-from core.contratos import HallazgoValidacion, ResultadoExtraccion
+from domain.contratos import HallazgoValidacion, ResultadoExtraccion
 from services.validacion.validadores._utils import comparar_texto, verificar_vigencia
 
 
