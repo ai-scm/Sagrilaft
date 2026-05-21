@@ -7,123 +7,26 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
 from core.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
-import enum
 
-
-class EstadoFormulario(str, enum.Enum):
-    BORRADOR        = "borrador"
-    ENVIADO         = "enviado"
-    EN_CORRECCION   = "en_correccion"
-    VALIDADO        = "validado"
-    RECHAZADO       = "rechazado"
-    PENDIENTE_FIRMA = "pendiente_firma"
-    FIRMADO         = "firmado"
-
-
-class TipoPersona(str, enum.Enum):
-    JURIDICA = "juridica"
-    NATURAL = "natural"
-
-
-class TipoContraparte(str, enum.Enum):
-    PROVEEDOR = "proveedor"
-    CLIENTE = "cliente"
-
-
-class TipoSolicitud(str, enum.Enum):
-    VINCULACION = "vinculacion"
-    ACTUALIZACION = "actualizacion"
-
-
-class ClasificacionActividad(str, enum.Enum):
-    """
-    Clasificación de la actividad comercial de la contraparte
-    según su rol en la cadena de valor del sector regulado.
-    """
-    COMERCIALIZADOR       = "C"
-    DISTRIBUIDOR          = "D"
-    REPRESENTANTE         = "R"
-    FABRICANTE            = "F"
-    IMPORTADOR            = "I"
-
-
-class ActividadClasificacion(str, enum.Enum):
-    """
-    Actividad principal de la empresa (Sección 8).
-    """
-    INDUSTRIAL         = "industrial"
-    COMERCIAL          = "comercial"
-    FINANCIERA         = "financiera"
-    ECONOMIA_SOLIDARIA = "economia_solidaria"
-    OTRA               = "otra"
-
-
-class SectorEmpresa(str, enum.Enum):
-    """
-    Sector de la empresa (Sección 8).
-
-    Valores canónicos: "Público", "Privado", "Mixto".
-    """
-    PUBLICO = "Público"
-    PRIVADO = "Privado"
-    MIXTO = "Mixto"
-
-
-class ResponsabilidadRenta(str, enum.Enum):
-    """
-    Responsabilidad del contribuyente frente al impuesto sobre la renta (Sección 8).
-    """
-    DECLARANTE                  = "Declarante"
-    NO_DECLARANTE               = "No declarante"
-    DECLARANTE_REGIMEN_ESPECIAL = "Declarante Regimen Especial"
-
-
-class ResponsabilidadIva(str, enum.Enum):
-    """
-    Responsabilidad del contribuyente frente al IVA (Sección 8).
-    """
-    RESPONSABLE    = "Responsable"
-    NO_RESPONSABLE = "No responsable"
-
-
-class RegimenIva(str, enum.Enum):
-    """
-    Régimen de IVA al que pertenece el contribuyente (Sección 8).
-    """
-    REGIMEN_COMUN        = "Régimen común"
-    REGIMEN_SIMPLIFICADO = "Régimen simplificado"
-    NINGUN_REGIMEN       = "Ningún régimen"
-
-class AreaResponsable(str, enum.Enum):
-    """
-    Área interna responsable de gestionar el acceso manual al formulario SAGRILAFT.
-    """
-    VENTAS   = "ventas"
-    LEGAL    = "legal"
-    FINANZAS = "finanzas"
-
-
-class OperacionesMonedaExtranjera(str, enum.Enum):
-    """
-    Operaciones en Moneda Extranjera - Seccion 6.
-    """
-
-    OPERACIONES_SI = "si"
-    OPERACIONES_NO = "no"
-
-class Autorretenedor(str, enum.Enum):
-    """
-    Indica si el contribuyente es autorretenedor (Paso 7).
-    """
-    AUTORRETENEDOR_SI = "si"
-    AUTORRETENEDOR_NO = "no"
-
-class GranContribuyente(str, enum.Enum):
-    """
-    Indica si el contribuyente es gran contribuyente (Paso 7).
-    """
-    GRAN_CONTRIBUYENTE_SI = "si"
-    GRAN_CONTRIBUYENTE_NO = "no"
+# Los enums de negocio viven en el dominio. Se re-exportan aquí para que
+# todos los imports existentes (api/schemas, services) sigan funcionando
+# sin cambios durante la migración incremental hacia arquitectura hexagonal.
+from domain.formulario.tipos import (  # noqa: F401
+    ActividadClasificacion,
+    AreaResponsable,
+    Autorretenedor,
+    ClasificacionActividad,
+    EstadoFormulario,
+    GranContribuyente,
+    OperacionesMonedaExtranjera,
+    RegimenIva,
+    ResponsabilidadIva,
+    ResponsabilidadRenta,
+    SectorEmpresa,
+    TipoContraparte,
+    TipoPersona,
+    TipoSolicitud,
+)
 
 def generate_uuid():
     return str(uuid.uuid4())
@@ -242,7 +145,8 @@ class Formulario(Base):
     ciudad_firma = Column(String,  nullable=True)
 
     # --- Devolución para corrección ---
-    campos_a_corregir = Column(Text, nullable=True)
+    campos_a_corregir  = Column(Text,    nullable=True)
+    numero_correccion  = Column(Integer, nullable=False, default=0, server_default="0")
 
     # --- ZohoSign ---
     zoho_request_id        = Column(String, nullable=True)
