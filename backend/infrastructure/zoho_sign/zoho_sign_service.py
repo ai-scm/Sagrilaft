@@ -76,125 +76,6 @@ class ZohoSignService:
 
     # ─── Firma ────────────────────────────────────────────────────────────────
 
-    def crear_solicitud_firma(
-        self,
-        pdf_path: Path,
-        nombre_documento: str,
-        correo_firmante: str,
-        nombre_firmante: str,
-    ) -> SolicitudFirmaCreada:
-        """
-        Sube el PDF a ZohoSign y envía la solicitud de firma en dos pasos:
-
-        1. POST /api/v1/requests — sube el PDF y crea el borrador.
-        2. POST /api/v1/requests/{id}/submit — dispara el correo al firmante.
-
-        ZohoSign gestiona la interfaz de firma; el API no soporta placement de
-        campos de firma vía submit (signature_fields no es una clave válida).
-        """
-        # ── Paso 1: crear borrador ────────────────────────────────────────────
-        data_crear = {
-            "requests": {
-                "request_name":   nombre_documento,
-                "expiration_days": 5, #VERIFICAR EXPIRACION JUNTO A EL LINK DE DILIGENCIAMIENTO PARA DEJAR CONSISTENCIA
-                "is_sequential":  True,
-                "actions": [
-                    {
-                        "action_type":     "SIGN",
-                        "recipient_email": correo_firmante,
-                        "recipient_name":  nombre_firmante,
-                        "signing_order":   0,
-                    }
-                ],
-            }
-        }
-        # testing=true va como query param (no en el JSON body — ZohoSign devuelve 400 si va adentro)
-        params_crear = {"testing": "true"} if self._config.modo_prueba else {}
-
-        logger.info(
-            "Paso 1/2 ZohoSign — creando borrador para '%s' → %s [modo_prueba=%s]",
-            nombre_documento,
-            correo_firmante,
-            self._config.modo_prueba,
-        )
-
-        with open(pdf_path, "rb") as archivo:
-            resp_crear = httpx.post(
-                f"{_API_BASE}/requests",
-                headers=self._headers(),
-                params=params_crear,
-                data={"data": json.dumps(data_crear)},
-                files={"file": (pdf_path.name, archivo, "application/pdf")},
-                timeout=30,
-            )
-
-        if not resp_crear.is_success:
-            raise RuntimeError(
-                f"ZohoSign rechazó la creación (HTTP {resp_crear.status_code}): "
-                f"{resp_crear.text[:500]}"
-            )
-        datos_crear = resp_crear.json()
-
-        if datos_crear.get("code") != 0:
-            raise RuntimeError(
-                f"ZohoSign rechazó la creación del borrador (code={datos_crear.get('code')}): "
-                f"{datos_crear.get('message', 'sin detalle')}"
-            )
-
-        solicitud   = datos_crear["requests"]
-        request_id  = solicitud["request_id"]
-        action_id   = solicitud["actions"][0]["action_id"]
-        doc_info = solicitud["document_ids"][0]
-
-        logger.info(
-            "Borrador ZohoSign creado: request_id=%s action_id=%s páginas=%s",
-            request_id, action_id, doc_info["total_pages"],
-        )
-
-        # ── Paso 2: enviar a firma ────────────────────────────────────────────
-        # Los campos de firma se configuran automáticamente por el text tag {{S:R1*}}
-        # embebido en el PDF durante la generación. ZohoSign lo detecta al subir el
-        # documento (paso 1) y no necesita configuración adicional aquí.
-        data_enviar = {
-            "requests": {
-                "actions": [
-                    {
-                        "action_id":   action_id,
-                        "action_type": "SIGN",
-                    }
-                ]
-            }
-        }
-
-        logger.info("Paso 2/2 ZohoSign — enviando a firma: request_id=%s", request_id)
-
-        resp_enviar = httpx.post(
-            f"{_API_BASE}/requests/{request_id}/submit",
-            headers=self._headers(),
-            params=params_crear,
-            data={"data": json.dumps(data_enviar)},
-            timeout=30,
-        )
-
-        if not resp_enviar.is_success:
-            raise RuntimeError(
-                f"ZohoSign rechazó el submit (HTTP {resp_enviar.status_code}): "
-                f"{resp_enviar.text[:500]}"
-            )
-        datos_enviar = resp_enviar.json()
-
-        if datos_enviar.get("code", 0) != 0:
-            raise RuntimeError(
-                f"ZohoSign rechazó el envío a firma (code={datos_enviar.get('code')}): "
-                f"{datos_enviar.get('message', 'sin detalle')}"
-            )
-
-        logger.info(
-            "Solicitud ZohoSign enviada a firma: request_id=%s → %s",
-            request_id, correo_firmante,
-        )
-        return SolicitudFirmaCreada(request_id=request_id)
-
     def crear_solicitud_firma_multiple(
         self,
         pdf_paths: list[Path],
@@ -204,7 +85,10 @@ class ZohoSignService:
     ) -> SolicitudFirmaCreada:
         """
         Sube varios PDFs a ZohoSign como un paquete unificado y envía la solicitud
-        de firma en dos pasos (idéntico a crear_solicitud_firma pero multi-archivo).
+        de firma en dos pasos:
+
+        1. POST /api/v1/requests — sube todos los PDFs y crea el borrador.
+        2. POST /api/v1/requests/{id}/submit — dispara el correo al firmante.
 
         El firmante recibe un solo email y firma todos los documentos en una sesión.
         El orden de pdf_paths determina el orden visual en ZohoSign.

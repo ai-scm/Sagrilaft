@@ -32,7 +32,7 @@ from domain.excepciones import (
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
 from api.routers import acceso_manual, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
-from services.zoho_sign.zoho_sign_service import ZohoSignService
+from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
 
 
 logging.basicConfig(level=logging.INFO)
