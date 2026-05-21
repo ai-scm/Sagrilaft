@@ -270,7 +270,9 @@ const s = {
   textarea: {
     width:        '100%',
     padding:      '10px 12px',
-    border:       '1.5px solid var(--gray-300, #cbd5e1)',
+    borderWidth:  '1.5px',
+    borderStyle:  'solid',
+    borderColor:  'var(--gray-300, #cbd5e1)',
     borderRadius: 'var(--radius-sm, 6px)',
     fontSize:     '0.88rem',
     lineHeight:   1.6,
