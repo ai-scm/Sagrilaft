@@ -14,8 +14,8 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from core import load_config
-from core.limitador import limitador
+from infrastructure.configuracion import load_config
+from api.limitador import limitador
 from domain.excepciones import (
     AccesoExpiradoError,
     ContraparteInvalidaError,

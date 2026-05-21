@@ -19,6 +19,7 @@ from infrastructure.dependencies import (
 )
 from infrastructure.persistencia.repositorios import RepositorioValidacionSQLAlchemy
 from api.schemas import ValidacionResponse
+from domain.validacion.resultado import ResultadoValidacionDominio
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.validacion_service import ValidacionService
@@ -43,7 +44,7 @@ def obtener_servicio_validacion(
 async def validar_formulario(
     formulario_id: str,
     servicio: ValidacionService = Depends(obtener_servicio_validacion),
-) -> List[ValidacionResponse]:
+) -> List[ResultadoValidacionDominio]:
     """
     Ejecuta validación completa del formulario:
       1. Contraste de documentos adjuntos vs datos diligenciados (vía IA).

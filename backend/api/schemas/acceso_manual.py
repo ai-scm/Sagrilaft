@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_serializer
 
-from infrastructure.persistencia.models import AreaResponsable, TipoContraparte
+from domain.formulario.tipos import AreaResponsable, TipoContraparte
 
 from .comunes import a_iso_utc
 

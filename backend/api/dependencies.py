@@ -7,7 +7,7 @@ evitar duplicar la misma función en múltiples routers.
 
 from fastapi import Depends, Request
 
-from core.configuracion import AppConfig
+from infrastructure.configuracion import AppConfig
 from infrastructure.dependencies import (
     obtener_config,
     obtener_repo_acceso,

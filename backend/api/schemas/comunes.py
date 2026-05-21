@@ -18,7 +18,7 @@ from domain.utils.coercion import (
     coercionar_porcentaje_participacion,
     vacio_a_nulo,
 )
-from core.fechas import a_iso_utc_z
+from domain.utils.fechas import a_iso_utc_z
 
 T = TypeVar("T")
 

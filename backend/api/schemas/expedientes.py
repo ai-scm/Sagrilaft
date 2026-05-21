@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from infrastructure.persistencia.models import EstadoFormulario, TipoContraparte, TipoPersona
+from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona
 from domain.catalogo_correcciones import validar_campos_identificados
 
 from .comunes import a_iso_utc

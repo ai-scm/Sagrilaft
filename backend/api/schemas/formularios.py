@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
-from infrastructure.persistencia.models import (
+from domain.formulario.tipos import (
     ActividadClasificacion,
     Autorretenedor,
     ClasificacionActividad,

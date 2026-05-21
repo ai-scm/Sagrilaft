@@ -31,9 +31,9 @@ from api.schemas import (
     ResultadoValidacionEnvio,
 )
 from api.dependencies import obtener_servicio_acceso
-from core.contratos import ExtractorIAImp
-from core.configuracion import AppConfig
-from core.limitador import limitador
+from domain.contratos import ExtractorIAImp
+from infrastructure.configuracion import AppConfig
+from api.limitador import limitador
 from services.formulario.formulario_service import FormularioService
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from api.transformadores import construir_respuesta_documento
