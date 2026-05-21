@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from api.schemas import ResultadoListaCautela
 from services.listas.protocolo_listas import ProveedorListaCautelaImp
-from services.utils.texto import quitar_diacriticos
+from domain.utils.texto import quitar_diacriticos
 
 
 # ─── Datos simulados ─────────────────────────────────────────────────────────

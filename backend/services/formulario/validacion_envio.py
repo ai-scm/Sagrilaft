@@ -7,13 +7,13 @@ import re
 from typing import Any, Callable, List, Optional, Tuple
 
 from pydantic import BaseModel
+from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
 from infrastructure.persistencia.models import Formulario
 
 _REGEX_TELEFONO = re.compile(r'^\d{10}$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA   = 5
 UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL = 25
-PORCENTAJE_MAXIMO_PERMITIDO = 100
 
 def limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
     """

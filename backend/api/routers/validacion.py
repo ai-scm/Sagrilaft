@@ -11,12 +11,15 @@ DIP : depende de ValidacionService vía inyección de dependencias.
 from typing import List
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
-from infrastructure.persistencia.database import get_db
-from infrastructure.dependencies import obtener_orquestador, obtener_servicio_lista_cautela
+from infrastructure.dependencies import (
+    obtener_orquestador,
+    obtener_repo_validacion,
+    obtener_servicio_lista_cautela,
+)
+from infrastructure.persistencia.repositorios import RepositorioValidacionSQLAlchemy
 from api.schemas import ValidacionResponse
-from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
+from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.validacion_service import ValidacionService
 
@@ -26,12 +29,12 @@ enrutador = APIRouter(prefix="/api/validar", tags=["validación"])
 # ─── Fábrica de dependencias ─────────────────────────────────────────────────
 
 def obtener_servicio_validacion(
-    sesion: Session = Depends(get_db),
+    repo: RepositorioValidacionSQLAlchemy = Depends(obtener_repo_validacion),
     orquestador: OrquestadorValidacionDocumentos = Depends(obtener_orquestador),
     servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
 ) -> ValidacionService:
     """Construye el ValidacionService con las dependencias inyectadas."""
-    return ValidacionService(sesion, orquestador, servicio_listas)
+    return ValidacionService(repo, orquestador, servicio_listas)
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────

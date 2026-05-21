@@ -13,10 +13,7 @@ Flujo de estados:
 
 import hmac
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
-
-from sqlalchemy.orm import Session
 
 from domain.constantes import (
     TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
@@ -29,20 +26,20 @@ from domain.excepciones import (
     FormularioNoEncontradoError,
     WebhookTokenInvalidoError,
 )
+from domain.puertos.repositorios import RepositorioFirma
 from infrastructure.persistencia.models import (
-    AccesoManual,
     DocumentoAdjunto,
     EstadoFormulario,
-    Formulario,
+)
+from services.firma.almacenamiento_firma import (
+    archivar_version_anterior,
+    resolver_ruta_certificado,
+    resolver_ruta_documento_firmado,
 )
 from services.firma.certificado_pdf import generar_certificado_pdf
-from services.formulario.almacenamiento_contraparte import resolver_ruta_contraparte
-from services.zoho_sign.zoho_sign_service import ZohoSignService
+from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
 
 logger = logging.getLogger(__name__)
-
-_NOMBRE_PDF_FIRMADO = "formulario_firmado.pdf"
-
 
 class FirmaService:
     """
@@ -54,102 +51,47 @@ class FirmaService:
 
     def __init__(
         self,
-        sesion: Session,
+        repo: RepositorioFirma,
         zoho: ZohoSignService,
         upload_dir: Path,
         webhook_secret: str,
     ) -> None:
-        self._sesion        = sesion
-        self._zoho          = zoho
-        self._upload_dir    = upload_dir
+        self._repo           = repo
+        self._zoho           = zoho
+        self._upload_dir     = upload_dir
         self._webhook_secret = webhook_secret
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
-    def _obtener_formulario(self, formulario_id: str) -> Formulario:
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(Formulario.id == formulario_id)
-            .first()
-        )
+    def _obtener_formulario(self, formulario_id: str):
+        formulario = self._repo.obtener_formulario(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
     def _obtener_pdf_del_formulario(self, formulario_id: str) -> DocumentoAdjunto:
-        doc = (
-            self._sesion.query(DocumentoAdjunto)
-            .filter(
-                DocumentoAdjunto.formulario_id == formulario_id,
-                DocumentoAdjunto.tipo_documento == TIPO_DOCUMENTO_FORMULARIO_PDF,
-                DocumentoAdjunto.deleted_at.is_(None),
-            )
-            .first()
-        )
+        doc = self._repo.obtener_pdf(formulario_id)
         if not doc:
             raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
         return doc
 
-    def _registrar_certificado(self, formulario: Formulario, ruta_certificado: Path) -> None:
+    def _registrar_certificado(self, formulario, ruta_certificado: Path) -> None:
         """
         Registra el certificado SAGRILAFT en documentos_adjuntos para trazabilidad.
 
         Si ya existe un registro previo (re-envío tras cancelación de firma), actualiza
         la ruta en lugar de crear un duplicado. El commit lo hace el llamador.
         """
-        existente = (
-            self._sesion.query(DocumentoAdjunto)
-            .filter(
-                DocumentoAdjunto.formulario_id == formulario.id,
-                DocumentoAdjunto.tipo_documento == TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
-                DocumentoAdjunto.deleted_at.is_(None),
-            )
-            .first()
-        )
+        existente = self._repo.obtener_certificado(formulario.id)
         if existente:
             existente.ruta_archivo = str(ruta_certificado)
         else:
-            self._sesion.add(DocumentoAdjunto(
+            self._repo.agregar_documento(DocumentoAdjunto(
                 formulario_id=formulario.id,
                 tipo_documento=TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
                 nombre_archivo=ruta_certificado.name,
                 ruta_archivo=str(ruta_certificado),
             ))
-
-    def _ruta_documento_firmado(self, formulario: Formulario) -> Path:
-        directorio_contraparte = resolver_ruta_contraparte(
-            tipo_contraparte=formulario.tipo_contraparte or "",
-            razon_social=formulario.razon_social or "",
-            upload_dir=self._upload_dir,
-        )
-        return directorio_contraparte / _NOMBRE_PDF_FIRMADO
-
-    def _archivar_version_anterior(self, ruta_version_actual: Path) -> None:
-        """
-        Renombra el documento firmado existente añadiendo un sello de fecha/hora
-        antes de guardar una nueva versión corregida.
-
-        Convención:  formulario_firmado_corregido_YYYYMMDD_HHMMSS.pdf
-        Si el archivo no existe en disco (ruta obsoleta de una migración anterior)
-        el archivado se omite sin error.
-        """
-        if not ruta_version_actual.exists():
-            logger.warning(
-                "Archivo previo no encontrado en disco, se omite el archivado: %s",
-                ruta_version_actual,
-            )
-            return
-
-        sello_temporal = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        nombre_archivado = f"formulario_firmado_corregido_{sello_temporal}.pdf"
-        ruta_archivada = ruta_version_actual.parent / nombre_archivado
-        ruta_version_actual.rename(ruta_archivada)
-
-        logger.info(
-            "Versión anterior archivada: %s → %s",
-            ruta_version_actual.name,
-            ruta_archivada.name,
-        )
 
     # ─── Enviar a firma ───────────────────────────────────────────────────────
 
@@ -174,11 +116,7 @@ class FirmaService:
                 f"(estado actual: '{formulario.estado}')."
             )
 
-        acceso = (
-            self._sesion.query(AccesoManual)
-            .filter(AccesoManual.formulario_id == formulario_id)
-            .first()
-        )
+        acceso = self._repo.obtener_acceso_manual(formulario_id)
         if not acceso:
             raise FormularioNoEditableError(
                 "No se encontró un acceso manual asociado al formulario. "
@@ -192,7 +130,7 @@ class FirmaService:
                 f"El archivo PDF del formulario no existe en disco: {pdf_path}"
             )
 
-        ruta_certificado = pdf_path.parent / "certificado_sagrilaft.pdf"
+        ruta_certificado = resolver_ruta_certificado(pdf_path)
         generar_certificado_pdf(formulario, ruta_certificado)
         self._registrar_certificado(formulario, ruta_certificado)
 
@@ -208,9 +146,15 @@ class FirmaService:
             nombre_firmante=nombre_firmante,
         )
 
+        # ZohoSign ya recibió el archivo; eliminarlo del disco evita que quede
+        # el certificado sin firmar junto al paquete firmado final.
+        if ruta_certificado.exists():
+            ruta_certificado.unlink()
+            logger.debug("Certificado temporal eliminado del disco: %s", ruta_certificado)
+
         formulario.zoho_request_id = resultado.request_id
         formulario.estado          = EstadoFormulario.PENDIENTE_FIRMA
-        self._sesion.commit()
+        self._repo.confirmar()
 
         logger.info(
             "Formulario %s enviado a firma (paquete: formulario + certificado). "
@@ -252,11 +196,7 @@ class FirmaService:
             logger.warning("Webhook ZohoSign sin request_id — ignorado")
             return
 
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(Formulario.zoho_request_id == request_id)
-            .first()
-        )
+        formulario = self._repo.obtener_formulario_por_zoho_id(request_id)
 
         if not formulario:
             logger.info("Webhook ZohoSign: request_id=%s no corresponde a ningún formulario", request_id)
@@ -273,16 +213,16 @@ class FirmaService:
                 request_status,
             )
 
-    def _procesar_firma_completada(self, formulario: Formulario, request_id: str) -> None:
+    def _procesar_firma_completada(self, formulario, request_id: str) -> None:
         if formulario.estado == EstadoFormulario.FIRMADO:
             logger.info("Webhook duplicado ignorado: formulario %s ya está FIRMADO", formulario.id)
             return
 
         es_refirma_tras_correccion = formulario.ruta_documento_firmado is not None
         if es_refirma_tras_correccion:
-            self._archivar_version_anterior(Path(formulario.ruta_documento_firmado))
+            archivar_version_anterior(Path(formulario.ruta_documento_firmado))
 
-        ruta_destino = self._ruta_documento_firmado(formulario)
+        ruta_destino = resolver_ruta_documento_firmado(formulario, self._upload_dir)
 
         # descargar_documento_firmado puede ajustar la extensión a .zip si ZohoSign
         # devuelve múltiples documentos comprimidos. Usamos la ruta real retornada.
@@ -290,16 +230,14 @@ class FirmaService:
 
         formulario.ruta_documento_firmado = str(ruta_guardada)
         formulario.estado                 = EstadoFormulario.FIRMADO
-        self._sesion.commit()
+        self._repo.confirmar()
 
         logger.info("Formulario %s → FIRMADO. Archivo en: %s", formulario.id, ruta_guardada)
 
-    def _procesar_firma_cancelada(
-        self, formulario: Formulario, request_id: str, status: str
-    ) -> None:
+    def _procesar_firma_cancelada(self, formulario, request_id: str, status: str) -> None:
         formulario.estado          = EstadoFormulario.VALIDADO
         formulario.zoho_request_id = None
-        self._sesion.commit()
+        self._repo.confirmar()
 
         logger.info(
             "Formulario %s devuelto a VALIDADO (ZohoSign status='%s', request_id=%s)",
@@ -334,7 +272,7 @@ class FirmaService:
 
         formulario.estado          = EstadoFormulario.VALIDADO
         formulario.zoho_request_id = None
-        self._sesion.commit()
+        self._repo.confirmar()
 
         logger.info("Firma cancelada para formulario %s → VALIDADO", formulario_id)
         return {"estado": formulario.estado}

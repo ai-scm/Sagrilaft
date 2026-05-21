@@ -14,3 +14,6 @@ TIPO_DOCUMENTO_FORMULARIO_PDF = "FORMULARIO_PDF"
 # Se persiste en documentos_adjuntos para trazabilidad de auditoría, pero no se
 # expone como adjunto del diligenciamiento en la UI (es un artefacto de firma).
 TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = "CERTIFICADO_SAGRILAFT"
+
+# Límite de porcentaje para participación accionaria y coerciones de porcentaje.
+PORCENTAJE_MAXIMO_PERMITIDO = 100

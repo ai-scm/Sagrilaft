@@ -11,23 +11,23 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
 
 from api.dependencies import obtener_servicio_acceso, obtener_servicio_email, obtener_servicio_firma
 from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, SolicitudDevolucion
-from infrastructure.persistencia.database import get_db
+from infrastructure.dependencies import obtener_repo_expediente
+from infrastructure.persistencia.repositorios import RepositorioExpedienteSQLAlchemy
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
-from services.notificaciones.email_service import EmailService
+from infrastructure.notificaciones.email_service import EmailService
 
 enrutador = APIRouter(prefix="/api/expedientes", tags=["expedientes"])
 
 
 def _obtener_servicio(
-    sesion: Session = Depends(get_db),
+    repo: RepositorioExpedienteSQLAlchemy = Depends(obtener_repo_expediente),
 ) -> ExpedienteService:
-    return ExpedienteService(sesion)
+    return ExpedienteService(repo)
 
 
 # ─── Listado ──────────────────────────────────────────────────────────────────

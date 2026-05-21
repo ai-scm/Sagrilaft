@@ -15,12 +15,10 @@ solo reglas de acceso (vigencia, consumo y autorización del envío).
 
 import logging
 import secrets
-from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
-from sqlalchemy.orm import Session, joinedload
 
 from domain.excepciones import (
     AccesoExpiradoError,
@@ -29,10 +27,11 @@ from domain.excepciones import (
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
 )
-from infrastructure.persistencia.models import AccesoManual, Formulario
+from domain.puertos.repositorios import RepositorioAccesoManual
+from infrastructure.persistencia.models import AccesoManual, Formulario, generate_expires_at
 from api.schemas import SolicitudAccesoManual
 from services.formulario.serializacion import construir_snapshot_formulario
-from services.utils.estado_formulario import es_estado_borrador, es_estado_editable
+from domain.utils.estado_formulario import es_estado_borrador, es_estado_editable
 from core.fechas import ahora_utc, normalizar_datetime_utc
 
 logger = logging.getLogger(__name__)
@@ -68,19 +67,11 @@ def _verificar_pin(pin_hash: str, pin: str) -> None:
         raise CredencialesAccesoInvalidasError()
 
 
-def _normalizar_datetime_utc(valor: datetime) -> datetime:
-    return normalizar_datetime_utc(valor)
-
-
-def _ahora_utc() -> datetime:
-    return ahora_utc()
-
-
 def _esta_expirado(acceso: "AccesoManual") -> bool:
     expires_at = acceso.expires_at
     if expires_at is None:
         return False
-    return _ahora_utc() > _normalizar_datetime_utc(expires_at)
+    return ahora_utc() > normalizar_datetime_utc(expires_at)
 
 
 def _verificar_vigencia(acceso: "AccesoManual") -> None:
@@ -128,41 +119,27 @@ class AccesoManualService:
     el enlace de diligenciamiento enviado al destinatario externo.
     """
 
-    def __init__(self, sesion: Session, url_base: str = "") -> None:
-        self._sesion = sesion
+    def __init__(self, repo: RepositorioAccesoManual, url_base: str = "") -> None:
+        self._repo = repo
         self._url_base = url_base.rstrip("/")
 
     # ─── Accesos a datos (queries) ──────────────────────────────────────────
 
     def _obtener_acceso_por_token(self, token: str) -> Optional[AccesoManual]:
-        return (
-            self._sesion.query(AccesoManual)
-            .options(joinedload(AccesoManual.formulario))
-            .filter(AccesoManual.token_diligenciamiento == token)
-            .first()
-        )
+        return self._repo.obtener_acceso_por_token(token)
 
     def _obtener_acceso_por_formulario_id(
         self, formulario_id: str, *, cargar_formulario: bool = False
     ) -> Optional[AccesoManual]:
-        consulta = self._sesion.query(AccesoManual).filter(AccesoManual.formulario_id == formulario_id)
-        if cargar_formulario:
-            consulta = consulta.options(joinedload(AccesoManual.formulario))
-        return consulta.first()
+        return self._repo.obtener_acceso_por_formulario_id(
+            formulario_id, cargar_formulario=cargar_formulario
+        )
 
     def _obtener_formulario_por_codigo(self, codigo_peticion: str) -> Optional[Formulario]:
-        return (
-            self._sesion.query(Formulario)
-            .filter(Formulario.codigo_peticion == codigo_peticion)
-            .first()
-        )
+        return self._repo.obtener_formulario_por_codigo(codigo_peticion)
 
     def _obtener_acceso_por_formulario(self, formulario: Formulario) -> Optional[AccesoManual]:
-        return (
-            self._sesion.query(AccesoManual)
-            .filter(AccesoManual.formulario_id == formulario.id)
-            .first()
-        )
+        return self._repo.obtener_acceso_por_formulario(formulario)
 
     # ─── Serialización / DTOs ───────────────────────────────────────────────
 
@@ -246,8 +223,8 @@ class AccesoManualService:
         token_diligenciamiento = secrets.token_urlsafe(32)
 
         formulario = self._crear_formulario_preinicializado(solicitud)
-        self._sesion.add(formulario)
-        self._sesion.flush()
+        self._repo.agregar_formulario(formulario)
+        self._repo.flush()
 
         acceso = self._crear_acceso_manual(
             solicitud=solicitud,
@@ -255,10 +232,10 @@ class AccesoManualService:
             pin_hash=pin_hash,
             token_diligenciamiento=token_diligenciamiento,
         )
-        self._sesion.add(acceso)
-        self._sesion.commit()
-        self._sesion.refresh(formulario)
-        self._sesion.refresh(acceso)
+        self._repo.agregar_acceso(acceso)
+        self._repo.confirmar()
+        self._repo.refrescar(formulario)
+        self._repo.refrescar(acceso)
 
         # TODO: integrar servicio de email para enviar credenciales al destinatario
         logger.info(
@@ -275,18 +252,13 @@ class AccesoManualService:
 
     def listar_accesos(self) -> List[Dict[str, Any]]:
         """Devuelve todos los accesos creados, ordenados del más reciente al más antiguo."""
-        accesos = (
-            self._sesion.query(AccesoManual)
-            .options(joinedload(AccesoManual.formulario))
-            .order_by(AccesoManual.created_at.desc())
-            .all()
-        )
+        accesos = self._repo.listar_accesos()
         return [self._serializar_acceso_listado(acceso) for acceso in accesos]
 
     # ─── Resolución de token ──────────────────────────────────────────────────
 
     @staticmethod
-    def _validar_acceso_para_token(acceso: AccesoManual, token: str) -> None:
+    def _validar_acceso_para_token(acceso: AccesoManual) -> None:
         _verificar_vigencia(acceso)
         _verificar_no_consumido(acceso)
         if not es_estado_editable(acceso.formulario.estado):
@@ -302,7 +274,7 @@ class AccesoManualService:
         if not acceso:
             raise TokenDiligenciamientoInvalidoError(token)
 
-        self._validar_acceso_para_token(acceso, token)
+        self._validar_acceso_para_token(acceso)
         return construir_snapshot_formulario(acceso.formulario)
 
     # ─── Verificación de credenciales ────────────────────────────────────────
@@ -395,23 +367,8 @@ class AccesoManualService:
         """Marca `consumed_at` si no estaba marcado (idempotente)."""
         if acceso.consumed_at is not None:
             return
-        acceso.consumed_at = _ahora_utc()
-        self._sesion.commit()
-
-    def consumir_token_al_enviar(self, formulario_id: str, token: str) -> None:
-        """
-        Marca el token de diligenciamiento como consumido tras un envío exitoso.
-
-        Es idempotente: si ya estaba consumido no hace nada.
-        """
-        acceso = self._obtener_acceso_por_formulario_id(formulario_id)
-        if not acceso:
-            return
-
-        if not secrets.compare_digest(acceso.token_diligenciamiento, token):
-            raise CredencialesAccesoInvalidasError()
-
-        self._marcar_consumido(acceso)
+        acceso.consumed_at = ahora_utc()
+        self._repo.confirmar()
 
     # ─── Reactivación para corrección ────────────────────────────────────────
 
@@ -429,8 +386,6 @@ class AccesoManualService:
             {"correo_destinatario": str, "enlace_diligenciamiento": str}
             o None si el formulario no tiene AccesoManual vinculado.
         """
-        from infrastructure.persistencia.models import generate_expires_at
-
         acceso = self._obtener_acceso_por_formulario_id(formulario_id)
         if not acceso:
             return None
@@ -449,9 +404,8 @@ class AccesoManualService:
         """
         Marca un AccesoManual como consumido tras un envío exitoso.
 
-        A diferencia de consumir_token_al_enviar(), este método NO valida token
-        porque se espera que el router ya haya verificado credenciales (token o
-        código+PIN) en verificar_credenciales_si_aplica().
+        No re-valida el token porque se espera que el router ya haya verificado
+        credenciales en verificar_credenciales_si_aplica().
 
         Es idempotente: si no hay acceso manual o ya estaba consumido, no hace nada.
         """

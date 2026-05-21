@@ -12,7 +12,7 @@ from typing import Annotated, Optional, TypeVar, Literal
 
 from pydantic import BeforeValidator
 
-from services.utils.coercion import (
+from domain.utils.coercion import (
     coercionar_monto,
     coercionar_porcentaje,
     coercionar_porcentaje_participacion,

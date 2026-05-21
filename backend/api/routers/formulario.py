@@ -9,10 +9,17 @@ DIP : depende de la abstracción ExtractorIAImp, no de la implementación Bedroc
 from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
-from sqlalchemy.orm import Session
 
-from infrastructure.persistencia.database import get_db
-from infrastructure.dependencies import obtener_config, obtener_extractor
+from infrastructure.dependencies import (
+    obtener_config,
+    obtener_extractor,
+    obtener_repo_documento,
+    obtener_repo_formulario,
+)
+from infrastructure.persistencia.repositorios import (
+    RepositorioDocumentoSQLAlchemy,
+    RepositorioFormularioSQLAlchemy,
+)
 from api.schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
@@ -29,7 +36,7 @@ from core.configuracion import AppConfig
 from core.limitador import limitador
 from services.formulario.formulario_service import FormularioService
 from services.acceso_manual.acceso_manual_service import AccesoManualService
-from api.routers.presentacion import construir_respuesta_documento
+from api.transformadores import construir_respuesta_documento
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
@@ -37,12 +44,13 @@ enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 # ─── Fábrica de dependencias ─────────────────────────────────────────────────
 
 def obtener_servicio_formulario(
-    sesion: Session = Depends(get_db),
+    repo: RepositorioFormularioSQLAlchemy = Depends(obtener_repo_formulario),
+    repo_doc: RepositorioDocumentoSQLAlchemy = Depends(obtener_repo_documento),
     extractor: ExtractorIAImp = Depends(obtener_extractor),
     config: AppConfig = Depends(obtener_config),
 ) -> FormularioService:
     """Crea un FormularioService con las dependencias inyectadas."""
-    return FormularioService(sesion, extractor, config.upload_dir)
+    return FormularioService(repo, repo_doc, extractor, config.upload_dir)
 
 
 # ─── Recuperación de sesión ──────────────────────────────────────────────────

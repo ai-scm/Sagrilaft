@@ -11,13 +11,12 @@ DIP: depende del orquestador y del servicio de listas vía sus interfaces,
      y no conoce ningún detalle HTTP (sin HTTPException, sin Request).
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Literal
 
-from sqlalchemy.orm import Session
-
-from infrastructure.persistencia.models import Formulario, ResultadoValidacion
+from infrastructure.persistencia.models import ResultadoValidacion
 from core.contratos import HallazgoValidacion
-from services.orquestacion.orquestador_documentos import OrquestadorValidacionDocumentos
+from domain.puertos.repositorios import RepositorioValidacion
+from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from domain.excepciones import FormularioNoEncontradoError
 
@@ -32,11 +31,11 @@ class ValidacionService:
 
     def __init__(
         self,
-        sesion: Session,
+        repo: RepositorioValidacion,
         orquestador: OrquestadorValidacionDocumentos,
         servicio_listas: ListaCautelaService,
     ) -> None:
-        self._sesion = sesion
+        self._repo = repo
         self._orquestador = orquestador
         self._servicio_listas = servicio_listas
 
@@ -44,7 +43,7 @@ class ValidacionService:
 
     async def ejecutar_validacion_completa(
         self, formulario_id: str
-    ) -> List[ResultadoValidacion]:
+    ) -> list[ResultadoValidacion]:
         """
         Ejecuta el flujo completo de validación y retorna los resultados persistidos.
 
@@ -54,40 +53,34 @@ class ValidacionService:
         formulario = self._obtener_o_error(formulario_id)
         self._limpiar_validaciones_previas(formulario_id)
 
-        hallazgos: List[ResultadoValidacion] = []
-        hallazgos += await self._validar_documentos(formulario_id, formulario)
-        hallazgos += self._validar_listas_cautela(formulario_id, formulario)
+        resultados: list[ResultadoValidacion] = []
+        resultados += await self._validar_documentos(formulario_id, formulario)
+        resultados += self._validar_listas_cautela(formulario_id, formulario)
 
-        self._sesion.commit()
-        for hallazgo in hallazgos:
-            self._sesion.refresh(hallazgo)
+        self._repo.confirmar()
+        for resultado in resultados:
+            self._repo.refrescar(resultado)
 
-        return hallazgos
+        return resultados
 
     # ── Helpers de orquestación ──────────────────────────────────────────────────
 
-    def _obtener_o_error(self, formulario_id: str) -> Formulario:
+    def _obtener_o_error(self, formulario_id: str):
         """Recupera el formulario o lanza FormularioNoEncontradoError."""
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(Formulario.id == formulario_id)
-            .first()
-        )
+        formulario = self._repo.obtener_formulario(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
     def _limpiar_validaciones_previas(self, formulario_id: str) -> None:
         """Elimina todos los resultados de validaciones anteriores del formulario."""
-        self._sesion.query(ResultadoValidacion).filter(
-            ResultadoValidacion.formulario_id == formulario_id
-        ).delete()
+        self._repo.limpiar_validaciones(formulario_id)
 
     async def _validar_documentos(
         self,
         formulario_id: str,
-        formulario: Formulario,
-    ) -> List[ResultadoValidacion]:
+        formulario,
+    ) -> list[ResultadoValidacion]:
         """
         Valida los documentos adjuntos vía IA y prepara los hallazgos para persistir.
 
@@ -106,30 +99,29 @@ class ValidacionService:
             )
         )
 
-        resultados: List[ResultadoValidacion] = []
+        resultados: list[ResultadoValidacion] = []
 
-        for hallazgo in hallazgos_individuales:
-            resultado = self._hallazgo_a_resultado(formulario_id, "documento", hallazgo)
-            self._sesion.add(resultado)
-            resultados.append(resultado)
-
-        for hallazgo in hallazgos_cruzados:
-            resultado = self._hallazgo_a_resultado(formulario_id, "cruce_documentos", hallazgo)
-            self._sesion.add(resultado)
-            resultados.append(resultado)
+        for tipo, grupo in [
+            ("documento",        hallazgos_individuales),
+            ("cruce_documentos", hallazgos_cruzados),
+        ]:
+            for hallazgo in grupo:
+                resultado = self._hallazgo_a_resultado(formulario_id, tipo, hallazgo)
+                self._repo.agregar_validacion(resultado)
+                resultados.append(resultado)
 
         return resultados
 
     def _validar_listas_cautela(
         self,
         formulario_id: str,
-        formulario: Formulario,
-    ) -> List[ResultadoValidacion]:
+        formulario,
+    ) -> list[ResultadoValidacion]:
         """
         Busca la empresa y el representante en todas las listas de cautela
         y prepara los resultados para persistir.
         """
-        resultados: List[ResultadoValidacion] = []
+        resultados: list[ResultadoValidacion] = []
 
         if formulario.razon_social:
             resultados += self._registrar_busqueda_en_listas(
@@ -153,9 +145,9 @@ class ValidacionService:
         self,
         formulario_id: str,
         nombre: str,
-        numero_identificacion: Optional[str],
-        sufijo_campo: Optional[str],
-    ) -> List[ResultadoValidacion]:
+        numero_identificacion: str | None,
+        sufijo_campo: str | None,
+    ) -> list[ResultadoValidacion]:
         """
         Ejecuta la búsqueda en listas de cautela para un sujeto y registra
         cada resultado en la sesión.
@@ -167,7 +159,7 @@ class ValidacionService:
         resultados_listas = self._servicio_listas.buscar_todas_listas(
             nombre, numero_identificacion
         )
-        nuevos: List[ResultadoValidacion] = []
+        resultados: list[ResultadoValidacion] = []
 
         for resultado_lista in resultados_listas:
             nombre_campo = (
@@ -182,15 +174,15 @@ class ValidacionService:
                 resultado="error" if resultado_lista.encontrado else "ok",
                 detalle=resultado_lista.detalle,
             )
-            self._sesion.add(resultado)
-            nuevos.append(resultado)
+            self._repo.agregar_validacion(resultado)
+            resultados.append(resultado)
 
-        return nuevos
+        return resultados
 
     # ── Helpers de transformación ────────────────────────────────────────────────
 
     @staticmethod
-    def _extraer_datos_relevantes(formulario: Formulario) -> Dict[str, Any]:
+    def _extraer_datos_relevantes(formulario) -> dict[str, Any]:
         """Extrae los campos del formulario necesarios para la validación documental."""
         return {
             "razon_social":             formulario.razon_social,
@@ -208,7 +200,7 @@ class ValidacionService:
     @staticmethod
     def _hallazgo_a_resultado(
         formulario_id: str,
-        tipo: str,
+        tipo: Literal["documento", "cruce_documentos"],
         hallazgo: HallazgoValidacion,
     ) -> ResultadoValidacion:
         """Convierte un HallazgoValidacion en un ResultadoValidacion persistible en BD."""

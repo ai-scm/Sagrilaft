@@ -12,20 +12,13 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
-
-from domain.constantes import TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
 from domain.excepciones import DocumentoNoEncontradoError, FormularioNoEditableError, FormularioNoEncontradoError
-from infrastructure.persistencia.models import (
-    DocumentoAdjunto,
-    EstadoFormulario,
-    Formulario,
-)
+from domain.puertos.repositorios import RepositorioExpediente
+from infrastructure.persistencia.models import EstadoFormulario
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService
-    from services.notificaciones.email_service import EmailService
+    from infrastructure.notificaciones.email_service import EmailService
 
 
 _ESTADOS_EXPEDIENTE = [
@@ -50,54 +43,32 @@ class ExpedienteService:
       - Aprobar o rechazar un formulario enviado (transición de estado manual).
     """
 
-    def __init__(self, sesion: Session) -> None:
-        self._sesion = sesion
+    def __init__(self, repo: RepositorioExpediente) -> None:
+        self._repo = repo
 
     # ─── Queries internas ─────────────────────────────────────────────────────
 
-    def _consulta_expedientes(self):
-        return self._sesion.query(Formulario).filter(
-            Formulario.estado.in_(_ESTADOS_EXPEDIENTE)
-        )
-
-    def _buscar_formulario_expediente(self, formulario_id: str) -> Formulario:
+    def _buscar_formulario_expediente(self, formulario_id: str):
         """
         Recupera un formulario únicamente si aplica como expediente.
 
         Regla: el formulario ya debió haber sido enviado (o estar en estados posteriores
         como validado/rechazado). En borrador, se comporta como "no existe" para el portal.
         """
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(
-                Formulario.id == formulario_id,
-                Formulario.estado.in_(_ESTADOS_EXPEDIENTE),
-            )
-            .first()
-        )
+        formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
-    def _buscar_documento_descargable(
-        self, formulario_id: str, doc_id: str
-    ) -> DocumentoAdjunto | None:
+    def _buscar_documento_descargable(self, formulario_id: str, doc_id: str):
         """
         Retorna el documento si y solo si pertenece a un expediente (no borrador).
 
         Regla de negocio: para descargar desde el portal interno, el formulario
         ya debió haber sido enviado (o estar en estados posteriores como validado/rechazado).
         """
-        return (
-            self._sesion.query(DocumentoAdjunto)
-            .join(Formulario, Formulario.id == DocumentoAdjunto.formulario_id)
-            .filter(
-                DocumentoAdjunto.id == doc_id,
-                DocumentoAdjunto.formulario_id == formulario_id,
-                DocumentoAdjunto.deleted_at.is_(None),
-                Formulario.estado.in_(_ESTADOS_EXPEDIENTE),
-            )
-            .first()
+        return self._repo.buscar_documento_descargable(
+            formulario_id, doc_id, _ESTADOS_EXPEDIENTE
         )
 
     def _conteos_documentos_por_formulario(self, ids_formularios: list[str]) -> dict[str, int]:
@@ -107,24 +78,11 @@ class ExpedienteService:
         automáticamente, no un documento subido por el usuario. El contador debe
         coincidir con lo que el operador ve en el detalle del expediente.
         """
-        filas = (
-            self._sesion.query(
-                DocumentoAdjunto.formulario_id,
-                func.count(DocumentoAdjunto.id).label("total"),
-            )
-            .filter(
-                DocumentoAdjunto.formulario_id.in_(ids_formularios),
-                DocumentoAdjunto.deleted_at.is_(None),
-                DocumentoAdjunto.tipo_documento != TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
-            )
-            .group_by(DocumentoAdjunto.formulario_id)
-            .all()
-        )
-        return {fila.formulario_id: fila.total for fila in filas}
+        return self._repo.contar_documentos(ids_formularios)
 
     # ─── Serialización ────────────────────────────────────────────────────────
 
-    def _serializar_resumen(self, formulario: Formulario, cantidad_documentos: int) -> Dict[str, Any]:
+    def _serializar_resumen(self, formulario, cantidad_documentos: int) -> Dict[str, Any]:
         return {
             "formulario_id":         formulario.id,
             "codigo_peticion":       formulario.codigo_peticion,
@@ -133,6 +91,7 @@ class ExpedienteService:
             "tipo_contraparte":      formulario.tipo_contraparte,
             "tipo_persona":          formulario.tipo_persona,
             "estado":                formulario.estado,
+            "numero_correccion":     formulario.numero_correccion or 0,
             "cantidad_documentos":   cantidad_documentos,
             "created_at":            formulario.created_at,
             "updated_at":            formulario.updated_at,
@@ -151,22 +110,7 @@ class ExpedienteService:
         Acepta filtros opcionales: tipo_contraparte ('cliente'/'proveedor') y búsqueda
         de texto libre en razón social y código de petición (case-insensitive).
         """
-        consulta = self._consulta_expedientes()
-
-        if tipo_contraparte:
-            consulta = consulta.filter(
-                Formulario.tipo_contraparte == tipo_contraparte.lower()
-            )
-        if busqueda:
-            termino = f"%{busqueda.strip()}%"
-            consulta = consulta.filter(
-                or_(
-                    Formulario.razon_social.ilike(termino),
-                    Formulario.codigo_peticion.ilike(termino),
-                )
-            )
-
-        formularios = consulta.order_by(Formulario.updated_at.desc()).all()
+        formularios = self._repo.listar(_ESTADOS_EXPEDIENTE, tipo_contraparte, busqueda)
         conteos     = self._conteos_documentos_por_formulario([f.id for f in formularios])
         return [self._serializar_resumen(f, conteos.get(f.id, 0)) for f in formularios]
 
@@ -183,24 +127,16 @@ class ExpedienteService:
         Lanza FormularioNoEncontradoError si el formulario no existe o está en borrador.
         """
         formulario = self._buscar_formulario_expediente(formulario_id)
-
-        documentos = (
-            self._sesion.query(DocumentoAdjunto)
-            .filter(
-                DocumentoAdjunto.formulario_id == formulario_id,
-                DocumentoAdjunto.deleted_at.is_(None),
-            )
-            .order_by(DocumentoAdjunto.created_at)
-            .all()
-        )
+        documentos = self._repo.listar_documentos(formulario_id)
 
         return {
             "formulario_id":    formulario.id,
             "codigo_peticion":  formulario.codigo_peticion,
             "razon_social":     formulario.razon_social,
             "tipo_contraparte": formulario.tipo_contraparte,
-            "estado":           formulario.estado,
-            "updated_at":       formulario.updated_at,
+            "estado":              formulario.estado,
+            "numero_correccion":   formulario.numero_correccion or 0,
+            "updated_at":          formulario.updated_at,
             "documentos": [
                 {
                     "id":             doc.id,
@@ -222,7 +158,7 @@ class ExpedienteService:
                 f"Solo se puede aprobar un formulario en estado 'enviado' (actual: '{formulario.estado}')."
             )
         formulario.estado = EstadoFormulario.VALIDADO
-        self._sesion.commit()
+        self._repo.confirmar()
         return {"estado": formulario.estado}
 
     def rechazar_expediente(self, formulario_id: str) -> Dict[str, Any]:
@@ -233,7 +169,7 @@ class ExpedienteService:
                 f"Solo se puede rechazar un formulario en estado 'enviado' o 'validado' (actual: '{formulario.estado}')."
             )
         formulario.estado = EstadoFormulario.RECHAZADO
-        self._sesion.commit()
+        self._repo.confirmar()
         return {"estado": formulario.estado}
 
     def devolver_para_correccion(
@@ -255,24 +191,21 @@ class ExpedienteService:
         """
         formulario = self._buscar_formulario_expediente(formulario_id)
 
-        estado_actual = formulario.estado
-        if isinstance(estado_actual, str):
-            estado_actual = EstadoFormulario(estado_actual)
-
-        if estado_actual not in _ESTADOS_DEVOLVIBLES:
+        if formulario.estado not in _ESTADOS_DEVOLVIBLES:
             raise FormularioNoEditableError(
                 f"Solo se puede devolver un formulario en estado 'enviado' o 'validado' "
                 f"(actual: '{formulario.estado}')."
             )
 
-        formulario.estado            = EstadoFormulario.EN_CORRECCION
-        formulario.campos_a_corregir = json.dumps(
+        formulario.estado             = EstadoFormulario.EN_CORRECCION
+        formulario.numero_correccion  = (formulario.numero_correccion or 0) + 1
+        formulario.campos_a_corregir  = json.dumps(
             {"especificaciones": especificaciones, "campos": campos_identificados},
             ensure_ascii=False,
         )
 
         datos_acceso = acceso_service.reactivar_acceso_para_correccion(formulario_id)
-        self._sesion.commit()
+        self._repo.confirmar()
 
         correo_notificado = datos_acceso["correo_destinatario"] if datos_acceso else None
         enlace_acceso     = datos_acceso["enlace_diligenciamiento"] if datos_acceso else None

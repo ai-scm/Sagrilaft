@@ -12,9 +12,7 @@ Organiza responsabilidades en capas claras:
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from sqlalchemy.orm import Session
-
-from infrastructure.persistencia.models import DocumentoAdjunto, EstadoFormulario, Formulario
+from infrastructure.persistencia.models import EstadoFormulario, Formulario
 from api.schemas import (
     FormularioCreate,
     FormularioUpdate,
@@ -26,6 +24,7 @@ from domain.excepciones import (
     FormularioNoEncontradoError,
     FormularioYaEnviadoError,
 )
+from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
 from core.contratos import ExtractorIAImp
 from services.formulario.serializacion import (
     serializar_campos_json,
@@ -44,7 +43,7 @@ from services.formulario.analisis_service import (
     ResultadoGuardadoDocumento,
     obtener_config_analisis_por_defecto,
 )
-from services.utils.estado_formulario import es_estado_borrador, es_estado_editable
+from domain.utils.estado_formulario import es_estado_borrador, es_estado_editable
 
 
 class FormularioService:
@@ -55,13 +54,19 @@ class FormularioService:
     los documentos y el análisis de IA. Mantiene la interfaz pública intacta.
     """
 
-    def __init__(self, sesion: Session, extractor: ExtractorIAImp, upload_dir: Path) -> None:
-        self._sesion = sesion
+    def __init__(
+        self,
+        repo: RepositorioFormulario,
+        repo_doc: RepositorioDocumento,
+        extractor: ExtractorIAImp,
+        upload_dir: Path,
+    ) -> None:
+        self._repo = repo
         self._validador_envio = ValidadorEnvioFormulario()
-        self._documentos = DocumentoService(sesion, upload_dir)
+        self._documentos = DocumentoService(repo_doc, upload_dir)
         self._exportador_pdf = ExportadorFormularioPdf(self._documentos)
         self._analisis = AnalisisDocumentosService(
-            extractor, 
+            extractor,
             obtener_config_analisis_por_defecto()
         )
 
@@ -70,15 +75,13 @@ class FormularioService:
     def crear_borrador(self, datos: FormularioCreate) -> Dict[str, Any]:
         datos_dict = serializar_campos_json(datos.model_dump(exclude_unset=True))
         formulario = Formulario(**datos_dict)
-        self._sesion.add(formulario)
-        self._sesion.commit()
-        self._sesion.refresh(formulario)
+        self._repo.agregar(formulario)
+        self._repo.confirmar()
+        self._repo.refrescar(formulario)
         return deserializar_campos_json(formulario)
 
     def obtener_por_codigo(self, codigo: str) -> Dict[str, Any]:
-        formulario = self._sesion.query(Formulario).filter(
-            (Formulario.codigo_peticion == codigo) | (Formulario.id == codigo)
-        ).first()
+        formulario = self._repo.obtener_por_codigo(codigo)
         if not formulario:
             raise FormularioNoEncontradoError(codigo)
 
@@ -95,8 +98,8 @@ class FormularioService:
         for clave, valor in datos_actualizacion.items():
             setattr(formulario, clave, valor)
 
-        self._sesion.commit()
-        self._sesion.refresh(formulario)
+        self._repo.confirmar()
+        self._repo.refrescar(formulario)
         return deserializar_campos_json(formulario)
 
     def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
@@ -122,7 +125,7 @@ class FormularioService:
         self._registrar_pdf_oficial(formulario.id, pdf)
 
         formulario.estado = EstadoFormulario.ENVIADO.value
-        self._sesion.commit()
+        self._repo.confirmar()
         return ResultadoValidacionEnvio(valido=True, errores=[])
 
     # ─── Gestión de documentos adjuntos ──────────────────────────────────────
@@ -157,7 +160,7 @@ class FormularioService:
         )
         # El commit dentro de registrar_documento_en_bd expira todos los objetos
         # de la sesión. Refrescar antes de pasarlo al análisis evita ObjectDeletedError.
-        self._sesion.refresh(formulario)
+        self._repo.refrescar(formulario)
 
         return await self._analisis.analizar_nueva_carga(
             documento=documento,
@@ -172,7 +175,7 @@ class FormularioService:
         )
         self._documentos.eliminar_documento(formulario_id, doc_id)
 
-    def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
+    def listar_documentos(self, formulario_id: str) -> List[Any]:
         # Para consistencia: si el formulario no existe, se responde 404.
         self._buscar_formulario_o_error(formulario_id)
         return self._documentos.listar_documentos(formulario_id)
@@ -205,11 +208,7 @@ class FormularioService:
 
     def _buscar_formulario_o_error(self, formulario_id: str) -> Formulario:
         """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
-        formulario = (
-            self._sesion.query(Formulario)
-            .filter(Formulario.id == formulario_id)
-            .first()
-        )
+        formulario = self._repo.obtener_por_id(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario

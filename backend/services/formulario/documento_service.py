@@ -7,12 +7,11 @@ import re
 import shutil
 from pathlib import Path
 from typing import List
-
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from infrastructure.persistencia.models import DocumentoAdjunto
 from domain.excepciones import DocumentoNoEncontradoError
+from domain.puertos.repositorios import RepositorioDocumento
 
 
 def _sanitizar_nombre_archivo(nombre: str) -> str:
@@ -34,8 +33,8 @@ class DocumentoService:
     CRUD y manejo de archivos en disco para los documentos adjuntos de un formulario.
     """
 
-    def __init__(self, sesion: Session, upload_dir: Path) -> None:
-        self._sesion = sesion
+    def __init__(self, repo: RepositorioDocumento, upload_dir: Path) -> None:
+        self._repo = repo
         self.directorio_base = upload_dir
         self._validar_directorio_produccion()
 
@@ -84,9 +83,9 @@ class DocumentoService:
             content_type=content_type,
             tamano=tamano,
         )
-        self._sesion.add(documento)
-        self._sesion.commit()
-        self._sesion.refresh(documento)
+        self._repo.agregar(documento)
+        self._repo.confirmar()
+        self._repo.refrescar(documento)
         return documento
 
     def mover_archivos_formulario_a_contraparte(
@@ -110,22 +109,14 @@ class DocumentoService:
                     shutil.move(str(ruta_actual), str(ruta_nueva))
                 doc.ruta_archivo = str(ruta_nueva)
 
-        self._sesion.commit()
+        self._repo.confirmar()
 
         if directorio_origen.exists() and not any(directorio_origen.iterdir()):
             directorio_origen.rmdir()
 
     def buscar_documento(self, formulario_id: str, doc_id: str) -> DocumentoAdjunto:
         """Recupera un documento adjunto por ID y formulario, o lanza DocumentoNoEncontradoError."""
-        documento = (
-            self._sesion.query(DocumentoAdjunto)
-            .filter(
-                DocumentoAdjunto.id == doc_id,
-                DocumentoAdjunto.formulario_id == formulario_id,
-                DocumentoAdjunto.deleted_at.is_(None),
-            )
-            .first()
-        )
+        documento = self._repo.buscar(formulario_id, doc_id)
         if not documento:
             raise DocumentoNoEncontradoError(formulario_id, doc_id)
         return documento
@@ -137,15 +128,8 @@ class DocumentoService:
         if ruta.exists():
             ruta.unlink()
         documento.deleted_at = datetime.now(timezone.utc)
-        self._sesion.commit()
+        self._repo.confirmar()
 
     def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
         """Lista todos los documentos adjuntos activos de un formulario."""
-        return (
-            self._sesion.query(DocumentoAdjunto)
-            .filter(
-                DocumentoAdjunto.formulario_id == formulario_id,
-                DocumentoAdjunto.deleted_at.is_(None),
-            )
-            .all()
-        )
+        return self._repo.listar_activos(formulario_id)
