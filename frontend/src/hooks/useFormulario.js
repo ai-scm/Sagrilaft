@@ -9,7 +9,7 @@
  */
 import { useState, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
-import { TOTAL_STEPS, CAMPOS_REQUERIDOS } from '../data/formularioConfig';
+import { TOTAL_STEPS, CAMPOS_REQUERIDOS, calcularPasosVisibles } from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
@@ -373,13 +373,17 @@ export function useFormulario() {
         const purged = purgarFilasVaciasPaso7({ infoBancariaPagos });
         setInfoBancariaPagos(purged.infoBancariaPagos);
       }
-      setStep(prev => Math.min(prev + 1, TOTAL_STEPS));
+      const visibles = calcularPasosVisibles(formData);
+      const siguientePaso = visibles.find(p => p > step) ?? step;
+      setStep(siguientePaso);
       scrollTop();
     }
   };
 
   const handlePrev = () => {
-    setStep(prev => Math.max(prev - 1, 1));
+    const visibles = calcularPasosVisibles(formData);
+    const anteriorPaso = [...visibles].reverse().find(p => p < step) ?? step;
+    setStep(anteriorPaso);
     scrollTop();
   };
 

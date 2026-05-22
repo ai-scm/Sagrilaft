@@ -7,6 +7,18 @@
 export const TOTAL_STEPS = 8;
 
 /**
+ * Devuelve los números de paso visibles para el formData actual.
+ * El Paso 4 (Junta / Accionistas / Beneficiarios) solo aplica a Persona Jurídica.
+ */
+export function calcularPasosVisibles(formData = {}) {
+  const todos = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1);
+  if (formData.tipo_persona === 'natural') {
+    return todos.filter(p => p !== 4);
+  }
+  return todos;
+}
+
+/**
  * Cargos válidos para la Junta Directiva y Representantes.
  * Fuente única de verdad — agregar nuevas opciones aquí sin tocar el componente.
  */
