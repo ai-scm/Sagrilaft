@@ -1279,3 +1279,110 @@ body {
   margin: 0;
   line-height: 1.5;
 }
+
+/* ========================================
+   Aviso: campos que no aplican (NA)
+   ======================================== */
+
+.aviso-campos-na {
+  background: var(--info-light);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-left: 4px solid var(--info);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  transition: padding 0.2s ease;
+}
+
+.aviso-campos-na--colapsado {
+  padding: 8px 16px;
+}
+
+.aviso-campos-na__encabezado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aviso-campos-na__icono {
+  color: var(--info);
+  font-size: 1rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.aviso-campos-na__resumen {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+.aviso-campos-na__toggle {
+  margin-left: auto;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--info);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.aviso-campos-na__toggle:hover {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.aviso-campos-na__toggle:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.aviso-campos-na__contenido {
+  margin-top: 8px;
+}
+
+.aviso-campos-na__contenido[hidden] {
+  display: none;
+}
+
+.aviso-campos-na__mensaje {
+  font-size: 0.875rem;
+  color: var(--gray-700);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.aviso-campos-na__etiqueta-na {
+  display: inline-block;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 0.9em;
+  color: var(--gray-800);
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  padding: 0 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 600px) {
+  .aviso-campos-na {
+    padding: 10px 12px;
+  }
+
+  .aviso-campos-na__toggle {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aviso-campos-na {
+    transition: none;
+  }
+}

@@ -17,6 +17,7 @@ import { CorreccionProvider, useCorreccion } from '../context/CorreccionContext'
 
 import SubmittedView from './SubmittedView';
 import NavegacionFormulario from './NavegacionFormulario';
+import DisclaimerCamposNoAplicables from './DisclaimerCamposNoAplicables';
 import PasoDocumentos from './pasos/PasoDocumentos';
 import PasoInfoBasica from './pasos/PasoInfoBasica';
 import PasoRepresentante from './pasos/PasoRepresentante';
@@ -194,6 +195,7 @@ export default function FormularioSagrilaft() {
 
         <main className="main-content">
           <BannerCorreccionPendiente onNavegar={irAPasoCorreccion} />
+          <DisclaimerCamposNoAplicables />
 
           <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={handleStepClick} />
 
