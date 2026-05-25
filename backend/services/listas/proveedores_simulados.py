@@ -13,8 +13,7 @@ DRY : _ProveedorSimuladoBase centraliza la normalización y comparación
 
 from typing import List, Optional
 
-from api.schemas import ResultadoListaCautela
-from services.listas.protocolo_listas import ProveedorListaCautelaImp
+from domain.contratos import ProveedorListaCautelaImp, ResultadoBusquedaLista
 from domain.utils.texto import quitar_diacriticos
 
 
@@ -64,21 +63,21 @@ class _ProveedorSimuladoBase:
         self,
         nombre: str,
         numero_identificacion: Optional[str] = None,
-    ) -> ResultadoListaCautela:
+    ) -> ResultadoBusquedaLista:
         """Busca por coincidencia parcial normalizada en los registros en memoria."""
         nombre_normalizado = _normalizar(nombre)
 
         for entrada in self._registros:
             entrada_normalizada = _normalizar(entrada)
             if nombre_normalizado in entrada_normalizada or entrada_normalizada in nombre_normalizado:
-                return ResultadoListaCautela(
+                return ResultadoBusquedaLista(
                     lista=self.nombre,
                     encontrado=True,
                     detalle=f"Coincidencia encontrada en {self.nombre}: '{entrada}'",
                     nivel_riesgo="alto",
                 )
 
-        return ResultadoListaCautela(
+        return ResultadoBusquedaLista(
             lista=self.nombre,
             encontrado=False,
             detalle=f"Sin coincidencias en {self.nombre}",

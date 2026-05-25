@@ -12,12 +12,12 @@ Referencia API: https://www.zoho.com/sign/api/
 import contextlib
 import json
 import logging
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
 
+from domain.contratos import SolicitudFirmaCreada
 from infrastructure.configuracion import ZohoSignConfig
 
 logger = logging.getLogger(__name__)
@@ -27,11 +27,6 @@ _API_BASE  = "https://sign.zoho.com/api/v1"
 
 # Margen de 5 minutos antes de que el token expire para forzar refresco anticipado
 _MARGEN_REFRESCO_SEGUNDOS = 300
-
-
-@dataclass
-class SolicitudFirmaCreada:
-    request_id: str
 
 
 class ZohoSignService:

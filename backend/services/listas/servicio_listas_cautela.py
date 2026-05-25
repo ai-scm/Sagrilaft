@@ -18,8 +18,7 @@ riesgo vivían en el router — ahora están correctamente en este servicio.
 
 from typing import List, Optional
 
-from api.schemas import ResultadoListaCautela, RespuestaListaCautela
-from services.listas.protocolo_listas import ProveedorListaCautelaImp
+from domain.contratos import ProveedorListaCautelaImp, ResultadoBusquedaLista, RespuestaBusquedaLista
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -50,7 +49,7 @@ class CalculadorNivelRiesgo:
         self._umbral_alto = umbral_alto
         self._umbral_medio = umbral_medio
 
-    def calcular(self, resultados: List[ResultadoListaCautela]) -> str:
+    def calcular(self, resultados: List[ResultadoBusquedaLista]) -> str:
         """
         Determina el nivel de riesgo según cuántas listas reportaron coincidencia.
 
@@ -104,7 +103,7 @@ class ListaCautelaService:
         self,
         nombre: str,
         numero_identificacion: Optional[str] = None,
-    ) -> List[ResultadoListaCautela]:
+    ) -> List[ResultadoBusquedaLista]:
         """
         Consulta todos los proveedores registrados y retorna sus resultados.
 
@@ -124,7 +123,7 @@ class ListaCautelaService:
         self,
         nombre: str,
         numero_identificacion: Optional[str] = None,
-    ) -> RespuestaListaCautela:
+    ) -> RespuestaBusquedaLista:
         """
         Busca en todas las listas y calcula el nivel de riesgo consolidado.
 
@@ -140,7 +139,7 @@ class ListaCautelaService:
         """
         resultados = self.buscar_todas_listas(nombre, numero_identificacion)
         nivel_riesgo = self._calculador_riesgo.calcular(resultados)
-        return RespuestaListaCautela(
+        return RespuestaBusquedaLista(
             nombre_buscado=nombre,
             resultados=resultados,
             riesgo_general=nivel_riesgo,

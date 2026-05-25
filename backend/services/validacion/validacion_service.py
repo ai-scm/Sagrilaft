@@ -11,15 +11,14 @@ DIP: depende del orquestador y del servicio de listas vía sus interfaces,
      y no conoce ningún detalle HTTP (sin HTTPException, sin Request).
 """
 
-from typing import Any, Literal
+from typing import Any
 
-from infrastructure.persistencia.models import ResultadoValidacion
 from domain.contratos import HallazgoValidacion
 from domain.puertos.repositorios import RepositorioValidacion
 from domain.validacion.resultado import ResultadoValidacionDominio
+from domain.excepciones import FormularioNoEncontradoError
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.listas.servicio_listas_cautela import ListaCautelaService
-from domain.excepciones import FormularioNoEncontradoError
 
 
 class ValidacionService:
@@ -54,38 +53,32 @@ class ValidacionService:
         formulario = self._obtener_o_error(formulario_id)
         self._limpiar_validaciones_previas(formulario_id)
 
-        resultados: list[ResultadoValidacion] = []
-        resultados += await self._validar_documentos(formulario_id, formulario)
-        resultados += self._validar_listas_cautela(formulario_id, formulario)
+        datos_validaciones: list[dict[str, Any]] = []
+        datos_validaciones += await self._validar_documentos(formulario_id, formulario)
+        datos_validaciones += self._validar_listas_cautela(formulario_id, formulario)
 
-        self._repo.confirmar()
-        for resultado in resultados:
-            self._repo.refrescar(resultado)
-
-        return [self._orm_a_dominio(r) for r in resultados]
+        return self._repo.guardar_validaciones(datos_validaciones)
 
     # ── Helpers de orquestación ──────────────────────────────────────────────────
 
     def _obtener_o_error(self, formulario_id: str):
-        """Recupera el formulario o lanza FormularioNoEncontradoError."""
         formulario = self._repo.obtener_formulario(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
     def _limpiar_validaciones_previas(self, formulario_id: str) -> None:
-        """Elimina todos los resultados de validaciones anteriores del formulario."""
         self._repo.limpiar_validaciones(formulario_id)
 
     async def _validar_documentos(
         self,
         formulario_id: str,
         formulario,
-    ) -> list[ResultadoValidacion]:
+    ) -> list[dict[str, Any]]:
         """
-        Valida los documentos adjuntos vía IA y prepara los hallazgos para persistir.
+        Valida los documentos adjuntos vía IA y prepara los datos para persistir.
 
-        Retorna los ResultadoValidacion añadidos a sesión (sin commit, para atomicidad).
+        Retorna dicts listos para pasar a guardar_validaciones.
         """
         datos_formulario = self._extraer_datos_relevantes(formulario)
         lista_documentos = [
@@ -100,32 +93,29 @@ class ValidacionService:
             )
         )
 
-        resultados: list[ResultadoValidacion] = []
-
+        datos: list[dict[str, Any]] = []
         for tipo, grupo in [
             ("documento",        hallazgos_individuales),
             ("cruce_documentos", hallazgos_cruzados),
         ]:
             for hallazgo in grupo:
-                resultado = self._hallazgo_a_resultado(formulario_id, tipo, hallazgo)
-                self._repo.agregar_validacion(resultado)
-                resultados.append(resultado)
+                datos.append(self._hallazgo_a_datos(formulario_id, tipo, hallazgo))
 
-        return resultados
+        return datos
 
     def _validar_listas_cautela(
         self,
         formulario_id: str,
         formulario,
-    ) -> list[ResultadoValidacion]:
+    ) -> list[dict[str, Any]]:
         """
         Busca la empresa y el representante en todas las listas de cautela
-        y prepara los resultados para persistir.
+        y prepara los datos para persistir.
         """
-        resultados: list[ResultadoValidacion] = []
+        datos: list[dict[str, Any]] = []
 
         if formulario.razon_social:
-            resultados += self._registrar_busqueda_en_listas(
+            datos += self._registrar_busqueda_en_listas(
                 formulario_id=formulario_id,
                 nombre=formulario.razon_social,
                 numero_identificacion=formulario.numero_identificacion,
@@ -133,14 +123,14 @@ class ValidacionService:
             )
 
         if formulario.nombre_representante:
-            resultados += self._registrar_busqueda_en_listas(
+            datos += self._registrar_busqueda_en_listas(
                 formulario_id=formulario_id,
                 nombre=formulario.nombre_representante,
                 numero_identificacion=formulario.numero_doc_representante,
                 sufijo_campo="(Rep. Legal)",
             )
 
-        return resultados
+        return datos
 
     def _registrar_busqueda_en_listas(
         self,
@@ -148,19 +138,11 @@ class ValidacionService:
         nombre: str,
         numero_identificacion: str | None,
         sufijo_campo: str | None,
-    ) -> list[ResultadoValidacion]:
-        """
-        Ejecuta la búsqueda en listas de cautela para un sujeto y registra
-        cada resultado en la sesión.
-
-        Args:
-            sufijo_campo: Texto para distinguir empresa de representante en el
-                          nombre del campo (ej. "(Rep. Legal)"). None para empresa.
-        """
+    ) -> list[dict[str, Any]]:
         resultados_listas = self._servicio_listas.buscar_todas_listas(
             nombre, numero_identificacion
         )
-        resultados: list[ResultadoValidacion] = []
+        datos: list[dict[str, Any]] = []
 
         for resultado_lista in resultados_listas:
             nombre_campo = (
@@ -168,23 +150,20 @@ class ValidacionService:
                 if sufijo_campo
                 else resultado_lista.lista
             )
-            resultado = ResultadoValidacion(
-                formulario_id=formulario_id,
-                tipo="lista_cautela",
-                campo=nombre_campo,
-                resultado="error" if resultado_lista.encontrado else "ok",
-                detalle=resultado_lista.detalle,
-            )
-            self._repo.agregar_validacion(resultado)
-            resultados.append(resultado)
+            datos.append({
+                "formulario_id": formulario_id,
+                "tipo":          "lista_cautela",
+                "campo":         nombre_campo,
+                "resultado":     "error" if resultado_lista.encontrado else "ok",
+                "detalle":       resultado_lista.detalle,
+            })
 
-        return resultados
+        return datos
 
     # ── Helpers de transformación ────────────────────────────────────────────────
 
     @staticmethod
     def _extraer_datos_relevantes(formulario) -> dict[str, Any]:
-        """Extrae los campos del formulario necesarios para la validación documental."""
         return {
             "razon_social":             formulario.razon_social,
             "numero_identificacion":    formulario.numero_identificacion,
@@ -199,34 +178,17 @@ class ValidacionService:
         }
 
     @staticmethod
-    def _hallazgo_a_resultado(
+    def _hallazgo_a_datos(
         formulario_id: str,
-        tipo: Literal["documento", "cruce_documentos"],
+        tipo: str,
         hallazgo: HallazgoValidacion,
-    ) -> ResultadoValidacion:
-        """Convierte un HallazgoValidacion en un ResultadoValidacion persistible en BD."""
-        return ResultadoValidacion(
-            formulario_id=formulario_id,
-            tipo=tipo,
-            campo=hallazgo.campo,
-            resultado=hallazgo.resultado,
-            detalle=hallazgo.detalle,
-            valor_formulario=hallazgo.valor_formulario,
-            valor_documento=hallazgo.valor_documento,
-        )
-
-    @staticmethod
-    def _orm_a_dominio(resultado: ResultadoValidacion) -> ResultadoValidacionDominio:
-        """Mapea un ResultadoValidacion ORM a su Value Object de dominio."""
-        return ResultadoValidacionDominio(
-            id=resultado.id,
-            formulario_id=resultado.formulario_id,
-            tipo=resultado.tipo,
-            campo=resultado.campo,
-            resultado=resultado.resultado,
-            detalle=resultado.detalle,
-            valor_formulario=resultado.valor_formulario,
-            valor_documento=resultado.valor_documento,
-            created_at=resultado.created_at,
-        )
-
+    ) -> dict[str, Any]:
+        return {
+            "formulario_id":    formulario_id,
+            "tipo":             tipo,
+            "campo":            hallazgo.campo,
+            "resultado":        hallazgo.resultado,
+            "detalle":          hallazgo.detalle,
+            "valor_formulario": hallazgo.valor_formulario,
+            "valor_documento":  hallazgo.valor_documento,
+        }
