@@ -21,11 +21,15 @@ from domain.formulario.tipos import (
     TipoPersona,
     TipoSolicitud,
 )
-from services.formulario.validacion_envio import (
-    ErrorValidacion,
+from domain.utils.coercion import (
     limpiar_numero_id_si_tipo_ausente,
     limpiar_vinculos_pep_si_no_es_pep,
 )
+
+
+class ErrorValidacion(BaseModel):
+    campo: str
+    mensaje: str
 
 from .comunes import (
     DropdownSiNo,

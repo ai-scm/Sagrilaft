@@ -13,7 +13,7 @@ import mimetypes
 from typing import Any, Dict, Tuple
 
 from domain.contratos import ResultadoExtraccion
-from services.formulario.prellenado import mapear_campos_para_formulario
+from domain.utils.mapeo_campos import mapear_campos_para_formulario
 
 logger = logging.getLogger(__name__)
 

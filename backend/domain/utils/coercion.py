@@ -1,4 +1,20 @@
+from typing import Any
+
 from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
+
+
+def limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
+    """Garantiza que numero_id sea nulo cuando tipo_id no está definido."""
+    if isinstance(data, dict) and not data.get('tipo_id'):
+        data = {**data, 'numero_id': None}
+    return data
+
+
+def limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
+    """Garantiza que vinculos_pep sea 'NA' cuando es_pep es 'no'."""
+    if isinstance(data, dict) and data.get('es_pep') == 'no':
+        data = {**data, 'vinculos_pep': 'NA'}
+    return data
 
 
 def vacio_a_nulo(v: object) -> object:
