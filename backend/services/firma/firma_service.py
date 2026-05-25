@@ -19,6 +19,7 @@ from domain.constantes import (
     TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
     TIPO_DOCUMENTO_FORMULARIO_PDF,
 )
+from domain.contratos import DocumentoDatos, IServicioFirmaExterna
 from domain.excepciones import (
     DocumentoNoEncontradoError,
     FirmaNoDisponibleError,
@@ -26,18 +27,15 @@ from domain.excepciones import (
     FormularioNoEncontradoError,
     WebhookTokenInvalidoError,
 )
+from domain.formulario.entidades import FormularioDatos
+from domain.formulario.tipos import EstadoFormulario
 from domain.puertos.repositorios import RepositorioFirma
-from infrastructure.persistencia.models import (
-    DocumentoAdjunto,
-    EstadoFormulario,
-)
 from services.firma.almacenamiento_firma import (
     archivar_version_anterior,
     resolver_ruta_certificado,
     resolver_ruta_documento_firmado,
 )
 from services.firma.certificado_pdf import generar_certificado_pdf
-from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,7 @@ class FirmaService:
     def __init__(
         self,
         repo: RepositorioFirma,
-        zoho: ZohoSignService,
+        zoho: IServicioFirmaExterna,
         upload_dir: Path,
         webhook_secret: str,
     ) -> None:
@@ -63,35 +61,35 @@ class FirmaService:
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
-    def _obtener_formulario(self, formulario_id: str):
+    def _obtener_formulario(self, formulario_id: str) -> FormularioDatos:
         formulario = self._repo.obtener_formulario(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
-    def _obtener_pdf_del_formulario(self, formulario_id: str) -> DocumentoAdjunto:
+    def _obtener_pdf_del_formulario(self, formulario_id: str) -> DocumentoDatos:
         doc = self._repo.obtener_pdf(formulario_id)
         if not doc:
             raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
         return doc
 
-    def _registrar_certificado(self, formulario, ruta_certificado: Path) -> None:
+    def _registrar_certificado(self, formulario: FormularioDatos, ruta_certificado: Path) -> None:
         """
         Registra el certificado SAGRILAFT en documentos_adjuntos para trazabilidad.
 
         Si ya existe un registro previo (re-envío tras cancelación de firma), actualiza
-        la ruta en lugar de crear un duplicado. El commit lo hace el llamador.
+        la ruta en lugar de crear un duplicado.
         """
         existente = self._repo.obtener_certificado(formulario.id)
         if existente:
-            existente.ruta_archivo = str(ruta_certificado)
+            self._repo.actualizar_ruta_certificado(existente.id, str(ruta_certificado))
         else:
-            self._repo.agregar_documento(DocumentoAdjunto(
-                formulario_id=formulario.id,
-                tipo_documento=TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
-                nombre_archivo=ruta_certificado.name,
-                ruta_archivo=str(ruta_certificado),
-            ))
+            self._repo.crear_documento({
+                "formulario_id":  formulario.id,
+                "tipo_documento": TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+                "nombre_archivo": ruta_certificado.name,
+                "ruta_archivo":   str(ruta_certificado),
+            })
 
     # ─── Enviar a firma ───────────────────────────────────────────────────────
 
@@ -152,9 +150,10 @@ class FirmaService:
             ruta_certificado.unlink()
             logger.debug("Certificado temporal eliminado del disco: %s", ruta_certificado)
 
-        formulario.zoho_request_id = resultado.request_id
-        formulario.estado          = EstadoFormulario.PENDIENTE_FIRMA
-        self._repo.confirmar()
+        self._repo.actualizar_formulario(formulario_id, {
+            "zoho_request_id": resultado.request_id,
+            "estado":          EstadoFormulario.PENDIENTE_FIRMA.value,
+        })
 
         logger.info(
             "Formulario %s enviado a firma (paquete: formulario + certificado). "
@@ -163,7 +162,7 @@ class FirmaService:
         )
         return {
             "request_id":      resultado.request_id,
-            "estado":          formulario.estado,
+            "estado":          EstadoFormulario.PENDIENTE_FIRMA.value,
             "correo_firmante": acceso.correo_destinatario,
         }
 
@@ -213,10 +212,10 @@ class FirmaService:
                 request_status,
             )
 
-    def _procesar_firma_completada(self, formulario, request_id: str) -> None:
+    def _procesar_firma_completada(self, formulario: FormularioDatos, request_id: str) -> str:
         if formulario.estado == EstadoFormulario.FIRMADO:
             logger.info("Webhook duplicado ignorado: formulario %s ya está FIRMADO", formulario.id)
-            return
+            return EstadoFormulario.FIRMADO.value
 
         es_refirma_tras_correccion = formulario.ruta_documento_firmado is not None
         if es_refirma_tras_correccion:
@@ -228,16 +227,21 @@ class FirmaService:
         # devuelve múltiples documentos comprimidos. Usamos la ruta real retornada.
         ruta_guardada = self._zoho.descargar_documento_firmado(request_id, ruta_destino)
 
-        formulario.ruta_documento_firmado = str(ruta_guardada)
-        formulario.estado                 = EstadoFormulario.FIRMADO
-        self._repo.confirmar()
+        self._repo.actualizar_formulario(formulario.id, {
+            "ruta_documento_firmado": str(ruta_guardada),
+            "estado":                 EstadoFormulario.FIRMADO.value,
+        })
 
         logger.info("Formulario %s → FIRMADO. Archivo en: %s", formulario.id, ruta_guardada)
+        return EstadoFormulario.FIRMADO.value
 
-    def _procesar_firma_cancelada(self, formulario, request_id: str, status: str) -> None:
-        formulario.estado          = EstadoFormulario.VALIDADO
-        formulario.zoho_request_id = None
-        self._repo.confirmar()
+    def _procesar_firma_cancelada(
+        self, formulario: FormularioDatos, request_id: str, status: str
+    ) -> str:
+        self._repo.actualizar_formulario(formulario.id, {
+            "estado":          EstadoFormulario.VALIDADO.value,
+            "zoho_request_id": None,
+        })
 
         logger.info(
             "Formulario %s devuelto a VALIDADO (ZohoSign status='%s', request_id=%s)",
@@ -245,6 +249,7 @@ class FirmaService:
             status,
             request_id,
         )
+        return EstadoFormulario.VALIDADO.value
 
     # ─── Cancelación de firma ────────────────────────────────────────────────
 
@@ -270,12 +275,13 @@ class FirmaService:
 
         self._zoho.cancelar_solicitud_firma(formulario.zoho_request_id)
 
-        formulario.estado          = EstadoFormulario.VALIDADO
-        formulario.zoho_request_id = None
-        self._repo.confirmar()
+        self._repo.actualizar_formulario(formulario_id, {
+            "estado":          EstadoFormulario.VALIDADO.value,
+            "zoho_request_id": None,
+        })
 
         logger.info("Firma cancelada para formulario %s → VALIDADO", formulario_id)
-        return {"estado": formulario.estado}
+        return {"estado": EstadoFormulario.VALIDADO.value}
 
     # ─── Verificación manual de estado ───────────────────────────────────────
 
@@ -295,17 +301,18 @@ class FirmaService:
             raise FormularioNoEditableError("No hay solicitud de firma activa.")
 
         estado_zoho = self._zoho.obtener_estado_solicitud(formulario.zoho_request_id)
+        estado_nuevo = formulario.estado
 
         if estado_zoho.lower() == "completed":
-            self._procesar_firma_completada(formulario, formulario.zoho_request_id)
+            estado_nuevo = self._procesar_firma_completada(formulario, formulario.zoho_request_id)
         elif estado_zoho.lower() in ("declined", "expired", "recalled"):
-            self._procesar_firma_cancelada(formulario, formulario.zoho_request_id, estado_zoho)
+            estado_nuevo = self._procesar_firma_cancelada(formulario, formulario.zoho_request_id, estado_zoho)
 
         logger.info(
             "Verificación manual formulario %s: ZohoSign='%s' → estado='%s'",
-            formulario_id, estado_zoho, formulario.estado,
+            formulario_id, estado_zoho, estado_nuevo,
         )
-        return {"estado_zoho": estado_zoho, "estado": formulario.estado}
+        return {"estado_zoho": estado_zoho, "estado": estado_nuevo}
 
     # ─── Descarga del firmado ─────────────────────────────────────────────────
 

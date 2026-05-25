@@ -6,46 +6,21 @@ import json
 import re
 from typing import Any, Callable, List, Optional, Tuple
 
-from pydantic import BaseModel
 from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
-from infrastructure.persistencia.models import Formulario
+from domain.contratos import ErrorCampoFormulario
+from domain.formulario.entidades import FormularioDatos
 
 _REGEX_TELEFONO = re.compile(r'^\d{10}$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA   = 5
 UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL = 25
 
-def limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
-    """
-    Garantiza que numero_id sea nulo cuando tipo_id no está definido.
-
-    Aplica a todos los sub-schemas de identificación (MiembroJunta,
-    Accionista, BeneficiarioFinal). Previene datos inconsistentes
-    en peticiones directas a la API.
-    """
-    if isinstance(data, dict) and not data.get('tipo_id'):
-        data = {**data, 'numero_id': None}
-    return data
-
-
-def limpiar_vinculos_pep_si_no_es_pep(data: Any) -> Any:
-    """
-    Garantiza que vinculos_pep sea 'NA' cuando es_pep es 'no'.
-    Consistencia con el frontend para campos dependientes.
-    """
-    if isinstance(data, dict) and data.get('es_pep') == 'no':
-        data = {**data, 'vinculos_pep': 'NA'}
-    return data
-
-
 def _esta_vacio(valor: Any) -> bool:
     """Fuente única de verdad para detectar un campo sin diligenciar."""
     return valor is None or (isinstance(valor, str) and not valor.strip())
 
 
-class ErrorValidacion(BaseModel):
-    campo: str
-    mensaje: str
+ErrorValidacion = ErrorCampoFormulario
 
 
 class ValidadorEnvioFormulario:
@@ -175,7 +150,7 @@ class ValidadorEnvioFormulario:
 
     # ── Orquestador principal ─────────────────────────────────────────────────
 
-    def validar(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def validar(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         """
         Valida que todos los campos requeridos estén diligenciados y que
         las declaraciones obligatorias estén aceptadas.
@@ -213,13 +188,13 @@ class ValidadorEnvioFormulario:
 
     # ── Validadores por sección ───────────────────────────────────────────────
 
-    def _validar_campos_persona_natural(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_campos_persona_natural(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         return self._errores_presencia(formulario, self._CAMPOS_PERSONA_NATURAL)
 
-    def _validar_clasificacion_tributaria(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_clasificacion_tributaria(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         return self._errores_presencia(formulario, self._CAMPOS_CLASIFICACION_JURIDICA)
 
-    def _validar_campos_fecha_firma(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_campos_fecha_firma(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         """Valida rangos de día (1-31), mes (1-12) y año (2000-2100) de la firma."""
         errores: List[ErrorValidacion] = []
 
@@ -246,7 +221,7 @@ class ValidadorEnvioFormulario:
 
         return errores
 
-    def _validar_campos_moneda_extranjera(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_campos_moneda_extranjera(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         """
         Valida los campos condicionales de operaciones en moneda extranjera.
         Solo se evalúan cuando la empresa declara que sí realiza este tipo de operaciones.
@@ -272,7 +247,7 @@ class ValidadorEnvioFormulario:
 
         return errores
 
-    def _validar_formatos(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_formatos(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         """
         Valida que teléfonos y correos tengan el formato correcto.
         Solo corre en envío final — los borradores aceptan valores parciales.
@@ -298,13 +273,13 @@ class ValidadorEnvioFormulario:
 
         return errores
 
-    def _validar_junta_directiva(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_junta_directiva(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         filas = self._deserializar_lista(formulario.junta_directiva)
         return self._validar_filas_tabla(
             filas, "Junta Directiva y Representantes", "junta_directiva", self._CAMPOS_JUNTA,
         )
 
-    def _validar_accionistas(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_accionistas(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         filas = self._deserializar_lista(formulario.accionistas)
         errores = self._validar_filas_tabla(
             filas, "Composición Accionaria", "accionistas",
@@ -320,7 +295,7 @@ class ValidadorEnvioFormulario:
             errores.append(error_total)
         return errores
 
-    def _validar_beneficiarios(self, formulario: Formulario) -> List[ErrorValidacion]:
+    def _validar_beneficiarios(self, formulario: FormularioDatos) -> List[ErrorValidacion]:
         filas = self._deserializar_lista(formulario.beneficiario_final)
         errores = self._validar_filas_tabla(
             filas, "Beneficiario Final", "beneficiario_final",
@@ -342,7 +317,7 @@ class ValidadorEnvioFormulario:
 
     @staticmethod
     def _errores_presencia(
-        formulario: Formulario, campos: List[Tuple[str, str]]
+        formulario: FormularioDatos, campos: List[Tuple[str, str]]
     ) -> List[ErrorValidacion]:
         return [
             ErrorValidacion(campo=campo, mensaje=f"El campo '{nombre}' es obligatorio")
@@ -354,7 +329,7 @@ class ValidadorEnvioFormulario:
 
     @staticmethod
     def _errores_formato(
-        formulario: Formulario,
+        formulario: FormularioDatos,
         campos: List[Tuple[str, str]],
         regex: re.Pattern,
         mensaje: str,
@@ -422,7 +397,7 @@ class ValidadorEnvioFormulario:
     # ── Helpers de estado del formulario ─────────────────────────────────────
 
     @staticmethod
-    def _es_persona_juridica(formulario: Formulario) -> bool:
+    def _es_persona_juridica(formulario: FormularioDatos) -> bool:
         """
         Determina si el formulario corresponde a una Persona Jurídica.
         Centralizar esta guarda evita repetir la comparación de string
@@ -431,7 +406,7 @@ class ValidadorEnvioFormulario:
         return (formulario.tipo_persona or "").lower() == "juridica"
 
     @staticmethod
-    def _realiza_operaciones_en_moneda_extranjera(formulario: Formulario) -> bool:
+    def _realiza_operaciones_en_moneda_extranjera(formulario: FormularioDatos) -> bool:
         return (formulario.realiza_operaciones_moneda_extranjera or "").lower() == "si"
 
     # ── Helpers de deserialización ────────────────────────────────────────────

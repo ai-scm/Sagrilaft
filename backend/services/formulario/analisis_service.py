@@ -6,8 +6,8 @@ documentos adjuntos, y detección de inconsistencias.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from infrastructure.persistencia.models import DocumentoAdjunto, Formulario
-from domain.contratos import AlertaInconsistencia, ExtractorIAImp
+from domain.contratos import AlertaInconsistencia, DocumentoDatos, ExtractorIAImp
+from domain.formulario.entidades import FormularioDatos
 from services.formulario.prellenado import mapear_campos_para_formulario
 
 from services.validacion.comparadores.detector_inconsistencias_nombre import detector as _detector_nombres
@@ -42,7 +42,7 @@ class ConfigDetector:
     detector:         IDetector
     attr_extraido:    str
     attr_alerta:      str
-    get_extra_kwargs: Callable[[Formulario], Dict[str, Any]] = field(
+    get_extra_kwargs: Callable[[FormularioDatos], Dict[str, Any]] = field(
         default_factory=lambda: lambda _: {}
     )
 
@@ -83,7 +83,7 @@ class ResultadoGuardadoDocumento:
         direccion_extraida:                Dirección encontrada en el documento.
         alerta_direccion:                  Alerta si la dirección del documento no coincide.
     """
-    documento:                         DocumentoAdjunto
+    documento:                         DocumentoDatos
     campos_sugeridos:                  Dict[str, Any]                 = field(default_factory=dict)
     razon_social_extraida:             Optional[str]                  = None
     alerta_nombre:                     Optional[AlertaInconsistencia] = None
@@ -117,7 +117,7 @@ def obtener_config_analisis_por_defecto() -> List[ConfigDetector]:
             detector         = _detector_nit,
             attr_extraido    = "nit_extraido",
             attr_alerta      = "alerta_nit",
-            get_extra_kwargs = lambda f: {"tipo_identificacion_formulario": f.tipo_identificacion},
+            get_extra_kwargs = lambda f: {"tipo_identificacion_formulario": f.tipo_identificacion},  # type: ignore[arg-type]
         ),
         ConfigDetector(
             campo_formulario = "nombre_representante",
@@ -162,7 +162,7 @@ class AnalisisDocumentosService:
     # Método privado compartido
     # -----------------------------------------------------------------------
 
-    async def _extraer(self, documento: DocumentoAdjunto) -> _ResultadoExtraccion:
+    async def _extraer(self, documento: DocumentoDatos) -> _ResultadoExtraccion:
         """Extrae y mapea los datos de un documento. Punto único de entrada a la IA."""
         extraccion = await self._extractor.extraer(
             str(documento.ruta_archivo), documento.tipo_documento
@@ -188,8 +188,8 @@ class AnalisisDocumentosService:
 
     async def analizar_nueva_carga(
         self,
-        documento: DocumentoAdjunto,
-        formulario: Formulario,
+        documento: DocumentoDatos,
+        formulario: FormularioDatos,
     ) -> ResultadoGuardadoDocumento:
         """
         Extrae datos del documento guardado y cruza contra los valores
@@ -227,7 +227,7 @@ class AnalisisDocumentosService:
         return resultado
 
     async def prellenar_documento(
-        self, documento: DocumentoAdjunto
+        self, documento: DocumentoDatos
     ) -> Dict[str, Any]:
         """
         Escanea un documento individual y devuelve campos consolidados.
@@ -246,7 +246,7 @@ class AnalisisDocumentosService:
         }
 
     async def prellenar_multiples_documentos(
-        self, documentos: List[DocumentoAdjunto]
+        self, documentos: List[DocumentoDatos]
     ) -> Dict[str, Any]:
         """
         Escanea todos los documentos y extrae valores con IA.

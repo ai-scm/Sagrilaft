@@ -11,8 +11,8 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from domain.formulario.entidades import FormularioDatos
 from domain.utils.fechas import NOMBRES_MESES_ES
-from infrastructure.persistencia.models import Formulario
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ _SIGLAS_DOC = {
 }
 
 
-def generar_certificado_pdf(formulario: Formulario, output_path: Path) -> Path:
+def generar_certificado_pdf(formulario: FormularioDatos, output_path: Path) -> Path:
     """
     Genera el Certificado de Terceros SAGRILAFT como PDF y lo guarda en output_path.
 
@@ -58,7 +58,7 @@ def generar_certificado_pdf(formulario: Formulario, output_path: Path) -> Path:
 
 # ─── Renderizado HTML ──────────────────────────────────────────────────────────
 
-def _render_certificado(formulario: Formulario) -> str:
+def _render_certificado(formulario: FormularioDatos) -> str:
     ahora = datetime.now(timezone.utc)
 
     nombre_repr = formulario.nombre_representante or "___________________"

@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from infrastructure.persistencia.models import Formulario
+from domain.formulario.entidades import FormularioDatos
 from services.formulario.almacenamiento_contraparte import resolver_ruta_contraparte
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def resolver_ruta_certificado(pdf_formulario: Path) -> Path:
     return pdf_formulario.parent / _NOMBRE_PDF_CERTIFICADO
 
 
-def resolver_ruta_documento_firmado(formulario: Formulario, upload_dir: Path) -> Path:
+def resolver_ruta_documento_firmado(formulario: FormularioDatos, upload_dir: Path) -> Path:
     """Devuelve la ruta en disco donde se guarda el PDF firmado del formulario."""
     directorio_contraparte = resolver_ruta_contraparte(
         tipo_contraparte=formulario.tipo_contraparte or "",

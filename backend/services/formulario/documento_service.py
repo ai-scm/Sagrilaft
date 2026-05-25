@@ -6,10 +6,9 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import List
-from datetime import datetime, timezone
+from typing import Dict, List
 
-from infrastructure.persistencia.models import DocumentoAdjunto
+from domain.contratos import DocumentoDatos
 from domain.excepciones import DocumentoNoEncontradoError
 from domain.puertos.repositorios import RepositorioDocumento
 
@@ -73,33 +72,30 @@ class DocumentoService:
         ruta_archivo: Path,
         content_type: str,
         tamano: int,
-    ) -> DocumentoAdjunto:
+    ) -> DocumentoDatos:
         """Crea y persiste el registro de un documento adjunto en la BD."""
-        documento = DocumentoAdjunto(
-            formulario_id=formulario_id,
-            tipo_documento=tipo_documento,
-            nombre_archivo=nombre_archivo,
-            ruta_archivo=str(ruta_archivo),
-            content_type=content_type,
-            tamano=tamano,
-        )
-        self._repo.agregar(documento)
-        self._repo.confirmar()
-        self._repo.refrescar(documento)
-        return documento
+        return self._repo.crear({
+            "formulario_id": formulario_id,
+            "tipo_documento": tipo_documento,
+            "nombre_archivo": nombre_archivo,
+            "ruta_archivo": str(ruta_archivo),
+            "content_type": content_type,
+            "tamano": tamano,
+        })
 
     def mover_archivos_formulario_a_contraparte(
         self, formulario_id: str, ruta_destino: Path
     ) -> None:
         """
         Mueve todos los archivos activos del formulario al directorio de la contraparte
-        y actualiza las rutas en BD.
+        y actualiza las rutas en BD en una sola transacción.
         """
         documentos = self.listar_documentos(formulario_id)
         if not documentos:
             return
 
         directorio_origen = Path(documentos[0].ruta_archivo).parent
+        rutas_nuevas: Dict[str, str] = {}
 
         for doc in documentos:
             ruta_actual = Path(doc.ruta_archivo)
@@ -107,14 +103,15 @@ class DocumentoService:
             if ruta_actual != ruta_nueva:
                 if ruta_actual.exists():
                     shutil.move(str(ruta_actual), str(ruta_nueva))
-                doc.ruta_archivo = str(ruta_nueva)
+                rutas_nuevas[doc.id] = str(ruta_nueva)
 
-        self._repo.confirmar()
+        if rutas_nuevas:
+            self._repo.actualizar_rutas(rutas_nuevas)
 
         if directorio_origen.exists() and not any(directorio_origen.iterdir()):
             directorio_origen.rmdir()
 
-    def buscar_documento(self, formulario_id: str, doc_id: str) -> DocumentoAdjunto:
+    def buscar_documento(self, formulario_id: str, doc_id: str) -> DocumentoDatos:
         """Recupera un documento adjunto por ID y formulario, o lanza DocumentoNoEncontradoError."""
         documento = self._repo.buscar(formulario_id, doc_id)
         if not documento:
@@ -127,9 +124,8 @@ class DocumentoService:
         ruta = Path(documento.ruta_archivo)
         if ruta.exists():
             ruta.unlink()
-        documento.deleted_at = datetime.now(timezone.utc)
-        self._repo.confirmar()
+        self._repo.marcar_eliminado(doc_id)
 
-    def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
+    def listar_documentos(self, formulario_id: str) -> List[DocumentoDatos]:
         """Lista todos los documentos adjuntos activos de un formulario."""
         return self._repo.listar_activos(formulario_id)

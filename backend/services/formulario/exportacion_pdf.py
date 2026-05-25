@@ -15,10 +15,10 @@ from html import escape
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
+from domain.formulario.entidades import FormularioDatos
 from domain.utils.fechas import NOMBRES_MESES_ES
-from infrastructure.persistencia.models import Formulario
 from services.formulario.documento_service import DocumentoService
-from services.formulario.serializacion import deserializar_campos_json
+from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
 
 
 # ─── Tipos del dominio ────────────────────────────────────────────────────────
@@ -490,7 +490,7 @@ class ExportadorFormularioPdf:
         self._documentos = documentos
 
     def generar_y_guardar_pdf(
-        self, formulario: Formulario, directorio_destino: Path
+        self, formulario: FormularioDatos, directorio_destino: Path
     ) -> ArchivoPdfGenerado:
         datos = deserializar_campos_json(formulario)
         codigo = _valor_a_texto(datos.get("codigo_peticion")) or formulario.id

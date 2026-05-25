@@ -3,34 +3,28 @@ FormularioService — lógica de negocio para formularios SAGRILAFT.
 
 Organiza responsabilidades en capas claras:
   - Funciones de serialización JSON: delegadas a serializacion.py
-  - ValidadorEnvioFormulario: delegado a validacion.py
+  - ValidadorEnvioFormulario: delegado a validacion_envio.py
   - DocumentoService: maneja CRUD y sistema de archivos de adjuntos.
   - AnalisisDocumentosService: orquesta extracción de datos vía IA.
   - FormularioService: CRUD de formularios e integración (Facade).
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from pathlib import Path
 
+from domain.formulario.entidades import FormularioDatos
 from domain.formulario.tipos import EstadoFormulario
-from infrastructure.persistencia.models import Formulario
-from api.schemas import (
-    FormularioCreate,
-    FormularioUpdate,
-    ResultadoValidacionEnvio,
-)
 from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
+from domain.contratos import ExtractorIAImp, ResultadoEnvioFormulario
 from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,
-    FormularioYaEnviadoError,
 )
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
-from domain.contratos import ExtractorIAImp
+from domain.utils.estado_formulario import es_estado_editable
 from services.formulario.serializacion import (
-    serializar_campos_json,
-    deserializar_campos_json,
     construir_snapshot_formulario,
+    formulario_a_dict,
 )
 from services.formulario.validacion_envio import ValidadorEnvioFormulario
 from services.formulario.documento_service import DocumentoService
@@ -44,7 +38,6 @@ from services.formulario.analisis_service import (
     ResultadoGuardadoDocumento,
     obtener_config_analisis_por_defecto,
 )
-from domain.utils.estado_formulario import es_estado_borrador, es_estado_editable
 
 
 class FormularioService:
@@ -73,46 +66,35 @@ class FormularioService:
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
-    def crear_borrador(self, datos: FormularioCreate) -> Dict[str, Any]:
-        datos_dict = serializar_campos_json(datos.model_dump(exclude_unset=True))
-        formulario = Formulario(**datos_dict)
-        self._repo.agregar(formulario)
-        self._repo.confirmar()
-        self._repo.refrescar(formulario)
-        return deserializar_campos_json(formulario)
+    def crear_borrador(self, datos: Dict[str, Any]) -> Dict[str, Any]:
+        formulario = self._repo.crear(datos)
+        return formulario_a_dict(formulario)
 
     def obtener_por_codigo(self, codigo: str) -> Dict[str, Any]:
         formulario = self._repo.obtener_por_codigo(codigo)
         if not formulario:
             raise FormularioNoEncontradoError(codigo)
-
         return construir_snapshot_formulario(formulario)
 
-    def actualizar(self, formulario_id: str, datos: FormularioUpdate) -> Dict[str, Any]:
+    def actualizar(self, formulario_id: str, datos: Dict[str, Any]) -> Dict[str, Any]:
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "No se puede modificar un formulario que ya fue enviado",
         )
+        formulario_actualizado = self._repo.actualizar(formulario_id, datos)
+        return formulario_a_dict(formulario_actualizado)
 
-        datos_actualizacion = serializar_campos_json(datos.model_dump(exclude_unset=True))
-        for clave, valor in datos_actualizacion.items():
-            setattr(formulario, clave, valor)
-
-        self._repo.confirmar()
-        self._repo.refrescar(formulario)
-        return deserializar_campos_json(formulario)
-
-    def enviar(self, formulario_id: str) -> ResultadoValidacionEnvio:
+    def enviar(self, formulario_id: str) -> ResultadoEnvioFormulario:
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "El formulario ya fue enviado previamente",
         )
 
         errores = self._validador_envio.validar(formulario)
         if errores:
-            return ResultadoValidacionEnvio(valido=False, errores=errores)
+            return ResultadoEnvioFormulario(valido=False, errores=errores)
 
         ruta_contraparte = resolver_ruta_contraparte(
             formulario.tipo_contraparte,
@@ -125,9 +107,8 @@ class FormularioService:
         pdf = self._exportador_pdf.generar_y_guardar_pdf(formulario, ruta_contraparte)
         self._registrar_pdf_oficial(formulario.id, pdf)
 
-        formulario.estado = EstadoFormulario.ENVIADO.value
-        self._repo.confirmar()
-        return ResultadoValidacionEnvio(valido=True, errores=[])
+        self._repo.actualizar(formulario_id, {"estado": EstadoFormulario.ENVIADO.value})
+        return ResultadoEnvioFormulario(valido=True, errores=[])
 
     # ─── Gestión de documentos adjuntos ──────────────────────────────────────
 
@@ -140,7 +121,7 @@ class FormularioService:
         content_type: str,
     ) -> ResultadoGuardadoDocumento:
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "No se pueden agregar documentos a un formulario enviado",
         )
@@ -154,30 +135,27 @@ class FormularioService:
         documento = self._documentos.registrar_documento_en_bd(
             formulario_id=formulario_id,
             tipo_documento=tipo_documento,
-            nombre_archivo=ruta_archivo.name,  # nombre ya sanitizado por guardar_archivo_en_disco
+            nombre_archivo=ruta_archivo.name,
             ruta_archivo=ruta_archivo,
             content_type=content_type,
             tamano=len(contenido_bytes),
         )
-        # El commit dentro de registrar_documento_en_bd expira todos los objetos
-        # de la sesión. Refrescar antes de pasarlo al análisis evita ObjectDeletedError.
-        self._repo.refrescar(formulario)
-
+        # FormularioDatos es un dataclass desacoplado de la sesión SQLAlchemy:
+        # no expira tras commits del repositorio de documentos. No se necesita refrescar.
         return await self._analisis.analizar_nueva_carga(
             documento=documento,
-            formulario=formulario
+            formulario=formulario,
         )
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "No se pueden eliminar documentos de un formulario enviado",
         )
         self._documentos.eliminar_documento(formulario_id, doc_id)
 
     def listar_documentos(self, formulario_id: str) -> List[Any]:
-        # Para consistencia: si el formulario no existe, se responde 404.
         self._buscar_formulario_o_error(formulario_id)
         return self._documentos.listar_documentos(formulario_id)
 
@@ -187,18 +165,16 @@ class FormularioService:
         self, formulario_id: str, doc_id: str
     ) -> Dict[str, Any]:
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "No se puede prellenar un formulario que ya fue enviado",
         )
-        # El router traduce DocumentoNoEncontradoError -> 404.
         documento = self._documentos.buscar_documento(formulario_id, doc_id)
         return await self._analisis.prellenar_documento(documento)
 
     async def prellenar_todos(self, formulario_id: str) -> Dict[str, Any]:
-        """Solo es invocado en estado borrador."""
         formulario = self._buscar_formulario_o_error(formulario_id)
-        self._verificar_estado_borrador_o_error(
+        self._verificar_estado_editable_o_error(
             formulario,
             "No se puede prellenar un formulario que ya fue enviado",
         )
@@ -207,16 +183,16 @@ class FormularioService:
 
     # ─── Helpers privados ─────────────────────────────────────────────────────
 
-    def _buscar_formulario_o_error(self, formulario_id: str) -> Formulario:
-        """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
+    def _buscar_formulario_o_error(self, formulario_id: str) -> FormularioDatos:
         formulario = self._repo.obtener_por_id(formulario_id)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
 
     @staticmethod
-    def _verificar_estado_borrador_o_error(formulario: Formulario, mensaje_error: str) -> None:
-        """Variante de dominio (sin HTTPException). Usada por el flujo /enviar."""
+    def _verificar_estado_editable_o_error(
+        formulario: FormularioDatos, mensaje_error: str
+    ) -> None:
         if not es_estado_editable(formulario.estado):
             raise FormularioNoEditableError(mensaje_error)
 
