@@ -5,37 +5,19 @@ Responsabilidad exclusiva: recibir la solicitud HTTP, delegar al ValidacionServi
 y traducir excepciones de dominio a respuestas HTTP apropiadas.
 
 SRP : sin lógica de negocio ni orquestación — esa vive en ValidacionService.
-DIP : depende de ValidacionService vía inyección de dependencias.
+DIP : depende de api.dependencies, no de infrastructure directamente.
 """
 
 from typing import List
 
 from fastapi import APIRouter, Depends
 
-from infrastructure.dependencies import (
-    obtener_orquestador,
-    obtener_repo_validacion,
-    obtener_servicio_lista_cautela,
-)
-from infrastructure.persistencia.repositorios import RepositorioValidacionSQLAlchemy
+from api.dependencies import obtener_servicio_validacion
 from api.schemas import ValidacionResponse
 from domain.validacion.resultado import ResultadoValidacionDominio
-from services.validacion.orquestador import OrquestadorValidacionDocumentos
-from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.validacion_service import ValidacionService
 
 enrutador = APIRouter(prefix="/api/validar", tags=["validación"])
-
-
-# ─── Fábrica de dependencias ─────────────────────────────────────────────────
-
-def obtener_servicio_validacion(
-    repo: RepositorioValidacionSQLAlchemy = Depends(obtener_repo_validacion),
-    orquestador: OrquestadorValidacionDocumentos = Depends(obtener_orquestador),
-    servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
-) -> ValidacionService:
-    """Construye el ValidacionService con las dependencias inyectadas."""
-    return ValidacionService(repo, orquestador, servicio_listas)
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────

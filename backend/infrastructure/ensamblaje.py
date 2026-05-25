@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from infrastructure.configuracion import AppConfig
 from infrastructure.ia.bedrock_extractor import ExtractorBedrock
-from services.listas.protocolo_listas import ProveedorListaCautelaImp
+from domain.contratos import ProveedorListaCautelaImp
 from services.listas.proveedores_simulados import PROVEEDORES_SIMULADOS
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.orquestador import OrquestadorValidacionDocumentos

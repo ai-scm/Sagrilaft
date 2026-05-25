@@ -12,8 +12,8 @@ DIP : delega completamente en ListaCautelaService mediante inyección de depende
 
 from fastapi import APIRouter, Depends
 
-from infrastructure.dependencies import obtener_servicio_lista_cautela
-from api.schemas import BusquedaListaCautela, RespuestaListaCautela
+from api.dependencies import obtener_servicio_lista_cautela
+from api.schemas import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
 from services.listas.servicio_listas_cautela import ListaCautelaService
 
 enrutador = APIRouter(prefix="/api/listas-cautela", tags=["listas de cautela"])
@@ -34,7 +34,20 @@ def buscar_en_listas(
     - Contraloría General de la República
     - Policía Nacional
     """
-    return servicio.buscar_y_evaluar(
+    resultado = servicio.buscar_y_evaluar(
         busqueda.nombre,
         busqueda.numero_identificacion,
+    )
+    return RespuestaListaCautela(
+        nombre_buscado=resultado.nombre_buscado,
+        resultados=[
+            ResultadoListaCautela(
+                lista=r.lista,
+                encontrado=r.encontrado,
+                detalle=r.detalle,
+                nivel_riesgo=r.nivel_riesgo,
+            )
+            for r in resultado.resultados
+        ],
+        riesgo_general=resultado.riesgo_general,
     )

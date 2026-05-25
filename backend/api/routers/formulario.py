@@ -3,23 +3,14 @@ Router de formularios — responsabilidades HTTP exclusivamente.
 
 SRP : parsea solicitudes, delega al servicio y devuelve respuestas.
       Toda la lógica de negocio vive en FormularioService.
-DIP : depende de la abstracción ExtractorIAImp, no de la implementación Bedrock.
+DIP : depende de api.dependencies, no de infrastructure directamente.
 """
 
 from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
 
-from infrastructure.dependencies import (
-    obtener_config,
-    obtener_extractor,
-    obtener_repo_documento,
-    obtener_repo_formulario,
-)
-from infrastructure.persistencia.repositorios import (
-    RepositorioDocumentoSQLAlchemy,
-    RepositorioFormularioSQLAlchemy,
-)
+from api.dependencies import obtener_servicio_acceso, obtener_servicio_formulario
 from api.schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
@@ -30,27 +21,12 @@ from api.schemas import (
     FormularioUpdate,
     ResultadoValidacionEnvio,
 )
-from api.dependencies import obtener_servicio_acceso
-from domain.contratos import ExtractorIAImp
-from infrastructure.configuracion import AppConfig
 from api.limitador import limitador
-from services.formulario.formulario_service import FormularioService
-from services.acceso_manual.acceso_manual_service import AccesoManualService
 from api.transformadores import construir_respuesta_documento
+from services.acceso_manual.acceso_manual_service import AccesoManualService
+from services.formulario.formulario_service import FormularioService
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
-
-
-# ─── Fábrica de dependencias ─────────────────────────────────────────────────
-
-def obtener_servicio_formulario(
-    repo: RepositorioFormularioSQLAlchemy = Depends(obtener_repo_formulario),
-    repo_doc: RepositorioDocumentoSQLAlchemy = Depends(obtener_repo_documento),
-    extractor: ExtractorIAImp = Depends(obtener_extractor),
-    config: AppConfig = Depends(obtener_config),
-) -> FormularioService:
-    """Crea un FormularioService con las dependencias inyectadas."""
-    return FormularioService(repo, repo_doc, extractor, config.upload_dir)
 
 
 # ─── Recuperación de sesión ──────────────────────────────────────────────────
@@ -99,7 +75,7 @@ def crear_formulario(
     servicio: FormularioService = Depends(obtener_servicio_formulario),
 ) -> FormularioResponse:
     """Crea un nuevo formulario en estado borrador."""
-    return servicio.crear_borrador(datos)
+    return servicio.crear_borrador(datos.model_dump(exclude_unset=True))
 
 
 @enrutador.get("/{formulario_id}", response_model=FormularioConDetalles)
@@ -118,7 +94,7 @@ def actualizar_formulario(
     servicio: FormularioService = Depends(obtener_servicio_formulario),
 ) -> FormularioResponse:
     """Actualiza un formulario en estado borrador (guardado parcial)."""
-    return servicio.actualizar(formulario_id, datos)
+    return servicio.actualizar(formulario_id, datos.model_dump(exclude_unset=True))
 
 
 @enrutador.post(
@@ -152,12 +128,17 @@ def enviar_formulario(
         codigo_peticion=credenciales.codigo_peticion if credenciales else None,
         pin=credenciales.pin if credenciales else None,
     )
-    resultado = servicio.enviar(formulario_id)
-    if resultado.valido and credenciales is not None:
+    resultado_dominio = servicio.enviar(formulario_id)
+    if resultado_dominio.valido and credenciales is not None:
         # Si el formulario tiene AccesoManual, dejar evidencia consistente de consumo
         # independientemente del tipo de credencial usada (token o código+PIN).
         servicio_acceso.marcar_consumido_al_enviar(formulario_id)
-    return resultado
+    return ResultadoValidacionEnvio(
+        valido=resultado_dominio.valido,
+        errores=[
+            {"campo": e.campo, "mensaje": e.mensaje} for e in resultado_dominio.errores
+        ],
+    )
 
 
 # ─── Endpoints de documentos adjuntos ────────────────────────────────────────

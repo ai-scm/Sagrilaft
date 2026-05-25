@@ -5,6 +5,7 @@ Expone endpoints de solo lectura para consultar formularios enviados por
 clientes y proveedores, incluyendo la descarga de documentos adjuntos.
 
 SRP: parsea solicitudes HTTP y delega toda la lógica al ExpedienteService.
+DIP: depende de api.dependencies, no de infrastructure directamente.
 """
 
 from typing import List, Optional
@@ -12,22 +13,18 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 
-from api.dependencies import obtener_servicio_acceso, obtener_servicio_email, obtener_servicio_firma
+from api.dependencies import (
+    obtener_servicio_acceso,
+    obtener_servicio_email,
+    obtener_servicio_expediente,
+    obtener_servicio_firma,
+)
 from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, SolicitudDevolucion
-from infrastructure.dependencies import obtener_repo_expediente
-from infrastructure.persistencia.repositorios import RepositorioExpedienteSQLAlchemy
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
-from infrastructure.notificaciones.email_service import EmailService
 
 enrutador = APIRouter(prefix="/api/expedientes", tags=["expedientes"])
-
-
-def _obtener_servicio(
-    repo: RepositorioExpedienteSQLAlchemy = Depends(obtener_repo_expediente),
-) -> ExpedienteService:
-    return ExpedienteService(repo)
 
 
 # ─── Listado ──────────────────────────────────────────────────────────────────
@@ -45,7 +42,7 @@ def _obtener_servicio(
 def listar_expedientes(
     tipo_contraparte: Optional[str] = Query(None, description="'CLIENTE' o 'PROVEEDOR'"),
     busqueda: Optional[str] = Query(None, description="Texto libre en razón social"),
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> List[ExpedienteResumen]:
     return servicio.listar_expedientes(
         tipo_contraparte=tipo_contraparte,
@@ -64,7 +61,7 @@ def listar_expedientes(
 )
 def obtener_expediente(
     formulario_id: str,
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ExpedienteDetalle:
     return servicio.obtener_expediente(formulario_id)
 
@@ -80,7 +77,7 @@ def obtener_expediente(
 def descargar_documento(
     formulario_id: str,
     doc_id: str,
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> FileResponse:
     ruta, nombre_archivo, content_type = servicio.resolver_documento_para_descarga(
         formulario_id, doc_id
@@ -101,7 +98,7 @@ def descargar_documento(
 )
 def aprobar_expediente(
     formulario_id: str,
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
     return servicio.aprobar_expediente(formulario_id)
 
@@ -113,7 +110,7 @@ def aprobar_expediente(
 )
 def rechazar_expediente(
     formulario_id: str,
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
     return servicio.rechazar_expediente(formulario_id)
 
@@ -132,9 +129,9 @@ def rechazar_expediente(
 def devolver_expediente(
     formulario_id: str,
     solicitud: SolicitudDevolucion,
-    servicio: ExpedienteService = Depends(_obtener_servicio),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
     acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
-    email_service: EmailService = Depends(obtener_servicio_email),
+    email_service = Depends(obtener_servicio_email),
 ) -> ResumenDevolucion:
     return servicio.devolver_para_correccion(
         formulario_id=formulario_id,
