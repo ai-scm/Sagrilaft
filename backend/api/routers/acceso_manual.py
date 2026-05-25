@@ -18,6 +18,7 @@ from api.schemas import (
     FormularioConDetalles,
     SolicitudAccesoManual,
 )
+from domain.contratos import SolicitudCreacionAcceso
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 
 enrutador = APIRouter(prefix="/api/accesos-manuales", tags=["accesos-manuales"])
@@ -40,7 +41,13 @@ def crear_acceso_manual(
     solicitud_acceso: SolicitudAccesoManual,
     servicio: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> AccesoManualCreado:
-    return servicio.crear_acceso(solicitud_acceso)
+    solicitud_dominio = SolicitudCreacionAcceso(
+        tipo_contraparte=solicitud_acceso.tipo_contraparte.value,
+        razon_social=solicitud_acceso.razon_social,
+        correo_destinatario=str(solicitud_acceso.correo_destinatario),
+        area_responsable=solicitud_acceso.area_responsable.value,
+    )
+    return servicio.crear_acceso(solicitud_dominio)
 
 
 # ─── Listado ─────────────────────────────────────────────────────────────────
