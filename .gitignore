@@ -76,6 +76,4 @@ infra/sagrilaft/cdk.context.json   # ← agregar esto (contiene account ID de AW
 postgres_data/
 keycloak_data/
 uploads/
-
-
-.env.example
+realm-sagrilaft.dev.json
