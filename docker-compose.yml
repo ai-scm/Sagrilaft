@@ -1,0 +1,271 @@
+# ============================================================
+# Producción — EC2 + docker-compose
+#
+# Este archivo describe los tres programas que corren juntos en el servidor:
+#   - backend  : la API que procesa formularios, usuarios y documentos
+#   - frontend : la web que ven los usuarios en el navegador
+#   - keycloak : el sistema de login del portal interno
+#
+# Arquitectura:
+#   Internet
+#     └─ ALB (HTTPS — el candado del navegador lo gestiona AWS)
+#          └─ EC2 (este archivo)
+#               ├─ frontend  :80   ← Nginx entrega la web y redirige /api al backend
+#               └─ backend   :8000 ← No está expuesto a internet, solo al frontend
+#   BD:      RDS PostgreSQL  (en la red privada de AWS, el servidor no la ve directamente)
+#   Archivos: uploads_data   (volumen EBS adjunto al EC2)
+#
+# Para desplegarlo: docker compose up -d --build
+# Variables requeridas: ver .env.example
+# ============================================================
+
+services:
+
+  # ── Backend (API Python) ───────────────────────────────────────────────────
+  # El backend es el núcleo del sistema: recibe los formularios, los valida,
+  # llama a Bedrock para el análisis IA, gestiona los documentos y controla
+  # el flujo de firma con Zoho Sign.
+  backend:
+    build:
+      # Construye la imagen a partir del Dockerfile que está en ./backend.
+      # Si cambias dependencias de Python (requirements.txt), debes hacer
+      # docker compose build backend para que se instalen.
+      context: ./backend
+      dockerfile: Dockerfile
+
+    # Si el proceso del backend se cae (error inesperado, reinicio del servidor),
+    # Docker lo vuelve a levantar automáticamente.
+    restart: unless-stopped
+
+    environment:
+      # Cadena de conexión a la base de datos en RDS.
+      # Formato: postgresql+psycopg://usuario:contraseña@host:5432/nombre_bd
+      # Si está vacía, el contenedor no arranca — es una variable obligatoria.
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL con el endpoint de RDS en .env}
+
+      # URL pública del sitio (ej: https://sagrilaft.tudominio.com).
+      # Se usa en los correos de notificación y en los CORS del servidor.
+      # Si está vacía, el contenedor no arranca.
+      FRONTEND_URL: ${FRONTEND_URL:?Define FRONTEND_URL con la URL pública del sitio en .env}
+
+      # Carpeta interna donde el backend guarda los archivos subidos.
+      # No cambiar: el volumen uploads_data está montado exactamente en esa ruta.
+      UPLOAD_DIR: /app/uploads
+
+      # Número de procesos paralelos del servidor. Regla general: 2 × número de CPUs.
+      # Con una EC2 t3.medium (2 vCPUs) el valor 4 es adecuado.
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
+
+      # El backend está detrás de un balanceador (ALB) y de Nginx. Estos intermediarios
+      # añaden la IP real del usuario en una cabecera HTTP. Esta variable le dice al
+      # backend en qué rango de IPs confiar para leer esa cabecera. El rango 172.0.0.0/8
+      # corresponde a la red interna de Docker; no cambiar salvo que modifiques la red.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.0.0.0/8}
+
+      # ── AWS ───────────────────────────────────────────────────────────────
+      # En producción NO hace falta definir ACCESS_KEY ni SECRET_ACCESS_KEY:
+      # el EC2 tiene un IAM Role que le da permisos automáticamente (más seguro
+      # que guardar credenciales en un archivo). Solo rellenar si corres esto
+      # fuera de AWS (CI, portátil de desarrollo, etc.).
+      AWS_REGION:            ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+
+      # ARN del modelo de inteligencia artificial en Amazon Bedrock.
+      # Si se deja vacío, el análisis automático de documentos queda desactivado.
+      # Ej: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-...
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID}
+
+      # "local" guarda los archivos en el disco del EC2 (volumen EBS).
+      # "s3" los guarda en Amazon S3 — recomendado si planeas escalar a varios
+      # servidores o necesitas que los archivos sobrevivan si el EC2 se reemplaza.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+
+      # Solo necesario si STORAGE_BACKEND=s3. Nombre del bucket S3 donde
+      # se almacenarán los documentos subidos.
+      S3_BUCKET: ${S3_BUCKET:-}
+
+      # ── Zoho Sign (firma electrónica) ──────────────────────────────────────
+      # Credenciales de la aplicación registrada en Zoho API Console.
+      # Las tres primeras son obligatorias para que el flujo de firma funcione.
+      ZOHO_CLIENT_ID:      ${ZOHO_CLIENT_ID}
+      ZOHO_CLIENT_SECRET:  ${ZOHO_CLIENT_SECRET}
+      ZOHO_REFRESH_TOKEN:  ${ZOHO_REFRESH_TOKEN}
+
+      # Token secreto que Zoho envía en cada notificación de estado (webhook).
+      # El backend lo verifica para confirmar que la notificación es legítima
+      # y no fue enviada por alguien externo. Generar con:
+      # python3 -c "import secrets; print(secrets.token_hex(32))"
+      ZOHO_WEBHOOK_SECRET: ${ZOHO_WEBHOOK_SECRET:-}
+
+      # "false" en producción: las firmas son reales y los correos se envían.
+      # "true" solo para pruebas: Zoho simula el proceso sin enviar nada.
+      ZOHO_SIGN_TESTING: ${ZOHO_SIGN_TESTING:-false}
+
+      # ── SMTP — correo electrónico (AWS SES) ────────────────────────────────
+      # El backend envía correos cuando se crea un acceso o se devuelve un formulario.
+      # AWS SES requiere credenciales SMTP propias (se generan en IAM → SES SMTP settings),
+      # distintas a las credenciales IAM del EC2.
+      SMTP_HOST:     ${SMTP_HOST}
+      SMTP_PORT:     ${SMTP_PORT:-587}
+      SMTP_USER:     ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      # Dirección que aparece como remitente en los correos. Debe estar
+      # verificada en SES (si SES está en modo sandbox, el destinatario
+      # también debe estar verificado).
+      SMTP_FROM: ${SMTP_FROM}
+
+      # ── Keycloak (login del portal interno) ────────────────────────────────
+      # Estas variables conectan el backend con el servidor de autenticación.
+      # Si están vacías, el portal interno funciona sin login (útil mientras
+      # se configura Keycloak por primera vez, pero no aceptable en producción).
+      KEYCLOAK_URL:        ${KEYCLOAK_URL:-}
+      KEYCLOAK_REALM:      ${KEYCLOAK_REALM:-sagrilaft}
+      KEYCLOAK_CLIENT_ID:  ${KEYCLOAK_CLIENT_ID:-}
+      # URL pública de Keycloak tal como la ve el navegador del usuario.
+      # Debe coincidir con el hostname configurado en Keycloak (KC_HOSTNAME).
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:-}
+
+    volumes:
+      # Monta el volumen uploads_data en la carpeta /app/uploads del contenedor.
+      # Los documentos subidos por los usuarios se guardan aquí y persisten
+      # aunque el contenedor se detenga o se reconstruya.
+      - uploads_data:/app/uploads
+
+    networks:
+      # El backend solo es accesible dentro de la red interna de Docker.
+      # No está expuesto a internet directamente — todo pasa por el frontend (Nginx).
+      - interna
+
+    healthcheck:
+      # Docker comprueba periódicamente que el backend responde correctamente.
+      # Si no responde, lo marca como no saludable y el frontend no le envía tráfico.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\""]
+      interval: 30s    # Comprueba cada 30 segundos
+      timeout: 10s     # Si no responde en 10 segundos, cuenta como fallo
+      retries: 3       # Tres fallos seguidos → contenedor marcado como no saludable
+      # Los primeros 90 segundos no se verifican: el backend espera a que RDS esté
+      # disponible y aplica las migraciones de base de datos al arrancar.
+      start_period: 90s
+
+
+  # ── Frontend (React + Nginx) ───────────────────────────────────────────────
+  # En producción el frontend es un conjunto de archivos HTML/JS/CSS servidos
+  # por Nginx. Nginx también redirige las llamadas /api al backend interno.
+  frontend:
+    build:
+      # El Dockerfile de producción compila React (npm run build) y copia
+      # el resultado en una imagen de Nginx. El resultado es liviano y rápido.
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      # Expone el puerto 80 del servidor. El ALB de AWS apunta aquí.
+      # El contenedor escucha en 8080 (nginx-unprivileged no puede usar 80 sin root).
+      # Si necesitas correr en otro puerto del host (ej: servidor compartido),
+      # cámbialo a "8081:8080" y ajusta el target group del ALB.
+      - "${PORT_FRONTEND:-80}:8080"
+
+    # El frontend no arranca hasta que el backend haya pasado su healthcheck.
+    # Esto garantiza que cuando Nginx empiece a proxear /api, el backend ya
+    # está listo para responder.
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    networks:
+      - interna
+
+
+  # ── Keycloak (servidor de autenticación) ───────────────────────────────────
+  # Keycloak es el sistema que verifica la identidad de los usuarios del portal
+  # interno. Cuando alguien inicia sesión, Keycloak comprueba su usuario y
+  # contraseña y emite un token que el backend valida en cada solicitud.
+  #
+  # Requiere una base de datos PostgreSQL propia. Puede ser la misma instancia
+  # RDS que usa el backend, pero en una base de datos separada (nombre: keycloak).
+  # Configurar KEYCLOAK_DB_URL, KEYCLOAK_DB_USER y KEYCLOAK_DB_PASSWORD en .env
+  keycloak:
+    # Versión fija para evitar actualizaciones automáticas que puedan romper
+    # la configuración. Actualizar de forma controlada con cambios planificados.
+    image: quay.io/keycloak/keycloak:25.0
+
+    # "start" es el modo producción de Keycloak (con HTTPS, sin herramientas debug).
+    # "--import-realm" carga la configuración del realm al primer arranque.
+    # Si el realm ya existe en la base de datos, este flag no hace nada (es seguro).
+    command: start --import-realm
+
+    environment:
+      # Usuario y contraseña de la consola de administración de Keycloak.
+      # KEYCLOAK_ADMIN_PASSWORD es obligatoria — el contenedor no arranca sin ella.
+      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Define KEYCLOAK_ADMIN_PASSWORD en .env}
+
+      # Hostname público de Keycloak, tal como lo verá el navegador del usuario.
+      # Ej: auth.tudominio.com
+      # Debe coincidir con el registro DNS y con KEYCLOAK_ISSUER_URL en el backend.
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-}
+
+      # Conexión a la base de datos de Keycloak en RDS.
+      # Formato de KC_DB_URL: jdbc:postgresql://host:5432/keycloak
+      KC_DB:          postgres
+      KC_DB_URL:      ${KEYCLOAK_DB_URL:-}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+
+      # Le indica a Keycloak que está detrás de un proxy (el ALB de AWS)
+      # y que debe leer la IP real del usuario desde las cabeceras HTTP.
+      KC_PROXY_HEADERS: xforwarded
+
+      # Permite que Keycloak responda en HTTP internamente aunque el ALB
+      # sirva HTTPS hacia el exterior. Sin esto, Keycloak exigiría HTTPS
+      # en todas las conexiones, incluyendo las internas de Docker.
+      KC_HTTP_ENABLED: "true"
+
+    volumes:
+      # Archivo con la configuración del portal: roles, cliente OIDC y configuración
+      # del realm. Keycloak lo importa una sola vez al primer arranque.
+      # Para reimportar (ej: si cambias roles), borra la BD de Keycloak y reinicia.
+      # ":ro" significa que el contenedor puede leer el archivo pero no modificarlo.
+      - ./keycloak/realm-sagrilaft.json:/opt/keycloak/data/import/realm-sagrilaft.json:ro
+
+    ports:
+      # Puerto de la consola de administración. En producción, considera
+      # no exponerlo públicamente y acceder solo desde una VPN o bastion host.
+      - "8080:8080"
+
+    restart: unless-stopped
+
+    networks:
+      - interna
+
+    healthcheck:
+      # Verifica que el realm "sagrilaft" esté cargado y respondiendo.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      # Keycloak tarda entre 60 y 120 segundos en arrancar en producción
+      # (aplica migraciones de BD, carga el realm, verifica la configuración).
+      start_period: 120s
+
+
+# ── Volúmenes persistentes ─────────────────────────────────────────────────
+# Los volúmenes son carpetas gestionadas por Docker que sobreviven cuando
+# los contenedores se detienen, se eliminan o se reconstruyen.
+volumes:
+  # Almacena los documentos subidos por los usuarios (PDFs, imágenes de documentos).
+  # En producción este volumen vive en el disco EBS adjunto al EC2.
+  # Si el EC2 se reemplaza y el EBS no se migra, los archivos se pierden.
+  # Para mayor resiliencia, cambiar STORAGE_BACKEND=s3 en .env y usar S3.
+  uploads_data:
+
+
+# ── Redes ──────────────────────────────────────────────────────────────────
+# La red "interna" conecta los tres contenedores entre sí de forma privada.
+# Desde fuera del servidor solo es accesible lo que está en "ports" — el resto
+# no es visible en internet aunque los contenedores estén corriendo.
+networks:
+  interna:

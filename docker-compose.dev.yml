@@ -1,0 +1,258 @@
+# ============================================================
+# Entorno de desarrollo local
+#
+# Este archivo modifica el stack base (docker-compose.yml) para que sea
+# cómodo trabajar en la máquina de cada desarrollador: base de datos local,
+# recarga automática de código y servidor web ligero.
+#
+# Cómo levantarlo:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Lo que cambia respecto a producción:
+#   - La base de datos corre aquí (en producción usa RDS de AWS)
+#   - El backend recarga solo cuando guardas un archivo Python
+#   - El frontend usa Vite en lugar de Nginx (recarga el navegador al guardar)
+#   - La autenticación Keycloak está desactivada por defecto para no bloquear
+#     el desarrollo mientras no sea necesario probarla
+# ============================================================
+
+services:
+
+  # ── Base de datos ──────────────────────────────────────────────────────────
+  # En producción la base de datos vive en AWS (RDS). Aquí la levantamos
+  # en un contenedor local para no depender de internet ni de credenciales AWS.
+  postgres:
+    #Verificar seguridad e integridad de la imagen:
+    image: postgres:16-alpine
+
+    # Si el contenedor se cae por cualquier razón, Docker lo vuelve a levantar.
+    # Útil cuando la máquina se reinicia con Docker corriendo.
+    restart: unless-stopped
+
+    environment:
+      # Estas tres variables se leen desde otra parte.
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      # Los datos de la base se guardan en un volumen con nombre (postgres_data,
+      # definido al final del archivo). Esto hace que sobrevivan cuando apagas
+      # y vuelves a levantar los contenedores. Si quisieras empezar desde cero,
+      # elimina el volumen con: docker volume rm solucion_postgres_data
+      - postgres_data:/var/lib/postgresql/data
+
+    ports:
+      # Expone el puerto 5432 en tu máquina para que puedas conectarte
+      # desde herramientas como DBeaver, pgAdmin o psql directamente.
+      # Si ya tienes PostgreSQL instalado localmente y ese puerto está ocupado,
+      # cámbialo a "5433:5432" y ajusta tu cliente.
+      - "5432:5432"
+
+    networks:
+      # La red "interna" es privada: los contenedores se hablan entre sí
+      # pero nada de eso es accesible desde internet.
+      - interna
+
+    healthcheck:
+      # Antes de arrancar el backend, Docker verifica que la base de datos
+      # esté lista para recibir conexiones. Sin esto, el backend fallaría
+      # al intentar conectarse mientras Postgres aún está iniciando.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sagrilaft_user} -d ${POSTGRES_DB:-sagrilaft}"]
+      interval: 10s     # Comprueba cada 10 segundos
+      timeout: 5s       # Si no responde en 5 segundos, cuenta como fallo
+      retries: 5        # Tras 5 fallos consecutivos, el contenedor se marca como no saludable
+      start_period: 15s # Le da 15 segundos al arranque antes de empezar a contar fallos
+
+
+  # ── Backend (API Python) ───────────────────────────────────────────────────
+  backend:
+    volumes:
+      # Monta la carpeta ./backend de tu máquina dentro del contenedor.
+      # Cualquier archivo Python que guardes se refleja de inmediato sin
+      # necesidad de reconstruir la imagen Docker.
+      - ./backend:/app
+      # Este segundo volumen evita que el montaje anterior borre la carpeta
+      # uploads que el contenedor crea internamente. Sin esto, los archivos
+      # subidos durante la sesión desaparecerían al reiniciar.
+      - /app/uploads
+
+    # En desarrollo reemplazamos el comando de arranque normal (que incluye
+    # comprobaciones de producción) por uno más simple:
+    # 1. Aplica los cambios pendientes en la base de datos (alembic upgrade head)
+    # 2. Arranca el servidor con --reload: se reinicia solo al guardar código
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload --workers 1"
+
+    ports:
+      # El backend escucha en el puerto 8000 de tu máquina.
+      # Puedes acceder a la documentación de la API en http://localhost:8000/docs
+      # Si necesitas correr dos backends a la vez, cambia a "8001:8000".
+      - "8000:8000"
+
+    environment:
+      # La URL de conexión a la base de datos apunta al contenedor postgres
+      # (no a AWS). Se construye con las mismas variables del .env.
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+      # En desarrollo un solo proceso es suficiente. En producción se usan
+      # varios (uno por CPU) para atender más solicitudes simultáneas.
+      UVICORN_WORKERS: "1"
+
+      # Activa el modo sandbox de Zoho Sign: los correos de firma se simulan,
+      # no se envían de verdad. Cambiar a "false" solo si necesitas probar
+      # el flujo de firma real con cuentas de Zoho reales.
+      ZOHO_SIGN_TESTING: "true"
+
+      # Los archivos subidos (PDFs, imágenes) se guardan en disco local.
+      # En producción esto cambia a "s3" para guardarlos en Amazon S3.
+      STORAGE_BACKEND: "local"
+
+      # Desactiva el login con Keycloak en el portal interno.
+      # El backend asume que cualquier llamada viene de un usuario autorizado.
+      # Cambiar a "false" (o eliminar esta línea) cuando quieras probar
+      # el flujo de autenticación completo en local.
+      PORTAL_AUTH_DISABLED: "true"
+
+      # Rango de IPs del que el backend acepta cabeceras de proxy (X-Forwarded-For).
+      # 172.0.0.0/8 es la red interna de Docker. No cambiar salvo que
+      # modifiques la configuración de red de Docker Compose.
+      TRUSTED_PROXY_IPS: "172.0.0.0/8"
+
+    # El backend no arranca hasta que Postgres haya pasado su healthcheck.
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    # En desarrollo no necesitamos healthcheck del backend: si falla, el log
+    # en la terminal es suficiente para diagnosticarlo.
+    healthcheck:
+      disable: true
+
+
+  # ── Frontend (React) ───────────────────────────────────────────────────────
+  # En producción el frontend es un conjunto de archivos estáticos servidos
+  # por Nginx. Aquí usamos el servidor de desarrollo de Vite, que actualiza
+  # el navegador automáticamente cada vez que guardas un archivo.
+  frontend:
+    build:
+      # Dockerfile.dev instala las dependencias y arranca Vite.
+      # Es distinto al Dockerfile de producción, que genera los archivos
+      # finales optimizados para servir con Nginx.
+      dockerfile: Dockerfile.dev
+
+    working_dir: /app
+
+    volumes:
+      # El código fuente de ./frontend se monta en vivo, igual que en el backend.
+      - ./frontend:/app
+      # Este volumen preserva node_modules dentro del contenedor para que el
+      # montaje anterior no lo borre. Sin esto, npm install tendría que correr
+      # desde cero en cada reinicio.
+      - /app/node_modules
+
+    # Instala dependencias si faltan y luego arranca Vite escuchando en todas
+    # las interfaces (necesario para que Docker lo exponga correctamente).
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+    ports:
+      # El frontend es accesible en http://localhost:5173
+      # Es el puerto estándar de Vite. Cambiar si ya está en uso.
+      - "5173:5173"
+
+    environment:
+      # Le dice a Vite dónde está el backend para redirigir las llamadas /api.
+      # Usa el nombre del servicio Docker (backend) en lugar de localhost,
+      # porque dentro de la red Docker los contenedores se llaman por su nombre.
+      VITE_BACKEND_URL: http://backend:8000
+
+      # Las tres variables siguientes configuran el login con Keycloak en
+      # el frontend. Por defecto están vacías, lo que desactiva el login.
+      # Para probar Keycloak en local, pon en tu .env:
+      #   VITE_KEYCLOAK_URL=http://localhost:8080
+      VITE_KEYCLOAK_URL:       ${VITE_KEYCLOAK_URL:-}
+      VITE_KEYCLOAK_REALM:     ${VITE_KEYCLOAK_REALM:-sagrilaft}
+      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
+
+    depends_on:
+      backend:
+        condition: service_started
+
+    healthcheck:
+      disable: true
+
+
+  # ── Keycloak (servidor de autenticación) ───────────────────────────────────
+  # Keycloak es el sistema que gestiona los usuarios del portal interno y
+  # verifica que solo personas autorizadas puedan acceder.
+  #
+  # En desarrollo está disponible pero desconectado por defecto:
+  #   PORTAL_AUTH_DISABLED=true  → el backend no exige token
+  #   VITE_KEYCLOAK_URL vacío    → el frontend no redirige al login
+  #
+  # Para activarlo completamente, define en tu .env:
+  #   KEYCLOAK_URL=http://keycloak:8080
+  #   VITE_KEYCLOAK_URL=http://localhost:8080
+  #   PORTAL_AUTH_DISABLED=false   (o elimina esa línea)
+  #
+  # Consola de administración: http://localhost:8080
+  # Usuario y contraseña: los que definas en KEYCLOAK_ADMIN y KEYCLOAK_ADMIN_PASSWORD
+  keycloak:
+    # Versión fija para evitar sorpresas. Actualizar solo con cambios controlados.
+    image: quay.io/keycloak/keycloak:25.0
+
+    # start-dev arranca Keycloak en modo desarrollo (sin HTTPS obligatorio).
+    # --import-realm carga automáticamente el archivo de configuración del realm
+    # al primer arranque (ver volumes más abajo).
+    command: start-dev --import-realm
+
+    environment:
+      # Credenciales de la consola de administración. Defínelas en tu .env.
+      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # Keycloak guarda su configuración en la misma base de datos Postgres
+      # del proyecto, en una base de datos separada llamada "keycloak".
+      KC_DB:          postgres
+      KC_DB_URL:      jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      # El archivo realm-sagrilaft.dev.json contiene la configuración del portal:
+      # usuarios de prueba, roles, configuración del cliente OIDC.
+      # Keycloak lo importa una sola vez al primer arranque.
+      # Si modificas ese archivo y quieres reimportarlo, borra el volumen
+      # postgres_data y vuelve a levantar el stack.
+      # ":ro" significa solo lectura — el contenedor no puede modificar el archivo.
+      - ./keycloak/realm-sagrilaft.dev.json:/opt/keycloak/data/import/realm-sagrilaft.json:ro
+
+    ports:
+      # La consola de Keycloak queda accesible en http://localhost:8080
+      - "8080:8080"
+
+    networks:
+      - interna
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    healthcheck:
+      # Espera a que el realm "sagrilaft" esté disponible antes de considerar
+      # Keycloak como listo. Tarda entre 30 y 60 segundos en el primer arranque.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s # Margen amplio para que Keycloak termine de importar el realm
+
+
+# ── Volúmenes persistentes ─────────────────────────────────────────────────
+# Los volúmenes son carpetas gestionadas por Docker que sobreviven
+# cuando los contenedores se detienen o se eliminan.
+# postgres_data guarda los datos de la base de datos entre sesiones.
+# Sin esto, cada vez que bajas el stack pierdes todos los formularios y registros.
+volumes:
+  postgres_data:
