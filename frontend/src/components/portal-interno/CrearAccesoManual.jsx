@@ -421,7 +421,31 @@ function ItemCredencial({ label, valor, monospace = true }) {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export default function CrearAccesoManual() {
+function BarraUsuario({ keycloak }) {
+  const email = keycloak.tokenParsed?.email ?? keycloak.tokenParsed?.preferred_username ?? '';
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 200,
+      background: 'var(--gray-900, #0f172a)', color: '#fff',
+      display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+      padding: '7px 24px', fontSize: '0.78rem', gap: '14px',
+    }}>
+      <span style={{ opacity: 0.65 }}>{email}</span>
+      <button
+        onClick={() => keycloak.logout()}
+        style={{
+          background: 'none', border: '1px solid rgba(255,255,255,0.25)',
+          color: '#fff', borderRadius: '6px', padding: '3px 10px',
+          cursor: 'pointer', fontSize: '0.78rem',
+        }}
+      >
+        Cerrar sesión
+      </button>
+    </div>
+  );
+}
+
+export default function CrearAccesoManual({ keycloak }) {
   const [vistaActual, setVistaActual]   = useState('crear');
   const [formData, setFormData]         = useState(ESTADO_INICIAL_ACCESO);
   const [erroresCampo, setErroresCampo] = useState({});
@@ -492,6 +516,7 @@ export default function CrearAccesoManual() {
   if (vistaEfectiva === 'expedientes') {
     return (
       <div style={ESTILOS.pagina}>
+        {keycloak && <BarraUsuario keycloak={keycloak} />}
         <div style={ESTILOS.contenedor}>
           <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
           <VistaExpedientes />
@@ -504,6 +529,7 @@ export default function CrearAccesoManual() {
   if (vistaEfectiva === 'listar') {
     return (
       <div style={ESTILOS.pagina}>
+        {keycloak && <BarraUsuario keycloak={keycloak} />}
         <div style={ESTILOS.contenedor}>
           <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
           <ListaAccesosManuales mensajeVacio="No hay accesos creados aún. Crea el primero desde la pestaña Crear acceso." />
@@ -516,6 +542,7 @@ export default function CrearAccesoManual() {
   if (vistaEfectiva === 'exito') {
     return (
       <div style={ESTILOS.pagina}>
+        {keycloak && <BarraUsuario keycloak={keycloak} />}
         <div style={ESTILOS.contenedor}>
           <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
 
@@ -566,6 +593,7 @@ export default function CrearAccesoManual() {
   // ── Vista: formulario de creación ─────────────────────────────────────────
   return (
     <div style={ESTILOS.pagina}>
+      {keycloak && <BarraUsuario keycloak={keycloak} />}
       <div style={ESTILOS.contenedor}>
         <EncabezadoConTabs vistaEfectiva={vistaEfectiva} onCambiarVista={handleCambiarVista} />
 

@@ -212,8 +212,8 @@ function ContactoAutorizado({ formData, onChange, onOpenHelp, errors }) {
  */
 function InfoBancariaPagos({ infoBancariaPagos, onInfoBancariaPagosChange, onAddInfoBancariaPagos, onEliminarInfoBancariaPagos, errors }) {
   const errFilas = errors.info_bancaria_pagos_filas ?? [];
-  const { esCampoConCorreccion } = useCorreccion();
-  const marcada = esCampoConCorreccion('informacion_bancaria_pagos');
+  const { camposPendientes } = useCorreccion();
+  const marcada = camposPendientes.has('informacion_bancaria_pagos');
 
   return (
     <BloqueCorreccion marcado={marcada} titulo="10. INFORMACIÓN BANCARIA PARA PAGOS">

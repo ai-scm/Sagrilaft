@@ -1,5 +1,11 @@
 const API_BASE = '/api';
 
+let _tokenGetter = null;
+
+export function configurarTokenPortal(getter) {
+  _tokenGetter = getter;
+}
+
 async function leerDetalleError(res) {
   const contentType = res.headers.get('content-type') ?? '';
 
@@ -32,6 +38,10 @@ async function leerDetalleError(res) {
 }
 
 async function requestJson(path, options = {}) {
+  const token = _tokenGetter?.();
+  if (token) {
+    options = { ...options, headers: { 'Authorization': `Bearer ${token}`, ...options.headers } };
+  }
   const res = await fetch(`${API_BASE}${path}`, options);
   if (!res.ok) {
     const err = new Error(await leerDetalleError(res));
@@ -174,6 +184,22 @@ export const api = {
     return `${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`;
   },
 
+  async descargarDocumento(formularioId, docId, nombreArchivo) {
+    const token = _tokenGetter?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
   async aprobarExpediente(formularioId) {
     return requestJson(`/expedientes/${formularioId}/aprobar`, { method: 'POST' });
   },
@@ -210,6 +236,22 @@ export const api = {
 
   urlDocumentoFirmado(formularioId) {
     return `${API_BASE}/expedientes/${formularioId}/documento-firmado`;
+  },
+
+  async descargarDocumentoFirmado(formularioId) {
+    const token = _tokenGetter?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documento-firmado`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'formulario_firmado.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
 
   // Pre-llenado IA

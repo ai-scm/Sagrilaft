@@ -9,12 +9,12 @@ import CrearAccesoManual from './components/portal-interno/CrearAccesoManual';
  *                        (el token es resuelto dentro de useFormulario)
  *   /                  → Formulario externo (flujo normal)
  */
-function App() {
+function App({ keycloak }) {
   const params = new URLSearchParams(window.location.search);
   const esPortalInterno = params.get('portal') === 'interno';
 
   if (esPortalInterno) {
-    return <CrearAccesoManual />;
+    return <CrearAccesoManual keycloak={keycloak} />;
   }
 
   // El parámetro ?token= es detectado y resuelto internamente por useFormulario

@@ -89,9 +89,9 @@ export default function PasoContactosBancaria({
   const tiposValue  = TIPOS_TRANSACCION.filter(o => tiposSeleccionados.includes(o.value));
   const monedaValue = OPCIONES_MONEDA.find(o => o.value === formData.realiza_operaciones_moneda_extranjera) ?? null;
 
-  const { esCampoConCorreccion } = useCorreccion();
-  const refComercMarcada = esCampoConCorreccion('referencias_comerciales');
-  const refBancMarcada   = esCampoConCorreccion('referencias_bancarias');
+  const { esCampoConCorreccion, camposPendientes } = useCorreccion();
+  const refComercMarcada = camposPendientes.has('referencias_comerciales');
+  const refBancMarcada   = camposPendientes.has('referencias_bancarias');
   const monedaMarcada    = esCampoConCorreccion('realiza_operaciones_moneda_extranjera');
   const tiposTxMarcados  = esCampoConCorreccion('tipos_transaccion');
 

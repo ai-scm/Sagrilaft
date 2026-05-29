@@ -78,10 +78,10 @@ export default function PasoJuntaAccionistas({
   const erroresFilasAccionistas   = errors.accionistas_filas     ?? [];
   const erroresFilasBeneficiarios = errors.beneficiarios_filas ?? [];
 
-  const { esCampoConCorreccion } = useCorreccion();
-  const juntaMarcada       = esCampoConCorreccion('junta_directiva');
-  const accionistasMarcados = esCampoConCorreccion('accionistas');
-  const beneficiariosMarcados = esCampoConCorreccion('beneficiario_final');
+  const { camposPendientes } = useCorreccion();
+  const juntaMarcada          = camposPendientes.has('junta_directiva');
+  const accionistasMarcados   = camposPendientes.has('accionistas');
+  const beneficiariosMarcados = camposPendientes.has('beneficiario_final');
 
   if (formData.tipo_persona === 'natural') {
     return (

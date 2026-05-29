@@ -281,8 +281,17 @@ const s = {
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 
 function BannerPdfFormulario({ documento, formularioId }) {
-  const urlDescarga = api.urlDescargaDocumento(formularioId, documento.id);
-  const tamano      = documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : '';
+  const [descargando, setDescargando] = useState(false);
+  const tamano = documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : '';
+
+  async function handleDescargar() {
+    setDescargando(true);
+    try {
+      await api.descargarDocumento(formularioId, documento.id, documento.nombre_archivo);
+    } finally {
+      setDescargando(false);
+    }
+  }
 
   return (
     <div style={s.bannerPdf}>
@@ -292,21 +301,28 @@ function BannerPdfFormulario({ documento, formularioId }) {
           {documento.nombre_archivo}{tamano}
         </p>
       </div>
-      <a
-        href={urlDescarga}
-        download={documento.nombre_archivo}
-        style={s.btnDescargarPdf}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        onClick={handleDescargar}
+        disabled={descargando}
+        style={{ ...s.btnDescargarPdf, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
       >
-        Descargar PDF
-      </a>
+        {descargando ? 'Descargando…' : 'Descargar PDF'}
+      </button>
     </div>
   );
 }
 
 function FilaDocumento({ documento, formularioId }) {
-  const urlDescarga = api.urlDescargaDocumento(formularioId, documento.id);
+  const [descargando, setDescargando] = useState(false);
+
+  async function handleDescargar() {
+    setDescargando(true);
+    try {
+      await api.descargarDocumento(formularioId, documento.id, documento.nombre_archivo);
+    } finally {
+      setDescargando(false);
+    }
+  }
 
   return (
     <div style={s.filaDocumento}>
@@ -319,16 +335,32 @@ function FilaDocumento({ documento, formularioId }) {
           {documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : ''}
         </span>
       </div>
-      <a
-        href={urlDescarga}
-        download={documento.nombre_archivo}
-        style={s.btnDescargar}
-        target="_blank"
-        rel="noreferrer"
+      <button
+        onClick={handleDescargar}
+        disabled={descargando}
+        style={{ ...s.btnDescargar, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
       >
-        Descargar
-      </a>
+        {descargando ? 'Descargando…' : 'Descargar'}
+      </button>
     </div>
+  );
+}
+
+function BtnDescargaFirmado({ formularioId }) {
+  const [descargando, setDescargando] = useState(false);
+  async function handleDescargar() {
+    setDescargando(true);
+    try { await api.descargarDocumentoFirmado(formularioId); }
+    finally { setDescargando(false); }
+  }
+  return (
+    <button
+      onClick={handleDescargar}
+      disabled={descargando}
+      style={{ ...s.btnFirma, ...s.btnFirmaColorFirmado, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
+    >
+      {descargando ? 'Descargando…' : 'Descargar firmado'}
+    </button>
   );
 }
 
@@ -522,22 +554,13 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
   }
 
   if (estado === ESTADO_FIRMADO) {
-    const urlFirmado = api.urlDocumentoFirmado(formularioId);
     return (
       <div style={{ ...s.bannerFirma, ...s.bannerFirmaFirmado }}>
         <div style={s.bannerFirmaTextos}>
           <p style={s.bannerFirmaTitulo}>Documentos firmados electrónicamente</p>
           <p style={s.bannerFirmaSubtitulo}>La contraparte firmó el formulario y Certificado vía ZohoSign.</p>
         </div>
-        <a
-          href={urlFirmado}
-          download="formulario_firmado.pdf"
-          style={{ ...s.btnFirma, ...s.btnFirmaColorFirmado }}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Descargar firmado
-        </a>
+        <BtnDescargaFirmado formularioId={formularioId} />
       </div>
     );
   }
