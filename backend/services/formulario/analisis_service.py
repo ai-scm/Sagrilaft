@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Protocol
 
 from domain.contratos import AlertaInconsistencia, DocumentoDatos, ExtractorIAImp
 from domain.formulario.entidades import FormularioDatos
+from domain.puertos.almacenamiento import IAlmacenamiento
 from services.formulario.prellenado import mapear_campos_para_formulario
 
 from services.validacion.comparadores.detector_inconsistencias_nombre import detector as _detector_nombres
@@ -151,12 +152,14 @@ class AnalisisDocumentosService:
     """
 
     def __init__(
-        self, 
-        extractor: ExtractorIAImp, 
-        config_analisis: List[ConfigDetector]
+        self,
+        extractor: ExtractorIAImp,
+        config_analisis: List[ConfigDetector],
+        storage: IAlmacenamiento,
     ) -> None:
         self._extractor = extractor
         self._config_analisis = config_analisis
+        self._storage = storage
 
     # -----------------------------------------------------------------------
     # Método privado compartido
@@ -164,9 +167,10 @@ class AnalisisDocumentosService:
 
     async def _extraer(self, documento: DocumentoDatos) -> _ResultadoExtraccion:
         """Extrae y mapea los datos de un documento. Punto único de entrada a la IA."""
-        extraccion = await self._extractor.extraer(
-            str(documento.ruta_archivo), documento.tipo_documento
-        )
+        with self._storage.como_archivo_local(documento.ruta_archivo, documento.nombre_archivo) as ruta_local:
+            extraccion = await self._extractor.extraer(
+                str(ruta_local), documento.tipo_documento
+            )
         if not extraccion.extraido:
             return _ResultadoExtraccion(
                 extraido = False,

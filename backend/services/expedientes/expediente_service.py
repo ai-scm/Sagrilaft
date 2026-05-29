@@ -9,16 +9,19 @@ Responsabilidades:
 """
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from domain.excepciones import DocumentoNoEncontradoError, FormularioNoEditableError, FormularioNoEncontradoError
+from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
+from domain.excepciones import DocumentoNoEncontradoError, FormularioNoEditableError, FormularioNoEncontradoError, SinPermisoError
+from domain.formulario.entidades import FormularioDominio
+from domain.puertos.auditoria import RepositorioAuditoria
+from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioExpediente
 from domain.formulario.tipos import EstadoFormulario
+from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService
-    from infrastructure.notificaciones.email_service import EmailService
 
 
 _ESTADOS_EXPEDIENTE = [
@@ -29,8 +32,6 @@ _ESTADOS_EXPEDIENTE = [
     EstadoFormulario.PENDIENTE_FIRMA,
     EstadoFormulario.FIRMADO,
 ]
-
-_ESTADOS_DEVOLVIBLES = {EstadoFormulario.ENVIADO, EstadoFormulario.VALIDADO}
 
 
 class ExpedienteService:
@@ -43,21 +44,29 @@ class ExpedienteService:
       - Aprobar o rechazar un formulario enviado (transición de estado manual).
     """
 
-    def __init__(self, repo: RepositorioExpediente) -> None:
+    def __init__(
+        self,
+        repo: RepositorioExpediente,
+        storage: IAlmacenamiento,
+        repo_auditoria: Optional[RepositorioAuditoria] = None,
+    ) -> None:
         self._repo = repo
+        self._storage = storage
+        self._auditoria = repo_auditoria
+
+    def _registrar(self, evento: EventoAuditoria) -> None:
+        """Registra un evento de auditoría si el repositorio está disponible."""
+        if self._auditoria:
+            self._auditoria.registrar_evento(evento)
 
     # ─── Queries internas ─────────────────────────────────────────────────────
 
-    def _buscar_formulario_expediente(self, formulario_id: str):
-        """
-        Recupera un formulario únicamente si aplica como expediente.
-
-        Regla: el formulario ya debió haber sido enviado (o estar en estados posteriores
-        como validado/rechazado). En borrador, se comporta como "no existe" para el portal.
-        """
+    def _buscar_formulario_expediente(self, formulario_id: str, contrapartes_permitidas: Optional[List[str]] = None):
         formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
+        if contrapartes_permitidas is not None and formulario.tipo_contraparte not in contrapartes_permitidas:
+            raise SinPermisoError(formulario.tipo_contraparte)
         return formulario
 
     def _buscar_documento_descargable(self, formulario_id: str, doc_id: str):
@@ -103,20 +112,17 @@ class ExpedienteService:
         self,
         tipo_contraparte: Optional[str] = None,
         busqueda: Optional[str] = None,
+        contrapartes_permitidas: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Retorna todos los formularios no-borrador ordenados por fecha de actualización.
-
-        Acepta filtros opcionales: tipo_contraparte ('cliente'/'proveedor') y búsqueda
-        de texto libre en razón social y código de petición (case-insensitive).
-        """
-        formularios = self._repo.listar(_ESTADOS_EXPEDIENTE, tipo_contraparte, busqueda)
-        conteos     = self._conteos_documentos_por_formulario([f.id for f in formularios])
+        formularios = self._repo.listar(
+            _ESTADOS_EXPEDIENTE, tipo_contraparte, busqueda, contrapartes_permitidas
+        )
+        conteos = self._conteos_documentos_por_formulario([f.id for f in formularios])
         return [self._serializar_resumen(f, conteos.get(f.id, 0)) for f in formularios]
 
     # ─── Detalle ──────────────────────────────────────────────────────────────
 
-    def obtener_expediente(self, formulario_id: str) -> Dict[str, Any]:
+    def obtener_expediente(self, formulario_id: str, contrapartes_permitidas: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Recupera los metadatos del expediente y sus documentos adjuntos.
 
@@ -126,7 +132,7 @@ class ExpedienteService:
 
         Lanza FormularioNoEncontradoError si el formulario no existe o está en borrador.
         """
-        formulario = self._buscar_formulario_expediente(formulario_id)
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
         documentos = self._repo.listar_documentos(formulario_id)
 
         return {
@@ -150,27 +156,47 @@ class ExpedienteService:
 
     # ─── Aprobación / Rechazo ─────────────────────────────────────────────────
 
-    def aprobar_expediente(self, formulario_id: str) -> Dict[str, Any]:
-        """Cambia el estado de ENVIADO a VALIDADO (aprobación manual del portal interno)."""
-        formulario = self._buscar_formulario_expediente(formulario_id)
-        if formulario.estado != EstadoFormulario.ENVIADO:
-            raise FormularioNoEditableError(
-                f"Solo se puede aprobar un formulario en estado 'enviado' (actual: '{formulario.estado}')."
-            )
-        formulario.estado = EstadoFormulario.VALIDADO
-        self._repo.confirmar()
-        return {"estado": formulario.estado}
+    def aprobar_expediente(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.aprobar()  # ENVIADO → VALIDADO; lanza FormularioNoEditableError si no aplica
+        self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FORMULARIO_APROBADO,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+        ))
+        return {"estado": dominio.estado.value}
 
-    def rechazar_expediente(self, formulario_id: str) -> Dict[str, Any]:
-        """Cambia el estado de ENVIADO o VALIDADO a RECHAZADO."""
-        formulario = self._buscar_formulario_expediente(formulario_id)
-        if formulario.estado not in (EstadoFormulario.ENVIADO, EstadoFormulario.VALIDADO):
-            raise FormularioNoEditableError(
-                f"Solo se puede rechazar un formulario en estado 'enviado' o 'validado' (actual: '{formulario.estado}')."
-            )
-        formulario.estado = EstadoFormulario.RECHAZADO
-        self._repo.confirmar()
-        return {"estado": formulario.estado}
+    def rechazar_expediente(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.rechazar()  # ENVIADO|VALIDADO → RECHAZADO; lanza FormularioNoEditableError si no aplica
+        self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FORMULARIO_RECHAZADO,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+        ))
+        return {"estado": dominio.estado.value}
 
     def devolver_para_correccion(
         self,
@@ -178,7 +204,9 @@ class ExpedienteService:
         especificaciones: str,
         campos_identificados: List[str],
         acceso_service: "AccesoManualService",
-        email_service: Optional["EmailService"] = None,
+        email_service: Optional[INotificador] = None,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Devuelve el formulario al remitente para que corrija la información indicada.
@@ -189,23 +217,38 @@ class ExpedienteService:
         Los campos_identificados se persisten como JSON junto con las especificaciones,
         permitiendo que el formulario destaque visualmente los campos que requieren atención.
         """
-        formulario = self._buscar_formulario_expediente(formulario_id)
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.devolver_para_correccion()  # ENVIADO|VALIDADO → EN_CORRECCION, incrementa numero_correccion
 
-        if formulario.estado not in _ESTADOS_DEVOLVIBLES:
-            raise FormularioNoEditableError(
-                f"Solo se puede devolver un formulario en estado 'enviado' o 'validado' "
-                f"(actual: '{formulario.estado}')."
-            )
-
-        formulario.estado             = EstadoFormulario.EN_CORRECCION
-        formulario.numero_correccion  = (formulario.numero_correccion or 0) + 1
-        formulario.campos_a_corregir  = json.dumps(
+        campos_a_corregir_json = json.dumps(
             {"especificaciones": especificaciones, "campos": campos_identificados},
             ensure_ascii=False,
         )
 
+        # Modifica AccesoManual en la sesión sin commit (el commit lo hace actualizar_para_correccion)
         datos_acceso = acceso_service.reactivar_acceso_para_correccion(formulario_id)
-        self._repo.confirmar()
+        self._repo.actualizar_para_correccion(
+            formulario_id,
+            dominio.estado.value,
+            dominio.numero_correccion,
+            campos_a_corregir_json,
+        )
+
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FORMULARIO_DEVUELTO,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+            metadata={
+                "numero_correccion": dominio.numero_correccion,
+                "especificaciones":  especificaciones,
+                "campos":            campos_identificados,
+            },
+        ))
 
         correo_notificado = datos_acceso["correo_destinatario"] if datos_acceso else None
         enlace_acceso     = datos_acceso["enlace_diligenciamiento"] if datos_acceso else None
@@ -220,7 +263,7 @@ class ExpedienteService:
             )
 
         return {
-            "estado":            formulario.estado,
+            "estado":            dominio.estado.value,
             "correo_notificado": correo_notificado,
             "correo_enviado":    correo_enviado,
         }
@@ -228,24 +271,21 @@ class ExpedienteService:
     # ─── Descarga ─────────────────────────────────────────────────────────────
 
     def resolver_documento_para_descarga(
-        self, formulario_id: str, doc_id: str
-    ) -> tuple[Path, str, str]:
+        self, formulario_id: str, doc_id: str, contrapartes_permitidas: Optional[List[str]] = None
+    ) -> InfoDescarga:
         """
-        Verifica que el documento pertenece al expediente y devuelve su ruta en disco.
+        Verifica que el documento pertenece al expediente y devuelve su info de descarga.
 
-        Returns:
-            (ruta_archivo, nombre_archivo, content_type)
-
-        Lanza DocumentoNoEncontradoError si el documento no existe, fue eliminado
-        o el archivo ya no está en disco.
+        El caller decide el tipo de respuesta según InfoDescarga.es_url.
+        Lanza DocumentoNoEncontradoError si el documento no existe o fue eliminado.
         """
+        self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
         documento = self._buscar_documento_descargable(formulario_id, doc_id)
         if not documento:
             raise DocumentoNoEncontradoError(formulario_id, doc_id)
 
-        ruta = Path(documento.ruta_archivo)
-        if not ruta.exists():
+        if not self._storage.existe(documento.ruta_archivo):
             raise DocumentoNoEncontradoError(formulario_id, doc_id)
 
         content_type = documento.content_type or "application/octet-stream"
-        return ruta, documento.nombre_archivo, content_type
+        return self._storage.info_descarga(documento.ruta_archivo, documento.nombre_archivo, content_type)

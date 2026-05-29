@@ -3,7 +3,6 @@ Resolución y creación de rutas de almacenamiento por tipo de contraparte.
 """
 
 import re
-from pathlib import Path
 
 from domain.excepciones import ContraparteInvalidaError
 
@@ -14,21 +13,19 @@ _CARPETA_POR_TIPO: dict[str, str] = {
 }
 
 
-def resolver_ruta_contraparte(
-    tipo_contraparte: str, razon_social: str, upload_dir: Path
-) -> Path:
-    """Determina el directorio destino según tipo de contraparte y razón social."""
+def resolver_key_contraparte(tipo_contraparte: str, razon_social: str) -> str:
+    """
+    Devuelve el prefijo de key del backend para los archivos de la contraparte.
+
+    Ejemplo: resolver_key_contraparte('cliente', 'Empresa SA') → 'CLIENTES/Empresa_SA'
+    La key es válida tanto para LocalStorage (se convierte en subdirectorio)
+    como para S3Storage (se usa como prefijo de objeto).
+    """
     tipo = (tipo_contraparte or "").strip().lower()
     carpeta_tipo = _CARPETA_POR_TIPO.get(tipo)
     if not carpeta_tipo:
         raise ContraparteInvalidaError(tipo_contraparte)
-    return upload_dir / carpeta_tipo / _sanitizar_nombre_carpeta(razon_social)
-
-
-def crear_carpeta_contraparte(ruta: Path) -> Path:
-    """Crea el directorio de la contraparte si no existe. Retorna la ruta."""
-    ruta.mkdir(parents=True, exist_ok=True)
-    return ruta
+    return f"{carpeta_tipo}/{_sanitizar_nombre_carpeta(razon_social)}"
 
 
 def _sanitizar_nombre_carpeta(nombre: str) -> str:

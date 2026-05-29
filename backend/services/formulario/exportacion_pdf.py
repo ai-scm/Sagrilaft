@@ -17,7 +17,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from domain.formulario.entidades import FormularioDatos
 from domain.utils.fechas import NOMBRES_MESES_ES
-from services.formulario.documento_service import DocumentoService
 from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
 
 
@@ -484,24 +483,20 @@ def _construir_html_formulario(datos: Dict[str, Any]) -> str:
 # ─── Exportador (infraestructura / IO) ───────────────────────────────────────
 
 class ExportadorFormularioPdf:
-    """Convierte un formulario a PDF y lo persiste en el directorio indicado."""
+    """Convierte un formulario a PDF y devuelve los bytes — sin responsabilidad de almacenamiento."""
 
-    def __init__(self, documentos: DocumentoService) -> None:
-        self._documentos = documentos
-
-    def generar_y_guardar_pdf(
-        self, formulario: FormularioDatos, directorio_destino: Path
-    ) -> ArchivoPdfGenerado:
+    def generar_bytes_pdf(
+        self, formulario: FormularioDatos
+    ) -> tuple[str, bytes]:
+        """
+        Genera el PDF del formulario y devuelve (nombre_archivo, bytes).
+        El llamador decide dónde guardar los bytes (local o S3).
+        """
         datos = deserializar_campos_json(formulario)
         codigo = _valor_a_texto(datos.get("codigo_peticion")) or formulario.id
         nombre_archivo = f"FORMULARIO_{codigo}.pdf"
-
         html = _construir_html_formulario(datos)
-        pdf_bytes = self._html_a_pdf_bytes(html)
-        ruta = self._documentos.guardar_archivo_en_disco(
-            directorio_destino, nombre_archivo, pdf_bytes
-        )
-        return ArchivoPdfGenerado(nombre_archivo=nombre_archivo, ruta_archivo=ruta)
+        return nombre_archivo, self._html_a_pdf_bytes(html)
 
     @staticmethod
     def _html_a_pdf_bytes(html: str) -> bytes:

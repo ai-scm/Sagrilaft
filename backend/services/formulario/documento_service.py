@@ -1,26 +1,27 @@
 """
-Persistencia de documentos en base de datos y sistema de archivos.
+CRUD de documentos adjuntos — delegación a IAlmacenamiento para el archivo físico.
+
+ruta_archivo en BD almacena la KEY relativa al backend (ej. 'CLIENTES/Empresa/rut.pdf').
+La key es agnóstica al backend de almacenamiento concreto.
 """
 
-import os
+import hashlib
 import re
-import shutil
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from domain.contratos import DocumentoDatos
 from domain.excepciones import DocumentoNoEncontradoError
 from domain.puertos.repositorios import RepositorioDocumento
+from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 
 
 def _sanitizar_nombre_archivo(nombre: str) -> str:
     """
-    Elimina vectores de path traversal y caracteres peligrosos del nombre de archivo.
+    Elimina vectores de path traversal y caracteres peligrosos.
 
-    OWASP A05 — Security Misconfiguration / Path Traversal:
-    Un cliente puede enviar '../../etc/passwd' como filename. Path.name extrae
-    solo la parte final, y la expresión regular retiene únicamente caracteres
-    seguros para el sistema de archivos.
+    OWASP A05: Path.name extrae solo la parte final del nombre, bloqueando '../'.
+    La expresión regular retiene únicamente caracteres seguros para el filesystem.
     """
     nombre_base = Path(nombre).name
     nombre_limpio = re.sub(r"[^\w.\-]", "_", nombre_base)
@@ -28,104 +29,110 @@ def _sanitizar_nombre_archivo(nombre: str) -> str:
 
 
 class DocumentoService:
-    """
-    CRUD y manejo de archivos en disco para los documentos adjuntos de un formulario.
-    """
+    """CRUD y manejo de archivos para los documentos adjuntos de un formulario."""
 
-    def __init__(self, repo: RepositorioDocumento, upload_dir: Path) -> None:
+    def __init__(self, repo: RepositorioDocumento, storage: IAlmacenamiento) -> None:
         self._repo = repo
-        self.directorio_base = upload_dir
-        self._validar_directorio_produccion()
+        self._storage = storage
 
-    def _validar_directorio_produccion(self) -> None:
-        """Previene fallas críticas antes de aceptar tráfico."""
-        if not self.directorio_base.exists():
-            self.directorio_base.mkdir(parents=True, exist_ok=True)
-        if not os.access(self.directorio_base, os.W_OK):
-            raise PermissionError(
-                f"CRÍTICO: El volumen de uploads {self.directorio_base} no tiene permisos de escritura."
-            )
+    # ─── Keys ─────────────────────────────────────────────────────────────────
 
-    def ruta_directorio_borrador(self, codigo_peticion: str) -> Path:
-        """Directorio temporal de trabajo mientras el formulario está en borrador."""
-        return self.directorio_base / codigo_peticion
+    def key_borrador(self, codigo_peticion: str, nombre_archivo: str) -> str:
+        """Key temporal en el backend mientras el formulario está en borrador."""
+        return f"{codigo_peticion}/{_sanitizar_nombre_archivo(nombre_archivo)}"
 
-    def guardar_archivo_en_disco(
-        self, directorio_destino: Path, nombre_archivo: str, contenido: bytes
-    ) -> Path:
-        """Persiste el contenido binario en el directorio indicado.
+    # ─── Escritura ─────────────────────────────────────────────────────────────
 
-        El nombre de archivo se sanitiza antes de construir la ruta para
-        prevenir path traversal (OWASP A05).
-        """
-        nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)
-        directorio_destino.mkdir(parents=True, exist_ok=True)
-        ruta = directorio_destino / nombre_seguro
-        ruta.write_bytes(contenido)
-        return ruta
+    @staticmethod
+    def calcular_hash(contenido: bytes) -> str:
+        """Calcula el hash SHA-256 de un contenido para verificación de integridad."""
+        return hashlib.sha256(contenido).hexdigest()
+
+    def guardar_archivo(self, key: str, contenido: bytes, content_type: str = "") -> None:
+        """Persiste el contenido binario en el backend bajo la key indicada."""
+        self._storage.guardar(key, contenido, content_type)
+
+    def guardar_desde_archivo_local(self, key: str, ruta_local: Path, content_type: str = "") -> None:
+        """Sube un archivo ya existente en disco al backend (util para PDFs generados)."""
+        self._storage.guardar_desde_archivo_local(key, ruta_local, content_type)
 
     def registrar_documento_en_bd(
         self,
         formulario_id: str,
         tipo_documento: str,
         nombre_archivo: str,
-        ruta_archivo: Path,
+        key: str,
         content_type: str,
         tamano: int,
+        hash_sha256: str | None = None,
+        subido_por: str | None = None,
     ) -> DocumentoDatos:
-        """Crea y persiste el registro de un documento adjunto en la BD."""
+        """Crea y persiste el registro del documento en la BD."""
         return self._repo.crear({
             "formulario_id": formulario_id,
             "tipo_documento": tipo_documento,
             "nombre_archivo": nombre_archivo,
-            "ruta_archivo": str(ruta_archivo),
-            "content_type": content_type,
-            "tamano": tamano,
+            "ruta_archivo":   key,
+            "content_type":   content_type,
+            "tamano":         tamano,
+            "hash_sha256":    hash_sha256,
+            "subido_por":     subido_por,
         })
 
+    # ─── Movimiento (borrador → contraparte) ───────────────────────────────────
+
     def mover_archivos_formulario_a_contraparte(
-        self, formulario_id: str, ruta_destino: Path
+        self, formulario_id: str, prefijo_destino: str
     ) -> None:
         """
-        Mueve todos los archivos activos del formulario al directorio de la contraparte
-        y actualiza las rutas en BD en una sola transacción.
+        Mueve los archivos del borrador al prefijo definitivo de la contraparte
+        y actualiza las rutas en BD en una sola operación.
         """
         documentos = self.listar_documentos(formulario_id)
         if not documentos:
             return
 
-        directorio_origen = Path(documentos[0].ruta_archivo).parent
-        rutas_nuevas: Dict[str, str] = {}
-
+        rutas_nuevas: dict[str, str] = {}
         for doc in documentos:
-            ruta_actual = Path(doc.ruta_archivo)
-            ruta_nueva = ruta_destino / ruta_actual.name
-            if ruta_actual != ruta_nueva:
-                if ruta_actual.exists():
-                    shutil.move(str(ruta_actual), str(ruta_nueva))
-                rutas_nuevas[doc.id] = str(ruta_nueva)
+            key_actual = doc.ruta_archivo
+            nombre = Path(key_actual).name
+            key_nuevo = f"{prefijo_destino}/{nombre}"
+            if key_actual != key_nuevo:
+                self._storage.mover(key_actual, key_nuevo)
+                rutas_nuevas[doc.id] = key_nuevo
 
         if rutas_nuevas:
             self._repo.actualizar_rutas(rutas_nuevas)
 
-        if directorio_origen.exists() and not any(directorio_origen.iterdir()):
-            directorio_origen.rmdir()
+    # ─── Lectura ───────────────────────────────────────────────────────────────
 
     def buscar_documento(self, formulario_id: str, doc_id: str) -> DocumentoDatos:
-        """Recupera un documento adjunto por ID y formulario, o lanza DocumentoNoEncontradoError."""
         documento = self._repo.buscar(formulario_id, doc_id)
         if not documento:
             raise DocumentoNoEncontradoError(formulario_id, doc_id)
         return documento
 
-    def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
-        """Elimina un documento adjunto de disco y lo marca como eliminado en BD."""
-        documento = self.buscar_documento(formulario_id, doc_id)
-        ruta = Path(documento.ruta_archivo)
-        if ruta.exists():
-            ruta.unlink()
-        self._repo.marcar_eliminado(doc_id)
-
     def listar_documentos(self, formulario_id: str) -> List[DocumentoDatos]:
-        """Lista todos los documentos adjuntos activos de un formulario."""
         return self._repo.listar_activos(formulario_id)
+
+    def leer_bytes(self, key: str) -> bytes:
+        """Lee el contenido de un archivo — usado para enviar PDFs a ZohoSign."""
+        return self._storage.leer(key)
+
+    def info_descarga(self, doc: DocumentoDatos) -> InfoDescarga:
+        """Genera la info de descarga (URL prefirmada o ruta local según backend)."""
+        if not self._storage.existe(doc.ruta_archivo):
+            raise DocumentoNoEncontradoError("", doc.id)
+        return self._storage.info_descarga(
+            doc.ruta_archivo,
+            doc.nombre_archivo,
+            doc.content_type or "application/octet-stream",
+        )
+
+    # ─── Eliminación ───────────────────────────────────────────────────────────
+
+    def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
+        """Elimina el archivo del backend y lo marca como eliminado en BD."""
+        documento = self.buscar_documento(formulario_id, doc_id)
+        self._storage.eliminar(documento.ruta_archivo)
+        self._repo.marcar_eliminado(doc_id)
