@@ -65,5 +65,17 @@ desktop.ini
 *.swp
 *.swo
 
-GUIA_BACKEND_NO_TECNICA*.md
-README.md
+# ── CDK ──────────────────────────────────────────────────
+infra/sagrilaft/cdk.out/
+infra/sagrilaft/.venv/
+infra/sagrilaft/.cdk.staging/      # ← agregar esto
+infra/sagrilaft/cdk.context.json   # ← agregar esto (contiene account ID de AWS)
+
+
+# ── Docker volumes locales ───────────────────────────────
+postgres_data/
+keycloak_data/
+uploads/
+
+
+.env.example
