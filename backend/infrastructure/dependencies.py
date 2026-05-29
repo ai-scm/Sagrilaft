@@ -9,8 +9,19 @@ api/dependencies.py, que es el punto de composición de la capa API.
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from infrastructure.configuracion import AppConfig
 from domain.contratos import ExtractorIAImp
+from domain.puertos.almacenamiento import IAlmacenamiento
+from domain.puertos.auditoria import RepositorioAuditoria
+from domain.puertos.repositorios import (
+    RepositorioAccesoManual,
+    RepositorioDocumento,
+    RepositorioExpediente,
+    RepositorioFirma,
+    RepositorioFormulario,
+    RepositorioValidacion,
+)
+from infrastructure.configuracion import AppConfig
+from infrastructure.persistencia.auditoria_repositorio import RepositorioAuditoriaSQLAlchemy
 from infrastructure.persistencia.database import get_db
 from infrastructure.persistencia.repositorios import (
     RepositorioAccesoManualSQLAlchemy,
@@ -27,6 +38,11 @@ def obtener_config(solicitud: Request) -> AppConfig:
     return solicitud.app.state.config
 
 
+def obtener_storage(solicitud: Request) -> IAlmacenamiento:
+    """Obtiene el backend de almacenamiento registrado en el ciclo de vida."""
+    return solicitud.app.state.storage
+
+
 def obtener_extractor(solicitud: Request) -> ExtractorIAImp:
     """Obtiene el extractor IA registrado en el ciclo de vida de la aplicación."""
     return solicitud.app.state.orchestrator.extractor
@@ -35,38 +51,45 @@ def obtener_extractor(solicitud: Request) -> ExtractorIAImp:
 # ── Factories de repositorios ────────────────────────────────────────────────
 # Todas dependen de get_db (request-scoped), de modo que instancias creadas en
 # el mismo request comparten la misma Session → atomicidad transaccional preservada.
+# Los tipos de retorno declaran el puerto (Protocol) — no la clase SQLAlchemy concreta.
 
 def obtener_repo_formulario(
     sesion: Session = Depends(get_db),
-) -> RepositorioFormularioSQLAlchemy:
+) -> RepositorioFormulario:
     return RepositorioFormularioSQLAlchemy(sesion)
 
 
 def obtener_repo_documento(
     sesion: Session = Depends(get_db),
-) -> RepositorioDocumentoSQLAlchemy:
+) -> RepositorioDocumento:
     return RepositorioDocumentoSQLAlchemy(sesion)
 
 
 def obtener_repo_validacion(
     sesion: Session = Depends(get_db),
-) -> RepositorioValidacionSQLAlchemy:
+) -> RepositorioValidacion:
     return RepositorioValidacionSQLAlchemy(sesion)
 
 
 def obtener_repo_expediente(
     sesion: Session = Depends(get_db),
-) -> RepositorioExpedienteSQLAlchemy:
+) -> RepositorioExpediente:
     return RepositorioExpedienteSQLAlchemy(sesion)
 
 
 def obtener_repo_firma(
     sesion: Session = Depends(get_db),
-) -> RepositorioFirmaSQLAlchemy:
+) -> RepositorioFirma:
     return RepositorioFirmaSQLAlchemy(sesion)
 
 
 def obtener_repo_acceso(
     sesion: Session = Depends(get_db),
-) -> RepositorioAccesoManualSQLAlchemy:
+) -> RepositorioAccesoManual:
     return RepositorioAccesoManualSQLAlchemy(sesion)
+
+
+def obtener_repo_auditoria(
+    sesion: Session = Depends(get_db),
+) -> RepositorioAuditoria:
+    return RepositorioAuditoriaSQLAlchemy(sesion)

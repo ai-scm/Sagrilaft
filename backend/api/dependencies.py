@@ -13,27 +13,33 @@ Diseño:
 from fastapi import Depends, Request
 
 from domain.contratos import ExtractorIAImp
+from domain.puertos.almacenamiento import IAlmacenamiento
+from domain.puertos.auditoria import RepositorioAuditoria
+from domain.puertos.notificaciones import INotificador
+from domain.puertos.repositorios import (
+    RepositorioAccesoManual,
+    RepositorioDocumento,
+    RepositorioExpediente,
+    RepositorioFirma,
+    RepositorioFormulario,
+    RepositorioValidacion,
+)
 from infrastructure.configuracion import AppConfig
 from infrastructure.dependencies import (
     obtener_config,
     obtener_extractor,
     obtener_repo_acceso,
+    obtener_repo_auditoria,
     obtener_repo_documento,
     obtener_repo_expediente,
     obtener_repo_firma,
     obtener_repo_formulario,
     obtener_repo_validacion,
+    obtener_storage,
 )
 from infrastructure.notificaciones.email_service import EmailService
-from infrastructure.persistencia.repositorios import (
-    RepositorioAccesoManualSQLAlchemy,
-    RepositorioDocumentoSQLAlchemy,
-    RepositorioExpedienteSQLAlchemy,
-    RepositorioFirmaSQLAlchemy,
-    RepositorioFormularioSQLAlchemy,
-    RepositorioValidacionSQLAlchemy,
-)
 from services.acceso_manual.acceso_manual_service import AccesoManualService
+from services.auditoria.auditoria_service import AuditoriaService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
 from services.formulario.formulario_service import FormularioService
@@ -57,7 +63,7 @@ def obtener_servicio_lista_cautela(solicitud: Request) -> ListaCautelaService:
 # ── Servicios de aplicación ──────────────────────────────────────────────────
 
 def obtener_servicio_acceso(
-    repo: RepositorioAccesoManualSQLAlchemy = Depends(obtener_repo_acceso),
+    repo: RepositorioAccesoManual = Depends(obtener_repo_acceso),
     config: AppConfig = Depends(obtener_config),
 ) -> AccesoManualService:
     return AccesoManualService(repo, config.frontend_urls[0])
@@ -65,40 +71,52 @@ def obtener_servicio_acceso(
 
 def obtener_servicio_email(
     config: AppConfig = Depends(obtener_config),
-) -> EmailService:
+) -> INotificador:
     return EmailService(config.smtp)
 
 
 def obtener_servicio_firma(
     request: Request,
-    repo: RepositorioFirmaSQLAlchemy = Depends(obtener_repo_firma),
+    repo: RepositorioFirma = Depends(obtener_repo_firma),
+    storage: IAlmacenamiento = Depends(obtener_storage),
 ) -> FirmaService:
     config = request.app.state.config
     return FirmaService(
         repo=repo,
         zoho=request.app.state.zoho_sign,
-        upload_dir=config.upload_dir,
+        storage=storage,
         webhook_secret=config.zoho_sign.webhook_secret,
     )
 
 
 def obtener_servicio_formulario(
-    repo: RepositorioFormularioSQLAlchemy = Depends(obtener_repo_formulario),
-    repo_doc: RepositorioDocumentoSQLAlchemy = Depends(obtener_repo_documento),
+    repo: RepositorioFormulario = Depends(obtener_repo_formulario),
+    repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     extractor: ExtractorIAImp = Depends(obtener_extractor),
-    config: AppConfig = Depends(obtener_config),
+    storage: IAlmacenamiento = Depends(obtener_storage),
 ) -> FormularioService:
-    return FormularioService(repo, repo_doc, extractor, config.upload_dir)
+    return FormularioService(repo, repo_doc, extractor, storage)
 
 
 def obtener_servicio_expediente(
-    repo: RepositorioExpedienteSQLAlchemy = Depends(obtener_repo_expediente),
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    storage: IAlmacenamiento = Depends(obtener_storage),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> ExpedienteService:
-    return ExpedienteService(repo)
+    return ExpedienteService(repo, storage, repo_auditoria)
+
+
+def obtener_servicio_auditoria(
+    request: Request,
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    repo_expediente: RepositorioExpediente = Depends(obtener_repo_expediente),
+    config: AppConfig = Depends(obtener_config),
+) -> AuditoriaService:
+    return AuditoriaService(repo_auditoria, repo_expediente, config.secret_key)
 
 
 def obtener_servicio_validacion(
-    repo: RepositorioValidacionSQLAlchemy = Depends(obtener_repo_validacion),
+    repo: RepositorioValidacion = Depends(obtener_repo_validacion),
     orquestador: OrquestadorValidacionDocumentos = Depends(obtener_orquestador),
     servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
 ) -> ValidacionService:

@@ -9,9 +9,11 @@ SRP: parsea solicitudes HTTP y delega toda la lógica al AccesoManualService.
 
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from api.dependencies import obtener_servicio_acceso
+from api.limitador import limitador
+from api.middleware.autenticacion import portal_interno
 from api.schemas import (
     AccesoManualCreado,
     AccesoManualResumen,
@@ -36,6 +38,7 @@ enrutador = APIRouter(prefix="/api/accesos-manuales", tags=["accesos-manuales"])
         "o proveedor acceda al formulario SAGRILAFT. El PIN se devuelve UNA SOLA VEZ "
         "y nunca se vuelve a exponer desde el backend."
     ),
+    dependencies=[Depends(portal_interno)],
 )
 def crear_acceso_manual(
     solicitud_acceso: SolicitudAccesoManual,
@@ -57,6 +60,7 @@ def crear_acceso_manual(
     response_model=List[AccesoManualResumen],
     summary="Listar accesos manuales",
     description="Devuelve todos los accesos creados ordenados del más reciente al más antiguo, con su estado calculado (activo, consumido o expirado).",
+    dependencies=[Depends(portal_interno)],
 )
 def listar_accesos_manuales(
     servicio: AccesoManualService = Depends(obtener_servicio_acceso),
@@ -78,9 +82,12 @@ def listar_accesos_manuales(
     responses={
         404: {"description": "Token inválido, no encontrado o ya consumido"},
         410: {"description": "El acceso ha expirado"},
+        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
     },
 )
+@limitador.limit("30/minute")
 def resolver_token_diligenciamiento(
+    request: Request,
     token: str,
     servicio: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> FormularioConDetalles:

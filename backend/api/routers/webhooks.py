@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 
 from api.dependencies import obtener_servicio_firma
 from api.schemas import ZohoWebhookPayload
+from domain.utils.seguridad import sanitizar_log
 from services.firma.firma_service import FirmaService
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ def webhook_zoho_sign(
     payload: ZohoWebhookPayload,
     servicio: FirmaService = Depends(obtener_servicio_firma),
 ) -> dict:
-    logger.info("Webhook ZohoSign recibido: %s", payload.notifications.operation_type)
+    logger.info("Webhook ZohoSign recibido: %s", sanitizar_log(payload.notifications.operation_type))
     servicio.procesar_webhook(
         secret_token=payload.notifications.secret_token,
         request_id=payload.requests.request_id,

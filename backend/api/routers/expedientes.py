@@ -11,7 +11,8 @@ DIP: depende de api.dependencies, no de infrastructure directamente.
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from starlette.responses import Response
 
 from api.dependencies import (
     obtener_servicio_acceso,
@@ -19,12 +20,29 @@ from api.dependencies import (
     obtener_servicio_expediente,
     obtener_servicio_firma,
 )
+from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
+from domain.excepciones import SinPermisoError
 from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, SolicitudDevolucion
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
 
-enrutador = APIRouter(prefix="/api/expedientes", tags=["expedientes"])
+enrutador = APIRouter(
+    prefix="/api/expedientes",
+    tags=["expedientes"],
+)
+
+
+def _contrapartes_permitidas(usuario: UsuarioPortalInterno) -> list[str]:
+    """Deriva las carpetas visibles según los roles del operador autenticado."""
+    permitidas = []
+    if usuario.tiene_rol("acceso_clientes"):
+        permitidas.append("cliente")
+    if usuario.tiene_rol("acceso_proveedores"):
+        permitidas.append("proveedor")
+    if not permitidas:
+        raise SinPermisoError("sin_roles")
+    return permitidas
 
 
 # ─── Listado ──────────────────────────────────────────────────────────────────
@@ -42,11 +60,13 @@ enrutador = APIRouter(prefix="/api/expedientes", tags=["expedientes"])
 def listar_expedientes(
     tipo_contraparte: Optional[str] = Query(None, description="'CLIENTE' o 'PROVEEDOR'"),
     busqueda: Optional[str] = Query(None, description="Texto libre en razón social"),
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> List[ExpedienteResumen]:
     return servicio.listar_expedientes(
         tipo_contraparte=tipo_contraparte,
         busqueda=busqueda,
+        contrapartes_permitidas=_contrapartes_permitidas(usuario),
     )
 
 
@@ -61,9 +81,10 @@ def listar_expedientes(
 )
 def obtener_expediente(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ExpedienteDetalle:
-    return servicio.obtener_expediente(formulario_id)
+    return servicio.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
 
 
 # ─── Descarga de documentos ───────────────────────────────────────────────────
@@ -77,16 +98,13 @@ def obtener_expediente(
 def descargar_documento(
     formulario_id: str,
     doc_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
-) -> FileResponse:
-    ruta, nombre_archivo, content_type = servicio.resolver_documento_para_descarga(
-        formulario_id, doc_id
-    )
-    return FileResponse(
-        path=ruta,
-        filename=nombre_archivo,
-        media_type=content_type,
-    )
+) -> Response:
+    info = servicio.resolver_documento_para_descarga(formulario_id, doc_id, _contrapartes_permitidas(usuario))
+    if info.es_url:
+        return RedirectResponse(url=info.valor, status_code=307)
+    return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)
 
 
 # ─── Aprobación / Rechazo ────────────────────────────────────────────────────
@@ -98,9 +116,14 @@ def descargar_documento(
 )
 def aprobar_expediente(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
-    return servicio.aprobar_expediente(formulario_id)
+    return servicio.aprobar_expediente(
+        formulario_id,
+        _contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
 
 
 @enrutador.post(
@@ -110,9 +133,14 @@ def aprobar_expediente(
 )
 def rechazar_expediente(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
-    return servicio.rechazar_expediente(formulario_id)
+    return servicio.rechazar_expediente(
+        formulario_id,
+        _contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
 
 
 @enrutador.post(
@@ -129,6 +157,7 @@ def rechazar_expediente(
 def devolver_expediente(
     formulario_id: str,
     solicitud: SolicitudDevolucion,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
     acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
     email_service = Depends(obtener_servicio_email),
@@ -139,6 +168,8 @@ def devolver_expediente(
         campos_identificados=solicitud.campos_identificados,
         acceso_service=acceso_service,
         email_service=email_service,
+        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
     )
 
 
@@ -159,8 +190,11 @@ def devolver_expediente(
 )
 def enviar_a_firma(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: FirmaService = Depends(obtener_servicio_firma),
+    servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
+    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
     return servicio.enviar_a_firma(formulario_id)
 
 
@@ -172,8 +206,11 @@ def enviar_a_firma(
 )
 def verificar_estado_firma(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: FirmaService = Depends(obtener_servicio_firma),
+    servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
+    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
     return servicio.verificar_estado_firma(formulario_id)
 
 
@@ -191,8 +228,11 @@ def verificar_estado_firma(
 )
 def cancelar_firma(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: FirmaService = Depends(obtener_servicio_firma),
+    servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
+    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
     return servicio.cancelar_firma(formulario_id)
 
 
@@ -206,12 +246,12 @@ def cancelar_firma(
 )
 def descargar_documento_firmado(
     formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: FirmaService = Depends(obtener_servicio_firma),
-) -> FileResponse:
-    ruta = servicio.resolver_documento_firmado(formulario_id)
-    es_zip = ruta.suffix == ".zip"
-    return FileResponse(
-        path=ruta,
-        filename="formulario_firmado.zip" if es_zip else "formulario_firmado.pdf",
-        media_type="application/zip" if es_zip else "application/pdf",
-    )
+    servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> Response:
+    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    info = servicio.resolver_documento_firmado(formulario_id)
+    if info.es_url:
+        return RedirectResponse(url=info.valor, status_code=307)
+    return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)

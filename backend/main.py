@@ -11,10 +11,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from infrastructure.configuracion import load_config
+from infrastructure.storage.backend import crear_storage
 from api.limitador import limitador
 from domain.excepciones import (
     AccesoExpiradoError,
@@ -25,19 +25,22 @@ from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,
     FormularioYaEnviadoError,
+    SinPermisoError,
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
     WebhookTokenInvalidoError,
 )
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
-from api.routers import acceso_manual, expedientes, formulario, listas_cautela, validacion, webhooks
+from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
 
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger("fontTools").setLevel(logging.WARNING)
-logging.getLogger("weasyprint").setLevel(logging.WARNING)
+_log_seg = logging.getLogger("sagrilaft.security")
+for _nombre in ("fontTools", "fontTools.ttLib", "fontTools.ttLib.ttFont",
+                "fontTools.subset", "fontTools.subset.timer", "weasyprint"):
+    logging.getLogger(_nombre).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 _NOMBRE_SERVICIO = "SAGRILAFT API"
@@ -63,6 +66,12 @@ async def lifespan(app: FastAPI):
 
     config.zoho_sign.validar()
 
+    app.state.storage = crear_storage(
+        upload_dir=config.upload_dir,
+        backend=config.storage_backend,
+        s3_bucket=config.s3.bucket,
+        s3_region=config.aws.region,
+    )
     app.state.orchestrator            = crear_orquestador_validacion(config)
     app.state.config                  = config
     app.state.servicio_listas_cautela = crear_servicio_listas_cautela()
@@ -80,6 +89,7 @@ def _registrar_rutas(app: FastAPI) -> None:
     app.include_router(acceso_manual.enrutador)
     app.include_router(expedientes.enrutador)
     app.include_router(webhooks.enrutador)
+    app.include_router(auditoria.enrutador)
 
 
 def _registrar_manejadores_excepcion(app: FastAPI) -> None:
@@ -101,6 +111,24 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
 
         return _inner
 
+    def _ip(req: Request) -> str:
+        return req.client.host if req.client else "unknown"
+
+    def handler_seguridad(status_code: int, evento: str, detalle: str):
+        def _inner(req: Request, exc: Exception) -> JSONResponse:
+            _log_seg.warning("SECURITY event=%s ip=%s path=%s", evento, _ip(req), req.url.path)
+            return _respuesta_error(status_code, detalle)
+        return _inner
+
+    def handler_seguridad_from_exception(status_code: int, evento: str):
+        def _inner(req: Request, exc: Exception) -> JSONResponse:
+            _log_seg.warning("SECURITY event=%s ip=%s path=%s", evento, _ip(req), req.url.path)
+            return _respuesta_error_desde_excepcion(status_code, exc)
+        return _inner
+
+    app.add_exception_handler(SinPermisoError,             handler_seguridad(403, "ACCESS_DENIED", "Acceso denegado"))
+    app.add_exception_handler(CredencialesAccesoInvalidasError, handler_seguridad_from_exception(401, "CREDENTIALS_INVALID"))
+    app.add_exception_handler(WebhookTokenInvalidoError,   handler_seguridad(403, "WEBHOOK_TOKEN_INVALID", "Token de webhook inválido"))
     app.add_exception_handler(FormularioNoEncontradoError, handler(404, "Formulario no encontrado"))
     app.add_exception_handler(FormularioNoEditableError, handler_from_exception(400))
     app.add_exception_handler(
@@ -110,11 +138,9 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
     app.add_exception_handler(ContraparteInvalidaError, handler_from_exception(422))
     app.add_exception_handler(DocumentoNoEncontradoError, handler(404, "Documento no encontrado"))
     app.add_exception_handler(FirmaNoDisponibleError, handler(404, "Documento firmado no disponible"))
-    app.add_exception_handler(CredencialesAccesoInvalidasError, handler_from_exception(401))
     app.add_exception_handler(TokenDiligenciamientoInvalidoError, handler_from_exception(404))
     app.add_exception_handler(TokenConsumidoError,                handler_from_exception(410))
     app.add_exception_handler(AccesoExpiradoError,                handler_from_exception(410))
-    app.add_exception_handler(WebhookTokenInvalidoError,          handler(403, "Token de webhook inválido"))
     app.add_exception_handler(
         DependenciaPdfNoInstaladaError,
         handler_from_exception_with_hint(
@@ -131,8 +157,8 @@ def _configurar_middlewares(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=load_config().frontend_urls,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Content-Type", "Authorization"],
     )
 
 
@@ -144,8 +170,12 @@ def _crear_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    def _handler_rate_limit(req: Request, exc: RateLimitExceeded) -> JSONResponse:
+        _log_seg.warning("SECURITY event=RATE_LIMIT_EXCEEDED ip=%s path=%s", req.client and req.client.host, req.url.path)
+        return JSONResponse(status_code=429, content={"detail": "Demasiadas solicitudes. Intente más tarde."})
+
     app.state.limiter = limitador
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _handler_rate_limit)
 
     _configurar_middlewares(app)
     _registrar_rutas(app)
