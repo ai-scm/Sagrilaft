@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from domain.constantes import (
@@ -402,10 +402,15 @@ class RepositorioExpedienteSQLAlchemy:
         estados: List[Any],
         tipo_contraparte: Optional[str] = None,
         busqueda: Optional[str] = None,
-    ) -> List[Formulario]:
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> List[FormularioDatos]:
         consulta = self._sesion.query(Formulario).filter(
             Formulario.estado.in_(estados)
         )
+        if contrapartes_permitidas is not None:
+            consulta = consulta.filter(
+                Formulario.tipo_contraparte.in_(contrapartes_permitidas)
+            )
         if tipo_contraparte:
             consulta = consulta.filter(
                 Formulario.tipo_contraparte == tipo_contraparte.lower()
@@ -418,10 +423,11 @@ class RepositorioExpedienteSQLAlchemy:
                     Formulario.codigo_peticion.ilike(termino),
                 )
             )
-        return consulta.order_by(Formulario.updated_at.desc()).all()
+        orms = consulta.order_by(Formulario.updated_at.desc()).all()
+        return [_orm_formulario_a_datos(orm) for orm in orms]
 
-    def obtener(self, formulario_id: str, estados: List[Any]) -> Optional[Formulario]:
-        return (
+    def obtener(self, formulario_id: str, estados: List[Any]) -> Optional[FormularioDatos]:
+        orm = (
             self._sesion.query(Formulario)
             .filter(
                 Formulario.id == formulario_id,
@@ -429,11 +435,12 @@ class RepositorioExpedienteSQLAlchemy:
             )
             .first()
         )
+        return _orm_formulario_a_datos(orm) if orm else None
 
     def buscar_documento_descargable(
         self, formulario_id: str, doc_id: str, estados: List[Any]
-    ) -> Optional[DocumentoAdjunto]:
-        return (
+    ) -> Optional[DocumentoDatos]:
+        orm = (
             self._sesion.query(DocumentoAdjunto)
             .join(Formulario, Formulario.id == DocumentoAdjunto.formulario_id)
             .filter(
@@ -444,9 +451,10 @@ class RepositorioExpedienteSQLAlchemy:
             )
             .first()
         )
+        return _orm_documento_a_datos(orm) if orm else None
 
-    def listar_documentos(self, formulario_id: str) -> List[DocumentoAdjunto]:
-        return (
+    def listar_documentos(self, formulario_id: str) -> List[DocumentoDatos]:
+        orms = (
             self._sesion.query(DocumentoAdjunto)
             .filter(
                 DocumentoAdjunto.formulario_id == formulario_id,
@@ -455,6 +463,7 @@ class RepositorioExpedienteSQLAlchemy:
             .order_by(DocumentoAdjunto.created_at)
             .all()
         )
+        return [_orm_documento_a_datos(orm) for orm in orms]
 
     def contar_documentos(self, ids_formularios: List[str]) -> Dict[str, int]:
         filas = (
@@ -472,8 +481,36 @@ class RepositorioExpedienteSQLAlchemy:
         )
         return {fila.formulario_id: fila.total for fila in filas}
 
-    def confirmar(self) -> None:
-        self._sesion.commit()
+    def actualizar_estado(self, formulario_id: str, estado: str) -> None:
+        """Persiste el nuevo estado y hace commit inmediato."""
+        orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
+        if orm:
+            # Informa al trigger de auditoría que este cambio viene de la aplicación
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
+            orm.estado = estado
+            self._sesion.commit()
+
+    def actualizar_para_correccion(
+        self,
+        formulario_id: str,
+        estado: str,
+        numero_correccion: int,
+        campos_a_corregir: str,
+    ) -> None:
+        """
+        Persiste los campos de una devolución para corrección y hace commit.
+
+        El commit de este método también confirma los cambios de AccesoManual
+        pendientes en la misma sesión (AccesoManualService.reactivar_acceso_para_correccion
+        modifica la sesión sin hacer commit, delegando aquí esa responsabilidad).
+        """
+        orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
+        if orm:
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
+            orm.estado = estado
+            orm.numero_correccion = numero_correccion
+            orm.campos_a_corregir = campos_a_corregir
+            self._sesion.commit()
 
 
 class RepositorioFirmaSQLAlchemy:
@@ -537,6 +574,8 @@ class RepositorioFirmaSQLAlchemy:
     def actualizar_formulario(self, formulario_id: str, campos: Dict[str, Any]) -> None:
         orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
         if orm:
+            if "estado" in campos:
+                self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
             for campo, valor in campos.items():
                 setattr(orm, campo, valor)
             self._sesion.commit()

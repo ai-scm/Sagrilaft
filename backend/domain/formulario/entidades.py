@@ -185,6 +185,17 @@ class FormularioDominio:
     estado: EstadoFormulario
     numero_correccion: int = 0
 
+    # ── Factory ────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def desde_snapshot(cls, datos: "FormularioDatos") -> "FormularioDominio":
+        """Construye la entidad rica desde un snapshot de persistencia."""
+        return cls(
+            id=datos.id,
+            estado=EstadoFormulario(datos.estado),
+            numero_correccion=datos.numero_correccion or 0,
+        )
+
     # ── Predicados ─────────────────────────────────────────────────────────────
 
     def es_borrador(self) -> bool:

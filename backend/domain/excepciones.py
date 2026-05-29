@@ -108,6 +108,13 @@ class AccesoExpiradoError(Exception):
         super().__init__("El acceso ha expirado. Solicite un nuevo enlace al área responsable.")
 
 
+class SinPermisoError(Exception):
+    """El usuario autenticado no tiene rol para acceder a este recurso."""
+
+    def __init__(self, tipo_contraparte: str) -> None:
+        super().__init__(f"Sin acceso a la carpeta '{tipo_contraparte.upper()}'.")
+
+
 class WebhookTokenInvalidoError(Exception):
     """
     El secret_token recibido en el webhook de ZohoSign no coincide con el configurado.

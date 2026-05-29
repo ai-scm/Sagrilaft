@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Integer, Float, Boolean, Text, DateTime,
+    BigInteger, Column, String, Integer, Float, Boolean, Text, DateTime,
     ForeignKey, Index,
 )
 from sqlalchemy.orm import relationship
@@ -185,6 +185,12 @@ class DocumentoAdjunto(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    # ── Trazabilidad documental ────────────────────────────────────────────────
+    version_numero = Column(Integer, nullable=False, default=1, server_default="1")
+    version_anterior_id = Column(String, ForeignKey("documentos_adjuntos.id"), nullable=True)
+    subido_por = Column(String(255), nullable=True)
+    hash_sha256 = Column(String(64), nullable=True)
+
     formulario = relationship("Formulario", back_populates="documentos")
 
 
@@ -232,3 +238,27 @@ class AccesoManual(Base):
     consumed_at = Column(DateTime(timezone=True), nullable=True)
 
     formulario = relationship("Formulario", foreign_keys=[formulario_id])
+
+
+class EventoFormulario(Base):
+    """
+    Log inmutable de eventos de ciclo de vida de un formulario SAGRILAFT.
+
+    Cada fila representa una transición de estado o acción significativa.
+    Nunca se actualizan — solo se insertan (append-only).
+    """
+    __tablename__ = "eventos_formulario"
+    __table_args__ = (
+        Index("ix_eventos_formulario_form_id", "formulario_id"),
+        Index("ix_eventos_formulario_form_created", "formulario_id", "created_at"),
+    )
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    tipo_evento = Column(String(60), nullable=False)
+    estado_anterior = Column(String(50), nullable=True)
+    estado_nuevo = Column(String(50), nullable=False)
+    actor_id = Column(String(255), nullable=True)
+    actor_tipo = Column(String(20), nullable=False, default="SISTEMA")
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
