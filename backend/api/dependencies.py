@@ -79,6 +79,7 @@ def obtener_servicio_firma(
     request: Request,
     repo: RepositorioFirma = Depends(obtener_repo_firma),
     storage: IAlmacenamiento = Depends(obtener_storage),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> FirmaService:
     config = request.app.state.config
     return FirmaService(
@@ -86,6 +87,7 @@ def obtener_servicio_firma(
         zoho=request.app.state.zoho_sign,
         storage=storage,
         webhook_secret=config.zoho_sign.webhook_secret,
+        repo_auditoria=repo_auditoria,
     )
 
 
@@ -94,8 +96,9 @@ def obtener_servicio_formulario(
     repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     extractor: ExtractorIAImp = Depends(obtener_extractor),
     storage: IAlmacenamiento = Depends(obtener_storage),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> FormularioService:
-    return FormularioService(repo, repo_doc, extractor, storage)
+    return FormularioService(repo, repo_doc, extractor, storage, repo_auditoria)
 
 
 def obtener_servicio_expediente(

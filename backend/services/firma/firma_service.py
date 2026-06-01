@@ -10,7 +10,9 @@ import hmac
 import logging
 import tempfile
 from pathlib import Path
+from typing import Optional
 
+from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
 from domain.constantes import (
     TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
     TIPO_DOCUMENTO_FORMULARIO_PDF,
@@ -25,8 +27,9 @@ from domain.excepciones import (
 )
 from domain.formulario.entidades import FormularioDatos, FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
-from domain.puertos.repositorios import RepositorioFirma
 from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
+from domain.puertos.auditoria import RepositorioAuditoria
+from domain.puertos.repositorios import RepositorioFirma
 from services.firma.almacenamiento_firma import (
     archivar_en_storage,
     resolver_key_documento_firmado,
@@ -46,11 +49,17 @@ class FirmaService:
         zoho: IServicioFirmaExterna,
         storage: IAlmacenamiento,
         webhook_secret: str,
+        repo_auditoria: Optional[RepositorioAuditoria] = None,
     ) -> None:
         self._repo           = repo
         self._zoho           = zoho
         self._storage        = storage
         self._webhook_secret = webhook_secret
+        self._auditoria      = repo_auditoria
+
+    def _registrar(self, evento: EventoAuditoria) -> None:
+        if self._auditoria:
+            self._auditoria.registrar_evento(evento)
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
@@ -85,7 +94,7 @@ class FirmaService:
 
     # ─── Enviar a firma ───────────────────────────────────────────────────────
 
-    def enviar_a_firma(self, formulario_id: str) -> dict:
+    def enviar_a_firma(self, formulario_id: str, actor_id: Optional[str] = None) -> dict:
         """
         Inicia el proceso de firma electrónica para un formulario validado.
 
@@ -137,6 +146,14 @@ class FirmaService:
             "zoho_request_id": resultado.request_id,
             "estado":          dominio.estado.value,
         })
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FIRMA_INICIADA,
+            estado_anterior=formulario.estado,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+        ))
 
         logger.info(
             "Formulario %s enviado a firma. ZohoSign request_id=%s",
@@ -202,6 +219,14 @@ class FirmaService:
             "ruta_documento_firmado": key_guardado,
             "estado":                 dominio.estado.value,
         })
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario.id,
+            tipo_evento=TipoEvento.FIRMA_COMPLETADA,
+            estado_anterior=formulario.estado,
+            estado_nuevo=dominio.estado.value,
+            actor_id=request_id,
+            actor_tipo=ActorTipo.SISTEMA,
+        ))
 
         logger.info("Formulario %s → FIRMADO. Key: %s", formulario.id, key_guardado)
         return dominio.estado.value
@@ -213,6 +238,14 @@ class FirmaService:
             "estado":          dominio.estado.value,
             "zoho_request_id": None,
         })
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario.id,
+            tipo_evento=TipoEvento.FIRMA_CANCELADA,
+            estado_anterior=formulario.estado,
+            estado_nuevo=dominio.estado.value,
+            actor_id=request_id,
+            actor_tipo=ActorTipo.SISTEMA,
+        ))
         logger.info(
             "Formulario %s devuelto a VALIDADO (ZohoSign status='%s', request_id=%s)",
             formulario.id, status, request_id,
@@ -221,7 +254,7 @@ class FirmaService:
 
     # ─── Cancelación de firma ────────────────────────────────────────────────
 
-    def cancelar_firma(self, formulario_id: str) -> dict:
+    def cancelar_firma(self, formulario_id: str, actor_id: Optional[str] = None) -> dict:
         formulario = self._obtener_formulario(formulario_id)
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.cancelar_firma()  # PENDIENTE_FIRMA → VALIDADO; lanza FormularioNoEditableError si no aplica
@@ -236,6 +269,14 @@ class FirmaService:
             "estado":          dominio.estado.value,
             "zoho_request_id": None,
         })
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FIRMA_CANCELADA,
+            estado_anterior=formulario.estado,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+        ))
 
         logger.info("Firma cancelada para formulario %s → VALIDADO", formulario_id)
         return {"estado": dominio.estado.value}

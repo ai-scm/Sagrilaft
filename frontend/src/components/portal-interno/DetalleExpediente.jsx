@@ -15,6 +15,8 @@ import { useExpedienteDetalle } from './hooks/useExpedienteDetalle';
 import { estilosEstadoCargaBase } from './ui/listaStyles';
 import BadgeEstadoFormulario from './BadgeEstadoFormulario';
 import ModalDevolucion from './ModalDevolucion';
+import ModalRechazo from './ModalRechazo';
+import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
   formatearFechaCorta,
@@ -367,11 +369,11 @@ function BtnDescargaFirmado({ formularioId }) {
 function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
   const [enviando, setEnviando]                         = useState(false); // enviar a ZohoSign (VALIDADO)
   const [aprobando, setAprobando]                       = useState(false); // aprobar expediente (ENVIADO)
-  const [rechazando, setRechazando]                     = useState(false); // rechazar expediente (ENVIADO)
   const [cancelando, setCancelando]                     = useState(false);
   const [verificando, setVerificando]                   = useState(false);
   const [errorFirma, setErrorFirma]                     = useState(null);
   const [mostrarModalDevolucion, setMostrarModalDevolucion] = useState(false);
+  const [mostrarModalRechazo, setMostrarModalRechazo]   = useState(false);
 
   async function handleEnviarAFirma() {
     setEnviando(true);
@@ -425,21 +427,8 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
     }
   }
 
-  async function handleRechazar() {
-    setRechazando(true);
-    setErrorFirma(null);
-    try {
-      await api.rechazarExpediente(formularioId);
-      onFirmaEnviada();
-    } catch (err) {
-      setErrorFirma(err.message || 'Error al rechazar.');
-    } finally {
-      setRechazando(false);
-    }
-  }
-
   if (estado === ESTADO_ENVIADO) {
-    const ocupado = aprobando || rechazando;
+    const ocupado = aprobando;
     return (
       <>
         <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)' }}>
@@ -460,11 +449,11 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
             </button>
             <button
               style={{ ...s.btnFirma, color: '#991b1b', opacity: 0.85, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
-              onClick={handleRechazar}
+              onClick={() => setMostrarModalRechazo(true)}
               disabled={ocupado}
               type="button"
             >
-              {rechazando ? 'Rechazando…' : 'Rechazar'}
+              Rechazar
             </button>
             <button
               style={{ ...s.btnFirma, color: '#c2410c', opacity: 0.9, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
@@ -481,6 +470,12 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
           formularioId={formularioId}
           onDevuelto={() => { setMostrarModalDevolucion(false); onFirmaEnviada(); }}
           onCancelar={() => setMostrarModalDevolucion(false)}
+        />
+        <ModalRechazo
+          visible={mostrarModalRechazo}
+          formularioId={formularioId}
+          onRechazado={() => { setMostrarModalRechazo(false); onFirmaEnviada(); }}
+          onCancelar={() => setMostrarModalRechazo(false)}
         />
       </>
     );
@@ -575,7 +570,10 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
 
   const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
   const todosDocumentos   = expediente?.documentos ?? [];
-  const pdfFormulario     = todosDocumentos.find(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF) ?? null;
+  // Puede haber varias versiones del PDF; la activa es la de mayor version_numero.
+  const pdfFormulario     = todosDocumentos
+    .filter(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF)
+    .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
   const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));
 
   return (
@@ -607,9 +605,17 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               </div>
             </div>
 
-            {/* PDF oficial del formulario */}
+            {/* PDF oficial del formulario — versión activa */}
             {pdfFormulario && (
               <BannerPdfFormulario documento={pdfFormulario} formularioId={formularioId} />
+            )}
+
+            {/* Historial de versiones — visible cuando hay más de una */}
+            {todosDocumentos.length > 0 && (
+              <HistorialVersionesFormulario
+                documentos={todosDocumentos}
+                formularioId={formularioId}
+              />
             )}
 
             {/* Firma electrónica */}

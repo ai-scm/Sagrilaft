@@ -66,18 +66,31 @@ class DocumentoService:
         tamano: int,
         hash_sha256: str | None = None,
         subido_por: str | None = None,
+        version_numero: int = 1,
+        version_anterior_id: str | None = None,
     ) -> DocumentoDatos:
         """Crea y persiste el registro del documento en la BD."""
         return self._repo.crear({
-            "formulario_id": formulario_id,
-            "tipo_documento": tipo_documento,
-            "nombre_archivo": nombre_archivo,
-            "ruta_archivo":   key,
-            "content_type":   content_type,
-            "tamano":         tamano,
-            "hash_sha256":    hash_sha256,
-            "subido_por":     subido_por,
+            "formulario_id":      formulario_id,
+            "tipo_documento":     tipo_documento,
+            "nombre_archivo":     nombre_archivo,
+            "ruta_archivo":       key,
+            "content_type":       content_type,
+            "tamano":             tamano,
+            "hash_sha256":        hash_sha256,
+            "subido_por":         subido_por,
+            "version_numero":     version_numero,
+            "version_anterior_id": version_anterior_id,
         })
+
+    def obtener_ultimo_formulario_pdf(self, formulario_id: str) -> DocumentoDatos | None:
+        """
+        Retorna el PDF del formulario con el mayor version_numero activo.
+
+        Se usa antes de generar un nuevo PDF para encadenar la versión nueva
+        con la anterior mediante version_anterior_id.
+        """
+        return self._repo.obtener_ultimo_formulario_pdf(formulario_id)
 
     # ─── Movimiento (borrador → contraparte) ───────────────────────────────────
 

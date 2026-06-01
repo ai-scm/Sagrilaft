@@ -37,6 +37,12 @@ class DocumentoDatos:
     deleted_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
+    # ── Trazabilidad de versiones ──────────────────────────────────────────────
+    version_numero: int = 1
+    version_anterior_id: Optional[str] = None
+    hash_sha256: Optional[str] = None
+    subido_por: Optional[str] = None
+
 
 @dataclass
 class ResultadoExtraccion:

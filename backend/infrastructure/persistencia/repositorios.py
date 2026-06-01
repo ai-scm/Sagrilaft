@@ -253,6 +253,10 @@ def _orm_documento_a_datos(orm: DocumentoAdjunto) -> DocumentoDatos:
         tamano=orm.tamano,
         deleted_at=orm.deleted_at,
         created_at=orm.created_at,
+        version_numero=orm.version_numero or 1,
+        version_anterior_id=orm.version_anterior_id,
+        hash_sha256=orm.hash_sha256,
+        subido_por=orm.subido_por,
     )
 
 
@@ -300,6 +304,8 @@ class RepositorioFormularioSQLAlchemy:
             .filter(Formulario.id == formulario_id)
             .first()
         )
+        if "estado" in campos:
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
         for clave, valor in _aplicar_serializacion(campos).items():
             setattr(orm, clave, valor)
         self._sesion.commit()
@@ -358,6 +364,25 @@ class RepositorioDocumentoSQLAlchemy:
             DocumentoAdjunto.id == doc_id
         ).update({"deleted_at": datetime.now(timezone.utc)})
         self._sesion.commit()
+
+    def obtener_ultimo_formulario_pdf(self, formulario_id: str) -> Optional[DocumentoDatos]:
+        """
+        Retorna el PDF del formulario con el mayor version_numero activo.
+
+        Se usa como ancla para construir la cadena de versiones al generar
+        un nuevo PDF: el nuevo documento apuntará a este como version_anterior_id.
+        """
+        orm = (
+            self._sesion.query(DocumentoAdjunto)
+            .filter(
+                DocumentoAdjunto.formulario_id == formulario_id,
+                DocumentoAdjunto.tipo_documento == TIPO_DOCUMENTO_FORMULARIO_PDF,
+                DocumentoAdjunto.deleted_at.is_(None),
+            )
+            .order_by(DocumentoAdjunto.version_numero.desc())
+            .first()
+        )
+        return _orm_documento_a_datos(orm) if orm else None
 
 
 class RepositorioValidacionSQLAlchemy:

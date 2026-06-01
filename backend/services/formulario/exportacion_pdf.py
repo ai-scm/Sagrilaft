@@ -486,15 +486,22 @@ class ExportadorFormularioPdf:
     """Convierte un formulario a PDF y devuelve los bytes — sin responsabilidad de almacenamiento."""
 
     def generar_bytes_pdf(
-        self, formulario: FormularioDatos
+        self,
+        formulario: FormularioDatos,
+        numero_version: int = 1,
     ) -> tuple[str, bytes]:
         """
         Genera el PDF del formulario y devuelve (nombre_archivo, bytes).
+
+        El nombre incluye la versión para que cada envío o corrección produzca
+        un archivo único en storage — nunca sobreescribe versiones anteriores.
+        Ej: FORMULARIO_SAG-CLT00042_v1.pdf, FORMULARIO_SAG-CLT00042_v2.pdf
+
         El llamador decide dónde guardar los bytes (local o S3).
         """
         datos = deserializar_campos_json(formulario)
         codigo = _valor_a_texto(datos.get("codigo_peticion")) or formulario.id
-        nombre_archivo = f"FORMULARIO_{codigo}.pdf"
+        nombre_archivo = f"FORMULARIO_{codigo}_v{numero_version}.pdf"
         html = _construir_html_formulario(datos)
         return nombre_archivo, self._html_a_pdf_bytes(html)
 

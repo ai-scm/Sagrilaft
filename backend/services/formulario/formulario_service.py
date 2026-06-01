@@ -9,8 +9,9 @@ Organiza responsabilidades en capas claras:
   - FormularioService: CRUD de formularios e integración (Facade).
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
 from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
 from domain.contratos import ExtractorIAImp, ResultadoEnvioFormulario
 from domain.excepciones import (
@@ -19,9 +20,10 @@ from domain.excepciones import (
 )
 from domain.formulario.entidades import FormularioDatos, FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
+from domain.puertos.almacenamiento import IAlmacenamiento
+from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
 from domain.utils.estado_formulario import es_estado_editable
-from domain.puertos.almacenamiento import IAlmacenamiento
 from services.formulario.almacenamiento_contraparte import resolver_key_contraparte
 from services.formulario.analisis_service import (
     AnalisisDocumentosService,
@@ -51,6 +53,7 @@ class FormularioService:
         repo_doc: RepositorioDocumento,
         extractor: ExtractorIAImp,
         storage: IAlmacenamiento,
+        repo_auditoria: Optional[RepositorioAuditoria] = None,
     ) -> None:
         self._repo = repo
         self._validador_envio = ValidadorEnvioFormulario()
@@ -61,6 +64,11 @@ class FormularioService:
             obtener_config_analisis_por_defecto(),
             storage,
         )
+        self._auditoria = repo_auditoria
+
+    def _registrar(self, evento: EventoAuditoria) -> None:
+        if self._auditoria:
+            self._auditoria.registrar_evento(evento)
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -83,8 +91,9 @@ class FormularioService:
         formulario_actualizado = self._repo.actualizar(formulario_id, datos)
         return formulario_a_dict(formulario_actualizado)
 
-    def enviar(self, formulario_id: str) -> ResultadoEnvioFormulario:
+    def enviar(self, formulario_id: str, actor_id: Optional[str] = None) -> ResultadoEnvioFormulario:
         formulario = self._buscar_formulario_o_error(formulario_id)
+        estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.enviar()  # valida BORRADOR|EN_CORRECCION → ENVIADO; lanza FormularioNoEditableError si no aplica
 
@@ -95,7 +104,12 @@ class FormularioService:
         prefijo = resolver_key_contraparte(formulario.tipo_contraparte, formulario.razon_social)
         self._documentos.mover_archivos_formulario_a_contraparte(formulario.id, prefijo)
 
-        nombre_pdf, pdf_bytes = self._exportador_pdf.generar_bytes_pdf(formulario)
+        pdf_anterior = self._documentos.obtener_ultimo_formulario_pdf(formulario.id)
+        numero_version_nuevo = (pdf_anterior.version_numero + 1) if pdf_anterior else 1
+
+        nombre_pdf, pdf_bytes = self._exportador_pdf.generar_bytes_pdf(
+            formulario, numero_version=numero_version_nuevo
+        )
         key_pdf = f"{prefijo}/{nombre_pdf}"
         self._documentos.guardar_archivo(key_pdf, pdf_bytes, "application/pdf")
         self._documentos.registrar_documento_en_bd(
@@ -107,9 +121,19 @@ class FormularioService:
             tamano=len(pdf_bytes),
             hash_sha256=self._documentos.calcular_hash(pdf_bytes),
             subido_por="SISTEMA",
+            version_numero=numero_version_nuevo,
+            version_anterior_id=pdf_anterior.id if pdf_anterior else None,
         )
 
         self._repo.actualizar(formulario_id, {"estado": dominio.estado.value})
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FORMULARIO_ENVIADO,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.CONTRAPARTE,
+        ))
         return ResultadoEnvioFormulario(valido=True, errores=[])
 
     # ─── Gestión de documentos adjuntos ──────────────────────────────────────

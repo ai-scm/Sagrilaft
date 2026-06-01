@@ -128,7 +128,8 @@ def enviar_formulario(
         codigo_peticion=credenciales.codigo_peticion if credenciales else None,
         pin=credenciales.pin if credenciales else None,
     )
-    resultado_dominio = servicio.enviar(formulario_id)
+    actor_id = servicio_acceso.obtener_correo_destinatario(formulario_id)
+    resultado_dominio = servicio.enviar(formulario_id, actor_id=actor_id)
     if resultado_dominio.valido and credenciales is not None:
         # Si el formulario tiene AccesoManual, dejar evidencia consistente de consumo
         # independientemente del tipo de credencial usada (token o código+PIN).
