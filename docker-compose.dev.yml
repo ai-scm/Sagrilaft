@@ -219,6 +219,11 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
+      # En dev forzamos localhost para que la consola de admin no redirija
+      # al hostname de producción (auth.tudominio.com) definido en .env.
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+
     volumes:
       # El archivo realm-sagrilaft.dev.json contiene la configuración del portal:
       # usuarios de prueba, roles, configuración del cliente OIDC.
