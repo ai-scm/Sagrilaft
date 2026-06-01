@@ -21,7 +21,7 @@ from domain.formulario.tipos import EstadoFormulario
 from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 
 if TYPE_CHECKING:
-    from services.acceso_manual.acceso_manual_service import AccesoManualService
+    from services.acceso_manual.acceso_manual_service import AccesoManualService  # noqa: F401
 
 
 _ESTADOS_EXPEDIENTE = [
@@ -149,6 +149,8 @@ class ExpedienteService:
                     "tipo_documento": doc.tipo_documento,
                     "nombre_archivo": doc.nombre_archivo,
                     "tamano":         doc.tamano,
+                    "version_numero": doc.version_numero,
+                    "created_at":     doc.created_at,
                 }
                 for doc in documentos
             ],
@@ -182,7 +184,18 @@ class ExpedienteService:
         formulario_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
         actor_id: Optional[str] = None,
+        motivo: str = "",
+        mensaje_para_destinatario: Optional[str] = None,
+        acceso_service: Optional["AccesoManualService"] = None,
+        email_service: Optional[INotificador] = None,
     ) -> Dict[str, Any]:
+        """
+        Rechaza el formulario de forma definitiva y registra el motivo en auditoría.
+
+        Si el operador redactó un mensaje_para_destinatario y los servicios de
+        acceso y email están disponibles, notifica al destinatario por correo.
+        El motivo interno nunca se expone al destinatario.
+        """
         formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
@@ -195,8 +208,48 @@ class ExpedienteService:
             estado_nuevo=dominio.estado.value,
             actor_id=actor_id,
             actor_tipo=ActorTipo.OPERADOR,
+            metadata={"motivo": motivo},
         ))
-        return {"estado": dominio.estado.value}
+
+        notificacion_enviada = self._notificar_rechazo_si_aplica(
+            formulario_id=formulario_id,
+            mensaje_para_destinatario=mensaje_para_destinatario,
+            acceso_service=acceso_service,
+            email_service=email_service,
+        )
+
+        return {
+            "estado":               dominio.estado.value,
+            "motivo":               motivo,
+            "notificacion_enviada": notificacion_enviada,
+        }
+
+    def _notificar_rechazo_si_aplica(
+        self,
+        formulario_id: str,
+        mensaje_para_destinatario: Optional[str],
+        acceso_service: Optional["AccesoManualService"],
+        email_service: Optional[INotificador],
+    ) -> bool:
+        """
+        Envía la notificación de rechazo al destinatario si el operador la redactó.
+
+        Retorna False si no hay mensaje, no hay servicios disponibles, o el
+        formulario no tiene destinatario registrado.
+        """
+        if not mensaje_para_destinatario:
+            return False
+        if not acceso_service or not email_service:
+            return False
+
+        correo_destinatario = acceso_service.obtener_correo_destinatario(formulario_id)
+        if not correo_destinatario:
+            return False
+
+        return email_service.enviar_notificacion_rechazo(
+            correo_destinatario=correo_destinatario,
+            mensaje_para_destinatario=mensaje_para_destinatario,
+        )
 
     def devolver_para_correccion(
         self,

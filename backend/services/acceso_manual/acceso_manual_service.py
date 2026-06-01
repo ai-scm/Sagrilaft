@@ -309,6 +309,18 @@ class AccesoManualService:
 
         raise CredencialesAccesoInvalidasError()
 
+    # ─── Consulta de datos del destinatario ──────────────────────────────────
+
+    def obtener_correo_destinatario(self, formulario_id: str) -> Optional[str]:
+        """
+        Retorna el correo del destinatario vinculado al formulario.
+
+        Lectura pura — no modifica el acceso. Retorna None si el formulario
+        no tiene AccesoManual asociado (formularios sin acceso externo).
+        """
+        acceso = self._repo.obtener_acceso_por_formulario_id(formulario_id)
+        return acceso.correo_destinatario if acceso else None
+
     # ─── Reactivación para corrección ────────────────────────────────────────
 
     def reactivar_acceso_para_correccion(

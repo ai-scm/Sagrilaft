@@ -204,8 +204,12 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}/aprobar`, { method: 'POST' });
   },
 
-  async rechazarExpediente(formularioId) {
-    return requestJson(`/expedientes/${formularioId}/rechazar`, { method: 'POST' });
+  async rechazarExpediente(formularioId, solicitud) {
+    return requestJson(`/expedientes/${formularioId}/rechazar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(solicitud),
+    });
   },
 
   async devolverExpediente(formularioId, solicitud) {

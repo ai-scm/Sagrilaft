@@ -28,3 +28,16 @@ class INotificador(Protocol):
         Returns True si la notificación se entregó; False si no se pudo enviar.
         """
         ...
+
+    def enviar_notificacion_rechazo(
+        self,
+        correo_destinatario: str,
+        mensaje_para_destinatario: str,
+    ) -> bool:
+        """
+        Notifica al destinatario que su formulario fue rechazado.
+
+        El mensaje es redactado por el operador y no expone el motivo interno
+        de compliance. Returns True si la notificación se entregó.
+        """
+        ...

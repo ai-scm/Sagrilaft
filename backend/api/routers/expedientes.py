@@ -22,7 +22,7 @@ from api.dependencies import (
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from domain.excepciones import SinPermisoError
-from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, SolicitudDevolucion
+from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, ResumenRechazo, SolicitudDevolucion, SolicitudRechazo
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
@@ -128,18 +128,32 @@ def aprobar_expediente(
 
 @enrutador.post(
     "/{formulario_id}/rechazar",
+    response_model=ResumenRechazo,
     summary="Rechazar formulario",
+    description=(
+        "Rechaza el formulario de forma definitiva registrando el motivo en auditoría. "
+        "Si el operador redacta un mensaje_para_destinatario, se envía una notificación "
+        "por correo al destinatario sin exponer el motivo interno. "
+        "Solo disponible en estados 'enviado' o 'validado'."
+    ),
     responses={400: {"description": "El formulario no puede rechazarse en su estado actual"}},
 )
 def rechazar_expediente(
     formulario_id: str,
+    solicitud: SolicitudRechazo,
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
-) -> dict:
+    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
+    email_service = Depends(obtener_servicio_email),
+) -> ResumenRechazo:
     return servicio.rechazar_expediente(
         formulario_id,
         _contrapartes_permitidas(usuario),
         actor_id=usuario.email,
+        motivo=solicitud.motivo,
+        mensaje_para_destinatario=solicitud.mensaje_para_destinatario,
+        acceso_service=acceso_service,
+        email_service=email_service,
     )
 
 
@@ -195,7 +209,7 @@ def enviar_a_firma(
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
     servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
-    return servicio.enviar_a_firma(formulario_id)
+    return servicio.enviar_a_firma(formulario_id, actor_id=usuario.email)
 
 
 @enrutador.post(
@@ -233,7 +247,7 @@ def cancelar_firma(
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
     servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
-    return servicio.cancelar_firma(formulario_id)
+    return servicio.cancelar_firma(formulario_id, actor_id=usuario.email)
 
 
 @enrutador.get(

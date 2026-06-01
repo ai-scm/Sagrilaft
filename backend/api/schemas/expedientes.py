@@ -37,6 +37,12 @@ class DocumentoResumen(BaseModel):
     tipo_documento: str
     nombre_archivo: str
     tamano: Optional[int] = None
+    version_numero: int = 1
+    created_at: Optional[datetime] = None
+
+    @field_serializer("created_at", when_used="json")
+    def _serializar_created_at(self, valor: Optional[datetime]) -> Optional[str]:
+        return a_iso_utc(valor) if valor else None
 
 
 class ExpedienteDetalle(BaseModel):
@@ -92,3 +98,34 @@ class ResumenDevolucion(BaseModel):
     estado:            str
     correo_notificado: Optional[str] = None
     correo_enviado:    bool = False
+
+
+class SolicitudRechazo(BaseModel):
+    """Datos requeridos para rechazar un formulario de forma definitiva."""
+
+    motivo: str = Field(
+        min_length=20,
+        max_length=1000,
+        description=(
+            "Justificación interna del rechazo. Queda registrada en la auditoría "
+            "y nunca se envía al destinatario."
+        ),
+    )
+    mensaje_para_destinatario: Optional[str] = Field(
+        default=None,
+        min_length=10,
+        max_length=500,
+        description=(
+            "Mensaje opcional que se envía por correo al destinatario. "
+            "El operador lo redacta sin exponer el motivo interno de compliance. "
+            "Si se omite, no se envía ninguna notificación."
+        ),
+    )
+
+
+class ResumenRechazo(BaseModel):
+    """Resultado de una operación de rechazo de formulario."""
+
+    estado:               str
+    motivo:               str
+    notificacion_enviada: bool
