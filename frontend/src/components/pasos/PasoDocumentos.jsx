@@ -17,7 +17,7 @@ export default function PasoDocumentos({
     <div className="form-card">
       <h2 className="section-title">📄 Documentos Adjuntos</h2>
       <p className="section-subtitle">
-        Al adjuntar cada documento el sistema extrae y pre-llena los campos automáticamente.
+        Aqui deberas cargar los documentos solicitados, recuerda que cada documento debe ser claro y legible para que el sistema pueda extraer la información correctamente.
       </p>
 
       <div className="info-box">
