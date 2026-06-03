@@ -29,4 +29,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column('formularios', 'campos_a_corregir')
+    op.execute("ALTER TABLE formularios DROP COLUMN IF EXISTS campos_a_corregir")

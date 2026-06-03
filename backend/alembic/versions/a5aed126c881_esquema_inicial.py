@@ -169,7 +169,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("accesos_manuales")
-    op.drop_table("resultados_validacion")
-    op.drop_table("documentos_adjuntos")
-    op.drop_table("formularios")
+    op.execute("DROP TABLE IF EXISTS accesos_manuales CASCADE")
+    op.execute("DROP TABLE IF EXISTS resultados_validacion CASCADE")
+    op.execute("DROP TABLE IF EXISTS documentos_adjuntos CASCADE")
+    op.execute("DROP TABLE IF EXISTS formularios CASCADE")
