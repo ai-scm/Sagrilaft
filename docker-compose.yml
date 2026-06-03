@@ -67,8 +67,8 @@ services:
       # el EC2 tiene un IAM Role que le da permisos automáticamente (más seguro
       # que guardar credenciales en un archivo). Solo rellenar si corres esto
       # fuera de AWS (CI, portátil de desarrollo, etc.).
-      AWS_REGION:            ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
 
       # ARN del modelo de inteligencia artificial en Amazon Bedrock.
@@ -88,9 +88,9 @@ services:
       # ── Zoho Sign (firma electrónica) ──────────────────────────────────────
       # Credenciales de la aplicación registrada en Zoho API Console.
       # Las tres primeras son obligatorias para que el flujo de firma funcione.
-      ZOHO_CLIENT_ID:      ${ZOHO_CLIENT_ID}
-      ZOHO_CLIENT_SECRET:  ${ZOHO_CLIENT_SECRET}
-      ZOHO_REFRESH_TOKEN:  ${ZOHO_REFRESH_TOKEN}
+      ZOHO_CLIENT_ID: ${ZOHO_CLIENT_ID}
+      ZOHO_CLIENT_SECRET: ${ZOHO_CLIENT_SECRET}
+      ZOHO_REFRESH_TOKEN: ${ZOHO_REFRESH_TOKEN}
 
       # Token secreto que Zoho envía en cada notificación de estado (webhook).
       # El backend lo verifica para confirmar que la notificación es legítima
@@ -106,9 +106,9 @@ services:
       # El backend envía correos cuando se crea un acceso o se devuelve un formulario.
       # AWS SES requiere credenciales SMTP propias (se generan en IAM → SES SMTP settings),
       # distintas a las credenciales IAM del EC2.
-      SMTP_HOST:     ${SMTP_HOST}
-      SMTP_PORT:     ${SMTP_PORT:-587}
-      SMTP_USER:     ${SMTP_USER}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       # Dirección que aparece como remitente en los correos. Debe estar
       # verificada en SES (si SES está en modo sandbox, el destinatario
@@ -119,12 +119,17 @@ services:
       # Estas variables conectan el backend con el servidor de autenticación.
       # Si están vacías, el portal interno funciona sin login (útil mientras
       # se configura Keycloak por primera vez, pero no aceptable en producción).
-      KEYCLOAK_URL:        ${KEYCLOAK_URL:-}
-      KEYCLOAK_REALM:      ${KEYCLOAK_REALM:-sagrilaft}
-      KEYCLOAK_CLIENT_ID:  ${KEYCLOAK_CLIENT_ID:-}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-sagrilaft}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-}
       # URL pública de Keycloak tal como la ve el navegador del usuario.
       # Debe coincidir con el hostname configurado en Keycloak (KC_HOSTNAME).
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:-}
+
+      # ── Alertas SNS ───────────────────────────────────────────────────────
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
+      SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      APP_ENV: production
 
     volumes:
       # Monta el volumen uploads_data en la carpeta /app/uploads del contenedor.
@@ -140,14 +145,13 @@ services:
     healthcheck:
       # Docker comprueba periódicamente que el backend responde correctamente.
       # Si no responde, lo marca como no saludable y el frontend no le envía tráfico.
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\""]
-      interval: 30s    # Comprueba cada 30 segundos
-      timeout: 10s     # Si no responde en 10 segundos, cuenta como fallo
-      retries: 3       # Tres fallos seguidos → contenedor marcado como no saludable
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\"" ]
+      interval: 30s # Comprueba cada 30 segundos
+      timeout: 10s # Si no responde en 10 segundos, cuenta como fallo
+      retries: 3 # Tres fallos seguidos → contenedor marcado como no saludable
       # Los primeros 90 segundos no se verifican: el backend espera a que RDS esté
       # disponible y aplica las migraciones de base de datos al arrancar.
       start_period: 90s
-
 
   # ── Frontend (React + Nginx) ───────────────────────────────────────────────
   # En producción el frontend es un conjunto de archivos HTML/JS/CSS servidos
@@ -178,7 +182,6 @@ services:
     networks:
       - interna
 
-
   # ── Keycloak (servidor de autenticación) ───────────────────────────────────
   # Keycloak es el sistema que verifica la identidad de los usuarios del portal
   # interno. Cuando alguien inicia sesión, Keycloak comprueba su usuario y
@@ -200,7 +203,7 @@ services:
     environment:
       # Usuario y contraseña de la consola de administración de Keycloak.
       # KEYCLOAK_ADMIN_PASSWORD es obligatoria — el contenedor no arranca sin ella.
-      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Define KEYCLOAK_ADMIN_PASSWORD en .env}
 
       # Hostname público de Keycloak, tal como lo verá el navegador del usuario.
@@ -210,8 +213,8 @@ services:
 
       # Conexión a la base de datos de Keycloak en RDS.
       # Formato de KC_DB_URL: jdbc:postgresql://host:5432/keycloak
-      KC_DB:          postgres
-      KC_DB_URL:      ${KEYCLOAK_DB_URL:-}
+      KC_DB: postgres
+      KC_DB_URL: ${KEYCLOAK_DB_URL:-}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
 
@@ -243,14 +246,13 @@ services:
 
     healthcheck:
       # Verifica que el realm "sagrilaft" esté cargado y respondiendo.
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 10
       # Keycloak tarda entre 60 y 120 segundos en arrancar en producción
       # (aplica migraciones de BD, carga el realm, verifica la configuración).
       start_period: 120s
-
 
 # ── Volúmenes persistentes ─────────────────────────────────────────────────
 # Los volúmenes son carpetas gestionadas por Docker que sobreviven cuando
@@ -262,10 +264,9 @@ volumes:
   # Para mayor resiliencia, cambiar STORAGE_BACKEND=s3 en .env y usar S3.
   uploads_data:
 
-
-# ── Redes ──────────────────────────────────────────────────────────────────
-# La red "interna" conecta los tres contenedores entre sí de forma privada.
-# Desde fuera del servidor solo es accesible lo que está en "ports" — el resto
-# no es visible en internet aunque los contenedores estén corriendo.
+    # ── Redes ──────────────────────────────────────────────────────────────────
+    # La red "interna" conecta los tres contenedores entre sí de forma privada.
+    # Desde fuera del servidor solo es accesible lo que está en "ports" — el resto
+    # no es visible en internet aunque los contenedores estén corriendo.
 networks:
   interna:

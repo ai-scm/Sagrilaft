@@ -31,8 +31,8 @@ services:
 
     environment:
       # Estas tres variables se leen desde otra parte.
-      POSTGRES_DB:       ${POSTGRES_DB}
-      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     volumes:
@@ -58,12 +58,11 @@ services:
       # Antes de arrancar el backend, Docker verifica que la base de datos
       # esté lista para recibir conexiones. Sin esto, el backend fallaría
       # al intentar conectarse mientras Postgres aún está iniciando.
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sagrilaft_user} -d ${POSTGRES_DB:-sagrilaft}"]
-      interval: 10s     # Comprueba cada 10 segundos
-      timeout: 5s       # Si no responde en 5 segundos, cuenta como fallo
-      retries: 5        # Tras 5 fallos consecutivos, el contenedor se marca como no saludable
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sagrilaft_user} -d ${POSTGRES_DB:-sagrilaft}" ]
+      interval: 10s # Comprueba cada 10 segundos
+      timeout: 5s # Si no responde en 5 segundos, cuenta como fallo
+      retries: 5 # Tras 5 fallos consecutivos, el contenedor se marca como no saludable
       start_period: 15s # Le da 15 segundos al arranque antes de empezar a contar fallos
-
 
   # ── Backend (API Python) ───────────────────────────────────────────────────
   backend:
@@ -120,6 +119,10 @@ services:
       # modifiques la configuración de red de Docker Compose.
       TRUSTED_PROXY_IPS: "172.0.0.0/8"
 
+      # ── Alertas SNS ───────────────────────────────────────────────────────
+      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
+      SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+
     # El backend no arranca hasta que Postgres haya pasado su healthcheck.
     depends_on:
       postgres:
@@ -129,7 +132,6 @@ services:
     # en la terminal es suficiente para diagnosticarlo.
     healthcheck:
       disable: true
-
 
   # ── Frontend (React) ───────────────────────────────────────────────────────
   # En producción el frontend es un conjunto de archivos estáticos servidos
@@ -171,8 +173,8 @@ services:
       # el frontend. Por defecto están vacías, lo que desactiva el login.
       # Para probar Keycloak en local, pon en tu .env:
       #   VITE_KEYCLOAK_URL=http://localhost:8080
-      VITE_KEYCLOAK_URL:       ${VITE_KEYCLOAK_URL:-}
-      VITE_KEYCLOAK_REALM:     ${VITE_KEYCLOAK_REALM:-sagrilaft}
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
+      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-sagrilaft}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
 
     depends_on:
@@ -181,7 +183,6 @@ services:
 
     healthcheck:
       disable: true
-
 
   # ── Keycloak (servidor de autenticación) ───────────────────────────────────
   # Keycloak es el sistema que gestiona los usuarios del portal interno y
@@ -209,13 +210,13 @@ services:
 
     environment:
       # Credenciales de la consola de administración. Defínelas en tu .env.
-      KEYCLOAK_ADMIN:          ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
       # Keycloak guarda su configuración en la misma base de datos Postgres
       # del proyecto, en una base de datos separada llamada "keycloak".
-      KC_DB:          postgres
-      KC_DB_URL:      jdbc:postgresql://postgres:5432/keycloak
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
 
@@ -247,12 +248,11 @@ services:
     healthcheck:
       # Espera a que el realm "sagrilaft" esté disponible antes de considerar
       # Keycloak como listo. Tarda entre 30 y 60 segundos en el primer arranque.
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1" ]
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 60s # Margen amplio para que Keycloak termine de importar el realm
-
 
 # ── Volúmenes persistentes ─────────────────────────────────────────────────
 # Los volúmenes son carpetas gestionadas por Docker que sobreviven

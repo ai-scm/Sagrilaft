@@ -77,31 +77,15 @@ echo "[entrypoint] Iniciando Uvicorn (workers=${UVICORN_WORKERS:-4})..."
 # señales de apagado (SIGTERM) al proceso principal — si Uvicorn fuera
 # un hijo del script, esas señales no llegarían y el contenedor se cerraría
 # de forma brusca, cortando peticiones en curso.
+# Parámetros del servidor:
+#   --host 0.0.0.0: Acepta conexiones de cualquier interfaz de red (necesario para Nginx/frontend en Docker).
+#   --port 8000: Puerto donde escucha la API.
+#   --workers: Número de procesos paralelos.
+#   --proxy-headers: Activa la lectura de cabeceras HTTP de proxies.
+#   --forwarded-allow-ips: Rango de IPs permitidas para confiar en cabeceras de proxy.
 exec uvicorn main:app \
-
-    # 0.0.0.0 significa "acepta conexiones de cualquier interfaz de red".
-    # Es necesario porque el tráfico llega desde Nginx (otro contenedor),
-    # no desde localhost. Cambiar a 127.0.0.1 rompería la comunicación
-    # entre contenedores.
     --host 0.0.0.0 \
-
-    # Puerto donde escucha la API. Nginx redirige /api a este puerto.
-    # Si se cambia aquí, hay que actualizarlo también en nginx.conf.
     --port 8000 \
-
-    # Número de procesos del servidor corriendo en paralelo.
-    # Más workers = más solicitudes simultáneas. La regla habitual es
-    # 2 × número de CPUs de la instancia. El valor lo define UVICORN_WORKERS
-    # en .env; si no está definido, usa 4 como valor por defecto.
     --workers "${UVICORN_WORKERS:-4}" \
-
-    # Activa la lectura de cabeceras HTTP añadidas por proxies (Nginx, ALB).
-    # Sin esto, el servidor vería siempre la IP interna de Docker en lugar
-    # de la IP real del usuario, y los logs de seguridad serían inútiles.
     --proxy-headers \
-
-    # Lista de IPs o rangos desde los que se acepta confiar en esas cabeceras.
-    # 172.0.0.0/8 es la red interna de Docker (donde vive Nginx).
-    # Aceptar cabeceras de IPs no confiables permitiría que alguien falsifique
-    # su dirección IP — por eso no se pone 0.0.0.0 aquí.
     --forwarded-allow-ips "${TRUSTED_PROXY_IPS:-127.0.0.1}"
