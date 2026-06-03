@@ -27,6 +27,7 @@ from domain.excepciones import (
 )
 from domain.formulario.entidades import FormularioDatos, FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
+from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioFirma
@@ -50,16 +51,30 @@ class FirmaService:
         storage: IAlmacenamiento,
         webhook_secret: str,
         repo_auditoria: Optional[RepositorioAuditoria] = None,
+        alertas_portal: Optional[IAlertasPortal] = None,
     ) -> None:
         self._repo           = repo
         self._zoho           = zoho
         self._storage        = storage
         self._webhook_secret = webhook_secret
         self._auditoria      = repo_auditoria
+        self._alertas        = alertas_portal
 
     def _registrar(self, evento: EventoAuditoria) -> None:
         if self._auditoria:
             self._auditoria.registrar_evento(evento)
+
+    def _alertar(self, tipo: TipoAlerta, formulario: FormularioDatos, detalle: Optional[str] = None) -> None:
+        """Dispara una alerta al portal si el adaptador está disponible."""
+        if self._alertas:
+            self._alertas.alertar(
+                tipo=tipo,
+                formulario_id=formulario.id,
+                razon_social=formulario.razon_social or "",
+                tipo_contraparte=formulario.tipo_contraparte or "",
+                codigo_peticion=formulario.codigo_peticion,
+                detalle=detalle,
+            )
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
@@ -154,6 +169,7 @@ class FirmaService:
             actor_id=actor_id,
             actor_tipo=ActorTipo.OPERADOR,
         ))
+        self._alertar(TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA, formulario)
 
         logger.info(
             "Formulario %s enviado a firma. ZohoSign request_id=%s",
@@ -227,6 +243,7 @@ class FirmaService:
             actor_id=request_id,
             actor_tipo=ActorTipo.SISTEMA,
         ))
+        self._alertar(TipoAlerta.FORMULARIO_FIRMADO, formulario)
 
         logger.info("Formulario %s → FIRMADO. Key: %s", formulario.id, key_guardado)
         return dominio.estado.value

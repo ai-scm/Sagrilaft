@@ -122,6 +122,19 @@ def _require_db_url() -> str:
 
 
 @dataclass(frozen=True)
+class SnsConfig:
+    """Configuración de Amazon SNS para alertas al portal interno."""
+    topic_arn: str = field(default_factory=lambda: os.getenv("SNS_TOPIC_ARN", ""))
+    habilitado: bool = field(
+        default_factory=lambda: os.getenv("SNS_NOTIFICACIONES_ENABLED", "false").lower() == "true"
+    )
+
+    @property
+    def configurado(self) -> bool:
+        return bool(self.topic_arn and self.habilitado)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
     db_url: str = field(default_factory=_require_db_url)
@@ -140,11 +153,13 @@ class AppConfig:
     smtp: SmtpConfig = field(default_factory=SmtpConfig)
     keycloak: KeycloakConfig = field(default_factory=KeycloakConfig)
     s3: S3Config = field(default_factory=S3Config)
+    sns: SnsConfig = field(default_factory=SnsConfig)
     # "local" usa el volumen del servidor; "s3" usa Amazon S3
     storage_backend: str = field(default_factory=lambda: os.getenv("STORAGE_BACKEND", "local"))
     # Clave para firmar reportes de auditoría con HMAC-SHA256
     secret_key: str = field(default_factory=lambda: os.getenv("SECRET_KEY", "cambiar-en-produccion"))
-
+    # "development" | "production" — controla comportamiento del health check y logs
+    entorno: str = field(default_factory=lambda: os.getenv("APP_ENV", "development").lower())
 
 def load_config() -> AppConfig:
     """Carga la configuración desde variables de entorno."""

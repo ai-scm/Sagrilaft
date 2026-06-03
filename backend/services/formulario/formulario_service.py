@@ -20,6 +20,7 @@ from domain.excepciones import (
 )
 from domain.formulario.entidades import FormularioDatos, FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
+from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from domain.puertos.almacenamiento import IAlmacenamiento
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
@@ -54,6 +55,7 @@ class FormularioService:
         extractor: ExtractorIAImp,
         storage: IAlmacenamiento,
         repo_auditoria: Optional[RepositorioAuditoria] = None,
+        alertas_portal: Optional[IAlertasPortal] = None,
     ) -> None:
         self._repo = repo
         self._validador_envio = ValidadorEnvioFormulario()
@@ -65,10 +67,23 @@ class FormularioService:
             storage,
         )
         self._auditoria = repo_auditoria
+        self._alertas = alertas_portal
 
     def _registrar(self, evento: EventoAuditoria) -> None:
         if self._auditoria:
             self._auditoria.registrar_evento(evento)
+
+    def _alertar(self, tipo: TipoAlerta, formulario, detalle: Optional[str] = None) -> None:
+        """Dispara una alerta al portal si el adaptador está disponible."""
+        if self._alertas:
+            self._alertas.alertar(
+                tipo=tipo,
+                formulario_id=formulario.id,
+                razon_social=formulario.razon_social or "",
+                tipo_contraparte=formulario.tipo_contraparte or "",
+                codigo_peticion=formulario.codigo_peticion,
+                detalle=detalle,
+            )
 
     # ─── CRUD de formulario ───────────────────────────────────────────────────
 
@@ -134,6 +149,15 @@ class FormularioService:
             actor_id=actor_id,
             actor_tipo=ActorTipo.CONTRAPARTE,
         ))
+
+        # Alerta al portal: distingue envío inicial de corrección por el estado anterior
+        tipo_alerta = (
+            TipoAlerta.FORMULARIO_CORREGIDO
+            if estado_anterior == EstadoFormulario.EN_CORRECCION.value
+            else TipoAlerta.FORMULARIO_RECIBIDO
+        )
+        self._alertar(tipo_alerta, formulario)
+
         return ResultadoEnvioFormulario(valido=True, errores=[])
 
     # ─── Gestión de documentos adjuntos ──────────────────────────────────────

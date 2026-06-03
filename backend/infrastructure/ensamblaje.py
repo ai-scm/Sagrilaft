@@ -59,6 +59,22 @@ def crear_orquestador_validacion(config: AppConfig) -> OrquestadorValidacionDocu
     return orquestador
 
 
+def crear_alertas_portal(config: AppConfig):
+    """
+    Fábrica: crea el adaptador SNS si está configurado; None en caso contrario.
+
+    Retorna None en lugar de lanzar excepción para no bloquear el arranque
+    en entornos sin SNS (desarrollo local, staging sin credenciales).
+    """
+    if not config.sns.configurado:
+        logger.info("SNS no configurado — alertas al portal deshabilitadas.")
+        return None
+    from infrastructure.notificaciones.sns_alertas import SnsAlertasPortal
+    alertas = SnsAlertasPortal(config.sns, config.aws)
+    logger.info("Alertas SNS habilitadas (topic=%s)", config.sns.topic_arn)
+    return alertas
+
+
 def crear_servicio_listas_cautela(
     proveedores: Optional[List[ProveedorListaCautelaImp]] = None,
 ) -> ListaCautelaService:

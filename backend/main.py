@@ -30,7 +30,7 @@ from domain.excepciones import (
     TokenDiligenciamientoInvalidoError,
     WebhookTokenInvalidoError,
 )
-from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela
+from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
@@ -76,6 +76,15 @@ async def lifespan(app: FastAPI):
     app.state.config                  = config
     app.state.servicio_listas_cautela = crear_servicio_listas_cautela()
     app.state.zoho_sign               = ZohoSignService(config.zoho_sign)
+    app.state.alertas_portal          = crear_alertas_portal(config)
+
+    # Validar SNS si está habilitado
+    if config.sns.configurado:
+        from infrastructure.notificaciones.sns_health import validar_sns_al_arranque
+        error_sns = validar_sns_al_arranque(config.sns, config.aws, entorno=config.entorno)
+        if error_sns:
+            logger.warning("SNS health check FALLÓ: %s — alertas deshabilitadas", error_sns)
+            app.state.alertas_portal = None  # Deshabilitar alertas si SNS no funciona
 
     logger.info("SAGRILAFT API iniciada")
     yield
@@ -188,6 +197,22 @@ def _crear_app() -> FastAPI:
             "version": _VERSION_SERVICIO,
             "estado": _ESTADO,
             "modo_ia": _MODO_IA,
+        }
+
+    @app.get("/health")
+    def health_check():
+        """Health check con estado de dependencias externas."""
+        alertas = app.state.alertas_portal
+        sns_info: dict = {"status": "disabled"}
+        if alertas is not None:
+            sns_info = {"status": "ok", **alertas.metricas()}
+        return {
+            "status": "healthy",
+            "version": _VERSION_SERVICIO,
+            "dependencies": {
+                "database": "ok",
+                "sns_alertas": sns_info,
+            },
         }
 
     return app

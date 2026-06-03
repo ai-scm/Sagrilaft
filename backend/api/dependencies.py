@@ -11,10 +11,12 @@ Diseño:
 """
 
 from fastapi import Depends, Request
+from typing import Optional
 
 from domain.contratos import ExtractorIAImp
 from domain.puertos.almacenamiento import IAlmacenamiento
 from domain.puertos.auditoria import RepositorioAuditoria
+from domain.puertos.alertas_portal import IAlertasPortal
 from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import (
     RepositorioAccesoManual,
@@ -75,11 +77,17 @@ def obtener_servicio_email(
     return EmailService(config.smtp)
 
 
+def obtener_alertas_portal(solicitud: Request) -> Optional[IAlertasPortal]:
+    """Obtiene el adaptador de alertas SNS registrado en app.state. Puede ser None."""
+    return getattr(solicitud.app.state, "alertas_portal", None)
+
+
 def obtener_servicio_firma(
     request: Request,
     repo: RepositorioFirma = Depends(obtener_repo_firma),
     storage: IAlmacenamiento = Depends(obtener_storage),
     repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    alertas_portal: Optional[IAlertasPortal] = Depends(obtener_alertas_portal),
 ) -> FirmaService:
     config = request.app.state.config
     return FirmaService(
@@ -88,25 +96,40 @@ def obtener_servicio_firma(
         storage=storage,
         webhook_secret=config.zoho_sign.webhook_secret,
         repo_auditoria=repo_auditoria,
+        alertas_portal=alertas_portal,
     )
 
 
 def obtener_servicio_formulario(
+    solicitud: Request,
     repo: RepositorioFormulario = Depends(obtener_repo_formulario),
     repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     extractor: ExtractorIAImp = Depends(obtener_extractor),
     storage: IAlmacenamiento = Depends(obtener_storage),
     repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> FormularioService:
-    return FormularioService(repo, repo_doc, extractor, storage, repo_auditoria)
+    return FormularioService(
+        repo=repo,
+        repo_doc=repo_doc,
+        extractor=extractor,
+        storage=storage,
+        repo_auditoria=repo_auditoria,
+        alertas_portal=obtener_alertas_portal(solicitud),
+    )
 
 
 def obtener_servicio_expediente(
+    solicitud: Request,
     repo: RepositorioExpediente = Depends(obtener_repo_expediente),
     storage: IAlmacenamiento = Depends(obtener_storage),
     repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> ExpedienteService:
-    return ExpedienteService(repo, storage, repo_auditoria)
+    return ExpedienteService(
+        repo=repo,
+        storage=storage,
+        repo_auditoria=repo_auditoria,
+        alertas_portal=obtener_alertas_portal(solicitud),
+    )
 
 
 def obtener_servicio_auditoria(
