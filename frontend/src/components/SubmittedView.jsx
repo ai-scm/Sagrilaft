@@ -15,7 +15,7 @@ export default function SubmittedView({ codigoPeticion }) {
           <h2 style={{ color: 'var(--gray-900)', marginBottom: '12px' }}>¡Formulario Enviado!</h2>
           <p style={{ color: 'var(--gray-500)', fontSize: '0.95rem', maxWidth: '500px', margin: '0 auto' }}>
             Su formulario ha sido recibido exitosamente. Se realizarán las validaciones
-            correspondientes y será notificado del resultado.
+            correspondientes y será notificado del resultado, ya puede cerrar esta pestaña.
           </p>
           {codigoPeticion && (
             <div style={{
