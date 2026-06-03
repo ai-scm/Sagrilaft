@@ -51,7 +51,7 @@ const TEXTOS_VISTA = {
   },
   expedientes: {
     titulo:    'Formularios recibidos',
-    subtitulo: 'Consulte los formularios enviados por clientes y proveedores, con sus documentos adjuntos.',
+    subtitulo: 'Aqui puede consultar los formularios enviados por la contraparte, con sus documentos adjuntos.',
   },
 };
 

@@ -243,7 +243,7 @@ export default function VistaExpedientes() {
       {/* Carpetas CLIENTES / PROVEEDORES */}
       {!cargando && !error && (
         <div style={s.carpetas}>
-          {TIPOS_CONTRAPARTE.map(({ valor, etiqueta }) => {
+          {TIPOS_CONTRAPARTE.map(({ valor, etiqueta, etiquetaPlural }) => {
             const conteo  = valor === 'cliente' ? totalClientes : totalProveedores;
             const activa  = filtroTipo === valor;
             return (
@@ -252,7 +252,7 @@ export default function VistaExpedientes() {
                 style={s.carpeta(activa)}
                 onClick={() => setFiltroTipo(activa ? FILTRO_TODOS : valor)}
               >
-                <p style={s.carpetaTitulo(activa)}>{etiqueta}s</p>
+                <p style={s.carpetaTitulo(activa)}>{etiquetaPlural}</p>
                 <p style={s.carpetaConteo(activa)}>{conteo}</p>
               </div>
             );

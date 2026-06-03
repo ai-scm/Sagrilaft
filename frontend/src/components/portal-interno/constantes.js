@@ -43,8 +43,8 @@ export const ETIQUETA_ESTADO_ACCESO = crearMapaEtiquetas(ESTADOS_ACCESO);
 export const ESTILO_ESTADO_ACCESO   = crearMapaEstilos(ESTADOS_ACCESO);
 
 export const TIPOS_CONTRAPARTE = [
-  { valor: 'cliente',   etiqueta: 'Cliente'   },
-  { valor: 'proveedor', etiqueta: 'Proveedor' },
+  { valor: 'cliente',   etiqueta: 'Cliente',   etiquetaPlural: 'Clientes'   },
+  { valor: 'proveedor', etiqueta: 'Proveedor', etiquetaPlural: 'Proveedores' },
 ];
 
 export const AREAS_RESPONSABLES = [
