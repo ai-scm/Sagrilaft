@@ -77,3 +77,7 @@ postgres_data/
 keycloak_data/
 uploads/
 realm-sagrilaft.dev.json
+.env.example
+
+
+sns-policy.json
