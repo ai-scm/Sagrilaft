@@ -21,7 +21,7 @@ export default function DisclaimerCamposNoAplicables() {
 
         {colapsado && (
           <span className="aviso-campos-na__resumen">
-            Instrucción de diligenciamiento
+            IMPORTANTE: Instrucción de diligenciamiento
           </span>
         )}
 
