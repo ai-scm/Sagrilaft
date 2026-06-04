@@ -11,8 +11,10 @@ export default function NavegacionFormulario({
   onPrev, onNext, onSaveDraft, onSubmit,
   bloqueadoPorAnalisis = false,
   bloqueadoPorAlertas = false,
+  bloqueadoPorDisclaimer = false,
 }) {
   const navegacionBloqueada = bloqueadoPorAnalisis || bloqueadoPorAlertas;
+  const envioBloqueado = saving || bloqueadoPorDisclaimer;
   const estiloBotonBloqueado = navegacionBloqueada
     ? { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' }
     : undefined;
@@ -63,7 +65,8 @@ export default function NavegacionFormulario({
               type="button"
               className="btn btn-success"
               onClick={onSubmit}
-              disabled={saving}
+              disabled={envioBloqueado}
+              style={bloqueadoPorDisclaimer ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
             >
               {saving ? '⏳ Enviando...' : '✅ Radicar Formulario'}
             </button>

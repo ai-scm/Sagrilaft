@@ -18,6 +18,8 @@ import { CorreccionProvider, useCorreccion } from '../context/CorreccionContext'
 import SubmittedView from './SubmittedView';
 import NavegacionFormulario from './NavegacionFormulario';
 import DisclaimerCamposNoAplicables from './DisclaimerCamposNoAplicables';
+import DisclaimerRadicacion from './DisclaimerRadicacion';
+import { useDisclaimerRadicacion } from '../hooks/useDisclaimerRadicacion';
 import PasoDocumentos from './pasos/PasoDocumentos';
 import PasoInfoBasica from './pasos/PasoInfoBasica';
 import PasoRepresentante from './pasos/PasoRepresentante';
@@ -139,6 +141,7 @@ export default function FormularioSagrilaft() {
     alertasDireccion,
     hayAlertasActivas,
   } = useFormulario();
+  const disclaimerRadicacion = useDisclaimerRadicacion();
 
   if (submitted) {
     return <SubmittedView codigoPeticion={codigoPeticion} />;
@@ -148,6 +151,15 @@ export default function FormularioSagrilaft() {
   const bloqueadoPorAnalisis =
     Object.values(uploadingDoc).some(Boolean) ||
     Object.values(eliminandoDoc).some(Boolean);
+  const bloqueadoPorDisclaimer = step === 8 && !disclaimerRadicacion.aceptado;
+
+  const handleSubmitConDisclaimer = async () => {
+    if (!disclaimerRadicacion.validarDisclaimer()) {
+      return;
+    }
+
+    await handleSubmit();
+  };
 
   return (
     <CorreccionProvider
@@ -269,7 +281,9 @@ export default function FormularioSagrilaft() {
             />
           )}
 
-          {step === 8 && <PasoDeclaraciones {...pasoProps} />}
+          {step === 8 && (
+            <PasoDeclaraciones {...pasoProps} />
+          )}
 
           <NavegacionFormulario
             step={step}
@@ -279,11 +293,19 @@ export default function FormularioSagrilaft() {
             onPrev={handlePrev}
             onNext={handleNext}
             onSaveDraft={handleSaveDraft}
-            onSubmit={handleSubmit}
+            onSubmit={handleSubmitConDisclaimer}
             bloqueadoPorAnalisis={bloqueadoPorAnalisis}
             bloqueadoPorAlertas={hayAlertasActivas}
+            bloqueadoPorDisclaimer={bloqueadoPorDisclaimer}
           />
         </main>
+
+        <DisclaimerRadicacion
+          visible={step === 8 && !disclaimerRadicacion.aceptado}
+          aceptado={disclaimerRadicacion.aceptado}
+          mensajeError={disclaimerRadicacion.mensajeError}
+          onCambiarAceptacion={disclaimerRadicacion.setAceptado}
+        />
 
         {helpField && (
           <HelpPanel fieldKey={helpField} onClose={() => setHelpField(null)} />

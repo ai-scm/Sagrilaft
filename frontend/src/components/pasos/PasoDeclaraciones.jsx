@@ -4,9 +4,14 @@ import FirmaRepresentanteLegal from '../FirmaRepresentanteLegal';
 import { RAZON_SOCIAL_EMPRESA, CORREO_DATOS_PERSONALES } from '../../config/textos-legales';
 
 /**
- * Paso 7 — Autorizaciones, Declaración de Origen de Fondos y Firma.
+ * Paso 8 — Autorizaciones, Declaración de Origen de Fondos y Firma.
  */
-export default function PasoDeclaraciones({ formData, onChange, onOpenHelp, errors }) {
+export default function PasoDeclaraciones({
+  formData,
+  onChange,
+  onOpenHelp,
+  errors,
+}) {
   const toggleCheckbox = (name) =>
     onChange({ target: { name, type: 'checkbox', checked: !formData[name] } });
 
