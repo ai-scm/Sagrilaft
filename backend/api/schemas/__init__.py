@@ -12,6 +12,7 @@ from .acceso_manual import (
     SolicitudAccesoManual,
 )
 from .documentos import AlertaInconsistenciaResponse, DocumentoResponse
+from .comunes import FechaServidorResponse
 from .formularios import (
     Accionista,
     BeneficiarioFinal,
@@ -43,6 +44,7 @@ __all__ = [
     # Documentos
     "AlertaInconsistenciaResponse",
     "DocumentoResponse",
+    "FechaServidorResponse",
     # Formularios
     "Accionista",
     "BeneficiarioFinal",
@@ -75,4 +77,3 @@ __all__ = [
     # Webhooks
     "ZohoWebhookPayload",
 ]
-

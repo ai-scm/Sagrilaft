@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Optional, TypeVar, Literal
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, BaseModel
 
 from domain.utils.coercion import (
     coercionar_monto,
@@ -38,3 +38,12 @@ PorcentajeParticipacion = Annotated[Optional[float], BeforeValidator(coercionar_
 def a_iso_utc(valor: Optional[datetime]) -> Optional[str]:
     """Serializa un datetime a ISO-8601 con zona UTC explícita ('Z')."""
     return a_iso_utc_z(valor)
+
+
+class FechaServidorResponse(BaseModel):
+    """Fecha actual del servidor, normalizada a la zona horaria de Colombia."""
+
+    dia: int
+    mes: int
+    year: int
+    iso: str

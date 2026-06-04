@@ -7,6 +7,8 @@ DIP : depende de api.dependencies, no de infrastructure directamente.
 """
 
 from typing import List, Optional
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
 
@@ -19,6 +21,7 @@ from api.schemas import (
     FormularioCreate,
     FormularioResponse,
     FormularioUpdate,
+    FechaServidorResponse,
     ResultadoValidacionEnvio,
 )
 from api.limitador import limitador
@@ -27,6 +30,18 @@ from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.formulario.formulario_service import FormularioService
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
+
+
+@enrutador.get("/fecha-servidor", response_model=FechaServidorResponse)
+def obtener_fecha_servidor() -> FechaServidorResponse:
+    """Retorna la fecha actual del servidor normalizada a hora de Colombia."""
+    ahora = datetime.now(ZoneInfo("America/Bogota"))
+    return FechaServidorResponse(
+        dia=ahora.day,
+        mes=ahora.month,
+        year=ahora.year,
+        iso=ahora.isoformat(),
+    )
 
 
 # ─── Recuperación de sesión ──────────────────────────────────────────────────
