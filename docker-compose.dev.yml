@@ -122,6 +122,7 @@ services:
       # ── Alertas SNS ───────────────────────────────────────────────────────
       SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
       SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      APP_ENV: ${APP_ENV:-development}
 
     # El backend no arranca hasta que Postgres haya pasado su healthcheck.
     depends_on:
