@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import FormField from './FormField';
 import { OPCIONES_MES, componerPartesFirma } from '../utils/firmaFormato';
+import { api } from '../services/api';
 
 const estilos = {
   contenedor: {
@@ -69,6 +71,7 @@ function CampoNarrativa({ valor, anchoVacio }) {
  * cuando el formulario se envía a firma electrónica.
  */
 export default function FirmaRepresentanteLegal({ formData, onChange, onOpenHelp, errors = {} }) {
+  const [cargandoFechaServidor, setCargandoFechaServidor] = useState(false);
   const diaFirma    = formData.dia_firma    ?? '';
   const mesFirma    = formData.mes_firma    ?? '';
   const yearFirma   = formData.year_firma   ?? '';
@@ -76,9 +79,53 @@ export default function FirmaRepresentanteLegal({ formData, onChange, onOpenHelp
 
   const { dia, mes, year, ciudad } = componerPartesFirma({ diaFirma, mesFirma, yearFirma, ciudadFirma });
 
+  const aplicarFecha = ({ dia, mes, year }) => {
+    onChange({ target: { name: 'dia_firma', value: String(dia), type: 'text' } });
+    onChange({ target: { name: 'mes_firma', value: String(mes), type: 'text' } });
+    onChange({ target: { name: 'year_firma', value: String(year), type: 'text' } });
+  };
+
+  const usarFechaServidor = async () => {
+    setCargandoFechaServidor(true);
+    try {
+      const fechaServidor = await api.obtenerFechaServidor();
+      aplicarFecha(fechaServidor);
+    } finally {
+      setCargandoFechaServidor(false);
+    }
+  };
+
+  const limpiarFecha = () => {
+    onChange({ target: { name: 'dia_firma', value: '', type: 'text' } });
+    onChange({ target: { name: 'mes_firma', value: '', type: 'text' } });
+    onChange({ target: { name: 'year_firma', value: '', type: 'text' } });
+  };
+
   return (
     <div style={estilos.contenedor}>
       <h3 style={estilos.titulo}>Firma del Representante Legal</h3>
+
+      <div className="firma-fecha-acciones">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm firma-fecha-acciones__boton"
+          onClick={usarFechaServidor}
+          disabled={cargandoFechaServidor}
+        >
+          {cargandoFechaServidor ? 'Cargando fecha...' : 'Usar fecha del servidor'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm firma-fecha-acciones__boton"
+          onClick={limpiarFecha}
+        >
+          Limpiar fecha
+        </button>
+        <span className="firma-fecha-acciones__ayuda">
+          Toma la fecha del servidor y completa día, mes y año automáticamente.
+          Verificar que esta bien.
+        </span>
+      </div>
 
       {/* Captura de fecha y ciudad */}
       <div className="form-row">

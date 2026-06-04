@@ -472,6 +472,23 @@ body {
   font-size: 0.7rem;
 }
 
+.firma-fecha-acciones {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -4px 0 20px;
+}
+
+.firma-fecha-acciones__boton {
+  flex-shrink: 0;
+}
+
+.firma-fecha-acciones__ayuda {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+
 /* ========================================
    Help Panel (Canvas Lateral)
    ======================================== */
@@ -912,6 +929,126 @@ body {
   font-size: 0.85rem;
   color: var(--gray-700);
   line-height: 1.5;
+}
+
+/* ========================================
+   Disclaimer de radicación (modal)
+   ======================================== */
+
+.disclaimer-radicacion__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  animation: disclaimer-overlay-in 180ms ease-out;
+}
+
+.disclaimer-radicacion {
+  width: 100%;
+  max-width: 760px;
+  max-height: min(84vh, 760px);
+  overflow: auto;
+  padding: 28px 30px;
+  border: 2px solid var(--error, #dc2626);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
+  box-shadow: var(--shadow-xl);
+  animation: disclaimer-card-in 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.disclaimer-radicacion__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.disclaimer-radicacion__icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--error, #dc2626);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.disclaimer-radicacion__titulo {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.disclaimer-radicacion__resumen {
+  margin: 0 0 14px;
+  color: var(--gray-700);
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.disclaimer-radicacion__lista {
+  margin: 0 0 18px;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.disclaimer-radicacion__item {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: #fff1f2;
+  color: var(--gray-800);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.disclaimer-radicacion__confirmacion {
+  margin-top: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: white;
+}
+
+.disclaimer-radicacion__checkbox {
+  margin-bottom: 0;
+}
+
+.disclaimer-radicacion__checkbox span {
+  font-size: 0.86rem;
+  color: var(--gray-800);
+  font-weight: 600;
+}
+
+@keyframes disclaimer-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes disclaimer-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* ========================================

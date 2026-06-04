@@ -54,6 +54,10 @@ async function requestJson(path, options = {}) {
 
 export const api = {
   // Formularios
+  async obtenerFechaServidor() {
+    return requestJson('/formularios/fecha-servidor');
+  },
+
   async crearFormulario(data = {}) {
     return requestJson('/formularios/', {
       method: 'POST',
