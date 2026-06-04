@@ -19,7 +19,7 @@ import ModalRechazo from './ModalRechazo';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
-  formatearFechaCorta,
+  formatearFechaHora,
   formatearBytes,
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
@@ -285,6 +285,8 @@ const s = {
 function BannerPdfFormulario({ documento, formularioId }) {
   const [descargando, setDescargando] = useState(false);
   const tamano = documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : '';
+  const fecha = documento.created_at ? formatearFechaHora(documento.created_at) : null;
+  const fechaTexto = fecha ? ` · ${fecha}` : '';
 
   async function handleDescargar() {
     setDescargando(true);
@@ -300,7 +302,7 @@ function BannerPdfFormulario({ documento, formularioId }) {
       <div style={s.bannerPdfTextos}>
         <p style={s.bannerPdfTitulo}>Formulario SAGRILAFT — PDF oficial</p>
         <p style={s.bannerPdfSubtitulo}>
-          {documento.nombre_archivo}{tamano}
+          {documento.nombre_archivo}{tamano}{fechaTexto}
         </p>
       </div>
       <button
@@ -600,7 +602,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 {tipoLabel && <span style={s.chip}>{tipoLabel}</span>}
                 <span style={s.chipCodigo}>{expediente.codigo_peticion}</span>
                 {expediente.updated_at && (
-                  <span style={s.chip}>Enviado {formatearFechaCorta(expediente.updated_at)}</span>
+                  <span style={s.chip}>Enviado {formatearFechaHora(expediente.updated_at)}</span>
                 )}
               </div>
             </div>

@@ -20,13 +20,18 @@ function crearMapaEstilos(opciones) {
   );
 }
 
-function formatearFecha(isoString, { month }) {
+function formatearFecha(isoString, { month, hour, minute, hour12 } = {}) {
   if (!isoString) return TEXTO_SIN_DATO;
-  return new Date(isoString).toLocaleDateString(LOCALE_FECHA, {
-    year: 'numeric',
-    month,
-    day: 'numeric',
-  });
+  const fecha = new Date(isoString);
+  if (isNaN(fecha.getTime())) return TEXTO_SIN_DATO;
+  const opciones = { year: 'numeric', month, day: 'numeric' };
+  if (hour !== undefined) {
+    opciones.hour = hour;
+    opciones.minute = minute;
+    opciones.hour12 = hour12;
+    return fecha.toLocaleString(LOCALE_FECHA, opciones);
+  }
+  return fecha.toLocaleDateString(LOCALE_FECHA, opciones);
 }
 
 // ── Datos de dominio ──────────────────────────────────────────────────────────
@@ -134,4 +139,14 @@ export function formatearFechaCorta(isoString) {
 /** Formato completo: "23 de enero de 2026" — para paneles de detalle. */
 export function formatearFechaLarga(isoString) {
   return formatearFecha(isoString, { month: 'long' });
+}
+
+/** Formato con hora: "23 ene. 2026, 14:32" — para metadata de versiones. */
+export function formatearFechaHora(isoString) {
+  return formatearFecha(isoString, {
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }

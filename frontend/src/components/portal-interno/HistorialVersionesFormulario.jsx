@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { api } from '../../services/api';
 import {
   TIPO_DOCUMENTO_FORMULARIO_PDF,
-  formatearFechaCorta,
+  formatearFechaHora,
   formatearBytes,
 } from './constantes';
 
@@ -124,7 +124,7 @@ function FilaVersion({ documento, esVersionActiva, formularioId }) {
   }
 
   const tamano    = documento.tamano ? formatearBytes(documento.tamano) : null;
-  const fecha     = documento.created_at ? formatearFechaCorta(documento.created_at) : null;
+  const fecha     = documento.created_at ? formatearFechaHora(documento.created_at) : null;
   const metaTexto = [fecha, tamano].filter(Boolean).join(' · ');
 
   return (
@@ -134,7 +134,7 @@ function FilaVersion({ documento, esVersionActiva, formularioId }) {
           {documento.nombre_archivo}
         </span>
         <div style={s.metaVersion}>
-          {metaTexto && <span style={s.fechaTamano}>{metaTexto}</span>}
+          {metaTexto && <span style={s.fechaTamano} title={documento.created_at ?? undefined}>{metaTexto}</span>}
           {esVersionActiva
             ? <span style={s.badgeVersionActiva}>Versión activa</span>
             : <span style={s.badgeVersionAnterior}>v{documento.version_numero}</span>

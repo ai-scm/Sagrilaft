@@ -568,6 +568,7 @@ class RepositorioFirmaSQLAlchemy:
                 DocumentoAdjunto.tipo_documento == TIPO_DOCUMENTO_FORMULARIO_PDF,
                 DocumentoAdjunto.deleted_at.is_(None),
             )
+            .order_by(DocumentoAdjunto.version_numero.desc())
             .first()
         )
         return _orm_documento_a_datos(orm) if orm else None
