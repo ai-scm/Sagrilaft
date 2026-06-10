@@ -78,6 +78,8 @@ keycloak_data/
 uploads/
 realm-sagrilaft.dev.json
 .env.example
+!frontend/apps/portal-interno/.env.example
+!frontend/apps/formulario-publico/.env.example
 
 
 sns-policy.json

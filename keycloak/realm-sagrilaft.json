@@ -32,9 +32,12 @@
       "directAccessGrantsEnabled": false,
       "protocol": "openid-connect",
       "redirectUris": [
+        "https://portal-interno.tudominio.com/*",
+        "https://portal-interno.tudominio.com",
         "https://sagrilaft.tudominio.com/*"
       ],
       "webOrigins": [
+        "https://portal-interno.tudominio.com",
         "https://sagrilaft.tudominio.com"
       ],
       "defaultClientScopes": [

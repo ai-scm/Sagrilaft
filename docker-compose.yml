@@ -3,15 +3,15 @@
 #
 # Este archivo describe los tres programas que corren juntos en el servidor:
 #   - backend  : la API que procesa formularios, usuarios y documentos
-#   - frontend : la web que ven los usuarios en el navegador
+#   - frontend : la web pública que ven los usuarios en el navegador
 #   - keycloak : el sistema de login del portal interno
 #
 # Arquitectura:
 #   Internet
 #     └─ ALB (HTTPS — el candado del navegador lo gestiona AWS)
 #          └─ EC2 (este archivo)
-#               ├─ frontend  :80   ← Nginx entrega la web y redirige /api al backend
-#               └─ backend   :8000 ← No está expuesto a internet, solo al frontend
+#               ├─ frontend :80   ← Nginx entrega la web pública y redirige /api al backend
+#               └─ backend  :8000 ← No está expuesto a internet, solo al frontend
 #   BD:      RDS PostgreSQL  (en la red privada de AWS, el servidor no la ve directamente)
 #   Archivos: uploads_data   (volumen EBS adjunto al EC2)
 #
@@ -153,30 +153,56 @@ services:
       # disponible y aplica las migraciones de base de datos al arrancar.
       start_period: 90s
 
-  # ── Frontend (React + Nginx) ───────────────────────────────────────────────
-  # En producción el frontend es un conjunto de archivos HTML/JS/CSS servidos
-  # por Nginx. Nginx también redirige las llamadas /api al backend interno.
-  frontend:
+  # ── Formulario Público (React + Nginx) ────────────────────────────────────
+  # Aplicación pública del formulario SAGRILAFT que los clientes y proveedores
+  # diligencian. No requiere autenticación - acceso mediante token o código+PIN.
+  formulario-publico:
     build:
-      # El Dockerfile de producción compila React (npm run build) y copia
-      # el resultado en una imagen de Nginx. El resultado es liviano y rápido.
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: apps/formulario-publico/Dockerfile
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
+        VITE_PORTAL_INTERNO_URL: ${VITE_PORTAL_INTERNO_URL:-}
 
     restart: unless-stopped
 
     ports:
       # Expone el puerto 80 del servidor. El ALB de AWS apunta aquí.
-      # El contenedor escucha en 8080 (nginx-unprivileged no puede usar 80 sin root).
-      # Si necesitas correr en otro puerto del host (ej: servidor compartido),
-      # cámbialo a "8081:8080" y ajusta el target group del ALB.
-      - "${PORT_FRONTEND:-80}:8080"
+      # El contenedor escucha en 8080 internamente.
+      - "${PORT_PUBLICO:-80}:8080"
 
-    # El frontend no arranca hasta que el backend haya pasado su healthcheck.
-    # Esto garantiza que cuando Nginx empiece a proxear /api, el backend ya
-    # está listo para responder.
     depends_on:
       backend:
+        condition: service_healthy
+
+    networks:
+      - interna
+
+  # ── Portal Interno (React + Nginx) ─────────────────────────────────────────
+  # Aplicación interna para equipos de Ventas, Legal y Finanzas. Requiere
+  # autenticación mediante Keycloak. Permite crear accesos manuales, revisar
+  # formularios enviados, solicitar correcciones y gestionar expedientes.
+  portal-interno:
+    build:
+      context: ./frontend
+      dockerfile: apps/portal-interno/Dockerfile
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-sagrilaft}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
+
+    restart: unless-stopped
+
+    ports:
+      # Puerto separado del formulario público para despliegue independiente.
+      # Configurar un target group separado en el ALB apuntando a este puerto.
+      - "${PORT_PORTAL:-81}:8080"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
 
     networks:
@@ -245,8 +271,9 @@ services:
       - interna
 
     healthcheck:
-      # Verifica que el realm "sagrilaft" esté cargado y respondiendo.
-      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1" ]
+      # Verifica que el puerto HTTP de Keycloak esté aceptando conexiones.
+      # La imagen oficial no incluye curl, así que usamos bash + /dev/tcp.
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
       interval: 30s
       timeout: 10s
       retries: 10

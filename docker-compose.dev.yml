@@ -74,7 +74,7 @@ services:
       # Este segundo volumen evita que el montaje anterior borre la carpeta
       # uploads que el contenedor crea internamente. Sin esto, los archivos
       # subidos durante la sesión desaparecerían al reiniciar.
-      - /app/uploads
+      - ./uploads:/app/uploads
 
     # En desarrollo reemplazamos el comando de arranque normal (que incluye
     # comprobaciones de producción) por uno más simple:
@@ -134,53 +134,75 @@ services:
     healthcheck:
       disable: true
 
-  # ── Frontend (React) ───────────────────────────────────────────────────────
-  # En producción el frontend es un conjunto de archivos estáticos servidos
-  # por Nginx. Aquí usamos el servidor de desarrollo de Vite, que actualiza
-  # el navegador automáticamente cada vez que guardas un archivo.
-  frontend:
+  # ── Formulario Público (React + Vite dev) ─────────────────────────────────
+  # Servidor de desarrollo para el formulario público.
+  formulario-publico:
     build:
-      # Dockerfile.dev instala las dependencias y arranca Vite.
-      # Es distinto al Dockerfile de producción, que genera los archivos
-      # finales optimizados para servir con Nginx.
+      context: ./frontend
       dockerfile: Dockerfile.dev
 
     working_dir: /app
 
     volumes:
-      # El código fuente de ./frontend se monta en vivo, igual que en el backend.
       - ./frontend:/app
-      # Este volumen preserva node_modules dentro del contenedor para que el
-      # montaje anterior no lo borre. Sin esto, npm install tendría que correr
-      # desde cero en cada reinicio.
       - /app/node_modules
+      - /app/apps/formulario-publico/node_modules
 
-    # Instala dependencias si faltan y luego arranca Vite escuchando en todas
-    # las interfaces (necesario para que Docker lo exponga correctamente).
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm --prefix apps/formulario-publico run dev -- --host 0.0.0.0"
 
     ports:
-      # El frontend es accesible en http://localhost:5173
-      # Es el puerto estándar de Vite. Cambiar si ya está en uso.
       - "5173:5173"
 
-    environment:
-      # Le dice a Vite dónde está el backend para redirigir las llamadas /api.
-      # Usa el nombre del servicio Docker (backend) en lugar de localhost,
-      # porque dentro de la red Docker los contenedores se llaman por su nombre.
-      VITE_BACKEND_URL: http://backend:8000
+    env_file:
+      - ./frontend/apps/formulario-publico/.env
 
-      # Las tres variables siguientes configuran el login con Keycloak en
-      # el frontend. Por defecto están vacías, lo que desactiva el login.
-      # Para probar Keycloak en local, pon en tu .env:
-      #   VITE_KEYCLOAK_URL=http://localhost:8080
-      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
-      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-sagrilaft}
-      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
 
     depends_on:
       backend:
         condition: service_started
+
+    networks:
+      - interna
+
+    healthcheck:
+      disable: true
+
+  # ── Portal interno (React + Keycloak en dev) ──────────────────────────────
+  # App separada del formulario público. En desarrollo queda disponible en
+  # http://localhost:5174, pide login en Keycloak y comparte el backend por proxy /api.
+  portal-interno:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+
+    working_dir: /app
+
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/apps/portal-interno/node_modules
+
+    command: sh -c "npm --prefix apps/portal-interno run dev -- --host 0.0.0.0"
+
+    ports:
+      - "5174:5174"
+
+    env_file:
+      - ./frontend/apps/portal-interno/.env
+
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
+
+    depends_on:
+      backend:
+        condition: service_started
+      keycloak:
+        condition: service_started
+
+    networks:
+      - interna
 
     healthcheck:
       disable: true
@@ -245,20 +267,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
     healthcheck:
-      # Espera a que el realm "sagrilaft" esté disponible antes de considerar
-      # Keycloak como listo. Tarda entre 30 y 60 segundos en el primer arranque.
-      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/realms/sagrilaft || exit 1" ]
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
       interval: 20s
       timeout: 10s
       retries: 10
-      start_period: 60s # Margen amplio para que Keycloak termine de importar el realm
+      start_period: 60s
 
-# ── Volúmenes persistentes ─────────────────────────────────────────────────
-# Los volúmenes son carpetas gestionadas por Docker que sobreviven
-# cuando los contenedores se detienen o se eliminan.
-# postgres_data guarda los datos de la base de datos entre sesiones.
-# Sin esto, cada vez que bajas el stack pierdes todos los formularios y registros.
 volumes:
   postgres_data:
