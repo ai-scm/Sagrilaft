@@ -39,3 +39,25 @@ export const SECTORES_EMPRESA = [
   { value: 'Mixto',   label: 'Mixto'   },
 ];
 
+// ─── Tipos de Documentos del Sistema ──────────────────────────────────────────
+export const TIPO_DOCUMENTO_FORMULARIO_PDF        = 'FORMULARIO_PDF';
+export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';
+
+// ─── Estados de Dominio ───────────────────────────────────────────────────────
+
+// Estados de Formulario / Expediente
+export const ESTADO_FORM_ENVIADO         = 'enviado';
+export const ESTADO_FORM_EN_CORRECCION   = 'en_correccion';
+export const ESTADO_FORM_VALIDADO        = 'validado';
+export const ESTADO_FORM_RECHAZADO       = 'rechazado';
+export const ESTADO_FORM_PENDIENTE_FIRMA = 'pendiente_firma';
+export const ESTADO_FORM_FIRMADO         = 'firmado';
+
+// Estados de Acceso Manual
+export const ESTADO_ACCESO_ACTIVO    = 'activo';
+export const ESTADO_ACCESO_CONSUMIDO = 'consumido';
+export const ESTADO_ACCESO_EXPIRADO  = 'expirado';
+
+// Tipos de Contraparte
+export const TIPO_CONTRAPARTE_CLIENTE   = 'cliente';
+export const TIPO_CONTRAPARTE_PROVEEDOR = 'proveedor';
