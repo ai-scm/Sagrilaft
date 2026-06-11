@@ -5,7 +5,7 @@ Centraliza valores que deben permanecer sincronizados entre múltiples capas
 (servicios, migraciones, frontend) para evitar magic strings duplicados.
 """
 
-# Sincronizar con: frontend/src/components/portal-interno/constantes.js
+# Sincronizar con: frontend/apps/portal-interno/src/config/constantes.js
 
 # PDF oficial del formulario SAGRILAFT generado al enviarlo a firma.
 TIPO_DOCUMENTO_FORMULARIO_PDF = "FORMULARIO_PDF"
