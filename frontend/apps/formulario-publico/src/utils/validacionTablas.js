@@ -20,7 +20,7 @@ import {
   PORCENTAJE_MAXIMO_PERMITIDO,
   LONGITUD_MAXIMA_ID,
   LONGITUD_TELEFONO,
-} from './constantes';
+} from '@shared/utils/constantes';
 
 export {
   UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA,

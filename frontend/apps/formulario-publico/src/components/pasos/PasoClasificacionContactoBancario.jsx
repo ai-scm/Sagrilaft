@@ -14,7 +14,7 @@ import FormField from '../FormField';
 import ContactGroup from '../ContactGroup';
 import { HR, SectionTitle, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, MensajeError } from '../TablaFormComponents';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
-import { SECTORES_EMPRESA } from '../../utils/constantes';
+import { SECTORES_EMPRESA } from '@shared/utils/constantes';
 import { useCorreccion } from '../../context/CorreccionContext';
 
 

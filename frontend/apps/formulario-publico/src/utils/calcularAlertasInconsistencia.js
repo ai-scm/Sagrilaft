@@ -16,7 +16,7 @@ import {
   normalizarNit,
   normalizarNumeroDoc,
   normalizarDireccion,
-} from './normalizadores';
+} from '@shared/utils/normalizadores';
 
 // ── Configuración de campos vigilados por tipo de documento ───────────────────
 // Lenguaje ubicuo: los nombres reflejan las secciones del documento físico.

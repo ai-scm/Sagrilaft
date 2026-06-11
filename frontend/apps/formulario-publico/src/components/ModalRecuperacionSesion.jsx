@@ -123,10 +123,10 @@ export default function ModalRecuperacionSesion({
   onRecuperar, onDescartar,
 }) {
   const [codigoPeticion, setCodigoPeticion] = useState('');
-  const [pin, setPin]                       = useState('');
-  const [codigoFocus, setCodigoFocus]       = useState(false);
-  const [pinFocus, setPinFocus]             = useState(false);
-  const pinRef                              = useRef(null);
+  const [pin, setPin] = useState('');
+  const [codigoFocus, setCodigoFocus] = useState(false);
+  const [pinFocus, setPinFocus] = useState(false);
+  const pinRef = useRef(null);
 
   // Sincroniza el input de código cuando el modal se abre con un código conocido
   // (post-refresh o sesión expirada). Resetea ambos campos al cerrar.
@@ -181,7 +181,7 @@ export default function ModalRecuperacionSesion({
           <p style={estilos.descripcion}>
             {codigoInicial
               ? 'Su sesión ha expirado. Ingrese su PIN para continuar.'
-              : 'Ingrese el código de petición y PIN que recibió por correo electrónico para recuperar su formulario desde cualquier dispositivo.'}
+              : 'Ingrese el código de petición y PIN que recibió por correo electrónico para recuperar su formulario. '}
           </p>
         )}
 

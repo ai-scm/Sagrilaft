@@ -32,7 +32,7 @@ const DEMORA_GUARDADO_REMOTO_MS = 10_000;
 export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
   const {
     formData, step, formularioId, codigoPeticion,
-    submitted,
+    submitted, saving,
     juntaDirectiva, accionistas, beneficiarios,
     referenciasComerciales, referenciasBancarias,
     infoBancariaPagos, documentos,
@@ -42,8 +42,9 @@ export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
     // Sin datos, sin ID o ya enviado: no sincronizar.
     // El guard de `submitted` cancela el timer de 10s que pudo haber quedado
     // pendiente desde la última edición. Sin él, el timer dispararía un PUT
-    // sobre un formulario en estado ENVIADO, recibiendo un 400 del backend.
-    if (Object.keys(formData).length === 0 || !formularioId || submitted) return;
+    // pendiente desde la última edición. Si el formulario se está guardando
+    // manualmente o enviando (saving = true), también pausamos el autoguardado.
+    if (Object.keys(formData).length === 0 || !formularioId || submitted || saving) return;
 
     let cancelado = false;
 
@@ -61,5 +62,5 @@ export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
       cancelado = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
+  }, [formData, step, formularioId, codigoPeticion, submitted, saving, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos]);
 }

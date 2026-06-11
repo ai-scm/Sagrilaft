@@ -7,8 +7,13 @@
  * Para agregar reglas a un campo nuevo, solo editar REGLAS_INPUT.
  */
 
-import { LONGITUD_TELEFONO, REGEX_CORREO } from './constantes';
-import { REGEX_CHAR_TEXTO, REGEX_CHAR_ALFANUMERICO_ESTRICTO, REGEX_CHAR_ALFANUMERICO} from './constantes';
+import {
+  LONGITUD_TELEFONO,
+  REGEX_CORREO,
+  REGEX_CHAR_TEXTO,
+  REGEX_CHAR_ALFANUMERICO_ESTRICTO,
+  REGEX_CHAR_ALFANUMERICO,
+} from '@shared/utils/constantes';
 
 /** Teclas de control que siempre se permiten en cualquier input restringido. */
 const TECLAS_CONTROL = [

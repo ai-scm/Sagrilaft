@@ -2,7 +2,7 @@ import Select from 'react-select';
 import FormField from '../FormField';
 import { buildSelectStyles } from '../../utils/selectStyles';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
-import { LONGITUD_TELEFONO } from '../../utils/constantes';
+import { LONGITUD_TELEFONO } from '@shared/utils/constantes';
 import { HR, SectionTitle, SubLabel, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, MensajeError, CeldaToggleProducto } from '../TablaFormComponents';
 import { useCorreccion } from '../../context/CorreccionContext';
 

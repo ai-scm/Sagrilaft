@@ -8,7 +8,7 @@ import {
   UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA,
   UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL,
   PORCENTAJE_MAXIMO_PERMITIDO,
-} from '../../utils/constantes';
+} from '@shared/utils/constantes';
 import { HR, SectionTitle, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, CeldaPEP, CeldaIdentificacion, MensajeError } from '../TablaFormComponents';
 import { useCorreccion } from '../../context/CorreccionContext';
 

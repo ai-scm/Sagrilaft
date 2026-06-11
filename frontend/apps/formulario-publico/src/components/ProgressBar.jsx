@@ -5,7 +5,7 @@
  * un punto naranja sobre su dot, indicando al usuario dónde debe actuar.
  */
 
-import { PASO_POR_CAMPO } from '../data/catalogoCorrecciones';
+import { PASO_POR_CAMPO } from '@shared/data/catalogoCorrecciones';
 import { useCorreccion } from '../context/CorreccionContext';
 
 const STEP_LABELS = [

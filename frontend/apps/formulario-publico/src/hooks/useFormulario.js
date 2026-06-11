@@ -20,7 +20,7 @@ import {
   validarTablasPaso6, CLAVES_ERROR_PASO6, purgarFilasVaciasPaso6,
   validarTablasPaso7, CLAVES_ERROR_PASO7, purgarFilasVaciasPaso7,
 } from '../utils/validacionTablas';
-import { sanitizarPayload } from '../utils/normalizadores';
+import { sanitizarPayload } from '@shared/utils/normalizadores';
 import { obtenerCamposDeDocumento } from '../data/mapeoDocumentos';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -106,7 +106,7 @@ export function useFormulario() {
   };
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
-    { formData, step, formularioId, codigoPeticion, submitted, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
+    { formData, step, formularioId, codigoPeticion, submitted, saving, juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos },
     _buildPayload,
   );
 

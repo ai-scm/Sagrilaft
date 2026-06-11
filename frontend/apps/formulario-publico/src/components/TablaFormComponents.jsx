@@ -6,7 +6,7 @@
  * OCP : nuevos primitivos se agregan aquí sin tocar los consumidores existentes.
  */
 import { getIdPropsByTipoDocumento, sanitizeIdValue } from '../utils/inputValidation';
-import { LONGITUD_MAXIMA_ID } from '../utils/constantes';
+import { LONGITUD_MAXIMA_ID } from '@shared/utils/constantes';
 
 export const ESTILO_CELDA_ERROR = { borderColor: 'var(--error, #e53e3e)' };
 

@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useCallback } from 'react';
-import { CATALOGO_CORRECCIONES } from '../data/catalogoCorrecciones';
+import { CATALOGO_CORRECCIONES } from '@shared/data/catalogoCorrecciones';
 
 const ESTADO_EN_CORRECCION = 'en_correccion';
 
