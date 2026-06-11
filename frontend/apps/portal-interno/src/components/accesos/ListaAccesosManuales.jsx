@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../services/api';
-import BadgeEstadoAcceso from './BadgeEstadoAcceso';
-import { estilosBandeja } from './ui/listaStyles';
+import BadgeEstadoAcceso from '../badges/BadgeEstadoAcceso';
+import { estilosBandeja } from '../ui/listaStyles';
+import Spinner from '@shared/components/ui/Spinner';
+import Alert from '@shared/components/ui/Alert';
 import {
   ESTADOS_ACCESO,
   TIPOS_CONTRAPARTE,
@@ -10,7 +12,7 @@ import {
   ETIQUETA_AREA_RESPONSABLE,
   formatearFechaCorta,
   generarTextoConteo,
-} from './constantes';
+} from '../../config/constantes';
 
 // ── Constantes de filtrado ────────────────────────────────────────────────────
 
@@ -134,8 +136,6 @@ const s = {
     whiteSpace: 'nowrap',
   }),
   estadoVacio: estilosBandeja.estadoVacio,
-  spinner: estilosBandeja.spinner,
-  errorCarga: estilosBandeja.errorCarga,
 };
 
 // ── Sub-componente: barra de filtros ──────────────────────────────────────────
@@ -266,8 +266,8 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
 
       <BarraFiltros filtros={filtros} onCambiar={actualizarFiltro} onLimpiar={limpiarFiltros} />
 
-      {error      && <div style={s.errorCarga}>{error}</div>}
-      {cargando   && !error && <div style={s.spinner}>Cargando accesos…</div>}
+      {error      && <Alert mensaje={error} />}
+      {cargando   && !error && <Spinner texto="Cargando accesos…" />}
       {listaVacia && <div style={s.estadoVacio}>{mensajeVacio}</div>}
       {sinResultados && <div style={s.estadoVacio}>{MENSAJE_SIN_RESULTADOS}</div>}
 

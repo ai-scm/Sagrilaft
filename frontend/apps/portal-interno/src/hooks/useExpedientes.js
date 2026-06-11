@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../../../services/api';
+import { api } from '../services/api';
 
 function useValorDebounce(valor, demoraMs) {
   const [valorDebounced, setValorDebounced] = useState(valor);
@@ -111,4 +111,3 @@ export default function useExpedientes({
     busquedaDebounced,
   };
 }
-

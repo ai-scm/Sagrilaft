@@ -9,7 +9,7 @@
 
 import { useState, useMemo } from 'react';
 import { api } from '../../services/api';
-import { CATALOGO_CORRECCIONES } from '../../data/catalogoCorrecciones';
+import { CATALOGO_CORRECCIONES } from '@shared/data/catalogoCorrecciones';
 
 const LONGITUD_MINIMA_ESPECIFICACIONES = 20;
 const LONGITUD_MAXIMA_ESPECIFICACIONES = 2000;

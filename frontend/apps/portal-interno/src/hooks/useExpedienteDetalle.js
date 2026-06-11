@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../../../services/api';
+import { api } from '../services/api';
 
 export function useExpedienteDetalle(formularioId) {
   const [expediente, setExpediente] = useState(null);

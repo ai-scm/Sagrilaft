@@ -5,18 +5,6 @@
  * "Formularios recibidos", manteniendo una estética consistente.
  */
 
-export const estilosEstadoCargaBase = {
-  spinner: {
-    textAlign: 'center',
-    color:     'var(--gray-400, #94a3b8)',
-  },
-  errorCarga: {
-    background:   '#fef2f2',
-    border:       '1px solid #fca5a5',
-    borderRadius: 'var(--radius-md, 8px)',
-    color:        '#991b1b',
-  },
-};
 
 export const estilosBandeja = {
   contenedor: {
@@ -60,16 +48,5 @@ export const estilosBandeja = {
     padding:   '48px 0',
     color:     'var(--gray-400, #94a3b8)',
     fontSize:  '0.9rem',
-  },
-  spinner: {
-    ...estilosEstadoCargaBase.spinner,
-    padding:   '48px 0',
-    fontSize:  '0.88rem',
-  },
-  errorCarga: {
-    ...estilosEstadoCargaBase.errorCarga,
-    padding:      '12px 16px',
-    fontSize:     '0.85rem',
-    textAlign:    'center',
   },
 };

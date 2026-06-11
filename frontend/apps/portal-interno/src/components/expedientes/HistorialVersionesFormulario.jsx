@@ -13,7 +13,7 @@ import {
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   formatearFechaHora,
   formatearBytes,
-} from './constantes';
+} from '../../config/constantes';
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,109 @@
+import { API_BASE, getToken, leerDetalleError, requestJson, configurarTokenPortal } from '@shared/services/apiClient';
+
+export { configurarTokenPortal };
+
+export const api = {
+  // Portal interno — accesos manuales
+  async crearAccesoManual(datos) {
+    return requestJson('/accesos-manuales/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    });
+  },
+
+  async listarAccesosManuales() {
+    return requestJson('/accesos-manuales/');
+  },
+
+  // Portal interno — expedientes (formularios enviados)
+  async listarExpedientes(tipo = null, busqueda = null, opcionesFetch = null) {
+    const params = new URLSearchParams();
+    if (tipo)     params.append('tipo_contraparte', tipo);
+    if (busqueda) params.append('busqueda', busqueda);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return requestJson(`/expedientes/${query}`, opcionesFetch);
+  },
+
+  async obtenerExpediente(formularioId) {
+    return requestJson(`/expedientes/${formularioId}`);
+  },
+
+  urlDescargaDocumento(formularioId, docId) {
+    return `${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`;
+  },
+
+  async descargarDocumento(formularioId, docId, nombreArchivo) {
+    const token = getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  async aprobarExpediente(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/aprobar`, { method: 'POST' });
+  },
+
+  async rechazarExpediente(formularioId, solicitud) {
+    return requestJson(`/expedientes/${formularioId}/rechazar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(solicitud),
+    });
+  },
+
+  async devolverExpediente(formularioId, solicitud) {
+    return requestJson(`/expedientes/${formularioId}/devolver`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(solicitud),
+    });
+  },
+
+  async enviarAFirma(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/enviar-a-firma`, {
+      method: 'POST',
+    });
+  },
+
+  async verificarFirma(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/verificar-firma`, {
+      method: 'POST',
+    });
+  },
+
+  async cancelarFirma(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/cancelar-firma`, {
+      method: 'POST',
+    });
+  },
+
+  urlDocumentoFirmado(formularioId) {
+    return `${API_BASE}/expedientes/${formularioId}/documento-firmado`;
+  },
+
+  async descargarDocumentoFirmado(formularioId) {
+    const token = getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documento-firmado`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'formulario_firmado.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+};

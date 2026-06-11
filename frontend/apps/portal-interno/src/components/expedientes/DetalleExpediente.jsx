@@ -11,11 +11,12 @@
 
 import { useState } from 'react';
 import { api } from '../../services/api';
-import { useExpedienteDetalle } from './hooks/useExpedienteDetalle';
-import { estilosEstadoCargaBase } from './ui/listaStyles';
-import BadgeEstadoFormulario from './BadgeEstadoFormulario';
-import ModalDevolucion from './ModalDevolucion';
-import ModalRechazo from './ModalRechazo';
+import { useExpedienteDetalle } from '../../hooks/useExpedienteDetalle';
+import Spinner from '@shared/components/ui/Spinner';
+import Alert from '@shared/components/ui/Alert';
+import BadgeEstadoFormulario from '../badges/BadgeEstadoFormulario';
+import ModalDevolucion from '../modals/ModalDevolucion';
+import ModalRechazo from '../modals/ModalRechazo';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
@@ -23,7 +24,7 @@ import {
   formatearBytes,
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
-} from './constantes';
+} from '../../config/constantes';
 
 const ESTADO_ENVIADO         = 'enviado';
 const ESTADO_EN_CORRECCION   = 'en_correccion';
@@ -265,18 +266,6 @@ const s = {
   btnFirmaDeshabilitado: {
     opacity: 0.6,
     cursor:  'not-allowed',
-  },
-  // Estados
-  spinner: {
-    ...estilosEstadoCargaBase.spinner,
-    padding:   '80px 0',
-    fontSize:  '0.9rem',
-  },
-  errorCarga: {
-    ...estilosEstadoCargaBase.errorCarga,
-    padding:      '16px 20px',
-    fontSize:     '0.88rem',
-    margin:       '24px 0',
   },
 };
 
@@ -586,8 +575,8 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
           ← Volver a formularios
         </button>
 
-        {cargando && <div style={s.spinner}>Cargando expediente…</div>}
-        {error    && <div style={s.errorCarga}>{error}</div>}
+        {cargando && <Spinner texto="Cargando expediente…" style={{ padding: '80px 0' }} />}
+        {error    && <Alert mensaje={error} style={{ margin: '24px 0' }} />}
 
         {!cargando && expediente && (
           <>

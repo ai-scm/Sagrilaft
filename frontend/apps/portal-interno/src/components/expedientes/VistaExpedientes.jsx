@@ -8,16 +8,17 @@
 
 import { useState } from 'react';
 import DetalleExpediente from './DetalleExpediente';
-import { estilosBandeja } from './ui/listaStyles';
-import useExpedientes from './hooks/useExpedientes';
-import BadgeEstadoFormulario from './BadgeEstadoFormulario';
+import { estilosBandeja } from '../ui/listaStyles';
+import useExpedientes from '../../hooks/useExpedientes';
+import Spinner from '@shared/components/ui/Spinner';
+import Alert from '@shared/components/ui/Alert';
+import BadgeEstadoFormulario, { OPCIONES_ESTADOS_FORMULARIO } from '../badges/BadgeEstadoFormulario';
 import {
   TIPOS_CONTRAPARTE,
-  ESTADOS_FORMULARIO,
   ETIQUETA_TIPO_CONTRAPARTE,
   formatearFechaCorta,
   generarTextoConteo,
-} from './constantes';
+} from '../../config/constantes';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -286,7 +287,7 @@ export default function VistaExpedientes() {
             onChange={e => setFiltroEstado(e.target.value)}
           >
             <option value="">Todos los estados</option>
-            {ESTADOS_FORMULARIO.map(({ valor, etiqueta }) => (
+            {OPCIONES_ESTADOS_FORMULARIO.map(({ valor, etiqueta }) => (
               <option key={valor} value={valor}>{etiqueta}</option>
             ))}
           </select>
@@ -294,8 +295,8 @@ export default function VistaExpedientes() {
       )}
 
       {/* Estados de carga / error / vacío */}
-      {error    && <div style={s.errorCarga}>{error}</div>}
-      {cargando && !error && <div style={s.spinner}>Cargando formularios…</div>}
+      {error    && <Alert mensaje={error} />}
+      {cargando && !error && <Spinner texto="Cargando formularios…" />}
       {!cargando && !error && expedientes.length === 0 && (
         <div style={s.estadoVacio}>
           Aún no hay formularios enviados. Aparecerán aquí cuando los destinatarios completen y envíen el formulario SAGRILAFT.

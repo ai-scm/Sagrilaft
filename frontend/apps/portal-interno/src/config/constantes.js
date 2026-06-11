@@ -4,6 +4,11 @@
  * Centraliza valores de dominio (tipos de contraparte, estados, áreas) y
  * helpers de formateo usados por todos los componentes del portal.
  */
+import {
+  ESTADO_ACCESO_ACTIVO, ESTADO_ACCESO_CONSUMIDO, ESTADO_ACCESO_EXPIRADO,
+  TIPO_CONTRAPARTE_CLIENTE, TIPO_CONTRAPARTE_PROVEEDOR,
+  TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
+} from '@shared/utils/constantes';
 
 const LOCALE_FECHA = 'es-CO';
 const TEXTO_SIN_DATO = '—';
@@ -39,17 +44,17 @@ function formatearFecha(isoString, { month, hour, minute, hour12 } = {}) {
 // Actualizar ambos archivos si se añaden o eliminan valores del enum.
 
 export const ESTADOS_ACCESO = [
-  { valor: 'activo',    etiqueta: 'Activo',    bg: '#dcfce7', color: '#15803d', borde: '#86efac' },
-  { valor: 'consumido', etiqueta: 'Consumido', bg: '#dbeafe', color: '#1d4ed8', borde: '#93c5fd' },
-  { valor: 'expirado',  etiqueta: 'Expirado',  bg: '#fee2e2', color: '#dc2626', borde: '#fca5a5' },
+  { valor: ESTADO_ACCESO_ACTIVO,    etiqueta: 'Activo',    bg: '#dcfce7', color: '#15803d', borde: '#86efac' },
+  { valor: ESTADO_ACCESO_CONSUMIDO, etiqueta: 'Consumido', bg: '#dbeafe', color: '#1d4ed8', borde: '#93c5fd' },
+  { valor: ESTADO_ACCESO_EXPIRADO,  etiqueta: 'Expirado',  bg: '#fee2e2', color: '#dc2626', borde: '#fca5a5' },
 ];
 
 export const ETIQUETA_ESTADO_ACCESO = crearMapaEtiquetas(ESTADOS_ACCESO);
 export const ESTILO_ESTADO_ACCESO   = crearMapaEstilos(ESTADOS_ACCESO);
 
 export const TIPOS_CONTRAPARTE = [
-  { valor: 'cliente',   etiqueta: 'Cliente',   etiquetaPlural: 'Clientes'   },
-  { valor: 'proveedor', etiqueta: 'Proveedor', etiquetaPlural: 'Proveedores' },
+  { valor: TIPO_CONTRAPARTE_CLIENTE,   etiqueta: 'Cliente',   etiquetaPlural: 'Clientes'   },
+  { valor: TIPO_CONTRAPARTE_PROVEEDOR, etiqueta: 'Proveedor', etiquetaPlural: 'Proveedores' },
 ];
 
 export const AREAS_RESPONSABLES = [
@@ -61,49 +66,14 @@ export const AREAS_RESPONSABLES = [
 export const ETIQUETA_TIPO_CONTRAPARTE = crearMapaEtiquetas(TIPOS_CONTRAPARTE);
 export const ETIQUETA_AREA_RESPONSABLE = crearMapaEtiquetas(AREAS_RESPONSABLES);
 
-export const ESTADOS_FORMULARIO = [
-  // Los valores deben coincidir con `EstadoFormulario` del backend (minúsculas):
-  // backend/infrastructure/persistencia/models.py
-  { valor: 'enviado',         etiqueta: 'Enviado',          bg: '#eff6ff', color: '#1d4ed8', borde: '#bfdbfe' },
-  { valor: 'en_correccion',   etiqueta: 'En corrección',    bg: '#fff7ed', color: '#c2410c', borde: '#fed7aa' },
-  { valor: 'validado',        etiqueta: 'Validado',         bg: '#f0fdf4', color: '#15803d', borde: '#bbf7d0' },
-  { valor: 'rechazado',       etiqueta: 'Rechazado',        bg: '#fef2f2', color: '#dc2626', borde: '#fca5a5' },
-  { valor: 'pendiente_firma', etiqueta: 'Pendiente firma',  bg: '#fefce8', color: '#854d0e', borde: '#fde047' },
-  { valor: 'firmado',         etiqueta: 'Firmado',          bg: '#f5f3ff', color: '#6d28d9', borde: '#c4b5fd' },
-];
 
-export const ETIQUETA_ESTADO_FORMULARIO = crearMapaEtiquetas(ESTADOS_FORMULARIO);
-export const ESTILO_ESTADO_FORMULARIO   = crearMapaEstilos(ESTADOS_FORMULARIO);
 
 // ── Constantes de documentos ──────────────────────────────────────────────────
 // Sincronizar con: backend/domain/constantes.py
 
-export const TIPO_DOCUMENTO_FORMULARIO_PDF       = 'FORMULARIO_PDF';
-export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';
+export { TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT };
 
-// ── Estilos reutilizables ─────────────────────────────────────────────────────
 
-const ESTILO_ESTADO_POR_DEFECTO = { bg: '#f1f5f9', color: '#64748b', borde: '#e2e8f0' };
-
-/**
- * Estilo base para badges de estado del formulario.
- *
- * Permite overrides (fontSize/padding, etc.) para reutilizar el mismo
- * estilo semántico (color/borde) en distintas densidades de UI.
- */
-export function estiloBadgeEstado(estado, overrides = {}) {
-  const estilo = ESTILO_ESTADO_FORMULARIO[estado] ?? ESTILO_ESTADO_POR_DEFECTO;
-  return {
-    fontWeight:    '700',
-    background:    estilo.bg,
-    color:         estilo.color,
-    border:        `1px solid ${estilo.borde}`,
-    borderRadius:  '999px',
-    whiteSpace:    'nowrap',
-    letterSpacing: '0.03em',
-    ...overrides,
-  };
-}
 
 // ── Formateo general ──────────────────────────────────────────────────────────
 

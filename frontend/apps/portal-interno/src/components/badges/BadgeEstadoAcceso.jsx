@@ -5,7 +5,7 @@
  *   estado {string} "activo" | "consumido" | "expirado"
  */
 
-import { ETIQUETA_ESTADO_ACCESO, ESTILO_ESTADO_ACCESO } from './constantes';
+import { ETIQUETA_ESTADO_ACCESO, ESTILO_ESTADO_ACCESO } from '../../config/constantes';
 
 const _FALLBACK_ESTILO = ESTILO_ESTADO_ACCESO.expirado;
 
