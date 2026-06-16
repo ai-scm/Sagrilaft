@@ -10,6 +10,7 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../services/api';
 import { CATALOGO_CORRECCIONES } from '@shared/data/catalogoCorrecciones';
+import ModalConfirmacion from './ModalConfirmacion';
 
 const LONGITUD_MINIMA_ESPECIFICACIONES = 20;
 const LONGITUD_MAXIMA_ESPECIFICACIONES = 2000;
@@ -385,6 +386,7 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
   const [enfocado, setEnfocado]                     = useState(false);
   const [enviando, setEnviando]                     = useState(false);
   const [error, setError]                           = useState(null);
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
 
   function resetearEstado() {
     setEspecificaciones('');
@@ -405,13 +407,16 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
     return null;
   }
 
-  async function handleConfirmar() {
+  function handleValidarYMostrarConfirmacion() {
     const errorValidacion = validarEspecificaciones();
     if (errorValidacion) {
       setError(errorValidacion);
       return;
     }
+    setMostrarConfirmacion(true);
+  }
 
+  async function handleConfirmar() {
     setEnviando(true);
     setError(null);
 
@@ -420,10 +425,12 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
         especificaciones:    especificaciones.trim(),
         campos_identificados: [...camposSeleccionados],
       });
+      setMostrarConfirmacion(false);
       resetearEstado();
       onDevuelto();
     } catch (errorDevolucion) {
       setError(errorDevolucion.message || 'Error al procesar la devolución. Intente nuevamente.');
+      setMostrarConfirmacion(false);
     } finally {
       setEnviando(false);
     }
@@ -522,7 +529,7 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
               ...s.btnConfirmar,
               ...(!especificacionesValidas || enviando ? s.btnDeshabilitado : {}),
             }}
-            onClick={handleConfirmar}
+            onClick={handleValidarYMostrarConfirmacion}
             disabled={!especificacionesValidas || enviando}
             type="button"
           >
@@ -530,6 +537,16 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
           </button>
         </div>
 
+        <ModalConfirmacion
+          visible={mostrarConfirmacion}
+          titulo="¿Confirmar devolución?"
+          mensaje="El formulario será devuelto y se notificará al remitente para su corrección. ¿Desea continuar?"
+          textoConfirmar="Sí, devolver"
+          colorConfirmar="#c2410c"
+          onConfirmar={handleConfirmar}
+          onCancelar={() => setMostrarConfirmacion(false)}
+          ocupado={enviando}
+        />
       </div>
     </div>
   );

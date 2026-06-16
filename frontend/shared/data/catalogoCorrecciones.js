@@ -71,6 +71,7 @@ export const CATALOGO_CORRECCIONES = [
     paso: 5,
     etiqueta: 'Información financiera',
     campos: [
+      { id: 'moneda_declaracion',   etiqueta: 'Moneda de Declaración' },
       { id: 'actividad_economica',  etiqueta: 'Actividad Económica' },
       { id: 'codigo_ciiu',          etiqueta: 'Código CIIU' },
       { id: 'ingresos_mensuales',   etiqueta: 'Ingresos Mensuales' },

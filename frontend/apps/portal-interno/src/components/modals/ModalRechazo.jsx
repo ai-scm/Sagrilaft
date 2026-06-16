@@ -11,6 +11,7 @@
 
 import { useState } from 'react';
 import { api } from '../../services/api';
+import ModalConfirmacion from './ModalConfirmacion';
 
 const LONGITUD_MINIMA_MOTIVO              = 20;
 const LONGITUD_MAXIMA_MOTIVO              = 1000;
@@ -224,6 +225,7 @@ export default function ModalRechazo({ visible, formularioId, onRechazado, onCan
   const [mensajeParaDestinatario, setMensajeParaDestinatario]   = useState('');
   const [enviando, setEnviando]                                 = useState(false);
   const [error, setError]                                       = useState(null);
+  const [mostrarConfirmacion, setMostrarConfirmacion]           = useState(false);
 
   function resetearEstado() {
     setMotivoInterno('');
@@ -243,9 +245,12 @@ export default function ModalRechazo({ visible, formularioId, onRechazado, onCan
   );
   const formularioValido = motivoValido && mensajeParaDestinatarioValido;
 
-  async function handleConfirmar() {
+  function handleValidarYMostrarConfirmacion() {
     if (!formularioValido) return;
+    setMostrarConfirmacion(true);
+  }
 
+  async function handleConfirmar() {
     setEnviando(true);
     setError(null);
 
@@ -254,10 +259,12 @@ export default function ModalRechazo({ visible, formularioId, onRechazado, onCan
         motivo:                    motivoInterno.trim(),
         mensaje_para_destinatario: mensajeParaDestinatario.trim() || null,
       });
+      setMostrarConfirmacion(false);
       resetearEstado();
       onRechazado();
     } catch (errorRechazo) {
       setError(errorRechazo.message || 'Error al procesar el rechazo. Intente nuevamente.');
+      setMostrarConfirmacion(false);
     } finally {
       setEnviando(false);
     }
@@ -339,7 +346,7 @@ export default function ModalRechazo({ visible, formularioId, onRechazado, onCan
               ...s.btnConfirmar,
               ...(!formularioValido || enviando ? s.btnDeshabilitado : {}),
             }}
-            onClick={handleConfirmar}
+            onClick={handleValidarYMostrarConfirmacion}
             disabled={!formularioValido || enviando}
             type="button"
           >
@@ -347,6 +354,16 @@ export default function ModalRechazo({ visible, formularioId, onRechazado, onCan
           </button>
         </div>
 
+        <ModalConfirmacion
+          visible={mostrarConfirmacion}
+          titulo="¿Confirmar rechazo?"
+          mensaje="El formulario será rechazado definitivamente y no podrá retomarse. ¿Desea continuar?"
+          textoConfirmar="Sí, rechazar"
+          colorConfirmar="#991b1b"
+          onConfirmar={handleConfirmar}
+          onCancelar={() => setMostrarConfirmacion(false)}
+          ocupado={enviando}
+        />
       </div>
     </div>
   );

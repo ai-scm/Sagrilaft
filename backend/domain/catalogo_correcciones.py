@@ -57,6 +57,7 @@ CAMPOS_IDENTIFICABLES_PARA_CORRECION: frozenset[str] = frozenset({
     "beneficiario_final",
 
     # Paso 5 — Información financiera
+    "moneda_declaracion",
     "actividad_economica",
     "codigo_ciiu",
     "ingresos_mensuales",
@@ -137,6 +138,7 @@ ETIQUETA_DE_CAMPO_EN_CORRECION: dict[str, str] = {
     "junta_directiva":         "Miembros de Junta Directiva",
     "accionistas":             "Accionistas",
     "beneficiario_final":      "Beneficiarios Finales",
+    "moneda_declaracion":      "Moneda de Declaración",
     "actividad_economica":     "Actividad Económica",
     "codigo_ciiu":             "Código CIIU",
     "ingresos_mensuales":      "Ingresos Mensuales",

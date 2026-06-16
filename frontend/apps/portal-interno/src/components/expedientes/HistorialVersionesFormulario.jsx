@@ -94,6 +94,19 @@ const s = {
     padding:       '2px 8px',
     whiteSpace:    'nowrap',
   },
+  badgeManual: {
+    fontSize:      '0.68rem',
+    fontWeight:    '700',
+    color:         '#0f172a',
+    background:    '#f8fafc',
+    border:        '1px solid #94a3b8',
+    borderRadius:  '999px',
+    padding:       '2px 8px',
+    letterSpacing: '0.03em',
+    textTransform: 'uppercase',
+    whiteSpace:    'nowrap',
+    marginLeft:    '8px',
+  },
   btnDescargar: {
     padding:        '5px 14px',
     background:     'var(--primary-50, #eff6ff)',
@@ -139,6 +152,9 @@ function FilaVersion({ documento, esVersionActiva, formularioId }) {
             ? <span style={s.badgeVersionActiva}>Versión activa</span>
             : <span style={s.badgeVersionAnterior}>v{documento.version_numero}</span>
           }
+          {documento.subido_por && documento.subido_por !== 'SISTEMA' && (
+            <span style={s.badgeManual} title={`Subido por: ${documento.subido_por}`}>Carga Manual</span>
+          )}
         </div>
       </div>
       <button
