@@ -32,7 +32,15 @@ from .formularios import (
     ReferenciaComercial,
     ResultadoValidacionEnvio,
 )
-from .expedientes import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, ResumenRechazo, SolicitudDevolucion, SolicitudRechazo
+from .expedientes import (
+    ComparacionVersionFormulario,
+    ExpedienteDetalle,
+    ExpedienteResumen,
+    ResumenDevolucion,
+    ResumenRechazo,
+    SolicitudDevolucion,
+    SolicitudRechazo,
+)
 from .listas_cautela import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
 from .validaciones import ValidacionResponse
 from .webhooks import ZohoWebhookPayload
@@ -68,6 +76,7 @@ __all__ = [
     # Expedientes
     "ExpedienteDetalle",
     "ExpedienteResumen",
+    "ComparacionVersionFormulario",
     "ResumenDevolucion",
     "ResumenRechazo",
     "SolicitudDevolucion",

@@ -22,7 +22,15 @@ from api.dependencies import (
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from domain.excepciones import SinPermisoError
-from api.schemas import ExpedienteDetalle, ExpedienteResumen, ResumenDevolucion, ResumenRechazo, SolicitudDevolucion, SolicitudRechazo
+from api.schemas import (
+    ComparacionVersionFormulario,
+    ExpedienteDetalle,
+    ExpedienteResumen,
+    ResumenDevolucion,
+    ResumenRechazo,
+    SolicitudDevolucion,
+    SolicitudRechazo,
+)
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
@@ -85,6 +93,41 @@ def obtener_expediente(
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ExpedienteDetalle:
     return servicio.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+
+
+@enrutador.get(
+    "/{formulario_id}/comparacion-versiones",
+    response_model=ComparacionVersionFormulario,
+    summary="Comparar última versión corregida",
+    description="Compara la última versión del PDF del formulario contra su versión anterior inmediata.",
+)
+def comparar_ultima_correccion(
+    formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> ComparacionVersionFormulario:
+    return servicio.comparar_ultima_correccion(formulario_id, _contrapartes_permitidas(usuario))
+
+
+@enrutador.get(
+    "/{formulario_id}/comparacion-versiones/reporte-pdf",
+    summary="Descargar evidencia de cambios",
+    description="Genera un PDF con la comparación estructurada entre la última versión y la anterior.",
+    responses={200: {"content": {"application/pdf": {}}, "description": "PDF de evidencia"}},
+)
+def descargar_reporte_comparacion(
+    formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> Response:
+    pdf_bytes = servicio.generar_reporte_comparacion_pdf(
+        formulario_id,
+        _contrapartes_permitidas(usuario),
+    )
+    headers = {
+        "Content-Disposition": f'attachment; filename="comparacion_{formulario_id[:8]}.pdf"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
 # ─── Descarga de documentos ───────────────────────────────────────────────────

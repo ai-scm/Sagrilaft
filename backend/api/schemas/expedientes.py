@@ -38,6 +38,8 @@ class DocumentoResumen(BaseModel):
     nombre_archivo: str
     tamano: Optional[int] = None
     version_numero: int = 1
+    version_anterior_id: Optional[str] = None
+    subido_por: Optional[str] = None
     created_at: Optional[datetime] = None
 
     @field_serializer("created_at", when_used="json")
@@ -60,11 +62,35 @@ class ExpedienteDetalle(BaseModel):
     tipo_contraparte: Optional[TipoContraparte] = None
     estado: EstadoFormulario
     updated_at: datetime
-    documentos: List[DocumentoResumen] = []
+    documentos: List[DocumentoResumen] = Field(default_factory=list)
 
     @field_serializer("updated_at", when_used="json")
     def _serializar_fecha(self, valor: datetime) -> str:
         return a_iso_utc(valor) or ""
+
+
+class CambioCampoVersion(BaseModel):
+    """Cambio detectado entre la versión anterior y la corregida."""
+
+    campo: str
+    etiqueta: str
+    valor_anterior: str
+    valor_corregido: str
+
+
+class ComparacionVersionFormulario(BaseModel):
+    """Comparación estructurada entre dos versiones consecutivas del formulario."""
+
+    disponible: bool
+    motivo: Optional[str] = None
+    version_anterior: int
+    version_corregida: int
+    moneda_anterior: Optional[str] = None
+    moneda_corregida: Optional[str] = None
+    documento_anterior_id: Optional[str] = None
+    documento_corregido_id: str
+    total_cambios: int
+    cambios: List[CambioCampoVersion] = Field(default_factory=list)
 
 
 class SolicitudDevolucion(BaseModel):

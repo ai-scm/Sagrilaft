@@ -9,6 +9,8 @@ Responsabilidades:
 """
 
 import json
+from datetime import datetime, timezone
+from html import escape
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
@@ -24,6 +26,11 @@ from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioExpediente, RepositorioDocumento
 from domain.formulario.tipos import EstadoFormulario
+from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
+from services.expedientes.comparacion_versiones import (
+    comparar_versiones,
+    comparacion_versiones_a_dict,
+)
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService  # noqa: F401
@@ -157,12 +164,49 @@ class ExpedienteService:
                     "nombre_archivo": doc.nombre_archivo,
                     "tamano":         doc.tamano,
                     "version_numero": doc.version_numero,
+                    "version_anterior_id": doc.version_anterior_id,
                     "created_at":     doc.created_at,
                     "subido_por":     doc.subido_por,
                 }
                 for doc in documentos
             ],
         }
+
+    def comparar_ultima_correccion(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        documento_corregido = self._documentos.obtener_ultimo_formulario_pdf(formulario_id)
+        if not documento_corregido:
+            raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
+
+        documento_anterior = None
+        if documento_corregido.version_anterior_id:
+            documento_anterior = self._documentos.buscar_documento(
+                formulario_id,
+                documento_corregido.version_anterior_id,
+            )
+
+        comparacion = comparar_versiones(documento_corregido, documento_anterior)
+        return comparacion_versiones_a_dict(comparacion)
+
+    def generar_reporte_comparacion_pdf(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> bytes:
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        comparacion = self.comparar_ultima_correccion(formulario_id, contrapartes_permitidas)
+        html = _html_reporte_comparacion(formulario, comparacion)
+
+        try:
+            from weasyprint import HTML
+        except ImportError as exc:
+            raise RuntimeError("No se encontró 'weasyprint' para generar el PDF de comparación.") from exc
+
+        return HTML(string=html).write_pdf()
 
     # ─── Carga Manual ─────────────────────────────────────────────────────────
 
@@ -439,3 +483,59 @@ class ExpedienteService:
             raise DocumentoNoEncontradoError(formulario_id, doc_id)
         content_type = documento.content_type or "application/octet-stream"
         return self._storage.info_descarga(documento.ruta_archivo, documento.nombre_archivo, content_type)
+
+
+def _html_reporte_comparacion(formulario, comparacion: Dict[str, Any]) -> str:
+    generado = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    filas = "".join(
+        f"""
+        <tr>
+          <td>{escape(cambio["etiqueta"])}</td>
+          <td>{escape(cambio["valor_anterior"])}</td>
+          <td>{escape(cambio["valor_corregido"])}</td>
+        </tr>
+        """
+        for cambio in comparacion["cambios"]
+    )
+    if not filas:
+        mensaje = comparacion.get("motivo") or "No se detectaron cambios en los campos comparables."
+        filas = f'<tr><td colspan="3" class="sin-cambios">{escape(mensaje)}</td></tr>'
+
+    return f"""
+    <!doctype html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {{ font-family: Arial, sans-serif; color: #0f172a; font-size: 12px; }}
+        h1 {{ font-size: 20px; margin: 0 0 6px; }}
+        .meta {{ color: #64748b; margin-bottom: 18px; }}
+        .resumen {{ margin: 14px 0 18px; padding: 10px 12px; border: 1px solid #e2e8f0; background: #f8fafc; }}
+        table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+        th {{ text-align: left; background: #f1f5f9; color: #475569; font-size: 10px; text-transform: uppercase; padding: 8px; }}
+        td {{ border-bottom: 1px solid #e2e8f0; padding: 8px; vertical-align: top; word-wrap: break-word; }}
+        .sin-cambios {{ text-align: center; color: #64748b; padding: 18px; }}
+      </style>
+    </head>
+    <body>
+      <h1>Evidencia de cambios corregidos</h1>
+      <div class="meta">Generado: {escape(generado)}</div>
+      <div class="resumen">
+        <strong>Expediente:</strong> {escape(formulario.codigo_peticion or formulario.id)}<br>
+        <strong>Razón social:</strong> {escape(formulario.razon_social or "Sin información")}<br>
+        <strong>Comparación:</strong> v{comparacion["version_anterior"]} → v{comparacion["version_corregida"]}<br>
+        <strong>Total de cambios:</strong> {comparacion["total_cambios"]}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Campo</th>
+            <th>Antes</th>
+            <th>Después</th>
+          </tr>
+        </thead>
+        <tbody>{filas}</tbody>
+      </table>
+    </body>
+    </html>
+    """
