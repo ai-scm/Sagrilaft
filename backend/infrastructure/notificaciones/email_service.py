@@ -16,12 +16,32 @@ from domain.catalogo_correcciones import resolver_etiquetas
 logger = logging.getLogger(__name__)
 
 
+class CorreoDestinatarioVacioError(Exception):
+    """No se puede enviar notificación: el correo destinatario está vacío o es None."""
+    
+    def __init__(self, tipo_notificacion: str) -> None:
+        super().__init__(
+            f"No se puede enviar notificación de {tipo_notificacion}: "
+            "correo destinatario es requerido y no está registrado."
+        )
+
+
 class EmailService:
     def __init__(self, config: SmtpConfig) -> None:
         self._config = config
 
     def _smtp_configurado(self) -> bool:
         return bool(self._config.host and self._config.usuario)
+    
+    def _validar_correo_destinatario(self, correo: str | None, tipo_notificacion: str) -> None:
+        """
+        Valida que el correo destinatario sea válido (no vacío ni None).
+        
+        Raises:
+            CorreoDestinatarioVacioError: si correo es None o está vacío.
+        """
+        if not correo or not correo.strip():
+            raise CorreoDestinatarioVacioError(tipo_notificacion)
 
     def enviar_notificacion_devolucion(
         self,
@@ -36,11 +56,16 @@ class EmailService:
         Si se proporcionan campos_identificados, el correo los lista con sus
         etiquetas legibles para que la contraparte sepa exactamente qué corregir
         antes de abrir el formulario.
+        
+        Raises:
+            CorreoDestinatarioVacioError: si correo_destinatario es None o vacío.
 
         Returns:
             True si el correo se envió correctamente; False si SMTP no está
             configurado o si ocurrió un error de envío (no lanza excepción).
         """
+        self._validar_correo_destinatario(correo_destinatario, "devolución")
+        
         if not self._smtp_configurado():
             logger.warning(
                 "SMTP no configurado — se omite notificación de devolución a '%s'.",
@@ -77,10 +102,15 @@ class EmailService:
 
         El mensaje lo redacta el operador; nunca incluye el motivo interno
         de compliance. Es un no-op silencioso si SMTP no está configurado.
+        
+        Raises:
+            CorreoDestinatarioVacioError: si correo_destinatario es None o vacío.
 
         Returns:
             True si el correo se envió correctamente; False en caso contrario.
         """
+        self._validar_correo_destinatario(correo_destinatario, "rechazo")
+        
         if not self._smtp_configurado():
             logger.warning(
                 "SMTP no configurado — se omite notificación de rechazo a '%s'.",

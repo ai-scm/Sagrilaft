@@ -10,7 +10,7 @@ from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
 from domain.contratos import ErrorCampoFormulario
 from domain.formulario.entidades import FormularioDatos
 
-_REGEX_TELEFONO = re.compile(r'^\d{10}$')
+_REGEX_TELEFONO = re.compile(r'^\d+$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA   = 5
 UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL = 25
@@ -255,7 +255,7 @@ class ValidadorEnvioFormulario:
         errores = [
             *self._errores_formato(
                 formulario, self._CAMPOS_FORMATO_TELEFONO, _REGEX_TELEFONO,
-                "El campo '{nombre}' debe tener exactamente 10 dígitos numéricos",
+                "El campo '{nombre}' debe contener solo dígitos numéricos",
             ),
             *self._errores_formato(
                 formulario, self._CAMPOS_FORMATO_CORREO, _REGEX_CORREO,
@@ -268,7 +268,7 @@ class ValidadorEnvioFormulario:
             if tel and not _REGEX_TELEFONO.match(tel):
                 errores.append(ErrorValidacion(
                     campo=f"referencias_comerciales[{i}].telefono",
-                    mensaje=f"El teléfono de la referencia comercial {i + 1} debe tener exactamente 10 dígitos numéricos",
+                    mensaje=f"El teléfono de la referencia comercial {i + 1} debe contener solo dígitos numéricos",
                 ))
 
         return errores

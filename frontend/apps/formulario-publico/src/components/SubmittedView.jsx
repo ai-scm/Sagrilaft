@@ -18,16 +18,35 @@ export default function SubmittedView({ codigoPeticion }) {
             correspondientes y será notificado del resultado, ya puede cerrar esta pestaña.
           </p>
           {codigoPeticion && (
-            <div style={{
-              marginTop: '24px', padding: '16px 24px',
-              background: 'var(--primary-50)', borderRadius: 'var(--radius-md)',
-              display: 'inline-block',
-            }}>
-              <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)' }}>Código de seguimiento</span>
-              <div style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--primary-700)', marginTop: '4px' }}>
-                {codigoPeticion}
+            <>
+              <div style={{
+                marginTop: '24px', padding: '16px 24px',
+                background: 'var(--primary-50)', borderRadius: 'var(--radius-md)',
+                display: 'inline-block',
+                marginBottom: '24px'
+              }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--gray-500)' }}>Código de seguimiento</span>
+                <div style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--primary-700)', marginTop: '4px' }}>
+                  {codigoPeticion}
+                </div>
               </div>
-            </div>
+
+              <div>
+                <a 
+                  href={`/api/formularios/${codigoPeticion}/pdf`}
+                  download={`formulario_SAG-${codigoPeticion}.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Descargar formulario en PDF
+                </a>
+              </div>
+            </>
           )}
         </div>
       </main>
