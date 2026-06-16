@@ -60,6 +60,7 @@ class ExpedienteDetalle(BaseModel):
     codigo_peticion: str
     razon_social: Optional[str] = None
     tipo_contraparte: Optional[TipoContraparte] = None
+    tipo_persona: Optional[TipoPersona] = None
     estado: EstadoFormulario
     updated_at: datetime
     documentos: List[DocumentoResumen] = Field(default_factory=list)

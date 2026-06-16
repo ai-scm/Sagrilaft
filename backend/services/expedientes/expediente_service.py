@@ -154,6 +154,7 @@ class ExpedienteService:
             "codigo_peticion":   formulario.codigo_peticion,
             "razon_social":      formulario.razon_social,
             "tipo_contraparte":  formulario.tipo_contraparte,
+            "tipo_persona":      formulario.tipo_persona,
             "estado":            formulario.estado,
             "numero_correccion": formulario.numero_correccion or 0,
             "updated_at":        formulario.updated_at,

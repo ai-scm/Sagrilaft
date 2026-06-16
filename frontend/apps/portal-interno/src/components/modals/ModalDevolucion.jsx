@@ -179,7 +179,7 @@ function GrupoAcordeon({ grupo, seleccionados, onToggle }) {
   );
 }
 
-function SelectorCamposCorreccion({ seleccionados, onChange }) {
+function SelectorCamposCorreccion({ seleccionados, onChange, tipoPersona }) {
   function toggleCampo(id) {
     const nuevaSeleccion = new Set(seleccionados);
     if (nuevaSeleccion.has(id)) {
@@ -191,6 +191,12 @@ function SelectorCamposCorreccion({ seleccionados, onChange }) {
   }
 
   const sufijo = seleccionados.size !== 1 ? 's' : '';
+  const gruposVisibles = useMemo(() => {
+    const esPersonaJuridica = (tipoPersona || '').toLowerCase() === 'juridica';
+    return esPersonaJuridica
+      ? CATALOGO_CORRECCIONES
+      : CATALOGO_CORRECCIONES.filter(grupo => grupo.paso !== 4);
+  }, [tipoPersona]);
 
   return (
     <div style={sSelector.contenedor}>
@@ -199,7 +205,7 @@ function SelectorCamposCorreccion({ seleccionados, onChange }) {
         Opcional — selecciona los campos para que el destinatario los vea resaltados en el formulario.
       </p>
 
-      {CATALOGO_CORRECCIONES.map(grupo => (
+      {gruposVisibles.map(grupo => (
         <GrupoAcordeon
           key={grupo.paso}
           grupo={grupo}
@@ -380,7 +386,7 @@ const s = {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export default function ModalDevolucion({ visible, formularioId, onDevuelto, onCancelar }) {
+export default function ModalDevolucion({ visible, formularioId, tipoPersona, onDevuelto, onCancelar }) {
   const [especificaciones, setEspecificaciones]     = useState('');
   const [camposSeleccionados, setCamposSeleccionados] = useState(new Set());
   const [enfocado, setEnfocado]                     = useState(false);
@@ -489,6 +495,7 @@ export default function ModalDevolucion({ visible, formularioId, onDevuelto, onC
           <SelectorCamposCorreccion
             seleccionados={camposSeleccionados}
             onChange={setCamposSeleccionados}
+            tipoPersona={tipoPersona}
           />
 
           {/* Vista previa del correo */}

@@ -362,7 +362,7 @@ function BtnDescargaFirmado({ formularioId }) {
   );
 }
 
-function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
+function BannerFirma({ estado, formularioId, tipoPersona, onFirmaEnviada }) {
   const [enviando, setEnviando]                         = useState(false); // enviar a ZohoSign (VALIDADO)
   const [aprobando, setAprobando]                       = useState(false); // aprobar expediente (ENVIADO)
   const [cancelando, setCancelando]                     = useState(false);
@@ -475,6 +475,7 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
         <ModalDevolucion
           visible={mostrarModalDevolucion}
           formularioId={formularioId}
+          tipoPersona={tipoPersona}
           onDevuelto={() => { setMostrarModalDevolucion(false); onFirmaEnviada(); }}
           onCancelar={() => setMostrarModalDevolucion(false)}
         />
@@ -688,6 +689,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
             <BannerFirma
               estado={expediente.estado}
               formularioId={formularioId}
+              tipoPersona={expediente.tipo_persona}
               onFirmaEnviada={recargarExpediente}
             />
 
