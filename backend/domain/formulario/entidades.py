@@ -86,6 +86,7 @@ class FormularioDatos:
     ciudad_residencia: Optional[str] = None
 
     # ── Información Financiera ────────────────────────────────────────────────
+    moneda_declaracion: Optional[str] = "COP"
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: Optional[float] = None
@@ -205,6 +206,10 @@ class FormularioDominio:
         """True si la contraparte puede modificar y reenviar el formulario."""
         return self.estado in (EstadoFormulario.BORRADOR, EstadoFormulario.EN_CORRECCION)
 
+    def esta_cerrado(self) -> bool:
+        """True si la carpeta ha sido cerrada con el reporte final."""
+        return self.estado == EstadoFormulario.CERRADO
+
     # ── Transiciones ───────────────────────────────────────────────────────────
 
     def enviar(self) -> None:
@@ -245,6 +250,14 @@ class FormularioDominio:
         self.estado = EstadoFormulario.EN_CORRECCION
         self.numero_correccion += 1
 
+    def carga_manual(self) -> None:
+        """CUALQUIER ESTADO → ENVIADO. El formulario vuelve al flujo de revisión."""
+        if self.esta_cerrado():
+            raise FormularioNoEditableError(
+                "La carpeta está cerrada y no admite cargas manuales de formularios."
+            )
+        self.estado = EstadoFormulario.ENVIADO
+
     def iniciar_firma(self) -> None:
         """VALIDADO → PENDIENTE_FIRMA."""
         if self.estado != EstadoFormulario.VALIDADO:
@@ -273,3 +286,15 @@ class FormularioDominio:
                 f"'pendiente_firma' (estado actual: '{self.estado.value}')."
             )
         self.estado = EstadoFormulario.VALIDADO
+
+    def cerrar_con_reporte(self) -> None:
+        """CUALQUIER ESTADO ACTIVO → CERRADO."""
+        if self.estado == EstadoFormulario.BORRADOR:
+            raise FormularioNoEditableError(
+                "No se puede cerrar una carpeta que aún está en borrador."
+            )
+        if self.estado == EstadoFormulario.RECHAZADO:
+            raise FormularioNoEditableError(
+                "No se puede cerrar una carpeta que ha sido rechazada."
+            )
+        self.estado = EstadoFormulario.CERRADO

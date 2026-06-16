@@ -16,6 +16,7 @@ class EstadoFormulario(str, enum.Enum):
     RECHAZADO       = "rechazado"
     PENDIENTE_FIRMA = "pendiente_firma"
     FIRMADO         = "firmado"
+    CERRADO         = "cerrado"
 
 
 class TipoPersona(str, enum.Enum):
@@ -92,6 +93,7 @@ class AreaResponsable(str, enum.Enum):
     VENTAS   = "ventas"
     LEGAL    = "legal"
     FINANZAS = "finanzas"
+    RECURSOS_HUMANOS = "recursos_humanos"
 
 
 class OperacionesMonedaExtranjera(str, enum.Enum):
