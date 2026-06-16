@@ -15,8 +15,8 @@ class SolicitudAccesoManual(BaseModel):
 
     tipo_contraparte: TipoContraparte
     razon_social: str = Field(min_length=1, strip_whitespace=True)
-    correo_destinatario: EmailStr
     area_responsable: AreaResponsable
+    correo_destinatario: Optional[EmailStr] = None
 
 
 class AccesoManualCreado(BaseModel):
@@ -31,12 +31,12 @@ class AccesoManualCreado(BaseModel):
     pin: str
     token_diligenciamiento: str
     enlace_diligenciamiento: str
-    correo_destinatario: str
     razon_social: str
     tipo_contraparte: TipoContraparte
     area_responsable: AreaResponsable
     created_at: datetime
     expires_at: datetime
+    correo_destinatario: Optional[str] = None
 
     @field_serializer("created_at", "expires_at", when_used="json")
     def _serializar_fechas(self, valor: datetime) -> str:
@@ -49,7 +49,6 @@ class AccesoManualResumen(BaseModel):
     id: str
     formulario_id: str
     codigo_peticion: str
-    correo_destinatario: str
     razon_social: str
     tipo_contraparte: TipoContraparte
     area_responsable: AreaResponsable
@@ -57,6 +56,7 @@ class AccesoManualResumen(BaseModel):
     created_at: datetime
     expires_at: datetime
     consumed_at: Optional[datetime] = None
+    correo_destinatario: Optional[str] = None
 
     @field_serializer("created_at", "expires_at", "consumed_at", when_used="json")
     def _serializar_fechas(self, valor: Optional[datetime]) -> Optional[str]:
@@ -69,3 +69,19 @@ class CredencialesAccesoManual(BaseModel):
     codigo_peticion: str
     pin: str
 
+
+class ActualizarCorreoAcceso(BaseModel):
+    """Datos para actualizar el correo de un acceso manual vía token."""
+
+    correo_destinatario: EmailStr
+
+
+class EstadoCorreoAcceso(BaseModel):
+    """
+    Respuesta liviana para verificar si el destinatario ya registró su correo.
+
+    Se usa exclusivamente por el frontend al cargar la página para decidir si
+    debe mostrar el modal de captura de correo. No expone datos del formulario.
+    """
+
+    correo_registrado: bool

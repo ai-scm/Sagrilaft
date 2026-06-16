@@ -219,6 +219,37 @@ class AccesoManualService:
         formulario = self._repo.obtener_formulario_completo(acceso.formulario_id)
         return construir_snapshot_formulario(formulario)
 
+    def registrar_correo_desde_token(self, token: str, correo: str) -> None:
+        """
+        Registra el correo del destinatario en el acceso (y formulario) asociado al token.
+        Valida que el token sea correcto y vigente.
+        """
+        acceso = self._repo.obtener_acceso_por_token(token)
+        if not acceso:
+            raise TokenDiligenciamientoInvalidoError(token)
+
+        self._validar_acceso_para_token(acceso)
+        self._repo.actualizar_correo_por_token(token, correo)
+
+    def verificar_estado_correo(self, token: str) -> bool:
+        """
+        Verifica si el acceso asociado al token tiene correo registrado.
+
+        Endpoint liviano: no carga el snapshot completo del formulario.
+        Retorna True si correo_destinatario está presente, False en caso contrario.
+
+        Raises:
+            TokenDiligenciamientoInvalidoError: si el token no existe.
+            AccesoExpiradoError: si el acceso ya venció.
+            TokenConsumidoError: si el formulario ya fue enviado.
+        """
+        acceso = self._repo.obtener_acceso_por_token(token)
+        if not acceso:
+            raise TokenDiligenciamientoInvalidoError(token)
+
+        self._validar_acceso_para_token(acceso)
+        return bool(acceso.correo_destinatario and acceso.correo_destinatario.strip())
+
     # ─── Verificación de credenciales ────────────────────────────────────────
 
     def buscar_formulario_por_credenciales(

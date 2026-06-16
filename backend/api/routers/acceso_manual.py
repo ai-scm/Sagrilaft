@@ -17,6 +17,8 @@ from api.middleware.autenticacion import portal_interno
 from api.schemas import (
     AccesoManualCreado,
     AccesoManualResumen,
+    ActualizarCorreoAcceso,
+    EstadoCorreoAcceso,
     FormularioConDetalles,
     SolicitudAccesoManual,
 )
@@ -47,7 +49,7 @@ def crear_acceso_manual(
     solicitud_dominio = SolicitudCreacionAcceso(
         tipo_contraparte=solicitud_acceso.tipo_contraparte.value,
         razon_social=solicitud_acceso.razon_social,
-        correo_destinatario=str(solicitud_acceso.correo_destinatario),
+        correo_destinatario=str(solicitud_acceso.correo_destinatario) if solicitud_acceso.correo_destinatario else None,
         area_responsable=solicitud_acceso.area_responsable.value,
     )
     return servicio.crear_acceso(solicitud_dominio)
@@ -92,3 +94,49 @@ def resolver_token_diligenciamiento(
     servicio: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> FormularioConDetalles:
     return servicio.resolver_token(token)
+
+
+@enrutador.patch(
+    "/token/{token}/correo",
+    status_code=204,
+    summary="Registrar correo del destinatario",
+    description="Permite al destinatario externo registrar su correo electrónico antes de iniciar el diligenciamiento.",
+    responses={
+        404: {"description": "Token inválido, no encontrado o ya consumido"},
+        410: {"description": "El acceso ha expirado"},
+        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
+    },
+)
+@limitador.limit("10/minute")
+def registrar_correo_acceso(
+    request: Request,
+    token: str,
+    payload: ActualizarCorreoAcceso,
+    servicio: AccesoManualService = Depends(obtener_servicio_acceso),
+) -> None:
+    servicio.registrar_correo_desde_token(token, payload.correo_destinatario)
+
+
+@enrutador.get(
+    "/token/{token}/estado-correo",
+    response_model=EstadoCorreoAcceso,
+    summary="Verificar si el acceso tiene correo registrado",
+    description=(
+        "Endpoint liviano para comprobar si el destinatario ya registró su correo. "
+        "No devuelve datos del formulario. Usado por el frontend al cargar la página "
+        "para decidir si debe mostrar el modal de captura de correo."
+    ),
+    responses={
+        404: {"description": "Token inválido o no encontrado"},
+        410: {"description": "El acceso ha expirado"},
+        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
+    },
+)
+@limitador.limit("60/minute")
+def verificar_estado_correo_acceso(
+    request: Request,
+    token: str,
+    servicio: AccesoManualService = Depends(obtener_servicio_acceso),
+) -> EstadoCorreoAcceso:
+    correo_registrado = servicio.verificar_estado_correo(token)
+    return EstadoCorreoAcceso(correo_registrado=correo_registrado)

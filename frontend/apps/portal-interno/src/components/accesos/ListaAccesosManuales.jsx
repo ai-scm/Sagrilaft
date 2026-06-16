@@ -129,6 +129,16 @@ const s = {
     padding:      '2px 10px',
     whiteSpace:   'nowrap',
   },
+  chipPendiente: {
+    fontSize:     '0.75rem',
+    color:        '#1e40af',
+    background:   '#eff6ff',
+    border:       '1px solid #bfdbfe',
+    borderRadius: '999px',
+    padding:      '2px 10px',
+    whiteSpace:   'nowrap',
+    fontStyle:    'italic',
+  },
   fechaLimite: (estado) => ({
     fontSize:   '0.75rem',
     fontWeight: '500',
@@ -206,7 +216,10 @@ function TarjetaAccesoManual({ acceso }) {
       <div style={s.metadatos}>
         <span style={s.chip}>{tipoLabel}</span>
         <span style={s.chip}>{areaLabel}</span>
-        <span style={s.chip}>{acceso.correo_destinatario}</span>
+        {acceso.correo_destinatario
+          ? <span style={s.chip}>{acceso.correo_destinatario}</span>
+          : <span style={s.chipPendiente}>⏳ Pendiente de correo</span>
+        }
         <span style={s.fechaLimite(acceso.estado_acceso)}>
           {formatearEtiquetaFechaLimite(acceso)}
         </span>

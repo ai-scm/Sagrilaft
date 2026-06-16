@@ -12,13 +12,12 @@ import {
   formatearFechaLarga,
   ETIQUETA_TIPO_CONTRAPARTE,
 } from '../../config/constantes';
-import { REGEX_CORREO } from '@shared/utils/constantes';
+
 import { ESTILOS } from './CrearAccesoManualStyles';
 
 const ESTADO_INICIAL_ACCESO = {
   tipo_contraparte:    '',
   razon_social:        '',
-  correo_destinatario: '',
   area_responsable:    '',
 };
 
@@ -28,12 +27,8 @@ function validarCamposAcceso(formData) {
   const errores = {};
   if (!formData.tipo_contraparte)          errores.tipo_contraparte    = 'Seleccione el tipo de contraparte';
   if (!formData.razon_social.trim())       errores.razon_social        = 'Ingrese la razón social';
-  if (!formData.correo_destinatario.trim()) errores.correo_destinatario = 'Ingrese el correo del destinatario';
   if (!formData.area_responsable)          errores.area_responsable    = 'Seleccione el área responsable';
 
-  if (formData.correo_destinatario && !REGEX_CORREO.test(formData.correo_destinatario)) {
-    errores.correo_destinatario = 'Formato de correo inválido';
-  }
   return errores;
 }
 
@@ -167,9 +162,18 @@ export default function CrearAccesoManual() {
             de forma segura antes de cerrar esta pantalla. El sistema nunca lo vuelve a mostrar.
           </div>
 
+          <div style={ESTILOS.notaCorreo}>
+            <span style={ESTILOS.notaCorreoIcono}>✉️</span>
+            <span>
+              <strong>Correo del destinatario:</strong> No es necesario ingresarlo aquí.
+              Cuando el destinatario acceda al enlace por primera vez, el sistema le solicitará
+              automáticamente su correo electrónico antes de mostrarle el formulario.
+            </span>
+          </div>
+
           <ItemCredencial label="Código de petición" valor={resultado.codigo_peticion} />
           <ItemCredencial label="PIN de acceso"       valor={resultado.pin} />
-          <ItemCredencial label="Destinatario"        valor={resultado.correo_destinatario} monospace={false} />
+          {resultado.correo_destinatario && <ItemCredencial label="Destinatario"        valor={resultado.correo_destinatario} monospace={false} />}
           <ItemCredencial label="Válido hasta"        valor={formatearFechaLarga(resultado.expires_at)} monospace={false} />
 
           <div style={ESTILOS.enlaceBox}>
@@ -206,7 +210,7 @@ export default function CrearAccesoManual() {
             options={TIPOS_CONTRAPARTE} error={erroresCampo.tipo_contraparte} disabled={cargando}
           />
           <CampoSelect
-            id="area_responsable" label="Área responsable"
+            id="area_responsable" label="Área de Contacto"
             value={formData.area_responsable} onChange={handleChange}
             options={AREAS_RESPONSABLES} error={erroresCampo.area_responsable} disabled={cargando}
           />
@@ -217,13 +221,6 @@ export default function CrearAccesoManual() {
           value={formData.razon_social} onChange={handleChange}
           onFocus={() => setCampoEnfocado('razon_social')} onBlur={() => setCampoEnfocado(null)}
           style={estiloInput('razon_social')} error={erroresCampo.razon_social} disabled={cargando}
-        />
-        <CampoInput
-          id="correo_destinatario" label="Correo destinatario" type="email"
-          placeholder="contacto@empresa.com"
-          value={formData.correo_destinatario} onChange={handleChange}
-          onFocus={() => setCampoEnfocado('correo_destinatario')} onBlur={() => setCampoEnfocado(null)}
-          style={estiloInput('correo_destinatario')} error={erroresCampo.correo_destinatario} disabled={cargando}
         />
         <div style={ESTILOS.fila}>
           <div style={ESTILOS.campo}>
