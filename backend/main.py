@@ -19,6 +19,7 @@ from api.limitador import limitador
 from domain.excepciones import (
     AccesoExpiradoError,
     ContraparteInvalidaError,
+    CorreoDestinatarioNoRegistradoError,
     CredencialesAccesoInvalidasError,
     DocumentoNoEncontradoError,
     FirmaNoDisponibleError,
@@ -33,6 +34,7 @@ from domain.excepciones import (
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
+from infrastructure.notificaciones.email_service import CorreoDestinatarioVacioError
 from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
 
 
@@ -150,6 +152,8 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
     app.add_exception_handler(TokenDiligenciamientoInvalidoError, handler_from_exception(404))
     app.add_exception_handler(TokenConsumidoError,                handler_from_exception(410))
     app.add_exception_handler(AccesoExpiradoError,                handler_from_exception(410))
+    app.add_exception_handler(CorreoDestinatarioNoRegistradoError, handler_from_exception(400))
+    app.add_exception_handler(CorreoDestinatarioVacioError, handler_from_exception(400))
     app.add_exception_handler(
         DependenciaPdfNoInstaladaError,
         handler_from_exception_with_hint(

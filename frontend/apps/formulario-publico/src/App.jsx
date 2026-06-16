@@ -1,5 +1,7 @@
 import FormularioSagrilaft from './components/FormularioSagrilaft';
+import ModalCorreoDestinatario from './components/ModalCorreoDestinatario';
 import Alert from '@shared/components/ui/Alert';
+import { useCapturaCorreoDestinatario } from './hooks/useCapturaCorreoDestinatario';
 
 function obtenerUrlPortalInterno() {
   return import.meta.env.VITE_PORTAL_INTERNO_URL || null;
@@ -9,12 +11,18 @@ function obtenerUrlPortalInterno() {
  * App pública del formulario SAGRILAFT.
  * El parámetro ?token= es detectado y resuelto internamente por useFormulario.
  * Los parámetros legacy ?portal=interno y ?portalinterno redirigen a la app separada del portal.
+ *
+ * Interceptación de correo:
+ *   Si el token corresponde a un acceso sin correo registrado, se muestra primero
+ *   el ModalCorreoDestinatario. Solo al confirmar el correo se revela el formulario.
  */
 function App() {
   const parametros = new URLSearchParams(window.location.search);
   const esEntradaPortalInterno =
     parametros.get('portal') === 'interno' ||
     parametros.has('portalinterno');
+
+  const { verificando, correoRequerido, enviando, error, registrarCorreo } = useCapturaCorreoDestinatario();
 
   if (esEntradaPortalInterno) {
     const urlPortal = obtenerUrlPortalInterno();
@@ -41,7 +49,21 @@ function App() {
     );
   }
 
-  return <FormularioSagrilaft />;
+  if (verificando) {
+    return null; // O un skeleton/spinner si se prefiere, aunque es rápido
+  }
+
+  return (
+    <>
+      <ModalCorreoDestinatario
+        visible={correoRequerido}
+        enviando={enviando}
+        error={error}
+        onConfirmar={registrarCorreo}
+      />
+      {!correoRequerido && <FormularioSagrilaft />}
+    </>
+  );
 }
 
 export default App;

@@ -3,6 +3,7 @@ import LocationSelect from '../LocationSelect';
 import AlertasInconsistencia from '../AlertasInconsistencia';
 import { HR } from '../TablaFormComponents';
 import { useUbicacion, NA_OPTION } from '../../hooks/useUbicacion';
+import { getDvProps } from '../../utils/inputValidation';
 
 const OPCIONES_TIPO_CONTRAPARTE = [
   { value: 'proveedor', label: 'Proveedor' },
@@ -60,7 +61,7 @@ export default function PasoInfoBasica(props) {
     handlePaisChange, handleDepartamentoChange, handleCiudadChange,
   } = useUbicacion(formData, onChange);
 
-  const renderCampo = ({ label, name, type, required, options }) => (
+  const renderCampo = ({ label, name, type, required, options, ...rest }) => (
     <FormField
       key={name}
       label={label}
@@ -72,6 +73,7 @@ export default function PasoInfoBasica(props) {
       onOpenHelp={onOpenHelp}
       error={errors[name]}
       options={options}
+      {...rest}
     />
   );
 
@@ -144,9 +146,8 @@ export default function PasoInfoBasica(props) {
             required: true,
           },
           {
-            label: 'DV',
             name: 'digito_verificacion',
-            required: true,
+            ...getDvProps(formData.tipo_identificacion),
           },
         ].map(renderCampo)}
       </div>

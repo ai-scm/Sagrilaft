@@ -25,6 +25,28 @@ export const api = {
     return requestJson(`/expedientes/${query}`, opcionesFetch);
   },
 
+  async cargarFormularioManual(formularioId, archivoFile, justificacion) {
+    const formData = new FormData();
+    formData.append('archivo', archivoFile);
+    formData.append('justificacion', justificacion);
+    return requestJson(`/expedientes/${formularioId}/carga-manual`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  async cargarReporteFinal(formularioId, archivoFile, justificacion) {
+    const formData = new FormData();
+    formData.append('archivo', archivoFile);
+    if (justificacion) {
+      formData.append('justificacion', justificacion);
+    }
+    return requestJson(`/expedientes/${formularioId}/reporte-final`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
   async obtenerExpediente(formularioId) {
     return requestJson(`/expedientes/${formularioId}`);
   },
@@ -34,7 +56,7 @@ export const api = {
   },
 
   async descargarDocumento(formularioId, docId, nombreArchivo) {
-    const token = getToken();
+    const token = await getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`, { headers });
     if (!res.ok) throw new Error(await leerDetalleError(res));
@@ -92,7 +114,7 @@ export const api = {
   },
 
   async descargarDocumentoFirmado(formularioId) {
-    const token = getToken();
+    const token = await getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documento-firmado`, { headers });
     if (!res.ok) throw new Error(await leerDetalleError(res));

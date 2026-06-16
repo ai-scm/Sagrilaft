@@ -42,6 +42,7 @@ export const SECTORES_EMPRESA = [
 // ─── Tipos de Documentos del Sistema ──────────────────────────────────────────
 export const TIPO_DOCUMENTO_FORMULARIO_PDF        = 'FORMULARIO_PDF';
 export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';
+export const TIPO_DOCUMENTO_REPORTE_FINAL         = 'REPORTE_FINAL';
 
 // ─── Estados de Dominio ───────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export const ESTADO_FORM_VALIDADO        = 'validado';
 export const ESTADO_FORM_RECHAZADO       = 'rechazado';
 export const ESTADO_FORM_PENDIENTE_FIRMA = 'pendiente_firma';
 export const ESTADO_FORM_FIRMADO         = 'firmado';
+export const ESTADO_FORM_CERRADO         = 'cerrado';
 
 // Estados de Acceso Manual
 export const ESTADO_ACCESO_ACTIVO    = 'activo';

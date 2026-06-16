@@ -8,7 +8,9 @@ Los módulos están nombrados con intención y organizados por contexto.
 from .acceso_manual import (
     AccesoManualCreado,
     AccesoManualResumen,
+    ActualizarCorreoAcceso,
     CredencialesAccesoManual,
+    EstadoCorreoAcceso,
     SolicitudAccesoManual,
 )
 from .documentos import AlertaInconsistenciaResponse, DocumentoResponse
@@ -39,7 +41,9 @@ __all__ = [
     # Acceso manual
     "AccesoManualCreado",
     "AccesoManualResumen",
+    "ActualizarCorreoAcceso",
     "CredencialesAccesoManual",
+    "EstadoCorreoAcceso",
     "SolicitudAccesoManual",
     # Documentos
     "AlertaInconsistenciaResponse",

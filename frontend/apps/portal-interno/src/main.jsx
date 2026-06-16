@@ -24,10 +24,17 @@ async function inicializarPortal() {
       checkLoginIframe: false,
     });
 
-    configurarTokenPortal(() => keycloak.token);
+    configurarTokenPortal(async () => {
+      try {
+        await keycloak.updateToken(30);
+      } catch (err) {
+        keycloak.login();
+      }
+      return keycloak.token;
+    });
 
     keycloak.onTokenExpired = () =>
-      keycloak.updateToken(60).catch(() => keycloak.login());
+      keycloak.updateToken(30).catch(() => keycloak.login());
 
     root.render(
       <StrictMode>

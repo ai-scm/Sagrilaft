@@ -6,8 +6,8 @@ export function configurarTokenPortal(getter) {
   _tokenGetter = getter;
 }
 
-export function getToken() {
-  return _tokenGetter?.() || null;
+export async function getToken() {
+  return _tokenGetter ? await _tokenGetter() : null;
 }
 
 export async function leerDetalleError(res) {
@@ -16,7 +16,19 @@ export async function leerDetalleError(res) {
   const leerComoJson = async () => {
     const data = await res.json();
     if (data && typeof data === 'object') {
-      return data.detail ?? JSON.stringify(data);
+      const detail = data.detail;
+      // Pydantic 422: detail es un array de objetos [{loc, msg, type}, ...]
+      if (Array.isArray(detail)) {
+        return detail
+          .map(e => {
+            const campo = e.loc?.filter(l => l !== 'body').join(' → ') || '';
+            const msg   = e.msg || JSON.stringify(e);
+            return campo ? `${campo}: ${msg}` : msg;
+          })
+          .join('\n');
+      }
+      if (detail !== undefined && detail !== null) return String(detail);
+      return JSON.stringify(data);
     }
     return String(data ?? '');
   };
@@ -42,7 +54,7 @@ export async function leerDetalleError(res) {
 }
 
 export async function requestJson(path, options = {}) {
-  const token = getToken();
+  const token = await getToken();
   if (token) {
     options = { ...options, headers: { 'Authorization': `Bearer ${token}`, ...options.headers } };
   }

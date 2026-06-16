@@ -5,7 +5,7 @@ export const DISCLAIMER_RADICACION = {
   titulo: 'Confirmación obligatoria antes de radicar',
   resumen: 'Antes de continuar, ten en cuenta lo siguiente:',
   puntos: [
-    'ATENCIÓN: Al correo electrónico del representante legal que usted le indico al area responsable se enviará automáticamente el formulario diligenciado junto con el Certificado SAGRILAFT para su firma electrónica. ',
+    'ATENCIÓN: A los correos electrónicos que usted le indico al inicio del formulario se enviará automáticamente el formulario diligenciado junto con el Certificado SAGRILAFT para su firma electrónica. ',
     'Al presionar " ✅ Radicar Formulario " los documentos se remitirán automáticamente para firma del representante legal indicado.',
   ],
   confirmacion:

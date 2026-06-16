@@ -108,6 +108,35 @@ export const api = {
     }
   },
 
+  async actualizarCorreoPorToken(token, correo) {
+    try {
+      return await requestJson(`/accesos-manuales/token/${token}/correo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo_destinatario: correo }),
+      });
+    } catch (err) {
+      if (err.status === 404) { err.code = 'TOKEN_INVALIDO';  throw err; }
+      if (err.status === 410) { err.code = 'ACCESO_EXPIRADO'; throw err; }
+      throw err;
+    }
+  },
+
+  /**
+   * Comprueba si el destinatario ya registró su correo para el token dado.
+   * Endpoint liviano: solo devuelve { correo_registrado: bool }.
+   * No carga el snapshot del formulario.
+   */
+  async verificarEstadoCorreo(token) {
+    try {
+      return await requestJson(`/accesos-manuales/token/${token}/estado-correo`);
+    } catch (err) {
+      if (err.status === 404) { err.code = 'TOKEN_INVALIDO';  throw err; }
+      if (err.status === 410) { err.code = 'ACCESO_EXPIRADO'; throw err; }
+      throw err;
+    }
+  },
+
   // Pre-llenado IA
   async prefillDocumento(formularioId, docId) {
     return requestJson(`/formularios/${formularioId}/documentos/${docId}/prefill`, {

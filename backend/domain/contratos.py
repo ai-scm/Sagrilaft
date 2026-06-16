@@ -169,7 +169,7 @@ class AccesoManualDatos:
     id: str
     formulario_id: str
     razon_social: str
-    correo_destinatario: str
+    correo_destinatario: Optional[str] = None
     # Campos extendidos — default vacío para compatibilidad con usos parciales (FirmaService)
     tipo_contraparte: str = ""
     area_responsable: str = ""
@@ -187,8 +187,8 @@ class SolicitudCreacionAcceso:
     """DTO de entrada para crear un acceso manual al formulario SAGRILAFT."""
     tipo_contraparte: str
     razon_social: str
-    correo_destinatario: str
     area_responsable: str
+    correo_destinatario: Optional[str] = None
 
 
 @dataclass
@@ -197,12 +197,12 @@ class ResultadoCreacionAcceso:
     formulario_id: str
     codigo_peticion: str
     token_diligenciamiento: str
-    correo_destinatario: str
     razon_social: str
     tipo_contraparte: str
     area_responsable: str
     created_at: datetime
     expires_at: datetime
+    correo_destinatario: Optional[str] = None
 
 
 @dataclass

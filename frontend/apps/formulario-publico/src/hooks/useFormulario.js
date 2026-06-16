@@ -22,6 +22,7 @@ import {
 } from '../utils/validacionTablas';
 import { sanitizarPayload } from '@shared/utils/normalizadores';
 import { obtenerCamposDeDocumento } from '../data/mapeoDocumentos';
+import { calcularValorDv } from '../utils/inputValidation';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -117,8 +118,17 @@ export function useFormulario() {
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
     const nuevoValor = type === 'checkbox' ? checked : value;
-    setFormData(prev => ({ ...prev, [name]: nuevoValor }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: nuevoValor };
+      if (name === 'tipo_identificacion') {
+        next.digito_verificacion = calcularValorDv(nuevoValor, prev.digito_verificacion);
+      }
+      return next;
+    });
     limpiarError(name);
+    if (name === 'tipo_identificacion') {
+      limpiarError('digito_verificacion');
+    }
 
     // Al cambiar a Persona Natural, reiniciar las tablas del Paso 4 a su
     // estado vacío/inicial y limpiar sus errores. Evita que datos de una

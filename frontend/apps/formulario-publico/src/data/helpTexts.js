@@ -58,7 +58,7 @@ La clasificación se relaciona con el CIIU
   digito_verificacion: {
     titulo: "Dígito de Verificación (DV)",
     descripcion: "Este dígito se encuentra en el RUT en la casilla 6 llamada DV. Solo aplica para NIT.",
-    ejemplo: "5"
+    ejemplo: "5 o NA"
   },
   direccion: {
     titulo: "Dirección",
@@ -146,7 +146,7 @@ La clasificación se relaciona con el CIIU
   },
   telefono_representante: {
     titulo: "Teléfono del Representante",
-    descripcion: "Número de contacto directo del representante legal - CELULAR 10 digitos.",
+    descripcion: "Número de contacto directo del representante legal.",
   },
   direccion_funciones: {
     titulo: "Dirección donde Ejerce Funciones",
@@ -187,11 +187,11 @@ La clasificación se relaciona con el CIIU
   },
   ingresos_mensuales: {
     titulo: "Ingresos Mensuales",
-    descripcion: "Total de ingresos mensuales en pesos colombianos (COP). Debe coincidir con los estados financieros adjuntos.",
+    descripcion: "Total de ingresos mensuales en la moneda seleccionada. Debe coincidir con los estados financieros adjuntos.",
   },
   egresos_mensuales: {
     titulo: "Egresos Mensuales",
-    descripcion: "Total de gastos y costos mensuales en pesos colombianos (COP).",
+    descripcion: "Total de gastos y costos mensuales en la moneda seleccionada.",
   },
   total_activos: {
     titulo: "Total Activos",

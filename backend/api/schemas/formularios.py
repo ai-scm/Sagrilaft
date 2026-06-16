@@ -148,6 +148,7 @@ class FormularioBase(BaseModel):
     ciudad_residencia: Optional[str] = None
 
     # 5. Información Financiera
+    moneda_declaracion: Optional[str] = Field("COP", description="Moneda en la que se declaran los valores financieros (COP, USD, EUR, PEN, BRL, CLP, ARS)")
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: MontoPositivo = None
@@ -217,9 +218,21 @@ class FormularioBase(BaseModel):
     def validar_digito_verificacion(cls, v: object) -> str | None:
         if v is None or v == "":
             return v
-        if len(str(v)) != 1 or not str(v).isdigit():
+        # Normalizar: quitar espacios y saltos de línea (la IA puede retornarlos)
+        limpio = str(v).strip()
+        if not limpio:
+            return None
+        # Permitir explícitamente 'NA' enviado por el frontend cuando no es NIT
+        if limpio.upper() == "NA":
+            return "NA"
+        # Algunos OCR devuelven "NIT-5" o "123456789-5": tomar el último dígito
+        if len(limpio) > 1:
+            ultimo = limpio[-1]
+            if ultimo.isdigit():
+                limpio = ultimo
+        if len(limpio) != 1 or not limpio.isdigit():
             raise ValueError("El dígito de verificación debe ser un único dígito numérico (0-9)")
-        return str(v)
+        return limpio
 
     @field_validator("retencion_ica", "impuesto_ica")
     @classmethod

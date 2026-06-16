@@ -121,11 +121,13 @@ def obtener_servicio_formulario(
 def obtener_servicio_expediente(
     solicitud: Request,
     repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     storage: IAlmacenamiento = Depends(obtener_storage),
     repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
 ) -> ExpedienteService:
     return ExpedienteService(
         repo=repo,
+        repo_doc=repo_doc,
         storage=storage,
         repo_auditoria=repo_auditoria,
         alertas_portal=obtener_alertas_portal(solicitud),

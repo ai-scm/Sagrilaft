@@ -7,7 +7,8 @@
 import {
   ESTADO_ACCESO_ACTIVO, ESTADO_ACCESO_CONSUMIDO, ESTADO_ACCESO_EXPIRADO,
   TIPO_CONTRAPARTE_CLIENTE, TIPO_CONTRAPARTE_PROVEEDOR,
-  TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
+  TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+  TIPO_DOCUMENTO_REPORTE_FINAL
 } from '@shared/utils/constantes';
 
 const LOCALE_FECHA = 'es-CO';
@@ -61,6 +62,7 @@ export const AREAS_RESPONSABLES = [
   { valor: 'ventas',   etiqueta: 'Ventas'   },
   { valor: 'legal',    etiqueta: 'Legal'    },
   { valor: 'finanzas', etiqueta: 'Finanzas' },
+  { valor: 'recursos_humanos', etiqueta: 'Recursos Humanos' },
 ];
 
 export const ETIQUETA_TIPO_CONTRAPARTE = crearMapaEtiquetas(TIPOS_CONTRAPARTE);
@@ -71,7 +73,7 @@ export const ETIQUETA_AREA_RESPONSABLE = crearMapaEtiquetas(AREAS_RESPONSABLES);
 // ── Constantes de documentos ──────────────────────────────────────────────────
 // Sincronizar con: backend/domain/constantes.py
 
-export { TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT };
+export { TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT, TIPO_DOCUMENTO_REPORTE_FINAL };
 
 
 

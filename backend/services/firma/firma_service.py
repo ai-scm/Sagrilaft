@@ -146,6 +146,12 @@ class FirmaService:
                 nombre_firmante  = formulario.nombre_representante or acceso.razon_social
                 nombre_documento = f"SAGRILAFT — {acceso.razon_social}"
 
+                if not acceso.correo_destinatario:
+                    raise FormularioNoEditableError(
+                        "El destinatario aún no ha confirmado su correo electrónico. "
+                        "No es posible iniciar la firma hasta que complete ese paso."
+                    )
+
                 resultado = self._zoho.crear_solicitud_firma_multiple(
                     pdf_paths=[pdf_path, ruta_certificado],
                     nombre_documento=nombre_documento,

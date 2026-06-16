@@ -57,6 +57,15 @@ export const CAMPOS_PERSONA_NATURAL = ['ciudad_residencia', 'direccion_residenci
  * esos campos se validan como obligatorios. Agregar nuevos casos aquí sin tocar validarPaso.
  */
 export const CAMPOS_CONDICIONALES = {
+  2: [
+    {
+      condicion: (fd) => fd.tipo_identificacion === 'NIT',
+      campos: ['digito_verificacion'],
+      mensajes: {
+        digito_verificacion: 'Dígito de Verificación (DV) es obligatorio para el NIT',
+      },
+    },
+  ],
   3: [
     {
       condicion: (fd) => fd.tipo_persona === 'natural',
@@ -86,10 +95,10 @@ export const CAMPOS_CONDICIONALES = {
  */
 export const CAMPOS_REQUERIDOS = {
   1: [],
-  2: ['tipo_contraparte', 'tipo_persona', 'tipo_solicitud', 'clasificacion_actividad', 'razon_social', 'tipo_identificacion', 'numero_identificacion', 'digito_verificacion', 'direccion', 'pais', 'departamento', 'ciudad', 'telefono', 'fax', 'correo', 'codigo_ica', 'pagina_web'],
+  2: ['tipo_contraparte', 'tipo_persona', 'tipo_solicitud', 'clasificacion_actividad', 'razon_social', 'tipo_identificacion', 'numero_identificacion', 'direccion', 'pais', 'departamento', 'ciudad', 'telefono', 'fax', 'correo', 'codigo_ica', 'pagina_web'],
   3: ['nombre_representante', 'tipo_doc_representante', 'numero_doc_representante', 'fecha_expedicion', 'ciudad_expedicion', 'nacionalidad', 'fecha_nacimiento', 'ciudad_nacimiento', 'profesion', 'correo_representante', 'telefono_representante', 'direccion_funciones', 'pais_funciones', 'departamento_funciones', 'ciudad_funciones'],
   4: [],
-  5: ['actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
+  5: ['moneda_declaracion', 'actividad_economica', 'codigo_ciiu', 'ingresos_mensuales', 'egresos_mensuales', 'total_activos', 'total_pasivos', 'patrimonio'],
   6: ['realiza_operaciones_moneda_extranjera'],
   7: [
     'contacto_ordenes_nombre', 'contacto_ordenes_cargo', 'contacto_ordenes_telefono', 'contacto_ordenes_correo',

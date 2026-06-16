@@ -144,6 +144,7 @@ def _orm_formulario_a_datos(
         ciudad_funciones=orm.ciudad_funciones,
         direccion_residencia=orm.direccion_residencia,
         ciudad_residencia=orm.ciudad_residencia,
+        moneda_declaracion=orm.moneda_declaracion or "COP",
         actividad_economica=orm.actividad_economica,
         codigo_ciiu=orm.codigo_ciiu,
         ingresos_mensuales=orm.ingresos_mensuales,
@@ -685,7 +686,6 @@ class RepositorioAccesoManualSQLAlchemy:
         formulario = Formulario(
             tipo_contraparte=solicitud.tipo_contraparte,
             razon_social=solicitud.razon_social,
-            correo=solicitud.correo_destinatario,
         )
         self._sesion.add(formulario)
         self._sesion.flush()  # genera formulario.id antes del acceso
@@ -731,3 +731,10 @@ class RepositorioAccesoManualSQLAlchemy:
             orm.token_diligenciamiento = nuevo_token
             orm.consumed_at = None
             orm.expires_at = nuevo_expires_at
+
+    def actualizar_correo_por_token(self, token: str, correo: str) -> None:
+        """Actualiza el correo_destinatario del acceso asociado a un token."""
+        acceso = self._sesion.query(AccesoManual).filter(AccesoManual.token_diligenciamiento == token).first()
+        if acceso:
+            acceso.correo_destinatario = correo
+            self._sesion.commit()

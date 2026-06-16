@@ -171,7 +171,12 @@ export function useRecuperacionSesion(setters) {
       return;
     }
 
-    if (!borrador.formularioId && !borrador.codigoPeticion) return;
+    if (!borrador.formularioId && !borrador.codigoPeticion) {
+      // Borrador puramente local (no sincronizado con el backend).
+      // Restaurar silenciosamente sin pedir PIN.
+      restaurarDesdeSnapshotRef.current(borrador);
+      return;
+    }
 
     setBorradorLocal(borrador);
     setVisible(true);

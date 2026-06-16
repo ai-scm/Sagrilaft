@@ -17,3 +17,6 @@ TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = "CERTIFICADO_SAGRILAFT"
 
 # Límite de porcentaje para participación accionaria y coerciones de porcentaje.
 PORCENTAJE_MAXIMO_PERMITIDO = 100
+
+# Reporte final cargado manualmente para marcar el cierre de la carpeta del proceso.
+TIPO_DOCUMENTO_REPORTE_FINAL = "REPORTE_FINAL"
