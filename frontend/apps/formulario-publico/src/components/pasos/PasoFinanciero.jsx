@@ -2,7 +2,6 @@ import FormField from '../FormField';
 import CurrencyInput from '../CurrencyInput';
 
 const MONEDAS_DISPONIBLES = [
-  { value: '', label: 'Seleccione una moneda...' },
   { value: 'COP', label: 'Pesos Colombianos (COP)' },
   { value: 'USD', label: 'Dólares Estadounidenses (USD)' },
   { value: 'EUR', label: 'Euros (EUR)' },

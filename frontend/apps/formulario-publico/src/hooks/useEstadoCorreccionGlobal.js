@@ -47,6 +47,18 @@ function _tablaFueModificada(actual, original) {
   return JSON.stringify(actual) !== JSON.stringify(original);
 }
 
+function _normalizarValorSimple(valor) {
+  if (valor == null) return '';
+  if (typeof valor === 'string') return valor.trim().replace(/\s+/g, ' ');
+  if (Array.isArray(valor)) {
+    return `[${valor.map(item => _normalizarValorSimple(item)).join(',')}]`;
+  }
+  if (typeof valor === 'object') {
+    return `{${Object.keys(valor).sort().map(clave => `${clave}:${_normalizarValorSimple(valor[clave])}`).join(',')}}`;
+  }
+  return String(valor).trim();
+}
+
 /**
  * @param {object} params
  * @param {Set<string>}  params.camposIdentificados  - campos marcados por el portal
@@ -92,8 +104,8 @@ export function useEstadoCorreccionGlobal({
         }
       } else {
         // Campo simple: corregido si tiene valor Y difiere del original
-        const valorActual   = formDataActual?.[campo]   ?? '';
-        const valorOriginal = formDataOriginal?.[campo]  ?? '';
+        const valorActual   = _normalizarValorSimple(formDataActual?.[campo]);
+        const valorOriginal = _normalizarValorSimple(formDataOriginal?.[campo]);
         if (valorActual !== '' && valorActual !== valorOriginal) {
           corregidos.add(campo);
         } else {

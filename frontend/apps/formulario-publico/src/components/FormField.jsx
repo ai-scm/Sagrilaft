@@ -15,16 +15,17 @@ export default function FormField({
   label, name, type = 'text', required = false,
   value, onChange, onOpenHelp, placeholder,
   error, options, children,
-  className = '', renderInputWrapper, ...rest
+  className = '', renderInputWrapper, comparisonValue, ...rest
 }) {
   const { esCampoConCorreccion, valorOriginalDeCampo } = useCorreccion();
   const marcadoParaCorreccion = esCampoConCorreccion(name);
 
-  // Verde solo si el usuario cambió el valor respecto al original del servidor.
-  // Tener un valor no basta: todos los campos ya tienen su valor al cargar.
-  const tieneValor = Boolean(value) && value !== '' && !error;
-  const valorOriginal = marcadoParaCorreccion ? (valorOriginalDeCampo(name) ?? '') : undefined;
-  const fueModificado = tieneValor && value !== valorOriginal;
+  const valorParaComparar = comparisonValue ?? value;
+  const valorActualNormalizado = normalizarValorComparable(valorParaComparar);
+  const valorOriginal = marcadoParaCorreccion ? valorOriginalDeCampo(name) : undefined;
+  const valorOriginalNormalizado = normalizarValorComparable(valorOriginal);
+  const tieneValor = valorActualNormalizado !== '' && !error;
+  const fueModificado = tieneValor && valorActualNormalizado !== valorOriginalNormalizado;
   const correccionPendiente  = marcadoParaCorreccion && !fueModificado;
   const correccionCompletada = marcadoParaCorreccion && fueModificado;
 
@@ -35,7 +36,7 @@ export default function FormField({
   const clasesCampo = [
     type === 'textarea' ? 'form-textarea' : (type === 'select' ? 'form-select' : 'form-input'),
     error ? 'error' : '',
-    value && !error ? 'valid' : '',
+    tieneValor ? 'valid' : '',
   ].filter(Boolean).join(' ');
 
   const clasesGrupo = [
@@ -64,7 +65,7 @@ export default function FormField({
       </label>
 
       {type === 'select' ? (
-        <select name={name} className={clasesCampo} value={value || ''} onChange={onChange} {...rest}>
+        <select name={name} className={clasesCampo} value={value ?? ''} onChange={onChange} {...rest}>
           <option value="">Seleccione...</option>
           {options?.map(opcion => (
             <option key={opcion.value} value={opcion.value}>{opcion.label}</option>
@@ -72,7 +73,7 @@ export default function FormField({
         </select>
       ) : type === 'textarea' ? (
         <textarea
-          name={name} className={clasesCampo} value={value || ''}
+          name={name} className={clasesCampo} value={value ?? ''}
           onChange={onChange} placeholder={placeholderText} rows={3} {...rest}
         />
       ) : (
@@ -80,7 +81,7 @@ export default function FormField({
           const inputEl = (
             <input
               type={type} name={name} className={clasesCampo}
-              value={value || ''} onChange={onChange} placeholder={placeholderText}
+              value={value ?? ''} onChange={onChange} placeholder={placeholderText}
               {...inputProps} {...rest}
             />
           );
@@ -98,4 +99,17 @@ export default function FormField({
       {children}
     </div>
   );
+}
+
+function normalizarValorComparable(valor) {
+  if (valor === null || valor === undefined) return '';
+  if (typeof valor === 'string') return valor.trim().replace(/\s+/g, ' ');
+  if (Array.isArray(valor)) {
+    return `[${valor.map(item => normalizarValorComparable(item)).join(',')}]`;
+  }
+  if (typeof valor === 'object') {
+    const entradas = Object.keys(valor).sort().map(clave => `${clave}:${normalizarValorComparable(valor[clave])}`);
+    return `{${entradas.join(',')}}`;
+  }
+  return String(valor).trim();
 }
