@@ -144,7 +144,7 @@ def _orm_formulario_a_datos(
         ciudad_funciones=orm.ciudad_funciones,
         direccion_residencia=orm.direccion_residencia,
         ciudad_residencia=orm.ciudad_residencia,
-        moneda_declaracion=orm.moneda_declaracion or "COP",
+        moneda_declaracion=orm.moneda_declaracion,
         actividad_economica=orm.actividad_economica,
         codigo_ciiu=orm.codigo_ciiu,
         ingresos_mensuales=orm.ingresos_mensuales,

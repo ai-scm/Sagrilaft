@@ -511,7 +511,7 @@ def _renderizar_seccion_financiera(datos: Dict[str, Any]) -> str:
     Lee `moneda_declaracion` del snapshot y aplica símbolo + separadores de miles
     consistentes con el frontend (CurrencyInput.jsx / PasoFinanciero.jsx).
     """
-    moneda = (datos.get("moneda_declaracion") or "COP").strip().upper()
+    moneda = (datos.get("moneda_declaracion") or "").strip().upper()
 
     # Campos no monetarios (se muestran tal cual)
     pares_escalares: List[Tuple[str, Any]] = [

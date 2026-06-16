@@ -54,7 +54,7 @@ export default function CurrencyInput({
   name,
   label,
   symbol = '$',
-  currency = 'COP',
+  currency,
   ...rest
 }) {
   const [displayValue, setDisplayValue] = useState('');

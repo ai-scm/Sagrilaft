@@ -92,7 +92,7 @@ class Formulario(Base):
     ciudad_residencia = Column(String, nullable=True)
 
     # --- 5. Información Financiera ---
-    moneda_declaracion = Column(String, nullable=True, default="COP")
+    moneda_declaracion = Column(String, nullable=True)
     actividad_economica = Column(String, nullable=True)
     codigo_ciiu = Column(String, nullable=True)
     ingresos_mensuales = Column(Float, nullable=True)

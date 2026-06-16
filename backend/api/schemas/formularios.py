@@ -148,7 +148,7 @@ class FormularioBase(BaseModel):
     ciudad_residencia: Optional[str] = None
 
     # 5. Información Financiera
-    moneda_declaracion: Optional[str] = Field("COP", description="Moneda en la que se declaran los valores financieros (COP, USD, EUR, PEN, BRL, CLP, ARS)")
+    moneda_declaracion: Optional[str] = Field(None, description="Moneda en la que se declaran los valores financieros")
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: MontoPositivo = None

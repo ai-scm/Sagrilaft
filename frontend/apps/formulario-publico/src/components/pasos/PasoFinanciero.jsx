@@ -2,6 +2,7 @@ import FormField from '../FormField';
 import CurrencyInput from '../CurrencyInput';
 
 const MONEDAS_DISPONIBLES = [
+  { value: '', label: 'Seleccione una moneda...' },
   { value: 'COP', label: 'Pesos Colombianos (COP)' },
   { value: 'USD', label: 'Dólares Estadounidenses (USD)' },
   { value: 'EUR', label: 'Euros (EUR)' },
@@ -26,8 +27,8 @@ const SIMBOLOS_MONEDA = {
  * Los valores se contrastan con los estados financieros adjuntos.
  */
 export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors }) {
-  const monedaActual = formData.moneda_declaracion || 'COP';
-  const simboloActual = SIMBOLOS_MONEDA[monedaActual] || '$';
+  const monedaActual = formData.moneda_declaracion || '';
+  const simboloActual = SIMBOLOS_MONEDA[monedaActual] || '';
 
   return (
     <div className="form-card">
@@ -37,7 +38,7 @@ export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors 
       <div className="form-row">
         <FormField
           label="Moneda de Declaración" name="moneda_declaracion" type="select" required
-          value={formData.moneda_declaracion || 'COP'} onChange={onChange}
+          value={formData.moneda_declaracion || ''} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.moneda_declaracion}
           options={MONEDAS_DISPONIBLES}
         />

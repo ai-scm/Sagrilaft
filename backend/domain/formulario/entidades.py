@@ -86,7 +86,7 @@ class FormularioDatos:
     ciudad_residencia: Optional[str] = None
 
     # ── Información Financiera ────────────────────────────────────────────────
-    moneda_declaracion: Optional[str] = "COP"
+    moneda_declaracion: Optional[str] = None
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: Optional[float] = None
