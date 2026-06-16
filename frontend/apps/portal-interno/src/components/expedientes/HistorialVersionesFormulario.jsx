@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { api } from '../../services/api';
+import ModalComparacionVersiones from './ModalComparacionVersiones';
 import {
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   formatearFechaHora,
@@ -120,6 +121,25 @@ const s = {
     whiteSpace:     'nowrap',
     flexShrink:     0,
   },
+  acciones: {
+    display: 'flex',
+    gap: '8px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  btnComparar: {
+    padding:        '5px 14px',
+    background:     '#f0fdf4',
+    color:          '#166534',
+    border:         '1px solid #bbf7d0',
+    borderRadius:   'var(--radius-sm, 6px)',
+    fontSize:       '0.78rem',
+    fontWeight:     '700',
+    cursor:         'pointer',
+    whiteSpace:     'nowrap',
+    flexShrink:     0,
+  },
 };
 
 // ── Sub-componente ────────────────────────────────────────────────────────────
@@ -176,7 +196,14 @@ function FilaVersion({ documento, esVersionActiva, formularioId }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function HistorialVersionesFormulario({ documentos, formularioId }) {
-  const versionesDelFormulario = documentos
+  const [comparacion, setComparacion] = useState(null);
+  const [cargandoComparacion, setCargandoComparacion] = useState(false);
+  const [errorComparacion, setErrorComparacion] = useState(null);
+  const [errorDescarga, setErrorDescarga] = useState(null);
+  const [mostrarComparacion, setMostrarComparacion] = useState(false);
+  const [descargandoReporte, setDescargandoReporte] = useState(false);
+
+  const versionesDelFormulario = [...documentos]
     .filter(doc => doc.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF)
     .sort((a, b) => b.version_numero - a.version_numero);
 
@@ -184,20 +211,68 @@ export default function HistorialVersionesFormulario({ documentos, formularioId 
 
   const numeroVersionMaxima = versionesDelFormulario[0].version_numero;
 
-  return (
-    <div style={s.contenedor}>
-      <p style={s.encabezado}>
-        Historial de versiones del formulario ({versionesDelFormulario.length})
-      </p>
+  async function handleVerCambios() {
+    setMostrarComparacion(true);
+    setCargandoComparacion(true);
+    setErrorComparacion(null);
+    setErrorDescarga(null);
+    try {
+      setComparacion(await api.compararVersionesFormulario(formularioId));
+    } catch (err) {
+      setErrorComparacion(err.message || 'No se pudo comparar las versiones.');
+    } finally {
+      setCargandoComparacion(false);
+    }
+  }
 
-      {versionesDelFormulario.map(doc => (
-        <FilaVersion
-          key={doc.id}
-          documento={doc}
-          esVersionActiva={doc.version_numero === numeroVersionMaxima}
-          formularioId={formularioId}
-        />
-      ))}
-    </div>
+  async function handleDescargarEvidencia() {
+    setDescargandoReporte(true);
+    setErrorDescarga(null);
+    try {
+      await api.descargarReporteComparacion(formularioId);
+    } catch (err) {
+      setErrorDescarga(err.message || 'No se pudo descargar la evidencia.');
+    } finally {
+      setDescargandoReporte(false);
+    }
+  }
+
+  function handleCerrarComparacion() {
+    setMostrarComparacion(false);
+    setErrorDescarga(null);
+  }
+
+  return (
+    <>
+      <div style={s.contenedor}>
+        <div style={{ ...s.encabezado, display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+          <span>Historial de versiones del formulario ({versionesDelFormulario.length})</span>
+          {versionesDelFormulario.length > 1 && (
+            <button type="button" style={s.btnComparar} onClick={handleVerCambios}>
+              Ver cambios
+            </button>
+          )}
+        </div>
+
+        {versionesDelFormulario.map(doc => (
+          <FilaVersion
+            key={doc.id}
+            documento={doc}
+            esVersionActiva={doc.version_numero === numeroVersionMaxima}
+            formularioId={formularioId}
+          />
+        ))}
+      </div>
+      <ModalComparacionVersiones
+        visible={mostrarComparacion}
+        comparacion={comparacion}
+        cargando={cargandoComparacion}
+        error={errorComparacion}
+        errorDescarga={errorDescarga}
+        descargandoReporte={descargandoReporte}
+        onDescargarReporte={handleDescargarEvidencia}
+        onCerrar={handleCerrarComparacion}
+      />
+    </>
   );
 }

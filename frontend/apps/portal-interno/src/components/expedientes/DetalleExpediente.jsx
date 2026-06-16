@@ -579,10 +579,10 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
   const todosDocumentos   = expediente?.documentos ?? [];
   // Puede haber varias versiones del PDF; la activa es la de mayor version_numero.
-  const pdfFormulario     = todosDocumentos
+  const pdfFormulario     = [...todosDocumentos]
     .filter(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF)
     .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
-  const reporteFinal      = todosDocumentos
+  const reporteFinal      = [...todosDocumentos]
     .filter(d => d.tipo_documento === TIPO_DOCUMENTO_REPORTE_FINAL)
     .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
   const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));

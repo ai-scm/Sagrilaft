@@ -51,6 +51,26 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}`);
   },
 
+  async compararVersionesFormulario(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/comparacion-versiones`);
+  },
+
+  async descargarReporteComparacion(formularioId) {
+    const token = await getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/comparacion-versiones/reporte-pdf`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comparacion_${formularioId.slice(0, 8)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
   urlDescargaDocumento(formularioId, docId) {
     return `${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`;
   },
