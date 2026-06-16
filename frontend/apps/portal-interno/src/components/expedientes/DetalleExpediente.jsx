@@ -17,6 +17,9 @@ import Alert from '@shared/components/ui/Alert';
 import BadgeEstadoFormulario from '../badges/BadgeEstadoFormulario';
 import ModalDevolucion from '../modals/ModalDevolucion';
 import ModalRechazo from '../modals/ModalRechazo';
+import ModalCargaManual from '../modals/ModalCargaManual';
+import ModalConfirmacion from '../modals/ModalConfirmacion';
+import ModalCargaReporteFinal from '../modals/ModalCargaReporteFinal';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
@@ -24,7 +27,9 @@ import {
   formatearBytes,
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+  TIPO_DOCUMENTO_REPORTE_FINAL,
 } from '../../config/constantes';
+import { ESTADO_FORM_CERRADO } from '@shared/utils/constantes';
 
 const ESTADO_ENVIADO         = 'enviado';
 const ESTADO_EN_CORRECCION   = 'en_correccion';
@@ -32,7 +37,7 @@ const ESTADO_VALIDADO        = 'validado';
 const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
 const ESTADO_FIRMADO         = 'firmado';
 
-const TIPOS_EXCLUIDOS_DE_ADJUNTOS = [TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT];
+const TIPOS_EXCLUIDOS_DE_ADJUNTOS = [TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT, TIPO_DOCUMENTO_REPORTE_FINAL];
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 
@@ -365,6 +370,7 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
   const [errorFirma, setErrorFirma]                     = useState(null);
   const [mostrarModalDevolucion, setMostrarModalDevolucion] = useState(false);
   const [mostrarModalRechazo, setMostrarModalRechazo]   = useState(false);
+  const [mostrarModalAprobacion, setMostrarModalAprobacion] = useState(false);
 
   async function handleEnviarAFirma() {
     setEnviando(true);
@@ -410,6 +416,7 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
     setErrorFirma(null);
     try {
       await api.aprobarExpediente(formularioId);
+      setMostrarModalAprobacion(false);
       onFirmaEnviada();
     } catch (err) {
       setErrorFirma(err.message || 'Error al aprobar.');
@@ -432,11 +439,11 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
             <button
               style={{ ...s.btnFirma, color: '#1d4ed8', ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
-              onClick={handleAprobar}
+              onClick={() => setMostrarModalAprobacion(true)}
               disabled={ocupado}
               type="button"
             >
-              {aprobando ? 'Aprobando…' : 'Aprobar'}
+              Aprobar
             </button>
             <button
               style={{ ...s.btnFirma, color: '#991b1b', opacity: 0.85, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
@@ -456,6 +463,15 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
             </button>
           </div>
         </div>
+        <ModalConfirmacion
+          visible={mostrarModalAprobacion}
+          titulo="¿Aprobar formulario?"
+          mensaje="El expediente pasará a estado Validado y quedará listo para enviarse a firma electrónica. ¿Desea continuar?"
+          textoConfirmar="Sí, aprobar"
+          onConfirmar={handleAprobar}
+          onCancelar={() => setMostrarModalAprobacion(false)}
+          ocupado={aprobando}
+        />
         <ModalDevolucion
           visible={mostrarModalDevolucion}
           formularioId={formularioId}
@@ -558,6 +574,7 @@ function BannerFirma({ estado, formularioId, onFirmaEnviada }) {
 
 export default function DetalleExpediente({ formularioId, razonSocial, onVolver }) {
   const { expediente, cargando, error, recargarExpediente } = useExpedienteDetalle(formularioId);
+  const [mostrarModalCargaManual, setMostrarModalCargaManual] = useState(false);
 
   const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
   const todosDocumentos   = expediente?.documentos ?? [];
@@ -565,7 +582,13 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const pdfFormulario     = todosDocumentos
     .filter(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF)
     .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
+  const reporteFinal      = todosDocumentos
+    .filter(d => d.tipo_documento === TIPO_DOCUMENTO_REPORTE_FINAL)
+    .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
   const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));
+
+  const estaCerrado = expediente?.estado === ESTADO_FORM_CERRADO;
+  const [mostrarModalReporteFinal, setMostrarModalReporteFinal] = useState(false);
 
   return (
     <div style={s.overlay}>
@@ -596,9 +619,61 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               </div>
             </div>
 
+            {/* Botones de acción manual */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '16px' }}>
+              <button 
+                style={{ ...s.btnDescargarPdf, background: '#fff', border: '1.5px solid #1d4ed8', color: '#1d4ed8', opacity: estaCerrado ? 0.5 : 1, cursor: estaCerrado ? 'not-allowed' : 'pointer' }}
+                onClick={() => { if (!estaCerrado) setMostrarModalCargaManual(true); }}
+                disabled={estaCerrado}
+                type="button"
+                title={estaCerrado ? "No se puede modificar un expediente cerrado" : ""}
+              >
+                Cargar Formulario Manual
+              </button>
+              <button 
+                style={{ ...s.btnDescargarPdf, background: '#1d4ed8', border: '1.5px solid #1d4ed8', color: '#fff' }}
+                onClick={() => setMostrarModalReporteFinal(true)}
+                type="button"
+              >
+                Cargar Reporte Final
+              </button>
+            </div>
+
+            <ModalCargaManual
+              visible={mostrarModalCargaManual}
+              formularioId={formularioId}
+              onCargado={() => { setMostrarModalCargaManual(false); recargarExpediente(); }}
+              onCancelar={() => setMostrarModalCargaManual(false)}
+            />
+
+            <ModalCargaReporteFinal
+              visible={mostrarModalReporteFinal}
+              formularioId={formularioId}
+              onCargado={() => { setMostrarModalReporteFinal(false); recargarExpediente(); }}
+              onCancelar={() => setMostrarModalReporteFinal(false)}
+            />
+
             {/* PDF oficial del formulario — versión activa */}
             {pdfFormulario && (
               <BannerPdfFormulario documento={pdfFormulario} formularioId={formularioId} />
+            )}
+
+            {/* Reporte Final */}
+            {reporteFinal && (
+              <div style={{ ...s.bannerPdf, background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' }}>
+                <div style={s.bannerPdfTextos}>
+                  <p style={s.bannerPdfTitulo}>Reporte Final de Cierre</p>
+                  <p style={s.bannerPdfSubtitulo}>
+                    {reporteFinal.nombre_archivo}{reporteFinal.tamano ? ` · ${formatearBytes(reporteFinal.tamano)}` : ''}{reporteFinal.created_at ? ` · ${formatearFechaHora(reporteFinal.created_at)}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => api.descargarDocumento(formularioId, reporteFinal.id, reporteFinal.nombre_archivo)}
+                  style={s.btnDescargarPdf}
+                >
+                  Descargar Reporte
+                </button>
+              </div>
             )}
 
             {/* Historial de versiones — visible cuando hay más de una */}

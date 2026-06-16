@@ -10,7 +10,7 @@ DIP: depende de api.dependencies, no de infrastructure directamente.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
@@ -106,6 +106,69 @@ def descargar_documento(
         return RedirectResponse(url=info.valor, status_code=307)
     return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)
 
+
+# ─── Carga Manual ─────────────────────────────────────────────────────────────
+
+@enrutador.post(
+    "/{formulario_id}/carga-manual",
+    summary="Cargar formulario manualmente",
+    description="Permite a un operador subir un PDF y reemplazar la versión actual, reanudando el flujo de revisión.",
+)
+async def carga_manual_expediente(
+    formulario_id: str,
+    justificacion: str = Form(...),
+    archivo: UploadFile = File(...),
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> dict:
+    if archivo.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Solo se permite subir archivos PDF.")
+    if len(justificacion.strip()) < 20:
+        raise HTTPException(status_code=400, detail="La justificación debe tener al menos 20 caracteres.")
+        
+    contenido = await archivo.read()
+    try:
+        return servicio.cargar_formulario_manual(
+            formulario_id=formulario_id,
+            archivo_bytes=contenido,
+            nombre_archivo=archivo.filename,
+            content_type=archivo.content_type,
+            justificacion=justificacion,
+            actor_id=usuario.email,
+            contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@enrutador.post(
+    "/{formulario_id}/reporte-final",
+    summary="Cargar reporte final y cerrar carpeta",
+    description="Permite a un operador subir un PDF como reporte final, lo que cambia el estado de la carpeta a 'cerrado' y bloquea modificaciones posteriores.",
+)
+async def carga_reporte_final(
+    formulario_id: str,
+    justificacion: Optional[str] = Form(""),
+    archivo: UploadFile = File(...),
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> dict:
+    if archivo.content_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Solo se permite subir archivos PDF para el reporte final.")
+        
+    contenido = await archivo.read()
+    try:
+        return servicio.cargar_reporte_final(
+            formulario_id=formulario_id,
+            archivo_bytes=contenido,
+            nombre_archivo=archivo.filename,
+            content_type=archivo.content_type,
+            justificacion=justificacion,
+            actor_id=usuario.email,
+            contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ─── Aprobación / Rechazo ────────────────────────────────────────────────────
 

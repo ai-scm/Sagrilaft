@@ -22,7 +22,7 @@ from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.notificaciones import INotificador
-from domain.puertos.repositorios import RepositorioExpediente
+from domain.puertos.repositorios import RepositorioExpediente, RepositorioDocumento
 from domain.formulario.tipos import EstadoFormulario
 
 if TYPE_CHECKING:
@@ -36,6 +36,7 @@ _ESTADOS_EXPEDIENTE = [
     EstadoFormulario.RECHAZADO,
     EstadoFormulario.PENDIENTE_FIRMA,
     EstadoFormulario.FIRMADO,
+    EstadoFormulario.CERRADO,
 ]
 
 
@@ -52,6 +53,7 @@ class ExpedienteService:
     def __init__(
         self,
         repo: RepositorioExpediente,
+        repo_doc: RepositorioDocumento,
         storage: IAlmacenamiento,
         repo_auditoria: Optional[RepositorioAuditoria] = None,
         alertas_portal: Optional[IAlertasPortal] = None,
@@ -60,6 +62,8 @@ class ExpedienteService:
         self._storage = storage
         self._auditoria = repo_auditoria
         self._alertas = alertas_portal
+        from services.formulario.documento_service import DocumentoService
+        self._documentos = DocumentoService(repo_doc, storage)
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
@@ -154,10 +158,131 @@ class ExpedienteService:
                     "tamano":         doc.tamano,
                     "version_numero": doc.version_numero,
                     "created_at":     doc.created_at,
+                    "subido_por":     doc.subido_por,
                 }
                 for doc in documentos
             ],
         }
+
+    # ─── Carga Manual ─────────────────────────────────────────────────────────
+
+    def cargar_formulario_manual(
+        self,
+        formulario_id: str,
+        archivo_bytes: bytes,
+        nombre_archivo: str,
+        content_type: str,
+        justificacion: str,
+        actor_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        if content_type != "application/pdf":
+            raise ValueError("Solo se permite formato PDF.")
+        if len(justificacion.strip()) < 20:
+            raise ValueError("La justificación debe tener al menos 20 caracteres.")
+
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        estado_anterior = formulario.estado
+
+        from services.formulario.almacenamiento_contraparte import resolver_key_contraparte
+        from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
+
+        prefijo = resolver_key_contraparte(formulario.tipo_contraparte, formulario.razon_social)
+        pdf_anterior = self._documentos.obtener_ultimo_formulario_pdf(formulario_id)
+        numero_version_nuevo = (pdf_anterior.version_numero + 1) if pdf_anterior else 1
+
+        key_pdf = f"{prefijo}/{nombre_archivo}"
+        self._documentos.guardar_archivo(key_pdf, archivo_bytes, content_type)
+        self._documentos.registrar_documento_en_bd(
+            formulario_id=formulario_id,
+            tipo_documento=TIPO_DOCUMENTO_FORMULARIO_PDF,
+            nombre_archivo=nombre_archivo,
+            key=key_pdf,
+            content_type=content_type,
+            tamano=len(archivo_bytes),
+            hash_sha256=self._documentos.calcular_hash(archivo_bytes),
+            subido_por=actor_id,
+            version_numero=numero_version_nuevo,
+            version_anterior_id=pdf_anterior.id if pdf_anterior else None,
+        )
+
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.carga_manual()
+        self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FORMULARIO_CARGADO_MANUALMENTE,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+            metadata={"upload_method": "MANUAL", "upload_reason": justificacion.strip()},
+        ))
+
+        self._alertar(TipoAlerta.FORMULARIO_RECIBIDO, formulario, detalle="Carga manual de formulario")
+
+        return {"estado": dominio.estado.value, "version_numero": numero_version_nuevo}
+
+    def cargar_reporte_final(
+        self,
+        formulario_id: str,
+        archivo_bytes: bytes,
+        nombre_archivo: str,
+        content_type: str,
+        justificacion: str,
+        actor_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        if content_type != "application/pdf":
+            raise ValueError("Solo se permite formato PDF para el reporte final.")
+
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        estado_anterior = formulario.estado
+
+        from services.formulario.almacenamiento_contraparte import resolver_key_contraparte
+        from domain.constantes import TIPO_DOCUMENTO_REPORTE_FINAL
+
+        reportes_previos = [d for d in self._documentos.listar_documentos(formulario_id) if d.tipo_documento == TIPO_DOCUMENTO_REPORTE_FINAL]
+        if reportes_previos:
+            reporte_anterior = max(reportes_previos, key=lambda d: d.version_numero)
+            numero_version_nuevo = reporte_anterior.version_numero + 1
+            version_anterior_id = reporte_anterior.id
+        else:
+            numero_version_nuevo = 1
+            version_anterior_id = None
+
+        prefijo = resolver_key_contraparte(formulario.tipo_contraparte, formulario.razon_social)
+        key_pdf = f"{prefijo}/reportes_finales/{nombre_archivo}"
+        self._documentos.guardar_archivo(key_pdf, archivo_bytes, content_type)
+        self._documentos.registrar_documento_en_bd(
+            formulario_id=formulario_id,
+            tipo_documento=TIPO_DOCUMENTO_REPORTE_FINAL,
+            nombre_archivo=nombre_archivo,
+            key=key_pdf,
+            content_type=content_type,
+            tamano=len(archivo_bytes),
+            hash_sha256=self._documentos.calcular_hash(archivo_bytes),
+            subido_por=actor_id,
+            version_numero=numero_version_nuevo,
+            version_anterior_id=version_anterior_id,
+        )
+
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.cerrar_con_reporte()
+        self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+
+        self._registrar(EventoAuditoria(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.REPORTE_FINAL_CARGADO,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id,
+            actor_tipo=ActorTipo.OPERADOR,
+            metadata={"justificacion": justificacion.strip(), "version": numero_version_nuevo},
+        ))
+
+        return {"estado": dominio.estado.value, "version_numero": numero_version_nuevo}
 
     # ─── Aprobación / Rechazo ─────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import {
   ESTADO_FORM_RECHAZADO,
   ESTADO_FORM_PENDIENTE_FIRMA,
   ESTADO_FORM_FIRMADO,
+  ESTADO_FORM_CERRADO,
 } from '@shared/utils/constantes';
 
 export const CONFIG_ESTADOS_FORMULARIO = {
@@ -15,6 +16,7 @@ export const CONFIG_ESTADOS_FORMULARIO = {
   [ESTADO_FORM_RECHAZADO]:       { etiqueta: 'Rechazado',        bg: '#fef2f2', color: '#dc2626', borde: '#fca5a5' },
   [ESTADO_FORM_PENDIENTE_FIRMA]: { etiqueta: 'Pendiente firma',  bg: '#fefce8', color: '#854d0e', borde: '#fde047' },
   [ESTADO_FORM_FIRMADO]:         { etiqueta: 'Firmado',          bg: '#f5f3ff', color: '#6d28d9', borde: '#c4b5fd' },
+  [ESTADO_FORM_CERRADO]:         { etiqueta: 'Cerrado',          bg: '#f3f4f6', color: '#374151', borde: '#d1d5db' },
 };
 
 // Para selects/filtros
