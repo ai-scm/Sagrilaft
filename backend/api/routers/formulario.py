@@ -11,6 +11,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
+from starlette.responses import Response
 
 from api.dependencies import obtener_servicio_acceso, obtener_servicio_formulario
 from api.schemas import (
@@ -28,6 +30,7 @@ from api.limitador import limitador
 from api.transformadores import construir_respuesta_documento
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.formulario.formulario_service import FormularioService
+from domain.excepciones import CorreoDestinatarioNoRegistradoError
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
@@ -136,6 +139,8 @@ def enviar_formulario(
 
     Si el formulario fue creado via acceso manual, requiere credenciales
     (token de diligenciamiento o código+PIN) para autorizar el envío.
+    
+    Requisito: el destinatario debe haber registrado su correo electrónico.
     """
     servicio_acceso.verificar_credenciales_si_aplica(
         formulario_id,
@@ -143,7 +148,12 @@ def enviar_formulario(
         codigo_peticion=credenciales.codigo_peticion if credenciales else None,
         pin=credenciales.pin if credenciales else None,
     )
+    
+    # Validación crítica: correo destinatario DEBE estar registrado
     actor_id = servicio_acceso.obtener_correo_destinatario(formulario_id)
+    if not actor_id or not actor_id.strip():
+        raise CorreoDestinatarioNoRegistradoError(formulario_id)
+    
     resultado_dominio = servicio.enviar(formulario_id, actor_id=actor_id)
     if resultado_dominio.valido and credenciales is not None:
         # Si el formulario tiene AccesoManual, dejar evidencia consistente de consumo
@@ -154,6 +164,26 @@ def enviar_formulario(
         errores=[
             {"campo": e.campo, "mensaje": e.mensaje} for e in resultado_dominio.errores
         ],
+    )
+
+
+@enrutador.get(
+    "/{formulario_id}/pdf",
+    summary="Descargar PDF oficial del formulario",
+    description="Descarga el PDF generado automáticamente al enviar el formulario.",
+)
+def descargar_pdf_oficial(
+    formulario_id: str,
+    servicio: FormularioService = Depends(obtener_servicio_formulario),
+) -> Response:
+    """Descarga el PDF del formulario enviado."""
+    info = servicio.descargar_pdf_oficial(formulario_id)
+    if info.es_url:
+        return RedirectResponse(url=info.valor, status_code=307)
+    return FileResponse(
+        path=info.valor,
+        filename=info.nombre_archivo,
+        media_type=info.content_type,
     )
 
 

@@ -21,7 +21,7 @@ from domain.excepciones import (
 from domain.formulario.entidades import FormularioDatos, FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
 from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
-from domain.puertos.almacenamiento import IAlmacenamiento
+from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
 from domain.utils.estado_formulario import es_estado_editable
@@ -206,6 +206,17 @@ class FormularioService:
     def listar_documentos(self, formulario_id: str) -> List[Any]:
         self._buscar_formulario_o_error(formulario_id)
         return self._documentos.listar_documentos(formulario_id)
+
+    def descargar_pdf_oficial(self, codigo_o_id: str) -> InfoDescarga:
+        formulario = self._repo.obtener_por_codigo(codigo_o_id) or self._repo.obtener_por_id(codigo_o_id)
+        if not formulario:
+            raise FormularioNoEncontradoError(codigo_o_id)
+            
+        pdf = self._documentos.obtener_ultimo_formulario_pdf(formulario.id)
+        if not pdf:
+            from domain.excepciones import DocumentoNoEncontradoError
+            raise DocumentoNoEncontradoError(codigo_o_id, "PDF_OFICIAL")
+        return self._documentos.info_descarga(pdf)
 
     # ─── Pre-llenado con IA ───────────────────────────────────────────────────
 

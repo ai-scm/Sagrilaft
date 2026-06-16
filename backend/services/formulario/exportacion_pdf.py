@@ -20,6 +20,41 @@ from domain.utils.fechas import NOMBRES_MESES_ES
 from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
 
 
+# ─── Configuración de monedas (espejo del frontend) ──────────────────────────
+
+#: Mapeo código ISO → locale BCP 47 (igual que LOCALE_POR_MONEDA en CurrencyInput.jsx)
+_LOCALE_POR_MONEDA: Dict[str, str] = {
+    "COP": "es_CO",
+    "USD": "en_US",
+    "EUR": "de_DE",
+    "PEN": "es_PE",
+    "BRL": "pt_BR",
+    "CLP": "es_CL",
+    "ARS": "es_AR",
+}
+
+#: Símbolos de moneda (espejo de SIMBOLOS_MONEDA en PasoFinanciero.jsx)
+_SIMBOLO_POR_MONEDA: Dict[str, str] = {
+    "COP": "$",
+    "USD": "US$",
+    "EUR": "€",
+    "PEN": "S/",
+    "BRL": "R$",
+    "CLP": "CL$",
+    "ARS": "AR$",
+}
+
+#: Campos financieros de monto con sus etiquetas (en orden de presentación)
+_CAMPOS_FINANCIEROS: List[Tuple[str, str]] = [
+    ("Ingresos Mensuales",  "ingresos_mensuales"),
+    ("Otros Ingresos",      "otros_ingresos"),
+    ("Egresos Mensuales",   "egresos_mensuales"),
+    ("Total Activos",       "total_activos"),
+    ("Total Pasivos",       "total_pasivos"),
+    ("Patrimonio",          "patrimonio"),
+]
+
+
 # ─── Tipos del dominio ────────────────────────────────────────────────────────
 
 class DependenciaPdfNoInstaladaError(RuntimeError):
@@ -66,6 +101,50 @@ def _valor_a_texto(valor: Any) -> str:
         normalizado = valor.strip()
         return _VALORES_AMIGABLES.get(normalizado.lower(), normalizado)
     return str(valor).strip()
+
+
+def _formatear_monto(valor: Any, moneda: str) -> str:
+    """
+    Formatea un valor numérico monetario aplicando el separador de miles
+    correcto según la moneda seleccionada (espejo exacto de CurrencyInput.jsx).
+
+    Retorna el valor precedido del símbolo de la moneda, con los separadores
+    de miles adecuados al locale de la moneda.
+
+    Ejemplos:
+        COP  → $ 1.500.000
+        USD  → US$ 1,500,000
+        EUR  → € 1.500.000
+        PEN  → S/ 1,500,000
+    """
+    if valor is None or valor == "":
+        return ""
+
+    # Normalizar a entero (los montos se almacenan como float sin decimales)
+    try:
+        num = int(float(str(valor).replace(",", "").replace(".", "") or 0))
+    except (ValueError, TypeError):
+        return _valor_a_texto(valor)
+
+    if num == 0 and valor not in (0, 0.0, "0"):
+        return _valor_a_texto(valor)
+
+    simbolo = _SIMBOLO_POR_MONEDA.get(moneda, "$")
+    locale_key = _LOCALE_POR_MONEDA.get(moneda, "es_CO")
+
+    # Determinar separadores de miles y decimales a partir del locale.
+    # Locales con separador de miles = punto: es_CO, de_DE, pt_BR, es_CL, es_AR.
+    # Locales con separador de miles = coma: en_US, es_PE.
+    _LOCALES_COMA = {"en_US", "es_PE"}
+    if locale_key in _LOCALES_COMA:
+        miles_sep = ","
+    else:
+        miles_sep = "."
+
+    # Aplicar formato de miles
+    formatted = f"{num:,}".replace(",", miles_sep)
+
+    return f"{simbolo} {formatted}"
 
 
 def _normalizar_referencias_comerciales(
@@ -347,14 +426,15 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
     ]),
     _PasoFormulario(5, "Información Financiera y Referencias", [
         _SeccionCampos("Información Financiera", [
+            ("Moneda de Declaración",         "moneda_declaracion"),
             ("Actividad Económica Principal", "actividad_economica"),
             ("Código CIIU",                   "codigo_ciiu"),
-            ("Ingresos Mensuales (COP)",      "ingresos_mensuales"),
-            ("Otros Ingresos (COP)",          "otros_ingresos"),
-            ("Egresos Mensuales (COP)",       "egresos_mensuales"),
-            ("Total Activos (COP)",           "total_activos"),
-            ("Total Pasivos (COP)",           "total_pasivos"),
-            ("Patrimonio (COP)",              "patrimonio"),
+            ("Ingresos Mensuales",            "ingresos_mensuales"),
+            ("Otros Ingresos",                "otros_ingresos"),
+            ("Egresos Mensuales",             "egresos_mensuales"),
+            ("Total Activos",                 "total_activos"),
+            ("Total Pasivos",                 "total_pasivos"),
+            ("Patrimonio",                    "patrimonio"),
         ]),
         _SeccionTabla("Referencias Comerciales", "referencias_comerciales", [
             ("nombre_establecimiento", "Nombre del establecimiento"),
@@ -424,10 +504,41 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
 
 # ─── Constructor HTML ─────────────────────────────────────────────────────────
 
+def _renderizar_seccion_financiera(datos: Dict[str, Any]) -> str:
+    """
+    Renderiza la sección «Información Financiera» con formato de moneda correcto.
+
+    Lee `moneda_declaracion` del snapshot y aplica símbolo + separadores de miles
+    consistentes con el frontend (CurrencyInput.jsx / PasoFinanciero.jsx).
+    """
+    moneda = (datos.get("moneda_declaracion") or "COP").strip().upper()
+
+    # Campos no monetarios (se muestran tal cual)
+    pares_escalares: List[Tuple[str, Any]] = [
+        ("Moneda de Declaración",         moneda),
+        ("Actividad Económica Principal", datos.get("actividad_economica")),
+        ("Código CIIU",                   datos.get("codigo_ciiu")),
+    ]
+
+    # Campos monetarios formateados con la moneda correcta
+    pares_montos: List[Tuple[str, Any]] = [
+        (etiqueta, _formatear_monto(datos.get(clave), moneda))
+        for etiqueta, clave in _CAMPOS_FINANCIEROS
+    ]
+
+    return _render_seccion_campos(
+        "Información Financiera",
+        pares_escalares + pares_montos,
+    )
+
+
 def _renderizar_seccion(seccion: _SeccionFormulario, datos: Dict[str, Any]) -> str:
     if isinstance(seccion, _SeccionNarrativaFirma):
         return _render_narrativa_firma(seccion.titulo, datos)
     if isinstance(seccion, _SeccionCampos):
+        # La sección financiera tiene tratamiento especial: usa formateo por moneda.
+        if seccion.titulo == "Información Financiera":
+            return _renderizar_seccion_financiera(datos)
         return _render_seccion_campos(
             seccion.titulo,
             [(etiqueta, datos.get(clave)) for etiqueta, clave in seccion.campos],
