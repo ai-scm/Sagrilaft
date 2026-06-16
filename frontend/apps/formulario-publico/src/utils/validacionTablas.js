@@ -19,7 +19,6 @@ import {
   UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL,
   PORCENTAJE_MAXIMO_PERMITIDO,
   LONGITUD_MAXIMA_ID,
-  LONGITUD_TELEFONO,
 } from '@shared/utils/constantes';
 
 export {
@@ -27,7 +26,6 @@ export {
   UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL,
   PORCENTAJE_MAXIMO_PERMITIDO,
   LONGITUD_MAXIMA_ID,
-  LONGITUD_TELEFONO,
 };
 
 
@@ -310,12 +308,7 @@ const ESQUEMAS_PASO6 = {
     errorKey:           'referencias_comerciales_tabla',
     errorKeyFilas:      'referencias_comerciales_filas',
     camposObligatorios: ['nombre_establecimiento', 'persona_contacto', 'telefono', 'ciudad'],
-    reglasCondicionales: [
-      (fila) =>
-        !esCampoVacio(fila.telefono) && String(fila.telefono).length !== LONGITUD_TELEFONO
-          ? { campo: 'telefono', mensaje: `Debe tener exactamente ${LONGITUD_TELEFONO} dígitos` }
-          : null,
-    ],
+    reglasCondicionales: [],
   },
   referenciasBancarias: {
     label:              'Referencias Bancarias',

@@ -1,1 +1,67 @@
 @import '@shared/styles/global.css';
+
+/* ========================================
+   Currency Input — patrón input-group
+   ======================================== */
+
+/* El wrapper externo hereda el layout del form-group */
+.currency-input-wrapper {
+  display: contents; /* se comporta como si no existiera, hereda el grid */
+}
+
+/* Contenedor flex que une prefijo + input como una sola unidad visual */
+.currency-input-group {
+  display: flex;
+  align-items: stretch;
+}
+
+/* Prefijo con el símbolo: exterior al input, nunca lo invade */
+.currency-prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--gray-100);
+  border: 1.5px solid var(--gray-300);
+  border-right: none;                    /* comparte el borde con el input */
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  white-space: nowrap;
+  min-width: 38px;                       /* ancho mínimo para "US$" */
+  justify-content: center;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* El input dentro del grupo: pierde su borde y radius izquierdos */
+.currency-input-group .currency-input-field {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important;
+  padding-left: 12px !important;         /* padding normal, sin compensar símbolo */
+  flex: 1;
+  min-width: 0;                          /* evita que desborde el contenedor */
+}
+
+/* Al enfocar el input, el prefijo adopta el mismo color de borde */
+.currency-input-group:focus-within .currency-prefix {
+  border-color: var(--primary-400);
+  background: var(--primary-50);
+  color: var(--primary-600);
+}
+
+/* Estado error: ambos elementos en rojo */
+.currency-input-group .currency-input-field.error {
+  border-color: var(--error);
+}
+.currency-input-group:has(.currency-input-field.error) .currency-prefix {
+  border-color: var(--error);
+  background: var(--error-light);
+}
+
+/* Estado válido */
+.currency-input-group .currency-input-field.valid {
+  border-color: var(--success);
+}
+.currency-input-group:has(.currency-input-field.valid) .currency-prefix {
+  border-color: var(--success);
+}

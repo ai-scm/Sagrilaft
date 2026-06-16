@@ -15,7 +15,7 @@ export default function FormField({
   label, name, type = 'text', required = false,
   value, onChange, onOpenHelp, placeholder,
   error, options, children,
-  className = '', ...rest
+  className = '', renderInputWrapper, ...rest
 }) {
   const { esCampoConCorreccion, valorOriginalDeCampo } = useCorreccion();
   const marcadoParaCorreccion = esCampoConCorreccion(name);
@@ -76,11 +76,16 @@ export default function FormField({
           onChange={onChange} placeholder={placeholderText} rows={3} {...rest}
         />
       ) : (
-        <input
-          type={type} name={name} className={clasesCampo}
-          value={value || ''} onChange={onChange} placeholder={placeholderText}
-          {...inputProps} {...rest}
-        />
+        (() => {
+          const inputEl = (
+            <input
+              type={type} name={name} className={clasesCampo}
+              value={value || ''} onChange={onChange} placeholder={placeholderText}
+              {...inputProps} {...rest}
+            />
+          );
+          return renderInputWrapper ? renderInputWrapper(inputEl) : inputEl;
+        })()
       )}
 
       {correccionPendiente && !error && (

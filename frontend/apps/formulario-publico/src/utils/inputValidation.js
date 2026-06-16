@@ -8,7 +8,6 @@
  */
 
 import {
-  LONGITUD_TELEFONO,
   REGEX_CORREO,
   REGEX_CHAR_TEXTO,
   REGEX_CHAR_ALFANUMERICO_ESTRICTO,
@@ -114,11 +113,10 @@ export const onPorcentajePaste = (e) => {
  */
 export const REGLAS_INPUT = {
   numero_identificacion:    { soloNumericos: true },
-  digito_verificacion:      { soloNumericos: true, longitudMaxima: 1
- },
+  digito_verificacion:      { soloNumericos: true },
   numero_doc_representante: { soloNumericos: true },
-  telefono:                 { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
-  telefono_representante:   { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
+  telefono:                 { soloNumericos: true },
+  telefono_representante:   { soloNumericos: true },
   codigo_ciiu:              { soloNumericos: true, longitudMaxima: 4 },
   codigo_ica:               { soloNumericos: true, longitudMaxima: 4 },
   ingresos_mensuales:       { soloNumericos: true, soloPositivo: true },
@@ -129,8 +127,8 @@ export const REGLAS_INPUT = {
   patrimonio:               { soloNumericos: true, soloPositivo: true },
   correo:                   { formatoCorreo: true },
   correo_representante:     { formatoCorreo: true },
-  contacto_ordenes_telefono: { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
-  contacto_pagos_telefono:   { soloNumericos: true, longitudExacta: LONGITUD_TELEFONO },
+  contacto_ordenes_telefono: { soloNumericos: true },
+  contacto_pagos_telefono:   { soloNumericos: true },
   contacto_ordenes_correo:   { formatoCorreo: true },
   contacto_pagos_correo:     { formatoCorreo: true },
 };
@@ -182,6 +180,29 @@ export function getIdPropsByTipoDocumento(tipoDoc) {
 }
 
 /**
+ * Retorna las propiedades dinámicas (deshabilitado, lectura, obligatoriedad, etc.)
+ * para el campo DV dependiendo del Tipo de Identificación.
+ */
+export function getDvProps(tipo_identificacion) {
+  const isNIT = tipo_identificacion === 'NIT';
+  return {
+    label: isNIT ? 'DV' : 'DV', // Si no es NIT, el valor forzado será 'NA'
+    required: isNIT,
+    disabled: !isNIT, // Previene interacción
+    readOnly: !isNIT, // Doble validación para inmutabilidad
+    maxLength: isNIT ? 1 : 2,
+  };
+}
+
+/**
+ * Determina el valor del DV cuando cambia el Tipo de Identificación.
+ */
+export function calcularValorDv(nuevoTipoIdentificacion, valorActual) {
+  return nuevoTipoIdentificacion === 'NIT' ? (valorActual === 'NA' ? '' : valorActual) : 'NA';
+}
+
+
+/**
  * Limpia el valor ingresado asegurando que cumpla el patrón del tipo de documento.
  * Útil para interceptar en onChange y evitar autocompletados inválidos.
  */
@@ -206,6 +227,22 @@ export function validarReglasEspeciales(formData, camposDePaso) {
     if (!reglas) continue;
 
     const valor = String(formData[campo] ?? '').trim();
+
+    if (campo === 'digito_verificacion') {
+      const isNIT = formData.tipo_identificacion === 'NIT';
+      const upperVal = valor.toUpperCase();
+      if (isNIT) {
+        if (!/^\d$/.test(valor)) {
+          errores[campo] = 'Debe ser un único dígito numérico (0-9)';
+        }
+      } else {
+        if (upperVal !== 'NA') {
+          errores[campo] = 'Debe ser "NA" para este tipo de identificación';
+        }
+      }
+      continue;
+    }
+
     if (!valor) continue;
 
     if (reglas.longitudExacta && valor.length !== reglas.longitudExacta) {

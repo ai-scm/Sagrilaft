@@ -4,22 +4,19 @@
  * DRY : fuente única de verdad para estilos y mensajes de error de tabla.
  * ISP : cada tabla importa solo los primitivos que necesita.
  * OCP : nuevos primitivos se agregan aquí sin tocar los consumidores existentes.
+ *
+ * NOTA: Las constantes de estilo (ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR) se
+ * mantienen en tablaFormStyles.js (archivo .js sin JSX) y se re-exportan aquí.
+ * Esto es necesario para que Vite Fast Refresh funcione correctamente: un módulo
+ * .jsx solo puede exportar componentes React; mezclar valores planos con
+ * componentes produce la advertencia «export is incompatible with Fast Refresh».
  */
 import { getIdPropsByTipoDocumento, sanitizeIdValue } from '../utils/inputValidation';
 import { LONGITUD_MAXIMA_ID } from '@shared/utils/constantes';
 
-export const ESTILO_CELDA_ERROR = { borderColor: 'var(--error, #e53e3e)' };
-
-export const ESTILO_BTN_ELIMINAR = {
-  background: 'none',
-  border: '1px solid var(--error, #e53e3e)',
-  color: 'var(--error, #e53e3e)',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  padding: '2px 8px',
-  fontSize: '0.85rem',
-  lineHeight: '1',
-};
+// Re-exportadas desde tablaFormStyles.js para que todos los importadores
+// existentes sigan funcionando sin cambios.
+export { ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR } from './tablaFormStyles';
 
 export const HR = () => (
   <hr style={{ border: 'none', borderTop: '1px solid var(--gray-200)', margin: '24px 0' }} />
