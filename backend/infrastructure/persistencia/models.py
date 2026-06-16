@@ -191,6 +191,7 @@ class DocumentoAdjunto(Base):
     version_anterior_id = Column(String, ForeignKey("documentos_adjuntos.id"), nullable=True)
     subido_por = Column(String(255), nullable=True)
     hash_sha256 = Column(String(64), nullable=True)
+    snapshot_datos = Column(Text, nullable=True)
 
     formulario = relationship("Formulario", back_populates="documentos")
 

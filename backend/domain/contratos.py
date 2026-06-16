@@ -42,6 +42,7 @@ class DocumentoDatos:
     version_anterior_id: Optional[str] = None
     hash_sha256: Optional[str] = None
     subido_por: Optional[str] = None
+    snapshot_datos: Optional[Dict[str, Any]] = None
 
 
 @dataclass

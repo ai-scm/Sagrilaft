@@ -8,7 +8,7 @@ La key es agnóstica al backend de almacenamiento concreto.
 import hashlib
 import re
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 from domain.contratos import DocumentoDatos
 from domain.excepciones import DocumentoNoEncontradoError
@@ -68,6 +68,7 @@ class DocumentoService:
         subido_por: str | None = None,
         version_numero: int = 1,
         version_anterior_id: str | None = None,
+        snapshot_datos: Dict[str, Any] | None = None,
     ) -> DocumentoDatos:
         """Crea y persiste el registro del documento en la BD."""
         return self._repo.crear({
@@ -81,6 +82,7 @@ class DocumentoService:
             "subido_por":         subido_por,
             "version_numero":     version_numero,
             "version_anterior_id": version_anterior_id,
+            "snapshot_datos":      snapshot_datos,
         })
 
     def obtener_ultimo_formulario_pdf(self, formulario_id: str) -> DocumentoDatos | None:

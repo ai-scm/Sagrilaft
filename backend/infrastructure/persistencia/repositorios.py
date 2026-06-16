@@ -41,6 +41,7 @@ _CAMPOS_JSON = [
     "junta_directiva", "accionistas", "beneficiario_final",
     "referencias_comerciales", "referencias_bancarias",
     "informacion_bancaria_pagos", "clasificaciones", "tipos_transaccion",
+    "snapshot_datos",
 ]
 
 
@@ -258,6 +259,7 @@ def _orm_documento_a_datos(orm: DocumentoAdjunto) -> DocumentoDatos:
         version_anterior_id=orm.version_anterior_id,
         hash_sha256=orm.hash_sha256,
         subido_por=orm.subido_por,
+        snapshot_datos=_deserializar_json(orm.snapshot_datos),
     )
 
 
@@ -345,7 +347,7 @@ class RepositorioDocumentoSQLAlchemy:
 
     def crear(self, datos: Dict[str, Any]) -> DocumentoDatos:
         """Persiste un nuevo documento adjunto y retorna su representación de dominio."""
-        orm = DocumentoAdjunto(**datos)
+        orm = DocumentoAdjunto(**_aplicar_serializacion(datos))
         self._sesion.add(orm)
         self._sesion.commit()
         self._sesion.refresh(orm)

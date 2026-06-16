@@ -36,6 +36,7 @@ from services.formulario.exportacion_pdf import ExportadorFormularioPdf
 from services.formulario.serializacion import (
     construir_snapshot_formulario,
     formulario_a_dict,
+    snapshot_version_formulario,
 )
 from services.formulario.validacion_envio import ValidadorEnvioFormulario
 
@@ -138,6 +139,7 @@ class FormularioService:
             subido_por="SISTEMA",
             version_numero=numero_version_nuevo,
             version_anterior_id=pdf_anterior.id if pdf_anterior else None,
+            snapshot_datos=snapshot_version_formulario(formulario),
         )
 
         self._repo.actualizar(formulario_id, {"estado": dominio.estado.value})
