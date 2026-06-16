@@ -1,25 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import FormField from './FormField';
-
-/**
- * Mapeo de código de moneda → locale BCP 47.
- * El locale determina el separador de miles y el separador decimal.
- *
- * Ejemplos visuales con Intl.NumberFormat:
- *   COP (es-CO) → 1.500.000        USD (en-US) → 1,500,000
- *   EUR (de-DE) → 1.500.000        BRL (pt-BR) → 1.500.000
- *   PEN (es-PE) → 1,500,000        CLP (es-CL) → 1.500.000
- *   ARS (es-AR) → 1.500.000
- */
-const LOCALE_POR_MONEDA = {
-  COP: 'es-CO',
-  USD: 'en-US',
-  EUR: 'de-DE',
-  PEN: 'es-PE',
-  BRL: 'pt-BR',
-  CLP: 'es-CL',
-  ARS: 'es-AR',
-};
+import { obtenerLocaleMoneda } from '../../../../shared/utils/formatoMoneda';
 
 /**
  * Formatea un valor a string con separadores de miles según el locale dado.
@@ -61,7 +42,7 @@ export default function CurrencyInput({
 
   // Derivar el locale del código de moneda; fallback a es-CO si no está mapeado.
   const locale = useMemo(
-    () => LOCALE_POR_MONEDA[currency] ?? 'es-CO',
+    () => obtenerLocaleMoneda(currency),
     [currency],
   );
 
@@ -94,6 +75,7 @@ export default function CurrencyInput({
         name={name}
         type="text"
         value={displayValue}
+        comparisonValue={value}
         onChange={handleChange}
         className="currency-input-field"
         inputMode="numeric"

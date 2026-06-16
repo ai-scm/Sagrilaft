@@ -17,34 +17,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from domain.formulario.entidades import FormularioDatos
 from domain.utils.fechas import NOMBRES_MESES_ES
+from services.formulario.formato_moneda import formatear_monto_monetario
 from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
 
-
-# ─── Configuración de monedas (espejo del frontend) ──────────────────────────
-
-#: Mapeo código ISO → locale BCP 47 (igual que LOCALE_POR_MONEDA en CurrencyInput.jsx)
-_LOCALE_POR_MONEDA: Dict[str, str] = {
-    "COP": "es_CO",
-    "USD": "en_US",
-    "EUR": "de_DE",
-    "PEN": "es_PE",
-    "BRL": "pt_BR",
-    "CLP": "es_CL",
-    "ARS": "es_AR",
-}
-
-#: Símbolos de moneda (espejo de SIMBOLOS_MONEDA en PasoFinanciero.jsx)
-_SIMBOLO_POR_MONEDA: Dict[str, str] = {
-    "COP": "$",
-    "USD": "US$",
-    "EUR": "€",
-    "PEN": "S/",
-    "BRL": "R$",
-    "CLP": "CL$",
-    "ARS": "AR$",
-}
-
-#: Campos financieros de monto con sus etiquetas (en orden de presentación)
+# ─── Campos financieros de monto con sus etiquetas (en orden de presentación) ─
 _CAMPOS_FINANCIEROS: List[Tuple[str, str]] = [
     ("Ingresos Mensuales",  "ingresos_mensuales"),
     ("Otros Ingresos",      "otros_ingresos"),
@@ -117,34 +93,7 @@ def _formatear_monto(valor: Any, moneda: str) -> str:
         EUR  → € 1.500.000
         PEN  → S/ 1,500,000
     """
-    if valor is None or valor == "":
-        return ""
-
-    # Normalizar a entero (los montos se almacenan como float sin decimales)
-    try:
-        num = int(float(str(valor).replace(",", "").replace(".", "") or 0))
-    except (ValueError, TypeError):
-        return _valor_a_texto(valor)
-
-    if num == 0 and valor not in (0, 0.0, "0"):
-        return _valor_a_texto(valor)
-
-    simbolo = _SIMBOLO_POR_MONEDA.get(moneda, "$")
-    locale_key = _LOCALE_POR_MONEDA.get(moneda, "es_CO")
-
-    # Determinar separadores de miles y decimales a partir del locale.
-    # Locales con separador de miles = punto: es_CO, de_DE, pt_BR, es_CL, es_AR.
-    # Locales con separador de miles = coma: en_US, es_PE.
-    _LOCALES_COMA = {"en_US", "es_PE"}
-    if locale_key in _LOCALES_COMA:
-        miles_sep = ","
-    else:
-        miles_sep = "."
-
-    # Aplicar formato de miles
-    formatted = f"{num:,}".replace(",", miles_sep)
-
-    return f"{simbolo} {formatted}"
+    return formatear_monto_monetario(valor, moneda)
 
 
 def _normalizar_referencias_comerciales(
