@@ -103,10 +103,10 @@ export const ESQUEMAS_TABLA = {
 	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA
 	          ? { campo: 'porcentaje', mensaje: `El % de participación debe ser mayor al ${UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA}%` }
 	          : null,
-	      (fila) =>
-	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= PORCENTAJE_MAXIMO_PERMITIDO
-	          ? { campo: 'porcentaje', mensaje: `El % de participación no puede ser igual o superior al ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
-	          : null,
+      (fila) =>
+        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) > PORCENTAJE_MAXIMO_PERMITIDO
+          ? { campo: 'porcentaje', mensaje: `El % de participación no puede superar el ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
+          : null,
 	      (fila) =>
 	        fila.es_pep === 'si' && esCampoVacio(fila.vinculos_pep)
 	          ? { campo: 'vinculos_pep', mensaje: 'Vínculos PEP es obligatorio cuando ¿PEP? es "Sí"' }
@@ -134,10 +134,10 @@ export const ESQUEMAS_TABLA = {
 	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL
 	          ? { campo: 'porcentaje', mensaje: `El % de control debe ser mayor al ${UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL}%` }
 	          : null,
-	      (fila) =>
-	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) >= PORCENTAJE_MAXIMO_PERMITIDO
-	          ? { campo: 'porcentaje', mensaje: `El % de control no puede ser igual o superior al ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
-	          : null,
+      (fila) =>
+        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) > PORCENTAJE_MAXIMO_PERMITIDO
+          ? { campo: 'porcentaje', mensaje: `El % de control no puede superar el ${PORCENTAJE_MAXIMO_PERMITIDO}%` }
+          : null,
 	      (fila) =>
 	        !esCampoVacio(fila.tipo_id) && String(fila.tipo_id).toUpperCase() === 'NIT'
 	          ? { campo: 'tipo_id', mensaje: 'El Tipo ID del beneficiario final no puede ser NIT (debe ser CC, CE o PAS)' }

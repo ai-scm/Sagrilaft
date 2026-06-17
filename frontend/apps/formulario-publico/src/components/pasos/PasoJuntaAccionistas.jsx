@@ -52,7 +52,7 @@ function CeldaPorcentaje({ valor, minimo, err, onChange }) {
       <input
         type="number" step="0.01"
         min={minimo + 0.01}
-        max={PORCENTAJE_MAXIMO_PERMITIDO - 0.01}
+        max={PORCENTAJE_MAXIMO_PERMITIDO}
         value={valor || ''} placeholder="%"
         onChange={e => onChange(e.target.value)}
         onKeyDown={onPorcentajeKeyDown} onPaste={onPorcentajePaste}
