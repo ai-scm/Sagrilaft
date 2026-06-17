@@ -245,6 +245,45 @@ def _construir_estilos_css(color_primario: str) -> str:
 """
 
 
+def _generar_seccion_cta_html(
+    incluir_cta: bool,
+    enlace_formulario: str,
+    config: dict,
+    codigo_peticion_esc: str,
+) -> str:
+    """
+    Genera la sección CTA (Call-To-Action) en HTML de forma condicional.
+    
+    Cuando incluir_cta=True: incluye botón + enlace alternativo + acceso manual.
+    Cuando incluir_cta=False: retorna string vacío para omitir toda la sección.
+    
+    Parámetros de dominio ubicuo:
+      enlace_formulario: URL completa al expediente con parámetros UTM
+      config: Diccionario de configuración de alerta (color, etiqueta_boton, etc.)
+      codigo_peticion_esc: Código SAG-XXXXXXXX escapado para seguridad
+    """
+    if not incluir_cta:
+        return ""
+    
+    return f"""
+        <!-- Botón de acción principal (CTA) -->
+        <div class="seccion-cta">
+          <a href="{enlace_formulario}" class="boton" role="button" aria-label="Revisar formulario en el portal SAGRILAFT" style="background-color: {config['color']}; color: #ffffff; display: inline-block; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.95em; border: 2px solid {config['color']}; border-radius: 6px; width: 280px; box-sizing: border-box; cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            &#x2192; {config['etiqueta_boton']} &#x2190;
+          </a>
+          <div class="enlace-alternativo">
+            O acceda directamente a: <a href="{enlace_formulario}">{enlace_formulario[:50]}...</a>
+          </div>
+        </div>
+
+        <!-- Instrucción de acceso manual -->
+        <div class="acceso-manual">
+          <strong>Acceso manual:</strong> Ingrese el código de petición <code>{codigo_peticion_esc}</code> 
+          en el portal de SAGRILAFT para localizar este formulario.
+        </div>
+"""
+
+
 def construir_html_notificacion(
     tipo_alerta: TipoAlertaTemplate,
     formulario_id: str,
@@ -253,6 +292,7 @@ def construir_html_notificacion(
     codigo_peticion: Optional[str],
     url_portal: str,
     detalle: Optional[str] = None,
+    incluir_cta: bool = True,
 ) -> str:
     """
     Construye el cuerpo HTML completo de la notificación.
@@ -265,6 +305,7 @@ def construir_html_notificacion(
       codigo_peticion: Código único SAG-XXXXXXXX
       url_portal: URL base del portal interno (ej: https://portal.sagrilaft.com)
       detalle: Información adicional opcional
+      incluir_cta: Si False, omite botón, enlace alternativo y acceso manual (para alertas internas)
     
     Retorna:
       String HTML completo y escapeado.
@@ -288,10 +329,14 @@ def construir_html_notificacion(
     formulario_id_truncado = _escapar_html(formulario_id[:16] + "...")
     
     # Sección de detalle adicional (si existe)
+    # Formatea el detalle para que preserva saltos de línea y viñetas en HTML
     seccion_detalle = ""
     if detalle:
+        # Escapar HTML
         detalle_esc = _escapar_html(detalle)
-        seccion_detalle = f'<p style="color: #64748b; font-size: 0.9em; margin-top: 12px;"><strong>Detalle:</strong> {detalle_esc}</p>'
+        # Preservar saltos de línea: \n → <br>, • (viñeta) se mantiene
+        detalle_formateado = detalle_esc.replace("\n", "<br>")
+        seccion_detalle = f'<div style="color: #64748b; font-size: 0.9em; margin-top: 16px; line-height: 1.5;"><strong>Detalle:</strong><br>{detalle_formateado}</div>'
     
     # Estilos CSS
     estilos = _construir_estilos_css(config["color"])
@@ -346,21 +391,7 @@ def construir_html_notificacion(
 
         {seccion_detalle}
 
-        <!-- Botón de acción principal (CTA) -->
-        <div class="seccion-cta">
-          <a href="{enlace_formulario}" class="boton" role="button" aria-label="Revisar formulario en el portal SAGRILAFT" style="background-color: {config['color']}; color: #ffffff; display: inline-block; padding: 14px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.95em; border: 2px solid {config['color']}; border-radius: 6px; width: 280px; box-sizing: border-box; cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            &#x2192; {config['etiqueta_boton']} &#x2190;
-          </a>
-          <div class="enlace-alternativo">
-            O acceda directamente a: <a href="{enlace_formulario}">{enlace_formulario[:50]}...</a>
-          </div>
-        </div>
-
-        <!-- Instrucción de acceso manual -->
-        <div class="acceso-manual">
-          <strong>Acceso manual:</strong> Ingrese el código de petición <code>{codigo_peticion_esc}</code> 
-          en el portal de SAGRILAFT para localizar este formulario.
-        </div>
+        {_generar_seccion_cta_html(incluir_cta, enlace_formulario, config, codigo_peticion_esc)}
 
         <p style="color: #64748b; font-size: 0.9em; margin-top: 24px;">
           Si tiene preguntas o necesita asistencia, contáctenos a través del portal SAGRILAFT.
@@ -392,12 +423,16 @@ def construir_texto_plano_notificacion(
     codigo_peticion: Optional[str],
     url_portal: str,
     detalle: Optional[str] = None,
+    incluir_cta: bool = True,
 ) -> str:
     """
     Construye versión en texto plano de la notificación.
     
     Se usa como fallback en clientes de correo sin soporte HTML,
     y para mensajes en SNS cuando no se usa MessageStructure="json".
+    
+    Parámetros:
+      incluir_cta: Si False, omite URL de acceso al formulario y acceso manual.
     """
     timestamp = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     enlace = f"{url_portal}/expedientes/{formulario_id}"
@@ -414,15 +449,16 @@ def construir_texto_plano_notificacion(
     if detalle:
         lineas.append(f"Detalle:          {detalle}")
     
-    lineas.extend([
-        "",
-        "─" * 60,
-        "",
-        "Acceda al formulario en:",
-        enlace,
-        "",
-        f"O ingrese el código de petición ({codigo_peticion or 'N/A'})",
-        "en el portal SAGRILAFT.",
-    ])
+    if incluir_cta:
+        lineas.extend([
+            "",
+            "─" * 60,
+            "",
+            "Acceda al formulario en:",
+            enlace,
+            "",
+            f"O ingrese el código de petición ({codigo_peticion or 'N/A'})",
+            "en el portal SAGRILAFT.",
+        ])
     
     return "\n".join(lineas)

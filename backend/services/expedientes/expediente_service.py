@@ -14,6 +14,7 @@ from html import escape
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
+from domain.catalogo_correcciones import resolver_etiquetas_campos_corregibles
 from domain.excepciones import (
     DocumentoNoEncontradoError,
     FormularioNoEncontradoError,
@@ -446,10 +447,17 @@ class ExpedienteService:
                 "campos":            campos_identificados,
             },
         ))
+        
+        # Construir detalle con campos que requieren corrección
+        etiquetas_campos = resolver_etiquetas_campos_corregibles(campos_identificados or [])
+        detalle_alerta = f"Corrección #{dominio.numero_correccion}\n"
+        if etiquetas_campos:
+            detalle_alerta += "\nCampos que requieren corrección:\n" + "\n".join(f"• {etiqueta}" for etiqueta in etiquetas_campos)
+        
         self._alertar(
             TipoAlerta.FORMULARIO_DEVUELTO,
             formulario,
-            detalle=f"Corrección #{dominio.numero_correccion}",
+            detalle=detalle_alerta.strip(),
         )
 
         correo_notificado = datos_acceso["correo_destinatario"] if datos_acceso else None

@@ -106,6 +106,12 @@ class SesAlertasPortal:
             # Mapear TipoAlerta (dominio) a TipoAlertaTemplate (templates)
             tipo_template = self._mapear_tipo_alerta(tipo)
 
+            # Para alertas de devolución (acción 5 → trazabilidad interna del área),
+            # omitir CTA (botón, enlace, acceso manual) ya que el área responsable
+            # ya verificó y decidió devolver. El botón solo es necesario para
+            # la contraparte (acción 4 → email_service).
+            incluir_cta = tipo != TipoAlerta.FORMULARIO_DEVUELTO
+
             # Construir versiones HTML y texto plano
             cuerpo_html = construir_html_notificacion(
                 tipo_alerta=tipo_template,
@@ -115,6 +121,7 @@ class SesAlertasPortal:
                 codigo_peticion=codigo_peticion,
                 url_portal=self._url_portal,
                 detalle=detalle,
+                incluir_cta=incluir_cta,
             )
 
             cuerpo_texto = construir_texto_plano_notificacion(
@@ -125,6 +132,7 @@ class SesAlertasPortal:
                 codigo_peticion=codigo_peticion,
                 url_portal=self._url_portal,
                 detalle=detalle,
+                incluir_cta=incluir_cta,
             )
 
             # Obtener email destinatario (placeholder, se reemplaza en real)
