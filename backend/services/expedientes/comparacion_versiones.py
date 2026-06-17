@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from domain.catalogo_correcciones import (
-    CAMPOS_IDENTIFICABLES_PARA_CORRECION,
-    ETIQUETA_DE_CAMPO_EN_CORRECION,
+    CAMPOS_CORREGIBLES,
+    ETIQUETAS_CAMPOS_CORREGIBLES,
 )
 from domain.contratos import DocumentoDatos
 from services.formulario.formato_moneda import formatear_monto_monetario
@@ -163,12 +163,12 @@ def _moneda_declaracion(snapshot: Optional[Dict[str, Any]]) -> Optional[str]:
 
 
 def _detectar_cambios(anterior: Dict[str, Any], corregido: Dict[str, Any]) -> List[CambioCampo]:
-    presentes = (set(anterior) | set(corregido)) & CAMPOS_IDENTIFICABLES_PARA_CORRECION
-    campos = [campo for campo in ETIQUETA_DE_CAMPO_EN_CORRECION if campo in presentes]
+    presentes = (set(anterior) | set(corregido)) & CAMPOS_CORREGIBLES
+    campos = [campo for campo in ETIQUETAS_CAMPOS_CORREGIBLES if campo in presentes]
     return [
         CambioCampo(
             campo=campo,
-            etiqueta=ETIQUETA_DE_CAMPO_EN_CORRECION.get(campo, campo),
+            etiqueta=ETIQUETAS_CAMPOS_CORREGIBLES.get(campo, campo),
             valor_anterior=_presentar(campo, anterior.get(campo), anterior),
             valor_corregido=_presentar(campo, corregido.get(campo), corregido),
         )

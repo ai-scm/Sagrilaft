@@ -6,7 +6,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona
-from domain.catalogo_correcciones import validar_campos_identificados
+from domain.catalogo_correcciones import validar_campos_corregibles
 
 from .comunes import a_iso_utc
 
@@ -116,7 +116,7 @@ class SolicitudDevolucion(BaseModel):
     @field_validator("campos_identificados")
     @classmethod
     def _validar_campos(cls, v: List[str]) -> List[str]:
-        return validar_campos_identificados(v)
+        return validar_campos_corregibles(v)
 
 
 class ResumenDevolucion(BaseModel):

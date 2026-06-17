@@ -40,20 +40,26 @@ enrutador = APIRouter(
     tags=["expedientes"],
 )
 
+_ROLES_A_CONTRAPARTES = {
+    "acceso_clientes": "cliente",
+    "acceso_proveedores": "proveedor",
+}
 
 def _contrapartes_permitidas(usuario: UsuarioPortalInterno) -> list[str]:
     """Deriva las carpetas visibles según los roles del operador autenticado."""
-    permitidas = []
-    if usuario.tiene_rol("acceso_clientes"):
-        permitidas.append("cliente")
-    if usuario.tiene_rol("acceso_proveedores"):
-        permitidas.append("proveedor")
+
+    permitidas = [
+        tipo
+        for rol, tipo in _ROLES_A_CONTRAPARTES.items()
+        if usuario.tiene_rol(rol)
+    ]
+
     if not permitidas:
         raise SinPermisoError("sin_roles")
+
     return permitidas
 
-
-# ─── Listado ──────────────────────────────────────────────────────────────────
+# ─── 1. Listado y consulta ─────────────────────────────────────────────────────
 
 @enrutador.get(
     "/",
@@ -77,8 +83,6 @@ def listar_expedientes(
         contrapartes_permitidas=_contrapartes_permitidas(usuario),
     )
 
-
-# ─── Detalle ──────────────────────────────────────────────────────────────────
 
 @enrutador.get(
     "/{formulario_id}",
@@ -130,8 +134,6 @@ def descargar_reporte_comparacion(
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
-# ─── Descarga de documentos ───────────────────────────────────────────────────
-
 @enrutador.get(
     "/{formulario_id}/documentos/{doc_id}/descargar",
     summary="Descargar documento adjunto",
@@ -150,7 +152,7 @@ def descargar_documento(
     return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)
 
 
-# ─── Carga Manual ─────────────────────────────────────────────────────────────
+# ─── 2. Carga y actualización de documentos ────────────────────────────────────
 
 @enrutador.post(
     "/{formulario_id}/carga-manual",
@@ -213,7 +215,8 @@ async def carga_reporte_final(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ─── Aprobación / Rechazo ────────────────────────────────────────────────────
+
+# ─── 3. Transiciones de estado (Aprobar, Rechazar, Devolver) ──────────────────
 
 @enrutador.post(
     "/{formulario_id}/aprobar",

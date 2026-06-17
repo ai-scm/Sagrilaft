@@ -12,7 +12,7 @@ from __future__ import annotations
 # IDs de campo válidos que un área puede marcar como "requiere corrección".
 # Deben coincidir exactamente con los IDs usados en el catálogo del frontend
 # (frontend/src/data/catalogoCorrecciones.js).
-CAMPOS_IDENTIFICABLES_PARA_CORRECION: frozenset[str] = frozenset({
+CAMPOS_CORREGIBLES: frozenset[str] = frozenset({
     # Paso 2 — Información básica
     "tipo_contraparte",
     "tipo_persona",
@@ -100,7 +100,7 @@ CAMPOS_IDENTIFICABLES_PARA_CORRECION: frozenset[str] = frozenset({
 # Etiquetas legibles de cada campo identificable.
 # Se usan en el correo de notificación para que la contraparte entienda
 # qué campos corregir sin necesidad de abrir el formulario.
-ETIQUETA_DE_CAMPO_EN_CORRECION: dict[str, str] = {
+ETIQUETAS_CAMPOS_CORREGIBLES: dict[str, str] = {
     "tipo_contraparte":        "Tipo de Contraparte",
     "tipo_persona":            "Tipo de Persona",
     "tipo_solicitud":          "Tipo de Solicitud",
@@ -172,22 +172,22 @@ ETIQUETA_DE_CAMPO_EN_CORRECION: dict[str, str] = {
 }
 
 
-def resolver_etiquetas(campos: list[str]) -> list[str]:
+def resolver_etiquetas_campos_corregibles(campos_corregibles: list[str]) -> list[str]:
     """Convierte IDs de campo a sus etiquetas legibles para mostrar en el correo."""
-    return [ETIQUETA_DE_CAMPO_EN_CORRECION.get(campo, campo) for campo in campos]
+    return [ETIQUETAS_CAMPOS_CORREGIBLES.get(campo, campo) for campo in campos_corregibles]
 
 
-def validar_campos_identificados(campos: list[str]) -> list[str]:
+def validar_campos_corregibles(campos: list[str]) -> list[str]:
     """
     Verifica que todos los IDs de campo proporcionados existen en el catálogo.
 
     Raises:
         ValueError: si algún ID no es reconocido, listando los inválidos.
     """
-    invalidos = [c for c in campos if c not in CAMPOS_IDENTIFICABLES_PARA_CORRECION]
-    if invalidos:
+    campos_no_corregibles = [campo for campo in campos if campo not in CAMPOS_CORREGIBLES]
+    if campos_no_corregibles:
         raise ValueError(
-            f"Los siguientes campos no son identificables en el formulario: {invalidos}. "
+            f"Los siguientes campos no son identificables en el formulario: {campos_no_corregibles}. "
             f"Consulte el catálogo de campos permitidos."
         )
     return campos

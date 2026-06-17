@@ -8,7 +8,7 @@ fue eliminado tras la migración de AccesoManualService a entidades de dominio.
 import dataclasses
 from typing import Any, Dict, List
 
-from domain.catalogo_correcciones import CAMPOS_IDENTIFICABLES_PARA_CORRECION
+from domain.catalogo_correcciones import CAMPOS_CORREGIBLES
 from domain.contratos import DocumentoDatos
 from domain.formulario.entidades import FormularioDatos
 
@@ -17,7 +17,7 @@ from domain.formulario.entidades import FormularioDatos
 _CAMPOS_EXCLUIDOS_DICT = frozenset({"documentos", "validaciones"})
 
 # Fuente única de verdad para los campos versionables que se guardan junto al PDF.
-_CAMPOS_VERSIONABLES_SNAPSHOT = CAMPOS_IDENTIFICABLES_PARA_CORRECION
+_CAMPOS_VERSIONABLES_SNAPSHOT = CAMPOS_CORREGIBLES
 
 
 def formulario_a_dict(formulario: FormularioDatos) -> Dict[str, Any]:

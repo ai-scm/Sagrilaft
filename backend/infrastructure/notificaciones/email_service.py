@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from infrastructure.configuracion import SmtpConfig
-from domain.catalogo_correcciones import resolver_etiquetas
+from domain.catalogo_correcciones import resolver_etiquetas_campos_corregibles
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ def _construir_cuerpo_texto(
 ) -> str:
     seccion_campos = ""
     if campos_identificados:
-        etiquetas = resolver_etiquetas(campos_identificados)
+        etiquetas = resolver_etiquetas_campos_corregibles(campos_identificados)
         lineas = "\n".join(f"  - {e}" for e in etiquetas)
         seccion_campos = f"\nCampos que requieren corrección:\n{lineas}\n"
 
@@ -241,7 +241,7 @@ def _construir_cuerpo_html(
 
     seccion_campos_html = ""
     if campos_identificados:
-        etiquetas = resolver_etiquetas(campos_identificados)
+        etiquetas = resolver_etiquetas_campos_corregibles(campos_identificados)
         items = "".join(f"<li>{e}</li>" for e in etiquetas)
         seccion_campos_html = (
             '<p style="font-weight:700; margin-bottom: 6px;">Campos que requieren corrección:</p>'
