@@ -60,10 +60,10 @@ def coercionar_porcentaje(v: object) -> float | None:
 def coercionar_porcentaje_participacion(v: object) -> float | None:
     """
     Coerciona porcentaje de participación accionaria o control efectivo.
-    Rango permitido: (0, PORCENTAJE_MAXIMO_PERMITIDO) exclusivo — ningún titular puede ostentar el 100%,
-    pues la figura aplica solo cuando existen múltiples partes.
+    Rango permitido: [0, PORCENTAJE_MAXIMO_PERMITIDO].
+    El 100% es válido cuando la tabla solo tiene un registro.
     """
     valor = coercionar_porcentaje(v)
-    if valor is not None and valor >= PORCENTAJE_MAXIMO_PERMITIDO:
-        raise ValueError(f'El porcentaje de participación no puede ser igual o superior al {PORCENTAJE_MAXIMO_PERMITIDO}%')
+    if valor is not None and valor > PORCENTAJE_MAXIMO_PERMITIDO:
+        raise ValueError(f'El porcentaje de participación no puede superar el {PORCENTAJE_MAXIMO_PERMITIDO}%')
     return valor

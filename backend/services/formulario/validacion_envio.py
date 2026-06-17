@@ -365,10 +365,10 @@ class ValidadorEnvioFormulario:
                     campo=f"{campo_base}[{i}].porcentaje",
                     mensaje=f"{etiqueta_entidad} '{nombre}' debe tener {nombre_porcentaje} mayor al {umbral_minimo:.0f}%",
                 )
-            if valor >= PORCENTAJE_MAXIMO_PERMITIDO:
+            if valor > PORCENTAJE_MAXIMO_PERMITIDO:
                 return ErrorValidacion(
                     campo=f"{campo_base}[{i}].porcentaje",
-                    mensaje=f"{etiqueta_entidad} '{nombre}' no puede tener {nombre_porcentaje} del {PORCENTAJE_MAXIMO_PERMITIDO}% o superior",
+                    mensaje=f"{etiqueta_entidad} '{nombre}' no puede tener {nombre_porcentaje} superior al {PORCENTAJE_MAXIMO_PERMITIDO}%",
                 )
             return None
         return regla
