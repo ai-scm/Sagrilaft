@@ -9,40 +9,55 @@ import textosAyudaCampos from '../data/helpTexts';
 import { CAMPOS_REQUERIDOS, CAMPOS_CONDICIONALES } from '../data/formularioConfig';
 import { validarReglasEspeciales } from '../utils/inputValidation';
 
+/**
+ * Determina si un valor de campo está vacío o sin seleccionar.
+ * Soporta cadenas de texto, arreglos (selects multi-valor) y valores nulos.
+ */
+function esCampoVacio(valor) {
+  if (valor === null || valor === undefined) return true;
+  if (typeof valor === 'string') return !valor.trim();
+  if (Array.isArray(valor)) return valor.length === 0;
+  return false;
+}
+
+/** Genera el mensaje de error predeterminado para un campo obligatorio vacío. */
+function mensajeObligatorio(campo, mensajesPersonalizados) {
+  return mensajesPersonalizados[campo]
+    ?? `${textosAyudaCampos[campo]?.titulo || campo} es obligatorio`;
+}
+
 export function useFormValidacion(formData) {
   const [errors, setErrors] = useState({});
 
   /** Valida los campos requeridos de un paso. Retorna el mapa de errores (sin mutar estado). */
   const validarPaso = useCallback((stepNum) => {
-    const campos = CAMPOS_REQUERIDOS[stepNum] || [];
-    const camposErr = {};
+    const camposRequeridos = CAMPOS_REQUERIDOS[stepNum] || [];
+    const errores = {};
 
-    for (const field of campos) {
-      const valor = formData[field];
-      if (!valor || (typeof valor === 'string' && !valor.trim())) {
-        camposErr[field] = `${textosAyudaCampos[field]?.titulo || field} es obligatorio`;
+    for (const campo of camposRequeridos) {
+      if (esCampoVacio(formData[campo])) {
+        errores[campo] = mensajeObligatorio(campo, {});
       }
     }
 
-    // Reglas especiales: longitud exacta, solo numéricos, etc.
-    const reglasErr = validarReglasEspeciales(formData, campos);
+    // Reglas especiales: longitud exacta, solo numéricos, formato correo, etc.
+    const reglasErr = validarReglasEspeciales(formData, camposRequeridos);
     for (const [campo, mensaje] of Object.entries(reglasErr)) {
-      if (!camposErr[campo]) camposErr[campo] = mensaje;
+      if (!errores[campo]) errores[campo] = mensaje;
     }
 
-    // Campos condicionales: declarados en formularioConfig — agregar nuevos allá sin tocar aquí
+    // Campos condicionales: declarados en formularioConfig — agregar nuevos allá sin tocar aquí.
     for (const { condicion, campos: camposCondicionados, mensajes = {} } of (CAMPOS_CONDICIONALES[stepNum] || [])) {
       if (condicion(formData)) {
         for (const campo of camposCondicionados) {
-          const valor = formData[campo];
-          if (!valor || (typeof valor === 'string' && !valor.trim())) {
-            camposErr[campo] = mensajes[campo] ?? `${textosAyudaCampos[campo]?.titulo || campo} es obligatorio`;
+          if (esCampoVacio(formData[campo])) {
+            errores[campo] = mensajeObligatorio(campo, mensajes);
           }
         }
       }
     }
 
-    return camposErr;
+    return errores;
   }, [formData]);
 
   /** Aplica un mapa de errores al estado (usado por handleNext y handleSubmit). */

@@ -26,6 +26,37 @@ import { calcularValorDv } from '../utils/inputValidation';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
+/** Campos que dependen de la respuesta a 'realiza_operaciones_moneda_extranjera'. */
+const CAMPOS_DEPENDIENTES_MONEDA_EXTRANJERA = [
+  'paises_operaciones',
+  'tipos_transaccion',
+  'tipos_transaccion_otros',
+];
+
+/**
+ * Retorna el nuevo estado del formulario tras cambiar la opción de moneda extranjera.
+ * Si el nuevo valor es distinto de 'si', purga los campos dependientes para evitar
+ * que datos residuales contaminen el envío o persistan en el borrador.
+ */
+function _actualizarMonedaConDependientes(estadoAnterior, nuevoValor) {
+  const siguiente = { ...estadoAnterior, realiza_operaciones_moneda_extranjera: nuevoValor };
+  if (nuevoValor !== 'si') {
+    siguiente.paises_operaciones      = '';
+    siguiente.tipos_transaccion       = [];
+    siguiente.tipos_transaccion_otros = '';
+  }
+  return siguiente;
+}
+
+/**
+ * Limpia los errores de validación de la pregunta principal y sus campos dependientes.
+ * Se invoca siempre que el usuario modifica la selección de moneda extranjera.
+ */
+function _limpiarErroresDependientesMoneda(limpiarError) {
+  limpiarError('realiza_operaciones_moneda_extranjera');
+  CAMPOS_DEPENDIENTES_MONEDA_EXTRANJERA.forEach(limpiarError);
+}
+
 export function useFormulario() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({});
@@ -153,16 +184,8 @@ export function useFormulario() {
    * persista datos de campos que el usuario ya no ve.
    */
   const handleMonedaExtranjeraChange = useCallback((nuevoValor) => {
-    setFormData(prev => {
-      const siguiente = { ...prev, realiza_operaciones_moneda_extranjera: nuevoValor };
-      if (nuevoValor !== 'si') {
-        siguiente.paises_operaciones     = '';
-        siguiente.tipos_transaccion      = [];
-        siguiente.tipos_transaccion_otros = '';
-      }
-      return siguiente;
-    });
-    limpiarError('realiza_operaciones_moneda_extranjera');
+    setFormData(prev => _actualizarMonedaConDependientes(prev, nuevoValor));
+    _limpiarErroresDependientesMoneda(limpiarError);
   }, [limpiarError]);
 
   /**
@@ -196,7 +219,11 @@ export function useFormulario() {
       tipos_transaccion: tiposSeleccionados,
       ...(!tiposSeleccionados.includes('otras') && { tipos_transaccion_otros: '' }),
     }));
-  }, []);
+    limpiarError('tipos_transaccion');
+    if (!tiposSeleccionados.includes('otras')) {
+      limpiarError('tipos_transaccion_otros');
+    }
+  }, [limpiarError]);
 
   const handleFileChange = useCallback(async (tipoDoc, file) => {
     if (!file) return;
