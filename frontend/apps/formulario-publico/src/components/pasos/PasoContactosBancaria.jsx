@@ -65,6 +65,68 @@ function CeldaEliminar({ mostrar, onClick, title }) {
 const clsGrupo = (pendiente, completado) =>
   ['form-group', pendiente ? 'correccion-pendiente' : completado ? 'correccion-completada' : ''].filter(Boolean).join(' ');
 
+/**
+ * Sección condicional de operaciones en moneda extranjera.
+ * Solo se renderiza cuando el usuario responde "Sí" a la pregunta principal.
+ */
+function SeccionMonedaExtranjera({ formData, onChange, onOpenHelp, errors, tiposValue, tiposPendiente, tiposCompletado, handleTiposChange }) {
+  const mostrarCampoOtrasTransacciones = (formData.tipos_transaccion ?? []).includes('otras');
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      <div className="form-row single">
+        <FormField
+          label="Países en los que realiza operaciones"
+          name="paises_operaciones"
+          required={true}
+          error={errors.paises_operaciones}
+          value={formData.paises_operaciones} onChange={onChange}
+          onOpenHelp={onOpenHelp}
+          placeholder="Ej: Estados Unidos, Alemania, China"
+        />
+      </div>
+
+      <div
+        className={clsGrupo(tiposPendiente, tiposCompletado)}
+        style={{ marginTop: '12px' }}
+      >
+        <SubLabel>
+          Si su actividad implica transacciones en moneda extranjera, señale los tipos de transacción: <span style={{ color: 'var(--error, #e53e3e)' }}>*</span>
+          {tiposPendiente  && <span className="correccion-mark"    title="Este campo requiere corrección" aria-label="Requiere corrección">✎</span>}
+          {tiposCompletado && <span className="correccion-ok-mark" title="Corrección completada"          aria-label="Corregido">✓</span>}
+        </SubLabel>
+        <Select
+          inputId="tipos_transaccion"
+          isMulti
+          value={tiposValue}
+          onChange={handleTiposChange}
+          options={TIPOS_TRANSACCION}
+          placeholder="Seleccione uno o más tipos..."
+          noOptionsMessage={() => 'Sin opciones'}
+          styles={buildSelectStyles(!!errors.tipos_transaccion, tiposValue.length > 0, tiposPendiente)}
+        />
+        <MensajeError msg={errors.tipos_transaccion} />
+        {tiposPendiente  && !errors.tipos_transaccion && <div className="correccion-aviso">Este campo requiere corrección</div>}
+        {tiposCompletado && <div className="correccion-aviso correccion-aviso--ok">Corrección completada</div>}
+      </div>
+
+      {mostrarCampoOtrasTransacciones && (
+        <div className="form-row single" style={{ marginTop: '12px' }}>
+          <FormField
+            label="¿Cuáles?"
+            name="tipos_transaccion_otros"
+            required={true}
+            error={errors.tipos_transaccion_otros}
+            value={formData.tipos_transaccion_otros} onChange={onChange}
+            onOpenHelp={onOpenHelp}
+            placeholder="Describa las otras transacciones"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 /**
@@ -78,21 +140,21 @@ export default function PasoContactosBancaria({
 }) {
   const errFilasComerciales = errors.referencias_comerciales_filas ?? [];
   const errFilasBancarias   = errors.referencias_bancarias_filas   ?? [];
-  const realizaMoneda      = formData.realiza_operaciones_moneda_extranjera === 'si';
-  const tiposSeleccionados  = formData.tipos_transaccion ?? [];
-  const muestraCuales      = tiposSeleccionados.includes('otras');
 
-  const handleMonedaChange = (option) => onMonedaChange(option?.value ?? '');
+  const realizaOperacionesMonedaExtranjera = formData.realiza_operaciones_moneda_extranjera === 'si';
+  const tiposSeleccionados                 = formData.tipos_transaccion ?? [];
+
+  const handleMonedaChange = (opcion) => onMonedaChange(opcion?.value ?? '');
   const handleTiposChange  = (opciones) => onTiposChange(opciones.map(o => o.value));
 
   const tiposValue  = TIPOS_TRANSACCION.filter(o => tiposSeleccionados.includes(o.value));
   const monedaValue = OPCIONES_MONEDA.find(o => o.value === formData.realiza_operaciones_moneda_extranjera) ?? null;
 
   const { esCampoConCorreccion, camposPendientes } = useCorreccion();
-  const refComercMarcada = camposPendientes.has('referencias_comerciales');
-  const refBancMarcada   = camposPendientes.has('referencias_bancarias');
-  const monedaMarcada    = esCampoConCorreccion('realiza_operaciones_moneda_extranjera');
-  const tiposTxMarcados  = esCampoConCorreccion('tipos_transaccion');
+  const seccionRefComercMarcada = camposPendientes.has('referencias_comerciales');
+  const seccionRefBancMarcada   = camposPendientes.has('referencias_bancarias');
+  const monedaMarcada           = esCampoConCorreccion('realiza_operaciones_moneda_extranjera');
+  const tiposTxMarcados         = esCampoConCorreccion('tipos_transaccion');
 
   const monedaPendiente  = monedaMarcada && !monedaValue;
   const monedaCompletada = monedaMarcada && !!monedaValue;
@@ -105,7 +167,7 @@ export default function PasoContactosBancaria({
       <p className="section-subtitle">Datos de contacto y referencias comerciales y bancarias</p>
 
       {/* ── REFERENCIAS COMERCIALES ─────────────────────────────────────────── */}
-      <BloqueCorreccion marcado={refComercMarcada} titulo="REFERENCIAS COMERCIALES">
+      <BloqueCorreccion marcado={seccionRefComercMarcada} titulo="REFERENCIAS COMERCIALES">
       <FilaError mensaje={errors.referencias_comerciales_tabla} />
       <div className="data-table-container">
         <table className="data-table">
@@ -164,7 +226,7 @@ export default function PasoContactosBancaria({
       <HR />
 
       {/* ── REFERENCIAS BANCARIAS ───────────────────────────────────────────── */}
-      <BloqueCorreccion marcado={refBancMarcada} titulo="REFERENCIAS BANCARIAS">
+      <BloqueCorreccion marcado={seccionRefBancMarcada} titulo="REFERENCIAS BANCARIAS">
       <FilaError mensaje={errors.referencias_bancarias_tabla} />
       <div className="data-table-container">
         <table className="data-table">
@@ -232,53 +294,17 @@ export default function PasoContactosBancaria({
           {monedaCompletada && <div className="correccion-aviso correccion-aviso--ok">Corrección completada</div>}
         </div>
 
-        {realizaMoneda && (
-          <div style={{ marginTop: '16px' }}>
-            <div className="form-row single">
-              <FormField
-                label="Países en los que realiza operaciones"
-                name="paises_operaciones"
-                value={formData.paises_operaciones} onChange={onChange}
-                onOpenHelp={onOpenHelp}
-                placeholder="Ej: Estados Unidos, Alemania, China"
-              />
-            </div>
-
-            <div
-              className={clsGrupo(tiposPendiente, tiposCompletado)}
-              style={{ marginTop: '12px' }}
-            >
-              <SubLabel>
-                Si su actividad implica transacciones en moneda extranjera, señale los tipos de transacción:
-                {tiposPendiente  && <span className="correccion-mark"    title="Este campo requiere corrección" aria-label="Requiere corrección">✎</span>}
-                {tiposCompletado && <span className="correccion-ok-mark" title="Corrección completada"          aria-label="Corregido">✓</span>}
-              </SubLabel>
-              <Select
-                inputId="tipos_transaccion"
-                isMulti
-                value={tiposValue}
-                onChange={handleTiposChange}
-                options={TIPOS_TRANSACCION}
-                placeholder="Seleccione uno o más tipos..."
-                noOptionsMessage={() => 'Sin opciones'}
-                styles={buildSelectStyles(false, tiposValue.length > 0, tiposPendiente)}
-              />
-              {tiposPendiente  && <div className="correccion-aviso">Este campo requiere corrección</div>}
-              {tiposCompletado && <div className="correccion-aviso correccion-aviso--ok">Corrección completada</div>}
-            </div>
-
-            {muestraCuales && (
-              <div className="form-row single" style={{ marginTop: '12px' }}>
-                <FormField
-                  label="¿Cuáles?"
-                  name="tipos_transaccion_otros"
-                  value={formData.tipos_transaccion_otros} onChange={onChange}
-                  onOpenHelp={onOpenHelp}
-                  placeholder="Describa las otras transacciones"
-                />
-              </div>
-            )}
-          </div>
+        {realizaOperacionesMonedaExtranjera && (
+          <SeccionMonedaExtranjera
+            formData={formData}
+            onChange={onChange}
+            onOpenHelp={onOpenHelp}
+            errors={errors}
+            tiposValue={tiposValue}
+            tiposPendiente={tiposPendiente}
+            tiposCompletado={tiposCompletado}
+            handleTiposChange={handleTiposChange}
+          />
         )}
       </div>
 
