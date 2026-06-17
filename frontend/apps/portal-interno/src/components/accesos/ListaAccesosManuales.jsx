@@ -13,6 +13,9 @@ import {
   formatearFechaCorta,
   generarTextoConteo,
 } from '../../config/constantes';
+import { obtenerCredencialesRecientes } from '../../utils/credenciales';
+import ModalCredencialesRecientes from './ModalCredencialesRecientes';
+import ModalAlertaExpirada from './ModalAlertaExpirada';
 
 // ── Constantes de filtrado ────────────────────────────────────────────────────
 
@@ -84,6 +87,8 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           '6px',
+    cursor:        'pointer',
+    transition:    'transform 0.15s, box-shadow 0.15s',
   },
   tarjetaExpirada: {
     borderColor: '#fca5a5',
@@ -197,14 +202,25 @@ function BarraFiltros({ filtros, onCambiar, onLimpiar }) {
 
 // ── Sub-componente: tarjeta individual ───────────────────────────────────────
 
-function TarjetaAccesoManual({ acceso }) {
+function TarjetaAccesoManual({ acceso, onClick }) {
   const tipoLabel      = obtenerEtiqueta(ETIQUETA_TIPO_CONTRAPARTE, acceso.tipo_contraparte);
   const areaLabel      = obtenerEtiqueta(ETIQUETA_AREA_RESPONSABLE, acceso.area_responsable);
   const accesoExpirado = acceso.estado_acceso === 'expirado';
   const estiloTarjeta  = accesoExpirado ? { ...s.tarjeta, ...s.tarjetaExpirada } : s.tarjeta;
 
   return (
-    <div style={estiloTarjeta}>
+    <div 
+      style={estiloTarjeta} 
+      onClick={() => onClick(acceso)}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'none';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
+    >
       <div style={s.filaSuperior}>
         <div style={s.filaCodigo}>
           <span style={s.codigo}>{acceso.codigo_peticion}</span>
@@ -238,6 +254,8 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
   const [cargando, setCargando]               = useState(true);
   const [error, setError]                     = useState(null);
   const [filtros, setFiltros]                 = useState(FILTROS_VACIOS);
+  const [credencialesSeleccionadas, setCredencialesSeleccionadas] = useState(null);
+  const [alertaExpirada, setAlertaExpirada]   = useState(false);
 
   const cargarAccesos = useCallback(async () => {
     setCargando(true);
@@ -260,6 +278,15 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
 
   function limpiarFiltros() {
     setFiltros(FILTROS_VACIOS);
+  }
+
+  function handleAccesoClick(acceso) {
+    const credenciales = obtenerCredencialesRecientes(acceso.codigo_peticion);
+    if (credenciales) {
+      setCredencialesSeleccionadas(credenciales);
+    } else {
+      setAlertaExpirada(true);
+    }
   }
 
   const accesosFiltrados = aplicarFiltros(accesosManuales, filtros);
@@ -285,8 +312,18 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
       {sinResultados && <div style={s.estadoVacio}>{MENSAJE_SIN_RESULTADOS}</div>}
 
       {!cargando && accesosFiltrados.map(acceso => (
-        <TarjetaAccesoManual key={acceso.id} acceso={acceso} />
+        <TarjetaAccesoManual key={acceso.id} acceso={acceso} onClick={handleAccesoClick} />
       ))}
+
+      <ModalCredencialesRecientes 
+        credenciales={credencialesSeleccionadas}
+        onClose={() => setCredencialesSeleccionadas(null)}
+      />
+
+      <ModalAlertaExpirada
+        isOpen={alertaExpirada}
+        onClose={() => setAlertaExpirada(false)}
+      />
     </div>
   );
 }

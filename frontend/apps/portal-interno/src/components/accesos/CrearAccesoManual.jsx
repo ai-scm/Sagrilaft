@@ -12,6 +12,7 @@ import {
   formatearFechaLarga,
   ETIQUETA_TIPO_CONTRAPARTE,
 } from '../../config/constantes';
+import { guardarCredenciales } from '../../utils/credenciales';
 
 import { ESTILOS } from './CrearAccesoManualStyles';
 
@@ -116,6 +117,7 @@ export default function CrearAccesoManual() {
     setErrorGlobal(null);
     try {
       const acceso = await api.crearAccesoManual(formData);
+      guardarCredenciales(acceso);
       setResultado(acceso);
     } catch (errorCreacion) {
       setErrorGlobal('Error al crear el acceso. Verifique los datos e intente nuevamente.');
@@ -159,7 +161,7 @@ export default function CrearAccesoManual() {
         <div style={ESTILOS.cuerpoExito}>
           <div style={ESTILOS.advertenciaPIN}>
             <strong>Nota de seguridad:</strong> El PIN se muestra una sola vez. Anótelo o compártalo
-            de forma segura antes de cerrar esta pantalla. El sistema nunca lo vuelve a mostrar.
+            de forma segura antes de cerrar esta pantalla. Tiene una ventana de 10 min para verlo en "Ver accesos" después de creado, pero luego se ocultará por seguridad.
           </div>
 
           <div style={ESTILOS.notaCorreo}>
