@@ -275,6 +275,16 @@ La clasificación se relaciona con el CIIU
     descripcion: "Indique si la empresa realiza transacciones en divisas distintas al peso colombiano (importaciones, exportaciones, inversiones en el exterior, etc.).",
     ejemplo: "Seleccione 'Sí' si tiene pagos o cobros en dólares, euros u otra divisa.",
   },
+  paises_operaciones: {
+    titulo: "Países en los que realiza operaciones",
+    descripcion: "Indique los países con los que realiza transacciones en moneda extranjera.",
+    ejemplo: "Estados Unidos, Alemania, China",
+  },
+  tipos_transaccion: {
+    titulo: "Tipos de transacción",
+    descripcion: "Señale cuáles tipos de transacciones realiza en moneda extranjera.",
+    ejemplo: "Importación, Exportación",
+  },
 };
 
 export default textosAyudaCampos;

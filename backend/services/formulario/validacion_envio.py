@@ -239,7 +239,12 @@ class ValidadorEnvioFormulario:
             ))
 
         tipos = self._deserializar_lista(formulario.tipos_transaccion)
-        if "otras" in tipos and _esta_vacio(formulario.tipos_transaccion_otros):
+        if not tipos:
+            errores.append(ErrorValidacion(
+                campo="tipos_transaccion",
+                mensaje="Debe seleccionar al menos un tipo de transacción",
+            ))
+        elif "otras" in tipos and _esta_vacio(formulario.tipos_transaccion_otros):
             errores.append(ErrorValidacion(
                 campo="tipos_transaccion_otros",
                 mensaje="El campo '¿Cuáles?' es obligatorio cuando selecciona 'Otras'",

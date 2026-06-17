@@ -52,6 +52,16 @@ export const DOCUMENTOS_CONFIG = [
 export const CAMPOS_PERSONA_NATURAL = ['ciudad_residencia', 'direccion_residencia'];
 
 /**
+ * Mensajes de validación para los campos dependientes de moneda extranjera (Paso 6).
+ * Fuente única de verdad — espeja los mensajes del backend (validacion_envio.py).
+ */
+const MENSAJES_VALIDACION_MONEDA_EXTRANJERA = {
+  paises_operaciones:      'El campo "Países en los que realiza operaciones" es obligatorio',
+  tipos_transaccion:       'Debe seleccionar al menos un tipo de transacción',
+  tipos_transaccion_otros: 'El campo "¿Cuáles?" es obligatorio cuando selecciona "Otras"',
+};
+
+/**
  * Campos obligatorios condicionalmente por paso, según el tipo de persona.
  * Cada entrada es una lista de { condicion, campos } — si condicion(formData) es true,
  * esos campos se validan como obligatorios. Agregar nuevos casos aquí sin tocar validarPaso.
@@ -74,6 +84,21 @@ export const CAMPOS_CONDICIONALES = {
         ciudad_residencia: 'Ciudad de Residencia es obligatoria',
         direccion_residencia: 'Dirección de Residencia es obligatoria',
       },
+    },
+  ],
+  6: [
+    {
+      condicion: (fd) => fd.realiza_operaciones_moneda_extranjera === 'si',
+      campos: ['paises_operaciones', 'tipos_transaccion'],
+      mensajes: MENSAJES_VALIDACION_MONEDA_EXTRANJERA,
+    },
+    {
+      condicion: (fd) =>
+        fd.realiza_operaciones_moneda_extranjera === 'si' &&
+        Array.isArray(fd.tipos_transaccion) &&
+        fd.tipos_transaccion.includes('otras'),
+      campos: ['tipos_transaccion_otros'],
+      mensajes: MENSAJES_VALIDACION_MONEDA_EXTRANJERA,
     },
   ],
   7: [
