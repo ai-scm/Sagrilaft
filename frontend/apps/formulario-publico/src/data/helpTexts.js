@@ -205,6 +205,11 @@ La clasificación se relaciona con el CIIU
     titulo: "Patrimonio",
     descripcion: "Patrimonio neto (Activos - Pasivos). Este valor se verificará contra los estados financieros adjuntos.",
   },
+  moneda_declaracion: {
+    titulo: "Moneda de Declaración",
+    descripcion: "Moneda en la que se declaran los valores financieros (ingresos, egresos, activos, pasivos y patrimonio).",
+    ejemplo: "COP (Pesos Colombianos) o USD (Dólares Estadounidenses)"
+  },
 
   // Clasificación tributaria
   actividad_clasificacion: { titulo: "Actividad", descripcion: "Actividad principal de la empresa." },
@@ -284,6 +289,29 @@ La clasificación se relaciona con el CIIU
     titulo: "Tipos de transacción",
     descripcion: "Señale cuáles tipos de transacciones realiza en moneda extranjera.",
     ejemplo: "Importación, Exportación",
+  },
+
+  // Paso 8 — Declaraciones y Firma
+  origen_fondos: {
+    titulo: "Origen de Fondos",
+    descripcion: "Describa las actividades económicas o fuentes de las cuales provienen los recursos de la empresa.",
+    ejemplo: "Venta de servicios de consultoría, exportación de productos"
+  },
+  dia_firma: {
+    titulo: "Día",
+    descripcion: "Día en que se firma el documento (1-31).",
+  },
+  mes_firma: {
+    titulo: "Mes",
+    descripcion: "Mes en que se firma el documento.",
+  },
+  year_firma: {
+    titulo: "Año",
+    descripcion: "Año en que se firma el documento.",
+  },
+  ciudad_firma: {
+    titulo: "Ciudad de Firma",
+    descripcion: "Ciudad donde se firma el documento. Se muestra en el pie de firma del formulario.",
   },
 };
 

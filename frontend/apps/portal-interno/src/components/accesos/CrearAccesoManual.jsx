@@ -56,7 +56,7 @@ function CampoSelect({ id, label, value, onChange, options, error, disabled }) {
   );
 }
 
-function CampoInput({ id, label, type = 'text', placeholder, value, onChange, onFocus, onBlur, style, error, disabled }) {
+function CampoInput({ id, label, type = 'text', placeholder, value, onChange, onFocus, onBlur, style, error, disabled, autoComplete }) {
   return (
     <div style={ESTILOS.campo}>
       <label style={ESTILOS.label} htmlFor={id}>
@@ -67,6 +67,7 @@ function CampoInput({ id, label, type = 'text', placeholder, value, onChange, on
         value={value} onChange={e => onChange(id, e.target.value)}
         onFocus={onFocus} onBlur={onBlur}
         style={style} disabled={disabled}
+        autoComplete={autoComplete}
       />
       {error && <span style={ESTILOS.errorCampo}>{error}</span>}
     </div>
@@ -223,6 +224,7 @@ export default function CrearAccesoManual() {
           value={formData.razon_social} onChange={handleChange}
           onFocus={() => setCampoEnfocado('razon_social')} onBlur={() => setCampoEnfocado(null)}
           style={estiloInput('razon_social')} error={erroresCampo.razon_social} disabled={cargando}
+          autoComplete="off"
         />
         <div style={ESTILOS.fila}>
           <div style={ESTILOS.campo}>

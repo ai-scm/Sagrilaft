@@ -18,7 +18,7 @@ export const PORCENTAJE_MAXIMO_PERMITIDO               = 100;
 // ─── Longitudes de campos de formato estricto ─────────────────────────────────
 
 export const LONGITUD_TELEFONO  = 10;
-export const LONGITUD_MAXIMA_ID = 10;
+export const LONGITUD_MAXIMA_ID = 20;
 
 // ─── Expresiones regulares ────────────────────────────────────────────────────
 
