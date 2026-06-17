@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { City } from 'country-state-city';
 import FormField from '../FormField';
 import LocationSelect from '../LocationSelect';
 import NacionalidadSelect from '../NacionalidadSelect';
@@ -15,9 +14,9 @@ const TIPOS_DOC = [
 /**
  * Paso 3 — Identidad del Sujeto Obligado / Representante Legal.
  *
- * Reutiliza useUbicacion (País → Departamento → Ciudad) en dos bloques:
- *   1. Ciudad donde ejerce funciones
- *   2. Ciudad de residencia (solo persona natural)
+ * Reutiliza useUbicacion (País → Departamento → Ciudad) solo en el bloque
+ * del lugar donde ejerce funciones. La ciudad de residencia quedó como texto
+ * libre para permitir cualquier valor sin depender del país seleccionado.
  *
  * Ciudad de Expedición y Ciudad de Nacimiento son campos de texto libre;
  * no usan selección jerárquica.
@@ -49,15 +48,6 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
     departamentoKey: 'departamento_funciones',
     ciudadKey:       'ciudad_funciones',
   });
-
-  // ── Bloque 2: Ciudad de Residencia (todas las ciudades del país, sin filtro) ─
-  const ciudadesResidencia = useMemo(
-    () => City.getCitiesOfCountry(formData.pais || 'CO').map(c => ({ value: c.name, label: c.name })),
-    [formData.pais],
-  );
-  const selectedCiudadResidencia = ciudadesResidencia.find(o => o.value === formData.ciudad_residencia) ?? null;
-  const handleCiudadResidenciaChange = (option) =>
-    onChange({ target: { name: 'ciudad_residencia', value: option?.value ?? '', type: 'text' } });
 
   return (
     <div className="form-card">
@@ -142,7 +132,7 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
         />
       </div>
 
-      {/* ── Residencia (solo persona natural) ───────────────────────────────── */}
+      {/* ── Residencia libre (solo persona natural) ─────────────────────────── */}
       {esNatural && (
         <>
           <div className="form-row single">
@@ -150,12 +140,14 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
           </div>
 
           <div className="form-row">
-            <LocationSelect
-              label="Ciudad de Residencia" name="ciudad_residencia" required
-              value={selectedCiudadResidencia}
-              onChange={handleCiudadResidenciaChange}
-              options={ciudadesResidencia}
-              onOpenHelp={onOpenHelp} error={errors.ciudad_residencia}
+            <FormField
+              label="Ciudad de Residencia"
+              name="ciudad_residencia"
+              required
+              value={formData.ciudad_residencia}
+              onChange={onChange}
+              onOpenHelp={onOpenHelp}
+              error={errors.ciudad_residencia}
             />
           </div>
         </>
