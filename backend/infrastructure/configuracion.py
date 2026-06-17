@@ -135,6 +135,23 @@ class SnsConfig:
 
 
 @dataclass(frozen=True)
+class SesConfig:
+    """Configuración de Amazon SES para envío directo de emails (alternativa a SNS).
+    
+    SES permite control total sobre MIME headers (Content-Type: text/html),
+    evitando que intermediarios conviertan HTML a markdown.
+    """
+    email_origen: str = field(default_factory=lambda: os.getenv("SES_EMAIL_ORIGEN", ""))
+    habilitado: bool = field(
+        default_factory=lambda: os.getenv("SES_NOTIFICACIONES_ENABLED", "false").lower() == "true"
+    )
+
+    @property
+    def configurado(self) -> bool:
+        return bool(self.email_origen and self.habilitado)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
     db_url: str = field(default_factory=_require_db_url)
@@ -154,6 +171,11 @@ class AppConfig:
     keycloak: KeycloakConfig = field(default_factory=KeycloakConfig)
     s3: S3Config = field(default_factory=S3Config)
     sns: SnsConfig = field(default_factory=SnsConfig)
+    ses: SesConfig = field(default_factory=SesConfig)
+    # URL base del portal interno — usada en enlaces de notificaciones por correo
+    portal_interno_url: str = field(
+        default_factory=lambda: os.getenv("PORTAL_INTERNO_URL", "https://portal.sagrilaft.com")
+    )
     # "local" usa el volumen del servidor; "s3" usa Amazon S3
     storage_backend: str = field(default_factory=lambda: os.getenv("STORAGE_BACKEND", "local"))
     # Clave para firmar reportes de auditoría con HMAC-SHA256

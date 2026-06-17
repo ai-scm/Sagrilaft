@@ -13,6 +13,7 @@ function App({ keycloak }) {
           <Route path="crear" element={<CrearAccesoManual />} />
           <Route path="accesos" element={<ListaAccesosManuales />} />
           <Route path="expedientes" element={<VistaExpedientes />} />
+          <Route path="expedientes/:id" element={<VistaExpedientes />} />
           <Route path="*" element={<Navigate to="/crear" replace />} />
         </Route>
       </Routes>

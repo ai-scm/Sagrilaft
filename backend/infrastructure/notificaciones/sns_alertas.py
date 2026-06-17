@@ -7,7 +7,9 @@ Las suscripciones (email, SQS, Lambda) se gestionan fuera del código.
 Prevención de duplicados: throttling temporal de 5 minutos por formulario+tipo.
 """
 
+import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -15,6 +17,11 @@ from botocore.exceptions import ClientError
 
 from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from infrastructure.configuracion import AWSConfig, SnsConfig
+from infrastructure.notificaciones.templates_correos import (
+    TipoAlertaTemplate,
+    construir_html_notificacion,
+    construir_texto_plano_notificacion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +38,27 @@ _ASUNTO_POR_TIPO: dict[TipoAlerta, str] = {
 
 
 class SnsAlertasPortal:
-    """Adaptador de alertas que publica en Amazon SNS."""
+    """Adaptador de alertas que publica en Amazon SNS.
+    
+    Publica mensajes formatados con HTML y botón directo al formulario.
+    Las suscripciones de email reciben notificaciones profesionales y accesibles.
+    """
 
-    def __init__(self, sns_config: SnsConfig, aws_config: AWSConfig) -> None:
+    def __init__(
+        self,
+        sns_config: SnsConfig,
+        aws_config: AWSConfig,
+        url_portal_interno: Optional[str] = None,
+    ) -> None:
         import boto3
         from botocore.config import Config
 
         self._topic_arn = sns_config.topic_arn
+        # Usar parámetro, variable de entorno o valor por defecto para desarrollo
+        self._url_portal = url_portal_interno or os.getenv(
+            "PORTAL_INTERNO_URL",
+            "https://portal.sagrilaft.com"
+        )
 
         # Cache en memoria: clave = (formulario_id, tipo), valor = datetime del último envío.
         # Previene duplicados si el mismo evento se dispara varias veces en poco tiempo.
@@ -86,13 +107,41 @@ class SnsAlertasPortal:
             return True  # Silencio intencional — no es un error
 
         try:
+            # Mapear TipoAlerta (dominio) a TipoAlertaTemplate (templates)
+            tipo_template = self._mapear_tipo_alerta(tipo)
+            
+            # Construir versiones HTML y texto plano
+            cuerpo_html = construir_html_notificacion(
+                tipo_alerta=tipo_template,
+                formulario_id=formulario_id,
+                razon_social=razon_social,
+                tipo_contraparte=tipo_contraparte,
+                codigo_peticion=codigo_peticion,
+                url_portal=self._url_portal,
+                detalle=detalle,
+            )
+            
+            cuerpo_texto = construir_texto_plano_notificacion(
+                tipo_alerta=tipo_template,
+                formulario_id=formulario_id,
+                razon_social=razon_social,
+                tipo_contraparte=tipo_contraparte,
+                codigo_peticion=codigo_peticion,
+                url_portal=self._url_portal,
+                detalle=detalle,
+            )
+            
+            # Publicar con estructura JSON: email recibe HTML, otros canales reciben texto
+            mensaje_json = json.dumps({
+                "default": cuerpo_texto,
+                "email": cuerpo_html,
+            })
+            
             respuesta = self._cliente.publish(
                 TopicArn=self._topic_arn,
                 Subject=_ASUNTO_POR_TIPO[tipo],
-                Message=_construir_cuerpo(
-                    tipo, formulario_id, razon_social,
-                    tipo_contraparte, codigo_peticion, detalle,
-                ),
+                Message=mensaje_json,
+                MessageStructure="json",
                 MessageAttributes={
                     "tipo_evento": {"DataType": "String", "StringValue": tipo.value}
                 },
@@ -176,27 +225,13 @@ class SnsAlertasPortal:
         for clave in expiradas:
             del self._ultimo_envio[clave]
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _construir_cuerpo(
-    tipo: TipoAlerta,
-    formulario_id: str,
-    razon_social: str,
-    tipo_contraparte: str,
-    codigo_peticion: Optional[str],
-    detalle: Optional[str],
-) -> str:
-    timestamp = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
-    lineas = [
-        f"Evento:           {tipo.value}",
-        f"Fecha/Hora:       {timestamp}",
-        f"Razón Social:     {razon_social}",
-        f"Tipo contraparte: {tipo_contraparte}",
-        f"Código petición:  {codigo_peticion or 'N/A'}",
-        f"Formulario ID:    {formulario_id}",
-    ]
-    if detalle:
-        lineas.append(f"Detalle:          {detalle}")
-    lineas.append("\nRevise el portal SAGRILAFT para gestionar este formulario.")
-    return "\n".join(lineas)
+    def _mapear_tipo_alerta(self, tipo: TipoAlerta) -> TipoAlertaTemplate:
+        """Convierte TipoAlerta (dominio) a TipoAlertaTemplate (templates)."""
+        mapeo = {
+            TipoAlerta.FORMULARIO_RECIBIDO: TipoAlertaTemplate.FORMULARIO_RECIBIDO,
+            TipoAlerta.FORMULARIO_DEVUELTO: TipoAlertaTemplate.FORMULARIO_DEVUELTO,
+            TipoAlerta.FORMULARIO_CORREGIDO: TipoAlertaTemplate.FORMULARIO_CORREGIDO,
+            TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: TipoAlertaTemplate.FORMULARIO_ENVIADO_A_FIRMA,
+            TipoAlerta.FORMULARIO_FIRMADO: TipoAlertaTemplate.FORMULARIO_FIRMADO,
+        }
+        return mapeo[tipo]

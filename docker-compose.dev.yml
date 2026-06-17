@@ -119,9 +119,21 @@ services:
       # modifiques la configuración de red de Docker Compose.
       TRUSTED_PROXY_IPS: "172.0.0.0/8"
 
-      # ── Alertas SNS ───────────────────────────────────────────────────────
-      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
-      SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      # ── Alertas por Email (SES directo) ────────────────────────────────────
+      # URL del portal interno para enlaces en notificaciones de correo
+      # En desarrollo: http://localhost:5174 (puerto local del portal-interno con Vite)
+      PORTAL_INTERNO_URL: ${PORTAL_INTERNO_URL:-http://localhost:5174}
+      
+      # SES DIRECTO (RECOMENDADO - control total sobre Content-Type)
+      # Envía HTML puro sin conversión a markdown
+      SES_EMAIL_ORIGEN: ${SES_EMAIL_ORIGEN:-}
+      SES_NOTIFICACIONES_ENABLED: ${SES_NOTIFICACIONES_ENABLED:-false}
+      ALERTAS_EMAIL_DESTINATARIO: ${ALERTAS_EMAIL_DESTINATARIO:-}
+      
+      # SNS LEGACY (comentado - se envía como text/plain)
+      # SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
+      # SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      
       APP_ENV: ${APP_ENV:-development}
 
     # El backend no arranca hasta que Postgres haya pasado su healthcheck.

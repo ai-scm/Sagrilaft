@@ -6,7 +6,8 @@
  * Al seleccionar un expediente, abre DetalleExpediente como vista superpuesta.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import DetalleExpediente from './DetalleExpediente';
 import { estilosBandeja } from '../ui/listaStyles';
 import useExpedientes from '../../hooks/useExpedientes';
@@ -187,6 +188,8 @@ function TarjetaExpediente({ expediente, onClick }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function VistaExpedientes() {
+  const { id: expedienteIdFromUrl } = useParams();
+  
   const [filtroTipo, setFiltroTipo]                 = useState(FILTRO_TODOS);
   const [filtroEstado, setFiltroEstado]             = useState(FILTRO_TODOS);
   const [busqueda, setBusqueda]                     = useState('');
@@ -200,6 +203,16 @@ export default function VistaExpedientes() {
     recargar,
     busquedaDebounced,
   } = useExpedientes({ filtroTipo, busqueda });
+
+  // Si hay un ID en la URL, busca automáticamente ese expediente
+  useEffect(() => {
+    if (expedienteIdFromUrl && expedientes.length > 0 && !expedienteDetalle) {
+      const expediente = expedientes.find(e => e.formulario_id === expedienteIdFromUrl);
+      if (expediente) {
+        setExpedienteDetalle(expediente);
+      }
+    }
+  }, [expedienteIdFromUrl, expedientes, expedienteDetalle]);
 
   const expedientesFiltrados = expedientes.filter(e => {
     const coincideTipo    = !filtroTipo   || e.tipo_contraparte === filtroTipo;

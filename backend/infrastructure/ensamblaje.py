@@ -61,18 +61,52 @@ def crear_orquestador_validacion(config: AppConfig) -> OrquestadorValidacionDocu
 
 def crear_alertas_portal(config: AppConfig):
     """
-    Fábrica: crea el adaptador SNS si está configurado; None en caso contrario.
+    Fábrica: crea el adaptador de alertas (SES preferido, SNS fallback).
+
+    Prioridad:
+      1. SES si está configurado (recomendado: control total sobre MIME headers)
+      2. SNS si está configurado (legacy)
+      3. None si ninguno está disponible
 
     Retorna None en lugar de lanzar excepción para no bloquear el arranque
-    en entornos sin SNS (desarrollo local, staging sin credenciales).
+    en entornos sin alertas (desarrollo local, staging sin credenciales).
+    
+    Parámetros:
+        config: Configuración de la aplicación (incluye URL del portal interno)
     """
-    if not config.sns.configurado:
-        logger.info("SNS no configurado — alertas al portal deshabilitadas.")
-        return None
-    from infrastructure.notificaciones.sns_alertas import SnsAlertasPortal
-    alertas = SnsAlertasPortal(config.sns, config.aws)
-    logger.info("Alertas SNS habilitadas (topic=%s)", config.sns.topic_arn)
-    return alertas
+    # Preferencia 1: SES (control total sobre Content-Type)
+    if config.ses.configurado:
+        from infrastructure.notificaciones.ses_alertas import SesAlertasPortal
+        alertas = SesAlertasPortal(
+            ses_config=config.ses,
+            aws_config=config.aws,
+            url_portal_interno=config.portal_interno_url,
+        )
+        logger.info(
+            "Alertas SES habilitadas (origen=%s, portal_url=%s)",
+            config.ses.email_origen,
+            config.portal_interno_url,
+        )
+        return alertas
+
+    # Preferencia 2: SNS (legacy, se convierte a plaintext)
+    if config.sns.configurado:
+        from infrastructure.notificaciones.sns_alertas import SnsAlertasPortal
+        alertas = SnsAlertasPortal(
+            sns_config=config.sns,
+            aws_config=config.aws,
+            url_portal_interno=config.portal_interno_url,
+        )
+        logger.info(
+            "Alertas SNS habilitadas (topic=%s, portal_url=%s)",
+            config.sns.topic_arn,
+            config.portal_interno_url,
+        )
+        return alertas
+
+    # Fallback: ninguno configurado
+    logger.info("Alertas al portal deshabilitadas (SES y SNS no configurados).")
+    return None
 
 
 def crear_servicio_listas_cautela(

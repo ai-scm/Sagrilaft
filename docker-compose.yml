@@ -126,9 +126,19 @@ services:
       # Debe coincidir con el hostname configurado en Keycloak (KC_HOSTNAME).
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:-}
 
-      # ── Alertas SNS ───────────────────────────────────────────────────────
-      SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
-      SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      # ── Alertas por Email (SES directo) ────────────────────────────────────
+      # URL del portal interno para enlaces en notificaciones de correo
+      PORTAL_INTERNO_URL: ${PORTAL_INTERNO_URL:-https://portal.sagrilaft.com}
+      
+      # SES DIRECTO (RECOMENDADO - control total sobre Content-Type)
+      SES_EMAIL_ORIGEN: ${SES_EMAIL_ORIGEN:-}
+      SES_NOTIFICACIONES_ENABLED: ${SES_NOTIFICACIONES_ENABLED:-false}
+      ALERTAS_EMAIL_DESTINATARIO: ${ALERTAS_EMAIL_DESTINATARIO:-}
+      
+      # SNS LEGACY (comentado)
+      # SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
+      # SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
+      
       APP_ENV: production
 
     volumes:
