@@ -53,6 +53,34 @@ class LocalStorage:
         if origen.exists():
             shutil.move(str(origen), str(destino))
 
+    def limpiar_directorio_vacio(self, key: str) -> None:
+        """Intenta eliminar el directorio si está vacío."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        directorio = self._ruta(key)
+        logger.info(f"[CLEANUP] Intentando limpiar: {directorio}")
+        
+        if not directorio.exists():
+            logger.info(f"[CLEANUP] El directorio no existe: {directorio}")
+            return
+            
+        # Verifica el contenido del directorio antes de intentar eliminar
+        contenido = list(directorio.iterdir())
+        if contenido:
+            logger.warning(f"[CLEANUP] El directorio NO está vacío ({len(contenido)} items): {directorio}")
+            for item in contenido:
+                logger.warning(f"[CLEANUP]   - {item.name}")
+            return
+        
+        try:
+            directorio.rmdir()
+            logger.info(f"[CLEANUP] Directorio eliminado exitosamente: {directorio}")
+        except OSError as e:
+            logger.error(f"[CLEANUP] Error al eliminar {directorio}: {e}")
+        except FileNotFoundError:
+            logger.info(f"[CLEANUP] El directorio no existe (ya fue eliminado): {directorio}")
+
     def existe(self, key: str) -> bool:
         return self._ruta(key).exists()
 
@@ -104,6 +132,10 @@ class S3Storage:
             CopySource={"Bucket": self._bucket, "Key": key_origen},
         )
         self._s3.delete_object(Bucket=self._bucket, Key=key_origen)
+
+    def limpiar_directorio_vacio(self, key: str) -> None:
+        """En S3 no hay directorios reales — sin-op."""
+        pass
 
     def existe(self, key: str) -> bool:
         from botocore.exceptions import ClientError

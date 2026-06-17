@@ -6,6 +6,7 @@ La key es agnóstica al backend de almacenamiento concreto.
 """
 
 import hashlib
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, List
@@ -102,22 +103,41 @@ class DocumentoService:
         """
         Mueve los archivos del borrador al prefijo definitivo de la contraparte
         y actualiza las rutas en BD en una sola operación.
+        Limpia el directorio temporal vacío después de mover todos los archivos.
         """
+        logger = logging.getLogger(__name__)
+        logger.info(f"[MOVER] Inicio: formulario_id={formulario_id}, prefijo_destino={prefijo_destino}")
+        
         documentos = self.listar_documentos(formulario_id)
+        logger.info(f"[MOVER] Documentos encontrados: {len(documentos)}")
         if not documentos:
+            logger.warning(f"[MOVER] No hay documentos para mover en {formulario_id}")
             return
+
+        # Extrae el prefijo origen del primer documento (ej: "SAG-705A5125" de "SAG-705A5125/archivo.pdf")
+        prefijo_origen = Path(documentos[0].ruta_archivo).parent.name if len(Path(documentos[0].ruta_archivo).parts) > 1 else None
 
         rutas_nuevas: dict[str, str] = {}
         for doc in documentos:
             key_actual = doc.ruta_archivo
             nombre = Path(key_actual).name
             key_nuevo = f"{prefijo_destino}/{nombre}"
+            logger.info(f"[MOVER] {key_actual} -> {key_nuevo}")
             if key_actual != key_nuevo:
                 self._storage.mover(key_actual, key_nuevo)
                 rutas_nuevas[doc.id] = key_nuevo
+            else:
+                logger.info(f"[MOVER] Archivo ya está en destino: {key_actual}")
 
         if rutas_nuevas:
             self._repo.actualizar_rutas(rutas_nuevas)
+            logger.info(f"[MOVER] Rutas actualizadas en BD: {len(rutas_nuevas)}")
+
+        # Limpia el directorio temporal vacío (prefijo origen del borrador)
+        if prefijo_origen:
+            logger.info(f"[MOVER] Intentando limpiar directorio origen: {prefijo_origen}")
+            self._storage.limpiar_directorio_vacio(prefijo_origen)
+        logger.info(f"[MOVER] Fin: {formulario_id}")
 
     # ─── Lectura ───────────────────────────────────────────────────────────────
 
