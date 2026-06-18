@@ -16,6 +16,7 @@
  */
 
 import { useMemo } from 'react';
+import { normalizarValorComparable } from '../utils/comparacionCorreccion';
 
 // IDs del catálogo que corresponden a tablas dinámicas (no viven en formData)
 const CAMPOS_TABLA = new Set([
@@ -45,23 +46,6 @@ const CLAVE_TABLA_POR_CAMPO = {
 function _tablaFueModificada(actual, original) {
   if (!original) return false;
   return JSON.stringify(actual) !== JSON.stringify(original);
-}
-
-function _normalizarValorSimple(valor) {
-  if (valor == null) return '';
-  if (typeof valor === 'string') return valor.trim().replace(/\s+/g, ' ');
-  if (Array.isArray(valor)) {
-    return `[${valor.map(item => _normalizarValorSimple(item)).join(',')}]`;
-  }
-  if (typeof valor === 'object') {
-    // Treat react-select option objects ({ value, label }) as their `value`
-    // to keep comparisons consistent with how selects store values in formData.
-    if (valor && Object.prototype.hasOwnProperty.call(valor, 'value')) {
-      return _normalizarValorSimple(valor.value);
-    }
-    return `{${Object.keys(valor).sort().map(clave => `${clave}:${_normalizarValorSimple(valor[clave])}`).join(',')}}`;
-  }
-  return String(valor).trim();
 }
 
 /**
@@ -109,8 +93,8 @@ export function useEstadoCorreccionGlobal({
         }
       } else {
         // Campo simple: corregido si tiene valor Y difiere del original
-        const valorActual   = _normalizarValorSimple(formDataActual?.[campo]);
-        const valorOriginal = _normalizarValorSimple(formDataOriginal?.[campo]);
+        const valorActual   = normalizarValorComparable(formDataActual?.[campo]);
+        const valorOriginal = normalizarValorComparable(formDataOriginal?.[campo]);
         if (valorActual !== '' && valorActual !== valorOriginal) {
           corregidos.add(campo);
         } else {

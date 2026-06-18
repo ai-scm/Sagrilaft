@@ -2,6 +2,7 @@ import { HelpIcon } from './HelpPanel';
 import textosAyudaCampos from '../data/helpTexts';
 import { getInputProps } from '../utils/inputValidation';
 import { useCorreccion } from '../context/CorreccionContext';
+import { fueValorModificado, normalizarValorComparable } from '../utils/comparacionCorreccion';
 
 /**
  * Campo de formulario reutilizable con tooltip de ayuda integrado.
@@ -21,11 +22,10 @@ export default function FormField({
   const marcadoParaCorreccion = esCampoConCorreccion(name);
 
   const valorParaComparar = comparisonValue ?? value;
-  const valorActualNormalizado = normalizarValorComparable(valorParaComparar);
   const valorOriginal = marcadoParaCorreccion ? valorOriginalDeCampo(name) : undefined;
-  const valorOriginalNormalizado = normalizarValorComparable(valorOriginal);
+  const valorActualNormalizado = normalizarValorComparable(valorParaComparar);
+  const fueModificado = fueValorModificado(valorParaComparar, valorOriginal);
   const tieneValor = valorActualNormalizado !== '' && !error;
-  const fueModificado = tieneValor && valorActualNormalizado !== valorOriginalNormalizado;
   const correccionPendiente  = marcadoParaCorreccion && !fueModificado;
   const correccionCompletada = marcadoParaCorreccion && fueModificado;
 
@@ -99,17 +99,4 @@ export default function FormField({
       {children}
     </div>
   );
-}
-
-function normalizarValorComparable(valor) {
-  if (valor === null || valor === undefined) return '';
-  if (typeof valor === 'string') return valor.trim().replace(/\s+/g, ' ');
-  if (Array.isArray(valor)) {
-    return `[${valor.map(item => normalizarValorComparable(item)).join(',')}]`;
-  }
-  if (typeof valor === 'object') {
-    const entradas = Object.keys(valor).sort().map(clave => `${clave}:${normalizarValorComparable(valor[clave])}`);
-    return `{${entradas.join(',')}}`;
-  }
-  return String(valor).trim();
 }

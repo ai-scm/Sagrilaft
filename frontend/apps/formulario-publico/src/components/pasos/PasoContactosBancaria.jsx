@@ -4,6 +4,7 @@ import { buildSelectStyles } from '../../utils/selectStyles';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
 import { HR, SectionTitle, SubLabel, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, MensajeError, CeldaToggleProducto } from '../TablaFormComponents';
 import { useCorreccion } from '../../context/CorreccionContext';
+import { fueValorModificado, normalizarValorComparable } from '../../utils/comparacionCorreccion';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -150,16 +151,18 @@ export default function PasoContactosBancaria({
   const tiposValue  = TIPOS_TRANSACCION.filter(o => tiposSeleccionados.includes(o.value));
   const monedaValue = OPCIONES_MONEDA.find(o => o.value === formData.realiza_operaciones_moneda_extranjera) ?? null;
 
-  const { esCampoConCorreccion, camposPendientes } = useCorreccion();
+  const { esCampoConCorreccion, camposPendientes, valorOriginalDeCampo } = useCorreccion();
   const seccionRefComercMarcada = camposPendientes.has('referencias_comerciales');
   const seccionRefBancMarcada   = camposPendientes.has('referencias_bancarias');
   const monedaMarcada           = esCampoConCorreccion('realiza_operaciones_moneda_extranjera');
   const tiposTxMarcados         = esCampoConCorreccion('tipos_transaccion');
 
-  const monedaPendiente  = monedaMarcada && !monedaValue;
-  const monedaCompletada = monedaMarcada && !!monedaValue;
-  const tiposPendiente   = tiposTxMarcados && tiposValue.length === 0;
-  const tiposCompletado  = tiposTxMarcados && tiposValue.length > 0;
+  const valorOriginalMoneda = valorOriginalDeCampo('realiza_operaciones_moneda_extranjera');
+  const valorOriginalTipos  = valorOriginalDeCampo('tipos_transaccion');
+  const monedaPendiente     = monedaMarcada && !fueValorModificado(monedaValue?.value ?? monedaValue, valorOriginalMoneda);
+  const monedaCompletada    = monedaMarcada && fueValorModificado(monedaValue?.value ?? monedaValue, valorOriginalMoneda);
+  const tiposCompletado     = tiposTxMarcados && fueValorModificado(tiposSeleccionados, valorOriginalTipos);
+  const tiposPendiente      = tiposTxMarcados && !tiposCompletado;
 
   return (
     <div className="form-card">
