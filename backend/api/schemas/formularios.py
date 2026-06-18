@@ -119,7 +119,7 @@ class FormularioBase(BaseModel):
     numero_identificacion: Optional[str] = None
     digito_verificacion: Optional[str] = None
     direccion: Optional[str] = None
-    pais: Optional[str] = "Colombia"
+    pais: Optional[str] = None
     departamento: Optional[str] = None
     ciudad: Optional[str] = None
     telefono: Optional[str] = None

@@ -63,7 +63,7 @@ class Formulario(Base):
     numero_identificacion = Column(String, nullable=True)
     digito_verificacion = Column(String, nullable=True)
     direccion = Column(String, nullable=True)
-    pais = Column(String, default="Colombia")
+    pais = Column(String, nullable=True)
     departamento = Column(String, nullable=True)
     ciudad = Column(String, nullable=True)
     telefono = Column(String, nullable=True)
