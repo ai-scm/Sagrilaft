@@ -15,8 +15,6 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
 from api.dependencies import (
-    obtener_servicio_acceso,
-    obtener_servicio_email,
     obtener_servicio_expediente,
     obtener_servicio_firma,
 )
@@ -31,7 +29,6 @@ from api.schemas import (
     SolicitudDevolucion,
     SolicitudRechazo,
 )
-from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
 
@@ -252,8 +249,6 @@ def rechazar_expediente(
     solicitud: SolicitudRechazo,
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
-    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
-    email_service = Depends(obtener_servicio_email),
 ) -> ResumenRechazo:
     return servicio.rechazar_expediente(
         formulario_id,
@@ -261,8 +256,6 @@ def rechazar_expediente(
         actor_id=usuario.email,
         motivo=solicitud.motivo,
         mensaje_para_destinatario=solicitud.mensaje_para_destinatario,
-        acceso_service=acceso_service,
-        email_service=email_service,
     )
 
 
@@ -282,15 +275,11 @@ def devolver_expediente(
     solicitud: SolicitudDevolucion,
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
-    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
-    email_service = Depends(obtener_servicio_email),
 ) -> ResumenDevolucion:
     return servicio.devolver_para_correccion(
         formulario_id=formulario_id,
         especificaciones=solicitud.especificaciones,
         campos_identificados=solicitud.campos_identificados,
-        acceso_service=acceso_service,
-        email_service=email_service,
         contrapartes_permitidas=_contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )

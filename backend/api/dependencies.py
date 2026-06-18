@@ -42,8 +42,20 @@ from infrastructure.dependencies import (
 from infrastructure.notificaciones.email_service import EmailService
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.auditoria.auditoria_service import AuditoriaService
+from services.expedientes.comparacion import ComparadorService
+from services.expedientes.configuracion_campos_complejos import (
+    ConfiguracionCamposComplejos,
+)
 from services.expedientes.expediente_service import ExpedienteService
+from services.expedientes.handlers import (
+    AprobacionRechazoHandler,
+    CargaDocumentoHandler,
+    DevolucionCorreccionHandler,
+    ValidadorCargaDocumento,
+)
+from services.expedientes.reportes import RendereadorReporteService
 from services.firma.firma_service import FirmaService
+from services.formulario.documento_service import DocumentoService
 from services.formulario.formulario_service import FormularioService
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
@@ -78,8 +90,82 @@ def obtener_servicio_email(
 
 
 def obtener_alertas_portal(solicitud: Request) -> Optional[IAlertasPortal]:
-    """Obtiene el adaptador de alertas SNS registrado en app.state. Puede ser None."""
-    return getattr(solicitud.app.state, "alertas_portal", None)
+    """Obtiene el adaptador de alertas del portal registrado en app.state."""
+    return getattr(solicitud.app.state, 'alertas_portal', None)
+
+
+def obtener_carga_handler(
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
+    storage: IAlmacenamiento = Depends(obtener_storage),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    alertas_portal: Optional[IAlertasPortal] = Depends(obtener_alertas_portal),
+) -> CargaDocumentoHandler:
+    """Instancia el handler de carga de documentos."""
+    documento_service = DocumentoService(repo_doc, storage)
+    validador = ValidadorCargaDocumento()
+    return CargaDocumentoHandler(
+        repo_expediente=repo,
+        documentos_service=documento_service,
+        validador=validador,
+        auditoria_service=repo_auditoria,
+        alertas_service=alertas_portal,
+    )
+
+
+def obtener_configuracion_campos_complejos() -> ConfiguracionCamposComplejos:
+    """Instancia la configuración estándar de campos complejos para comparación."""
+    return ConfiguracionCamposComplejos.por_defecto()
+
+
+def obtener_comparador(
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
+    storage: IAlmacenamiento = Depends(obtener_storage),
+    config: ConfiguracionCamposComplejos = Depends(obtener_configuracion_campos_complejos),
+) -> ComparadorService:
+    """Instancia el servicio de comparación de versiones."""
+    documento_service = DocumentoService(repo_doc, storage)
+    rendereador = RendereadorReporteService(configuracion=config)
+    return ComparadorService(
+        repo_expediente=repo,
+        documentos_service=documento_service,
+        rendereador=rendereador,
+    )
+
+
+def obtener_aprobacion_rechazo_handler(
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    alertas_portal: Optional[IAlertasPortal] = Depends(obtener_alertas_portal),
+    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
+    email_service: INotificador = Depends(obtener_servicio_email),
+) -> AprobacionRechazoHandler:
+    """Instancia el handler de aprobación y rechazo de expedientes."""
+    return AprobacionRechazoHandler(
+        repo_expediente=repo,
+        repo_auditoria=repo_auditoria,
+        acceso_service=acceso_service,
+        email_service=email_service,
+        alertas_service=alertas_portal,
+    )
+
+
+def obtener_devolucion_handler(
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    alertas_portal: Optional[IAlertasPortal] = Depends(obtener_alertas_portal),
+    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
+    email_service: INotificador = Depends(obtener_servicio_email),
+) -> DevolucionCorreccionHandler:
+    """Instancia el handler de devolución para corrección de expedientes."""
+    return DevolucionCorreccionHandler(
+        repo_expediente=repo,
+        acceso_service=acceso_service,
+        repo_auditoria=repo_auditoria,
+        alertas_service=alertas_portal,
+        email_service=email_service,
+    )
 
 
 def obtener_servicio_firma(
@@ -124,11 +210,19 @@ def obtener_servicio_expediente(
     repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     storage: IAlmacenamiento = Depends(obtener_storage),
     repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    carga_handler: CargaDocumentoHandler = Depends(obtener_carga_handler),
+    comparador: ComparadorService = Depends(obtener_comparador),
+    aprobacion_rechazo: AprobacionRechazoHandler = Depends(obtener_aprobacion_rechazo_handler),
+    devolucion: DevolucionCorreccionHandler = Depends(obtener_devolucion_handler),
 ) -> ExpedienteService:
     return ExpedienteService(
         repo=repo,
         repo_doc=repo_doc,
         storage=storage,
+        carga_handler=carga_handler,
+        comparador=comparador,
+        aprobacion_rechazo_handler=aprobacion_rechazo,
+        devolucion_handler=devolucion,
         repo_auditoria=repo_auditoria,
         alertas_portal=obtener_alertas_portal(solicitud),
     )
