@@ -1,5 +1,6 @@
 import Spinner from '@shared/components/ui/Spinner';
 import { esCampoMonetario, formatearMontoMoneda } from '../../../../../shared/utils/formatoMoneda';
+import ComparadorRegistros from '@shared/components/cambios/ComparadorRegistros';
 
 const s = {
   fondo: {
@@ -198,15 +199,40 @@ export default function ModalComparacionVersiones({
                   <th style={s.th}>Después</th>
                 </tr>
               </thead>
-              <tbody>
-                {comparacion.cambios.map(cambio => (
-                  <tr key={cambio.campo}>
-                    <td style={{ ...s.td, ...s.campo }}>{cambio.etiqueta}</td>
-                    <td style={{ ...s.td, ...s.antes }}>{presentarCambio(cambio, comparacion.moneda_anterior)}</td>
-                    <td style={{ ...s.td, ...s.despues }}>{presentarCambioCorregido(cambio, comparacion.moneda_corregida)}</td>
-                  </tr>
-                ))}
-              </tbody>
+                  <tbody>
+                    {comparacion.cambios.map(cambio => {
+                      const camposComplejos = new Set([
+                        'junta_directiva',
+                        'accionistas',
+                        'beneficiario_final',
+                        'referencias_comerciales',
+                        'referencias_bancarias',
+                        'tipos_transaccion',
+                      ]);
+                      if (camposComplejos.has(cambio.campo)) {
+                        return (
+                          <tr key={cambio.campo}>
+                            <td style={{ ...s.td, ...s.campo }}>{cambio.etiqueta}</td>
+                            <td style={{ ...s.td }} colSpan={2}>
+                              <ComparadorRegistros
+                                campo={cambio.campo}
+                                valorAnterior={cambio.valor_anterior}
+                                valorCorregido={cambio.valor_corregido}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return (
+                        <tr key={cambio.campo}>
+                          <td style={{ ...s.td, ...s.campo }}>{cambio.etiqueta}</td>
+                          <td style={{ ...s.td, ...s.antes }}>{presentarCambio(cambio, comparacion.moneda_anterior)}</td>
+                          <td style={{ ...s.td, ...s.despues }}>{presentarCambioCorregido(cambio, comparacion.moneda_corregida)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
             </table>
           )}
         </div>

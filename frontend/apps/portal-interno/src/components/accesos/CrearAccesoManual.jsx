@@ -28,7 +28,7 @@ function validarCamposAcceso(formData) {
   const errores = {};
   if (!formData.tipo_contraparte)          errores.tipo_contraparte    = 'Seleccione el tipo de contraparte';
   if (!formData.razon_social.trim())       errores.razon_social        = 'Ingrese la razón social';
-  if (!formData.area_responsable)          errores.area_responsable    = 'Seleccione el área responsable';
+  if (!formData.area_responsable)          errores.area_responsable    = 'Seleccione el área de contacto';
 
   return errores;
 }
