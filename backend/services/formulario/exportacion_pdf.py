@@ -59,6 +59,8 @@ _VALORES_AMIGABLES: Dict[str, str] = {
     "r": "Representante",
     "f": "Fabricante",
     "i": "Importador",
+    "cuenta_corriente": "Cuenta corriente",
+    "cuenta_ahorros": "Cuenta ahorros",
 }
 
 
@@ -392,10 +394,8 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
             ("ciudad",                 "Ciudad"),
         ], _normalizar_referencias_comerciales),
         _SeccionTabla("Referencias Bancarias", "referencias_bancarias", [
-            ("banco",         "Banco"),
-            ("tipo_cuenta",   "Tipo cuenta"),
-            ("numero_cuenta", "Número cuenta"),
-            ("ciudad",        "Ciudad"),
+            ("entidad",  "Entidad"),
+            ("producto", "Producto"),
         ]),
     ]),
     _PasoFormulario(6, "Moneda Extranjera y Régimen Tributario", [

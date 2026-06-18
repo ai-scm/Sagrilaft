@@ -64,10 +64,13 @@ def son_valores_iguales(valor_a: Any, valor_b: Any) -> bool:
     return str_a == str_b
 
 
-def formatear_valor_campo(valor: Any, clave: str) -> str:
+def formatear_valor_campo(valor: Any, clave: str, etiquetas_valores: Optional[Dict[str, str]] = None) -> str:
     """Formatea un valor según el tipo de campo."""
     if valor is None or valor == '':
         return ''
+    if etiquetas_valores:
+        texto = str(valor)
+        return etiquetas_valores.get(texto, texto)
     if clave == 'porcentaje':
         try:
             numero = float(valor)
@@ -179,6 +182,7 @@ def generar_fichas_registro_comparadas(
         for campoDef in configuracion.get('campos', []):
             clave = campoDef['clave']
             etiquetaCampo = campoDef['etiqueta']
+            etiquetasValoresCampo = campoDef.get('etiquetasValores')
             valorAntes = (parRegistro['antes'] or {}).get(clave, '') if parRegistro['antes'] else ''
             valorDespues = (parRegistro['despues'] or {}).get(clave, '') if parRegistro['despues'] else ''
             seModifico = not son_valores_iguales(valorAntes, valorDespues)
@@ -189,8 +193,8 @@ def generar_fichas_registro_comparadas(
             filasTabla.append(f'''
                 <tr>
                   <td style="padding: 6px 8px; color: #64748b; font-size: 11px; width: 30%;">{escape(etiquetaCampo)}</td>
-                  <td style="padding: 6px 8px; background: {bgAntes}; width: 35%;">{escape(formatear_valor_campo(valorAntes, clave))}</td>
-                  <td style="padding: 6px 8px; background: {bgDespues}; width: 35%;">{escape(formatear_valor_campo(valorDespues, clave))}</td>
+                  <td style="padding: 6px 8px; background: {bgAntes}; width: 35%;">{escape(formatear_valor_campo(valorAntes, clave, etiquetasValoresCampo))}</td>
+                  <td style="padding: 6px 8px; background: {bgDespues}; width: 35%;">{escape(formatear_valor_campo(valorDespues, clave, etiquetasValoresCampo))}</td>
                 </tr>
             ''')
 
