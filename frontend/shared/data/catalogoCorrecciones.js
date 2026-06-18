@@ -54,8 +54,8 @@ export const CATALOGO_CORRECCIONES = [
       { id: 'pais_funciones',             etiqueta: 'País de funciones' },
       { id: 'departamento_funciones',     etiqueta: 'Departamento de funciones' },
       { id: 'ciudad_funciones',           etiqueta: 'Ciudad de funciones' },
-      { id: 'ciudad_residencia',          etiqueta: 'Ciudad de Residencia (Persona Natural)' },
-      { id: 'direccion_residencia',       etiqueta: 'Dirección de Residencia (Persona Natural)' },
+      { id: 'ciudad_residencia',          etiqueta: 'Ciudad de Residencia (solo aplica para Persona Natural)' },
+      { id: 'direccion_residencia',       etiqueta: 'Dirección de Residencia (solo aplica para Persona Natural)' },
     ],
   },
   {

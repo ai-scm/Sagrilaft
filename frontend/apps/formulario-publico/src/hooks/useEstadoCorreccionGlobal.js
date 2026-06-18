@@ -54,6 +54,11 @@ function _normalizarValorSimple(valor) {
     return `[${valor.map(item => _normalizarValorSimple(item)).join(',')}]`;
   }
   if (typeof valor === 'object') {
+    // Treat react-select option objects ({ value, label }) as their `value`
+    // to keep comparisons consistent with how selects store values in formData.
+    if (valor && Object.prototype.hasOwnProperty.call(valor, 'value')) {
+      return _normalizarValorSimple(valor.value);
+    }
     return `{${Object.keys(valor).sort().map(clave => `${clave}:${_normalizarValorSimple(valor[clave])}`).join(',')}}`;
   }
   return String(valor).trim();
