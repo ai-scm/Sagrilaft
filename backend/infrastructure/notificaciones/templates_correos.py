@@ -22,6 +22,8 @@ class TipoAlertaTemplate(str, Enum):
     FORMULARIO_CORREGIDO = "FORMULARIO_CORREGIDO"
     FORMULARIO_ENVIADO_A_FIRMA = "FORMULARIO_ENVIADO_A_FIRMA"
     FORMULARIO_FIRMADO = "FORMULARIO_FIRMADO"
+    FORMULARIO_RECHAZADO = "FORMULARIO_RECHAZADO"
+    REPORTE_FINAL_CARGADO = "REPORTE_FINAL_CARGADO"
 
 
 # ── Configuración por tipo de alerta ─────────────────────────────────────────
@@ -66,6 +68,22 @@ CONFIGURACION_ALERTA: Dict[TipoAlertaTemplate, Dict[str, str]] = {
         "color_oscuro": "#0891b2",
         "mensaje": "El formulario ha sido firmado electrónicamente. Descargue la copia firmada en el portal.",
         "etiqueta_boton": "Descargar Formulario Firmado",
+    },
+    TipoAlertaTemplate.FORMULARIO_RECHAZADO: {
+        "titulo": "Formulario Rechazado",
+        "icono": "&#x274C;",  # ❌ (cross mark) - usar entity HTML para evitar markdown conversion
+        "color": "#dc2626",  # Rojo
+        "color_oscuro": "#b91c1c",
+        "mensaje": "El expediente fue rechazado de forma definitiva. Revise el motivo interno y la trazabilidad en el portal.",
+        "etiqueta_boton": "Ver Expediente Rechazado",
+    },
+    TipoAlertaTemplate.REPORTE_FINAL_CARGADO: {
+        "titulo": "Reporte Final Cargado",
+        "icono": "&#x1F4C4;",  # 📄 (documento) - usar entity HTML para evitar markdown conversion
+        "color": "#0f766e",  # Teal
+        "color_oscuro": "#115e59",
+        "mensaje": "Se ha cargado el reporte final del expediente. La carpeta quedó cerrada para gestión interna.",
+        "etiqueta_boton": "Ver Reporte Final en el Portal",
     },
 }
 

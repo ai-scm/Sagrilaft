@@ -34,6 +34,8 @@ _ASUNTO_POR_TIPO: dict[TipoAlerta, str] = {
     TipoAlerta.FORMULARIO_CORREGIDO: "[SAGRILAFT] Formulario corregido y reenviado",
     TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: "[SAGRILAFT] Formulario enviado a firma electrónica",
     TipoAlerta.FORMULARIO_FIRMADO:   "[SAGRILAFT] Formulario firmado electrónicamente",
+    TipoAlerta.FORMULARIO_RECHAZADO: "[SAGRILAFT] Formulario rechazado",
+    TipoAlerta.REPORTE_FINAL_CARGADO: "[SAGRILAFT] Reporte final cargado",
 }
 
 
@@ -233,5 +235,7 @@ class SnsAlertasPortal:
             TipoAlerta.FORMULARIO_CORREGIDO: TipoAlertaTemplate.FORMULARIO_CORREGIDO,
             TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: TipoAlertaTemplate.FORMULARIO_ENVIADO_A_FIRMA,
             TipoAlerta.FORMULARIO_FIRMADO: TipoAlertaTemplate.FORMULARIO_FIRMADO,
+            TipoAlerta.FORMULARIO_RECHAZADO: TipoAlertaTemplate.FORMULARIO_RECHAZADO,
+            TipoAlerta.REPORTE_FINAL_CARGADO: TipoAlertaTemplate.REPORTE_FINAL_CARGADO,
         }
         return mapeo[tipo]
