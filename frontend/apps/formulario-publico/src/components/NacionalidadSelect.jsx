@@ -34,11 +34,30 @@ export default function NacionalidadSelect({
   error,
   placeholder = 'Seleccione un país...',
 }) {
-  const { esCampoConCorreccion } = useCorreccion();
+  const { esCampoConCorreccion, valorOriginalDeCampo } = useCorreccion();
   const marcado = esCampoConCorreccion(name);
-  const tieneValor = !!value;
-  const correccionPendiente  = marcado && !tieneValor && !error;
-  const correccionCompletada = marcado && tieneValor;
+
+  function normalizarValorComparable(valor) {
+    if (valor === null || valor === undefined) return '';
+    if (typeof valor === 'string') return valor.trim().replace(/\s+/g, ' ');
+    if (Array.isArray(valor)) return `[${valor.map(item => normalizarValorComparable(item)).join(',')}]`;
+    if (typeof valor === 'object') {
+      if (valor && Object.prototype.hasOwnProperty.call(valor, 'value')) {
+        return normalizarValorComparable(valor.value);
+      }
+      const entradas = Object.keys(valor).sort().map(clave => `${clave}:${normalizarValorComparable(valor[clave])}`);
+      return `{${entradas.join(',')}}`;
+    }
+    return String(valor).trim();
+  }
+
+  const valorActualNormalizado = normalizarValorComparable(value);
+  const valorOriginal = marcado ? valorOriginalDeCampo(name) : undefined;
+  const valorOriginalNormalizado = normalizarValorComparable(valorOriginal);
+  const tieneValor = valorActualNormalizado !== '' && !error;
+  const fueModificado = tieneValor && valorActualNormalizado !== valorOriginalNormalizado;
+  const correccionPendiente  = marcado && !fueModificado;
+  const correccionCompletada = marcado && fueModificado;
 
   const tieneAyuda = !!textosAyudaCampos[name];
 
