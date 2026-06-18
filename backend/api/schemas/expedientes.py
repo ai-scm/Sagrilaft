@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
@@ -92,6 +92,7 @@ class ComparacionVersionFormulario(BaseModel):
     documento_corregido_id: str
     total_cambios: int
     cambios: List[CambioCampoVersion] = Field(default_factory=list)
+    campos_complejos: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
 class SolicitudDevolucion(BaseModel):

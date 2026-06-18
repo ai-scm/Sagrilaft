@@ -58,11 +58,16 @@ class ConfiguracionCamposComplejos:
         """Retorna el conjunto de todos los campos complejos registrados."""
         return set(self._configuracion.keys())
 
+    def a_dict(self) -> Dict[str, Dict[str, Any]]:
+        """Retorna la configuración completa serializable para consumidores externos."""
+        return self._configuracion
+
 
 # Configuración estándar de campos complejos
 _CONFIGURACION_ESTANDAR = {
     "junta_directiva": {
         "tipo": "arregloObjetos",
+        "llaves": ["cargo", "numero_id", "nombre"],
         "campos": [
             {"clave": "nombre", "etiqueta": "Nombre"},
             {"clave": "cargo", "etiqueta": "Cargo"},
@@ -74,6 +79,7 @@ _CONFIGURACION_ESTANDAR = {
     },
     "accionistas": {
         "tipo": "arregloObjetos",
+        "llaves": ["numero_id", "nombre"],
         "campos": [
             {"clave": "nombre", "etiqueta": "Nombre"},
             {"clave": "tipo_id", "etiqueta": "Tipo ID"},
@@ -85,6 +91,7 @@ _CONFIGURACION_ESTANDAR = {
     },
     "beneficiario_final": {
         "tipo": "arregloObjetos",
+        "llaves": ["numero_id", "nombre"],
         "campos": [
             {"clave": "nombre", "etiqueta": "Nombre"},
             {"clave": "tipo_id", "etiqueta": "Tipo ID"},
@@ -96,6 +103,7 @@ _CONFIGURACION_ESTANDAR = {
     },
     "referencias_comerciales": {
         "tipo": "arregloObjetos",
+        "llaves": ["nombre_establecimiento", "ciudad"],
         "campos": [
             {"clave": "nombre_establecimiento", "etiqueta": "Establecimiento"},
             {"clave": "ciudad", "etiqueta": "Ciudad"},
@@ -105,9 +113,27 @@ _CONFIGURACION_ESTANDAR = {
     },
     "referencias_bancarias": {
         "tipo": "arregloObjetos",
+        "llaves": ["entidad", "producto"],
         "campos": [
             {"clave": "entidad", "etiqueta": "Entidad"},
-            {"clave": "producto", "etiqueta": "Producto"},
+            {
+                "clave": "producto",
+                "etiqueta": "Producto",
+                "etiquetasValores": {
+                    "cuenta_corriente": "Cuenta corriente",
+                    "cuenta_ahorros": "Cuenta ahorros",
+                },
+            },
+        ]
+    },
+    "informacion_bancaria_pagos": {
+        "tipo": "arregloObjetos",
+        "llaves": ["numero_cuenta", "entidad_bancaria"],
+        "campos": [
+            {"clave": "entidad_bancaria", "etiqueta": "Entidad Bancaria"},
+            {"clave": "ciudad_oficina", "etiqueta": "Ciudad / Oficina"},
+            {"clave": "tipo_cuenta", "etiqueta": "Tipo de Cuenta"},
+            {"clave": "numero_cuenta", "etiqueta": "Número de Cuenta"},
         ]
     },
     "tipos_transaccion": {

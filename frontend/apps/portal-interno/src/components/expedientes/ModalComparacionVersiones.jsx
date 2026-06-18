@@ -1,6 +1,6 @@
 import Spinner from '@shared/components/ui/Spinner';
 import { esCampoMonetario, formatearMontoMoneda } from '../../../../../shared/utils/formatoMoneda';
-import ComparadorRegistros from '@shared/components/cambios/ComparadorRegistros';
+import ComparadorRegistros, { esCampoComparableComoRegistro } from '@shared/components/cambios/ComparadorRegistros';
 
 const s = {
   fondo: {
@@ -129,6 +129,7 @@ export default function ModalComparacionVersiones({
 }) {
   if (!visible) return null;
 
+  const camposComplejos = comparacion?.campos_complejos ?? {};
   const subtitulo = comparacion
     ? `v${comparacion.version_anterior || '-'} → v${comparacion.version_corregida}`
     : 'Comparando versiones';
@@ -201,15 +202,7 @@ export default function ModalComparacionVersiones({
               </thead>
                   <tbody>
                     {comparacion.cambios.map(cambio => {
-                      const camposComplejos = new Set([
-                        'junta_directiva',
-                        'accionistas',
-                        'beneficiario_final',
-                        'referencias_comerciales',
-                        'referencias_bancarias',
-                        'tipos_transaccion',
-                      ]);
-                      if (camposComplejos.has(cambio.campo)) {
+                      if (esCampoComparableComoRegistro(cambio.campo, camposComplejos)) {
                         return (
                           <tr key={cambio.campo}>
                             <td style={{ ...s.td, ...s.campo }}>{cambio.etiqueta}</td>
@@ -218,6 +211,7 @@ export default function ModalComparacionVersiones({
                                 campo={cambio.campo}
                                 valorAnterior={cambio.valor_anterior}
                                 valorCorregido={cambio.valor_corregido}
+                                configuracionComparador={camposComplejos}
                               />
                             </td>
                           </tr>

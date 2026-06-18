@@ -21,6 +21,9 @@ from services.expedientes.comparacion_versiones import (
     comparar_versiones,
     comparacion_versiones_a_dict,
 )
+from services.expedientes.configuracion_campos_complejos import (
+    ConfiguracionCamposComplejos,
+)
 from services.expedientes.reportes import RendereadorReporteService
 
 
@@ -38,10 +41,12 @@ class ComparadorService:
         repo_expediente: RepositorioExpediente,
         documentos_service,
         rendereador: RendereadorReporteService,
+        configuracion: ConfiguracionCamposComplejos,
     ) -> None:
         self._repo = repo_expediente
         self._documentos = documentos_service
         self._rendereador = rendereador
+        self._configuracion = configuracion
         self._estados_expediente = [
             EstadoFormulario.ENVIADO,
             EstadoFormulario.EN_CORRECCION,
@@ -71,7 +76,9 @@ class ComparadorService:
             )
 
         comparacion = comparar_versiones(documento_corregido, documento_anterior)
-        return comparacion_versiones_a_dict(comparacion)
+        respuesta = comparacion_versiones_a_dict(comparacion)
+        respuesta["campos_complejos"] = self._configuracion.a_dict()
+        return respuesta
 
     def generar_reporte_comparacion_pdf(
         self,

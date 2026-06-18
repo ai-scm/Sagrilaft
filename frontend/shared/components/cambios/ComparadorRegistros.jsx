@@ -1,77 +1,6 @@
-/**
- * Configuración de tipos de registros complejos.
- * Soporta registros de objetos con campos y arreglos simples de strings.
- */
-const CONFIGURACION_COMPARADOR = {
-  // Registros de personas (objetos con múltiples campos)
-  junta_directiva: {
-    tipo: 'arregloObjetos',
-    llaves: ['cargo', 'numero_id', 'nombre'],
-    campos: [
-      { clave: 'nombre', etiqueta: 'Nombre' },
-      { clave: 'cargo', etiqueta: 'Cargo' },
-      { clave: 'tipo_id', etiqueta: 'Tipo ID' },
-      { clave: 'numero_id', etiqueta: 'Número ID' },
-      { clave: 'es_pep', etiqueta: 'PEP' },
-      { clave: 'vinculos_pep', etiqueta: 'Vínculos PEP' },
-    ],
-  },
-  accionistas: {
-    tipo: 'arregloObjetos',
-    llaves: ['numero_id', 'nombre'],
-    campos: [
-      { clave: 'nombre', etiqueta: 'Nombre' },
-      { clave: 'tipo_id', etiqueta: 'Tipo ID' },
-      { clave: 'numero_id', etiqueta: 'Número ID' },
-      { clave: 'porcentaje', etiqueta: 'Porcentaje' },
-      { clave: 'es_pep', etiqueta: 'PEP' },
-      { clave: 'vinculos_pep', etiqueta: 'Vínculos PEP' },
-    ],
-  },
-  beneficiario_final: {
-    tipo: 'arregloObjetos',
-    llaves: ['numero_id', 'nombre'],
-    campos: [
-      { clave: 'nombre', etiqueta: 'Nombre' },
-      { clave: 'tipo_id', etiqueta: 'Tipo ID' },
-      { clave: 'numero_id', etiqueta: 'Número ID' },
-      { clave: 'porcentaje', etiqueta: 'Porcentaje' },
-      { clave: 'es_pep', etiqueta: 'PEP' },
-      { clave: 'vinculos_pep', etiqueta: 'Vínculos PEP' },
-    ],
-  },
-  // Referencias comerciales (objetos con campos comerciales)
-  referencias_comerciales: {
-    tipo: 'arregloObjetos',
-    llaves: ['nombre_establecimiento', 'ciudad'],
-    campos: [
-      { clave: 'nombre_establecimiento', etiqueta: 'Establecimiento' },
-      { clave: 'ciudad', etiqueta: 'Ciudad' },
-      { clave: 'persona_contacto', etiqueta: 'Persona de contacto' },
-      { clave: 'telefono', etiqueta: 'Teléfono' },
-    ],
-  },
-  // Referencias bancarias (objetos con info bancaria)
-  referencias_bancarias: {
-    tipo: 'arregloObjetos',
-    llaves: ['entidad', 'producto'],
-    campos: [
-      { clave: 'entidad', etiqueta: 'Entidad' },
-      { clave: 'producto', etiqueta: 'Producto' },
-    ],
-  },
-  // Tipos de transacción (arreglo simple de strings)
-  tipos_transaccion: {
-    tipo: 'arregloSimple',
-    etiquetasValores: {
-      importacion: 'Importación',
-      exportacion: 'Exportación',
-      inversiones: 'Inversiones',
-      pago_servicios: 'Pago de servicios',
-      otras: 'Otras',
-    },
-  },
-};
+export function esCampoComparableComoRegistro(campo, configuracionComparador = {}) {
+  return Boolean(configuracionComparador[campo]);
+}
 
 /**
  * Estilos CSS-in-JS para el comparador de registros.
@@ -138,8 +67,12 @@ function sonValoresIguales(a, b) {
  * @param {string} clave - Clave del campo para determinar formato
  * @returns {string} Valor formateado
  */
-function formatearValor(valor, clave) {
+function formatearValor(valor, clave, etiquetasValores = null) {
   if (valor === null || valor === undefined) return '';
+  if (etiquetasValores) {
+    const texto = String(valor);
+    return etiquetasValores[texto] || texto;
+  }
   if (clave === 'porcentaje') {
     const numero = Number(valor);
     if (!Number.isNaN(numero)) return `${numero}%`;
@@ -348,8 +281,8 @@ function renderizarArregloSimple(valoresAntes, valoresDespues, configuracion) {
   );
 }
 
-export default function ComparadorRegistros({ campo, valorAnterior, valorCorregido }) {
-  const configuracion = CONFIGURACION_COMPARADOR[campo] || { tipo: 'arregloObjetos', campos: [] };
+export default function ComparadorRegistros({ campo, valorAnterior, valorCorregido, configuracionComparador = {} }) {
+  const configuracion = configuracionComparador[campo] || { tipo: 'arregloObjetos', campos: [] };
   const registrosAntes = parseArreglo(valorAnterior);
   const registrosDespues = parseArreglo(valorCorregido);
 
@@ -395,7 +328,7 @@ export default function ComparadorRegistros({ campo, valorAnterior, valorCorregi
 
           <table style={estilos.tabla}>
             <tbody>
-              {configuracion.campos.map(({ clave, etiqueta }) => {
+              {configuracion.campos.map(({ clave, etiqueta, etiquetasValores }) => {
                 const valorAntes = parConEstatus.antes ? parConEstatus.antes[clave] ?? '' : '';
                 const valorDespues = parConEstatus.despues ? parConEstatus.despues[clave] ?? '' : '';
                 const seModifico = !sonValoresIguales(valorAntes, valorDespues);
@@ -403,10 +336,10 @@ export default function ComparadorRegistros({ campo, valorAnterior, valorCorregi
                   <tr key={clave}>
                     <td style={estilos.etiquetaCampo}>{etiqueta}</td>
                     <td style={{ ...estilos.valor, ...(seModifico && parConEstatus.antes ? estilos.valorCambiadoAntes : {}) }}>
-                      {formatearValor(valorAntes, clave)}
+                      {formatearValor(valorAntes, clave, etiquetasValores)}
                     </td>
                     <td style={{ ...estilos.valor, ...(seModifico && parConEstatus.despues ? estilos.valorCambiadoDespues : {}) }}>
-                      {formatearValor(valorDespues, clave)}
+                      {formatearValor(valorDespues, clave, etiquetasValores)}
                     </td>
                   </tr>
                 );

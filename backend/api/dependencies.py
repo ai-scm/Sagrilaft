@@ -131,6 +131,7 @@ def obtener_comparador(
         repo_expediente=repo,
         documentos_service=documento_service,
         rendereador=rendereador,
+        configuracion=config,
     )
 
 
@@ -207,9 +208,7 @@ def obtener_servicio_formulario(
 def obtener_servicio_expediente(
     solicitud: Request,
     repo: RepositorioExpediente = Depends(obtener_repo_expediente),
-    repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),
     storage: IAlmacenamiento = Depends(obtener_storage),
-    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
     carga_handler: CargaDocumentoHandler = Depends(obtener_carga_handler),
     comparador: ComparadorService = Depends(obtener_comparador),
     aprobacion_rechazo: AprobacionRechazoHandler = Depends(obtener_aprobacion_rechazo_handler),
@@ -217,14 +216,11 @@ def obtener_servicio_expediente(
 ) -> ExpedienteService:
     return ExpedienteService(
         repo=repo,
-        repo_doc=repo_doc,
         storage=storage,
         carga_handler=carga_handler,
         comparador=comparador,
         aprobacion_rechazo_handler=aprobacion_rechazo,
         devolucion_handler=devolucion,
-        repo_auditoria=repo_auditoria,
-        alertas_portal=obtener_alertas_portal(solicitud),
     )
 
 
