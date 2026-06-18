@@ -15,11 +15,10 @@ from domain.excepciones import (
     FormularioNoEncontradoError,
     SinPermisoError,
 )
-from domain.puertos.alertas_portal import IAlertasPortal
 from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
-from domain.puertos.auditoria import RepositorioAuditoria
-from domain.puertos.repositorios import RepositorioExpediente, RepositorioDocumento
+from domain.puertos.repositorios import RepositorioExpediente
 from domain.formulario.tipos import EstadoFormulario
+from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_REPORTE_FINAL
 from services.expedientes.comparacion import ComparadorService
 from services.expedientes.handlers import (
     AprobacionRechazoHandler,
@@ -30,7 +29,6 @@ from services.expedientes.handlers import (
     ComandoRechazo,
     DevolucionCorreccionHandler,
 )
-
 
 _ESTADOS_EXPEDIENTE = [
     EstadoFormulario.ENVIADO,
@@ -56,25 +54,18 @@ class ExpedienteService:
     def __init__(
         self,
         repo: RepositorioExpediente,
-        repo_doc: RepositorioDocumento,
         storage: IAlmacenamiento,
         carga_handler: CargaDocumentoHandler,
         comparador: ComparadorService,
         aprobacion_rechazo_handler: AprobacionRechazoHandler,
         devolucion_handler: DevolucionCorreccionHandler,
-        repo_auditoria: Optional[RepositorioAuditoria] = None,
-        alertas_portal: Optional[IAlertasPortal] = None,
     ) -> None:
         self._repo = repo
         self._storage = storage
-        self._auditoria = repo_auditoria
-        self._alertas = alertas_portal
         self._carga_handler = carga_handler
         self._comparador = comparador
-        self._aprobacion_rechazo_handler = aprobacion_rechazo_handler
-        self._devolucion_handler = devolucion_handler
-        from services.formulario.documento_service import DocumentoService
-        self._documentos = DocumentoService(repo_doc, storage)
+        self._aprobacion_rechazo = aprobacion_rechazo_handler
+        self._devolucion = devolucion_handler
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
@@ -165,14 +156,20 @@ class ExpedienteService:
         formulario_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        return self._comparador.comparar_ultima_correccion(formulario_id, contrapartes_permitidas)
+        return self._comparador.comparar_ultima_correccion(
+            formulario_id,
+            contrapartes_permitidas,
+        )
 
     def generar_reporte_comparacion_pdf(
         self,
         formulario_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> bytes:
-        return self._comparador.generar_reporte_comparacion_pdf(formulario_id, contrapartes_permitidas)
+        return self._comparador.generar_reporte_comparacion_pdf(
+            formulario_id,
+            contrapartes_permitidas,
+        )
 
     # ─── Carga Manual ─────────────────────────────────────────────────────────
 
@@ -186,10 +183,7 @@ class ExpedienteService:
         actor_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Carga un formulario en formato PDF manualmente."""
-        from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
-
-        comando = ComandoCargaDocumento(
+        return self._carga_handler.ejecutar(ComandoCargaDocumento(
             formulario_id=formulario_id,
             archivo_bytes=archivo_bytes,
             nombre_archivo=nombre_archivo,
@@ -198,8 +192,7 @@ class ExpedienteService:
             actor_id=actor_id,
             tipo_documento=TIPO_DOCUMENTO_FORMULARIO_PDF,
             contrapartes_permitidas=contrapartes_permitidas,
-        )
-        return self._carga_handler.ejecutar(comando)
+        ))
 
     def cargar_reporte_final(
         self,
@@ -211,10 +204,7 @@ class ExpedienteService:
         actor_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Carga un reporte final en formato PDF."""
-        from domain.constantes import TIPO_DOCUMENTO_REPORTE_FINAL
-
-        comando = ComandoCargaDocumento(
+        return self._carga_handler.ejecutar(ComandoCargaDocumento(
             formulario_id=formulario_id,
             archivo_bytes=archivo_bytes,
             nombre_archivo=nombre_archivo,
@@ -223,8 +213,7 @@ class ExpedienteService:
             actor_id=actor_id,
             tipo_documento=TIPO_DOCUMENTO_REPORTE_FINAL,
             contrapartes_permitidas=contrapartes_permitidas,
-        )
-        return self._carga_handler.ejecutar(comando)
+        ))
 
     # ─── Aprobación / Rechazo ─────────────────────────────────────────────────
 
@@ -234,12 +223,11 @@ class ExpedienteService:
         contrapartes_permitidas: Optional[List[str]] = None,
         actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        comando = ComandoAprobacion(
+        return self._aprobacion_rechazo.ejecutar_aprobacion(ComandoAprobacion(
             formulario_id=formulario_id,
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,
-        )
-        return self._aprobacion_rechazo_handler.ejecutar_aprobacion(comando)
+        ))
 
     def rechazar_expediente(
         self,
@@ -249,16 +237,13 @@ class ExpedienteService:
         motivo: str = "",
         mensaje_para_destinatario: Optional[str] = None,
     ) -> Dict[str, Any]:
-        comando = ComandoRechazo(
+        return self._aprobacion_rechazo.ejecutar_rechazo(ComandoRechazo(
             formulario_id=formulario_id,
             motivo=motivo,
             mensaje_para_destinatario=mensaje_para_destinatario,
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,
-        )
-        return self._aprobacion_rechazo_handler.ejecutar_rechazo(comando)
-
-
+        ))
 
     def devolver_para_correccion(
         self,
@@ -268,14 +253,13 @@ class ExpedienteService:
         contrapartes_permitidas: Optional[List[str]] = None,
         actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        comando = ComandoDevolucion(
+        return self._devolucion.ejecutar_devolucion(ComandoDevolucion(
             formulario_id=formulario_id,
             especificaciones=especificaciones,
             campos_identificados=campos_identificados,
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,
-        )
-        return self._devolucion_handler.ejecutar_devolucion(comando)
+        ))
 
     # ─── Descarga ─────────────────────────────────────────────────────────────
 
