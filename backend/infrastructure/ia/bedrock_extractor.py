@@ -23,25 +23,25 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════
 
 PROMPTS_EXTRACCION: Dict[str, str] = {
-    "cedula_representante": """Analiza este documento de identificación colombiano y extrae exactamente los siguientes campos:
-- tipo_documento: tipo de documento tal como aparece en el encabezado. Normaliza tildes: "CÉDULA DE CIUDADANÍA" → "CEDULA DE CIUDADANIA". Valores posibles: "CEDULA DE CIUDADANIA", "CEDULA DE EXTRANJERIA", "PASAPORTE".
+    "cedula_representante": """Analiza este documento de identidad (puede ser de cualquier país) y extrae exactamente los siguientes campos, adaptándote a la terminología local del formato:
+- tipo_documento: tipo de documento tal como aparece en el encabezado. Normaliza a un formato genérico si es posible (ej: "CEDULA DE CIUDADANIA", "CEDULA DE EXTRANJERIA", "PASAPORTE").
 - nombre: nombre completo de la persona (nombres y apellidos)
-- numero_documento: número del documento (solo dígitos, sin puntos ni espacios)
+- numero_documento: número del documento (solo caracteres alfanuméricos o digitos, sin puntos ni espacios)
 - fecha_expedicion: fecha de expedición en formato YYYY-MM-DD
-- lugar_expedicion: ciudad o municipio de expedición
+- lugar_expedicion: ciudad, municipio o país de expedición
 - fecha_nacimiento: fecha de nacimiento en formato YYYY-MM-DD. Ejemplo: "1990-08-15".
 - lugar_nacimiento: ciudad o municipio de nacimiento tal como aparece en el documento
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
-    "rut": """Analiza este documento RUT (Registro Único Tributario) de la DIAN Colombia y extrae:
+    "rut": """Analiza este documento de registro tributario o fiscal (como RUT, RUC, RFC, CUIT, etc., dependiendo del país) y extrae la información solicitada. Adapta tu búsqueda a la estructura y nombres de secciones equivalentes en el documento proporcionado:
 - razon_social: nombre o razón social completa
-- nit: número de identificación tributaria (solo dígitos, sin puntos ni guiones)
-- actividades_economicas: lista de códigos CIIU con descripción (array de strings)
-- codigo_ica: código de la actividad principal para el Impuesto de Industria y Comercio (ICA). Búscalo en la sección "CLASIFICACION" → subsección "Actividad Principal" → campo "46. Codigo". Devuelve solo el número, sin texto adicional.
-- tipo_persona: tipo de persona de la sección "CLASIFICACIÓN E INFORMACIÓN BÁSICA DE LA EMPRESA" → pregunta "24. Tipo de contribuyente" → campo "Tipo de Persona". Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
-- nombre_representante: nombre completo del representante legal. Búscalo en la sección "REPRESENTACIÓN" y concatena los campos en este orden: "106. Primer nombre" + "107. Otros nombres" (si existe) + "104. Primer apellido" + "105. Segundo apellido". Devuelve una sola cadena con los valores separados por espacio, omitiendo los que sean nulos.
-- fecha_documento: fecha del documento en formato YYYY-MM-DD
+- nit: número de identificación tributaria o fiscal (solo alfanuméricos o digitos, sin puntos ni guiones) ¡ATENCION A BARRERAS VISUALES!
+- actividades_economicas: lista de códigos de actividad económica con su descripción (array de strings)
+- codigo_ica: código de la actividad principal a nivel local/municipal (si aplica). Devuelve solo el número, sin texto adicional.
+- tipo_persona: tipo de persona o contribuyente (ej. Jurídica, Natural). Normaliza el valor extraído a "Persona Jurídica" o "Persona Natural" según corresponda.
+- nombre_representante: nombre completo del representante legal. Busca en la sección de representación o apoderados y concatena los nombres y apellidos. Devuelve una sola cadena.
+- fecha_documento: fecha de generación, inscripción o actualización del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
 - telefono: número de teléfono registrado (solo dígitos, sin espacios ni guiones)
@@ -50,57 +50,57 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
-    "certificado_existencia": """Analiza este Certificado de Existencia y Representación Legal de Cámara de Comercio y extrae:
+    "certificado_existencia": """Analiza este Certificado de Existencia y Representación Legal, Registro Público de Comercio o equivalente (dependiendo del país) y extrae la información solicitada adaptándote a los nombres y secciones locales:
 - razon_social: razón social completa de la empresa
-- tipo_persona: determina si el documento corresponde a una "Persona Jurídica" o "Persona Natural". Búscalo en el encabezado del certificado, en la sección de clasificación o en frases como "La persona jurídica..." o "La persona natural...". Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
-- tipo_identificacion: tipo de identificación de la empresa según la sección "NOMBRE, IDENTIFICACIÓN Y DOMICILIO". Busca la etiqueta del campo de número (ej: "NIT", "Cédula de ciudadanía", "Cédula de extranjería", "Pasaporte"). Normaliza SIEMPRE a uno de estos valores exactos: "NIT", "CC", "CE", "PAS". Reglas de normalización: si el documento dice "NIT" o "Número de Identificación Tributaria" → devuelve "NIT"; si dice "Cédula de ciudadanía" o "Cedula de ciudadania" → devuelve "CC"; si dice "Cédula de extranjería" o "Cedula de extranjeria" → devuelve "CE"; si dice "Pasaporte" → devuelve "PAS". Si no encuentras el tipo, devuelve "NIT" como valor por defecto para personas jurídicas.
-- nit: número de identificación de la empresa en la sección "NOMBRE, IDENTIFICACIÓN Y DOMICILIO" (solo dígitos, sin puntos, guiones ni dígito de verificación)
-- representante_legal: nombre completo del representante legal
-- cedula_representante: número de cédula del representante legal (solo dígitos)
-- termino_duracion: vigencia de la empresa extraída de la sección "TÉRMINO DE DURACIÓN" o de frases como "su duración es hasta el [FECHA]" o "su duración es indefinida". Si es una fecha específica devuelve formato YYYY-MM-DD; si es indefinida devuelve "INDEFINIDA".
+- tipo_persona: determina si el documento corresponde a una "Persona Jurídica" (sociedad/empresa) o "Persona Natural" (individuo). Búscalo en el encabezado, clasificación o cuerpo del documento. Valores posibles exactos: "Persona Jurídica" o "Persona Natural".
+- tipo_identificacion: tipo de identificación de la empresa. Busca la etiqueta del campo de número tributario (ej. NIT, RUC, CUIT, RFC, etc). Si es un identificador de empresa asume "NIT" como valor genérico. Si no encuentras el tipo, devuelve "NIT" por defecto para empresas.
+- nit: número de identificación tributaria o fiscal de la empresa (solo alfanuméricos, sin puntos, guiones ni dígito de verificación)
+- representante_legal: nombre completo del representante legal, administrador o gerente
+- cedula_representante: número de identificación (cédula, DNI, pasaporte) del representante legal (solo caracteres alfanuméricos o digitos)
+- termino_duracion: vigencia o término de duración de la sociedad extraída del documento. Si es una fecha específica devuelve formato YYYY-MM-DD; si es indefinida devuelve "INDEFINIDA".
 - fecha_documento: fecha de expedición del certificado en formato YYYY-MM-DD
-- direccion: dirección comercial registrada
-- municipio: municipio o ciudad registrada en la sección UBICACIÓN del certificado
-- correo: correo electrónico registrado en la sección UBICACIÓN del certificado (campo "Correo electrónico")
-- telefono: teléfono comercial registrado en la sección UBICACIÓN del certificado (campo "Teléfono comercial 1", solo dígitos)
-- objeto_social: descripción del objeto social (resumido)
+- direccion: dirección comercial, domicilio principal o sede social registrada
+- municipio: municipio, ciudad o jurisdicción registrada
+- correo: correo electrónico registrado
+- telefono: teléfono comercial registrado (solo dígitos)
+- objeto_social: descripción principal del objeto social (resumido)
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
-    "estados_financieros": """Analiza estos estados financieros y extrae las siguientes cifras del último año reportado:
+    "estados_financieros": """Analiza estos estados financieros (pueden ser de cualquier país) y extrae las siguientes cifras del último año reportado:
 - razon_social: nombre o razón social de la empresa que presenta los estados financieros (búscalo en el encabezado o membrete del documento)
-- nit: NIT de la empresa (solo dígitos, sin puntos, guiones ni dígito de verificación). Búscalo en el encabezado, membrete o carátula del documento.
+- nit: Identificador tributario o fiscal de la empresa (solo alfanuméricos, sin puntos, guiones ni dígito de verificación). Búscalo en el encabezado, membrete o carátula del documento.
 - nombre_representante: nombre completo del representante legal o firmante principal del documento. Búscalo en la sección de firmas, en el bloque del representante legal, o en la carátula. Si no aparece explícitamente, devuelve null.
-- cedula_representante: número de documento de identidad (cédula, pasaporte, etc.) del representante legal o firmante. Solo caracteres alfanuméricos, sin puntos, guiones ni espacios. Búscalo junto al nombre del representante en la sección de firmas o en el bloque del representante legal. Si no aparece explícitamente, devuelve null.
+- cedula_representante: número de documento de identidad del representante legal o firmante. Solo caracteres alfanuméricos, sin puntos, guiones ni espacios. Búscalo junto al nombre del representante en la sección de firmas o en el bloque del representante legal. Si no aparece explícitamente, devuelve null.
 - total_activos: valor numérico del total de activos (solo número, sin separadores)
 - total_pasivos: valor numérico del total de pasivos (solo número)
 - patrimonio: valor numérico del patrimonio neto (solo número)
 - ingresos: valor numérico del total de ingresos operacionales (solo número)
 - egresos: valor numérico del total de gastos/costos (solo número)
 - anio_reporte: año del reporte (número entero, ej: 2025)
-- cifras_en: unidad de las cifras ("pesos", "miles", "millones")
+- cifras_en: unidad de las cifras ("pesos", "dólares", "miles", "millones", etc.)
 - firmado: true si el documento tiene firma visible, false si no
 - tiene_comparativo: true si muestra datos de 2 años, false si solo un año
-- firma_revisor_fiscal: true si hay firma del revisor fiscal, false si no
+- firma_revisor_fiscal: true si hay firma de revisor fiscal, auditor o contador público independiente, false si no
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
-    "declaracion_renta": """Analiza esta Declaración de Renta colombiana y extrae:
+    "declaracion_renta": """Analiza esta Declaración de Renta o de Impuestos sobre la Renta (de cualquier país) y extrae:
 - razon_social: nombre o razón social del declarante
-- nit: NIT del declarante (solo dígitos)
-- anio_gravable: año gravable declarado (número entero)
+- nit: identificador tributario o fiscal del declarante (solo alfanuméricos)
+- anio_gravable: año gravable o fiscal declarado (número entero)
 - total_patrimonio_bruto: valor numérico (solo número)
 - total_patrimonio_liquido: valor numérico (solo número)
 - total_ingresos_brutos: valor numérico (solo número)
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
 
-    "referencias_bancarias": """Analiza esta certificación/referencia bancaria y extrae:
+    "referencias_bancarias": """Analiza esta certificación/referencia bancaria (de cualquier país) y extrae:
 - entidad: nombre del banco o entidad financiera
 - tipo_cuenta: tipo de producto (ahorros, corriente, etc.)
 - numero_cuenta: número de cuenta (parcial o completo)
 - titular: nombre del titular de la cuenta
-- nit: NIT del titular (solo dígitos, sin puntos, guiones ni dígito de verificación). Búscalo en el cuerpo de la carta bancaria; puede no estar presente.
+- nit: Identificador tributario o fiscal del titular (solo alfanuméricos). Búscalo en el cuerpo de la carta bancaria; puede no estar presente.
 - fecha_documento: fecha de expedición en formato YYYY-MM-DD
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
