@@ -35,16 +35,15 @@ export default function AlertasInconsistencia({ alertas, tipoCampo, nombreCampo 
     <div className="alertas-razon-social" role="alert" aria-live="polite">
 
       <div className="alertas-razon-social__encabezado">
-        <span aria-hidden="true">🚫</span>
+        <span aria-hidden="true">⚠️</span>
         <strong>
-          No puedes avanzar: hay {alertas.length === 1 ? 'una inconsistencia' : `${alertas.length} inconsistencias`} de {tipoCampo}
+          Advertencia: hay {alertas.length === 1 ? 'una inconsistencia' : `${alertas.length} inconsistencias`} de {tipoCampo}
         </strong>
       </div>
 
       <p className="alertas-razon-social__instruccion">
-        Para cada documento marcado, debes <strong>corregir el campo "{nombreCampo}"</strong> en
-        el formulario para que coincida con el documento, o bien <strong>reemplazar el archivo adjunto</strong> con
-        uno que contenga el valor correcto. El bloqueo se libera automáticamente al corregir.
+        Te sugerimos <strong>revisar el campo "{nombreCampo}"</strong> en
+        el formulario para que coincida con el documento adjunto. Aunque puedes continuar, es recomendable corregir esta diferencia.
       </p>
 
       {alertas.map((alerta) => (

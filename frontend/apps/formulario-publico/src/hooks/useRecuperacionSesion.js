@@ -37,8 +37,8 @@ const _CAMPOS_EXCLUIR_DE_FORMDATA = new Set([
 
 const ERRORES_RECUPERACION = {
   CREDENCIALES_INVALIDAS: 'Código de petición o PIN incorrecto. Verifique los datos',
-  FORMULARIO_YA_ENVIADO:  'Este formulario ya fue enviado y no puede recuperarse.',
-  ACCESO_EXPIRADO:        'El acceso ha expirado. Solicite un nuevo enlace al área responsable.',
+  FORMULARIO_YA_ENVIADO: 'Este formulario ya fue enviado y no puede recuperarse.',
+  ACCESO_EXPIRADO: 'El acceso ha expirado. Solicite un nuevo enlace al área responsable.',
 };
 
 function _normalizarDocumentos(documentosArray) {
@@ -49,24 +49,53 @@ function _normalizarDocumentos(documentosArray) {
   }, {});
 }
 
-function _adaptarRespuestaServidor(formulario) {
+function _adaptarRespuestaServidor(formulario, borradorLocal = null) {
   const formData = Object.fromEntries(
     Object.entries(formulario).filter(([k]) => !_CAMPOS_EXCLUIR_DE_FORMDATA.has(k)),
   );
+
+  const documentos = _normalizarDocumentos(formulario.documentos);
+
+  // Preservar datos extraídos por IA (que el backend no persiste en la BD)
+  // cruzando el ID del documento para asegurar que es el mismo archivo.
+  if (borradorLocal && borradorLocal.documentos) {
+    Object.keys(documentos).forEach(tipo => {
+      const docLocal = borradorLocal.documentos[tipo];
+      const docServer = documentos[tipo];
+      if (docLocal && docLocal.id === docServer.id) {
+        if (docServer.razon_social_extraida == null && docLocal.razon_social_extraida != null) {
+          docServer.razon_social_extraida = docLocal.razon_social_extraida;
+        }
+        if (docServer.nit_extraido == null && docLocal.nit_extraido != null) {
+          docServer.nit_extraido = docLocal.nit_extraido;
+        }
+        if (docServer.nombre_representante_extraido == null && docLocal.nombre_representante_extraido != null) {
+          docServer.nombre_representante_extraido = docLocal.nombre_representante_extraido;
+        }
+        if (docServer.numero_doc_representante_extraido == null && docLocal.numero_doc_representante_extraido != null) {
+          docServer.numero_doc_representante_extraido = docLocal.numero_doc_representante_extraido;
+        }
+        if (docServer.direccion_extraida == null && docLocal.direccion_extraida != null) {
+          docServer.direccion_extraida = docLocal.direccion_extraida;
+        }
+      }
+    });
+  }
+
   return {
     formData,
-    step:                formulario.pagina_actual ?? 1,
-    formularioId:        formulario.id,
-    codigoPeticion:      formulario.codigo_peticion,
-    estadoFormulario:    formulario.estado ?? null,
-    camposACorregir:     formulario.campos_a_corregir ?? null,
-    juntaDirectiva:      formulario.junta_directiva     ?? [],
-    accionistas:         formulario.accionistas          ?? [],
-    beneficiarios:       formulario.beneficiario_final   ?? [],
-    referenciasComerciales:  formulario.referencias_comerciales    ?? [],
-    referenciasBancarias:    formulario.referencias_bancarias       ?? [],
-    infoBancariaPagos:       formulario.informacion_bancaria_pagos  ?? [],
-    documentos:          _normalizarDocumentos(formulario.documentos),
+    step: formulario.pagina_actual ?? 1,
+    formularioId: formulario.id,
+    codigoPeticion: formulario.codigo_peticion,
+    estadoFormulario: formulario.estado ?? null,
+    camposACorregir: formulario.campos_a_corregir ?? null,
+    juntaDirectiva: formulario.junta_directiva ?? [],
+    accionistas: formulario.accionistas ?? [],
+    beneficiarios: formulario.beneficiario_final ?? [],
+    referenciasComerciales: formulario.referencias_comerciales ?? [],
+    referenciasBancarias: formulario.referencias_bancarias ?? [],
+    infoBancariaPagos: formulario.informacion_bancaria_pagos ?? [],
+    documentos,
   };
 }
 
@@ -80,10 +109,10 @@ export function useRecuperacionSesion(setters) {
     setInfoBancariaPagos, setDocumentos,
   } = setters;
 
-  const [visible, setVisible]           = useState(false);
+  const [visible, setVisible] = useState(false);
   const [borradorLocal, setBorradorLocal] = useState(null);
-  const [error, setError]               = useState(null);
-  const [cargando, setCargando]         = useState(false);
+  const [error, setError] = useState(null);
+  const [cargando, setCargando] = useState(false);
 
   // Credenciales en memoria para autorizar el envío del formulario.
   // Nunca se persisten en localStorage. Se populan tras token resolution o PIN recovery.
@@ -103,12 +132,12 @@ export function useRecuperacionSesion(setters) {
       setFormDataOriginal(snapshot_recuperar_sesion.formData ?? {});
       // Guarda snapshot de tablas para detectar modificaciones durante la corrección
       setTablasOriginales({
-        juntaDirectiva:         snapshot_recuperar_sesion.juntaDirectiva          ?? [],
-        accionistas:            snapshot_recuperar_sesion.accionistas              ?? [],
-        beneficiarios:          snapshot_recuperar_sesion.beneficiarios            ?? [],
-        referenciasComerciales: snapshot_recuperar_sesion.referenciasComerciales  ?? [],
-        referenciasBancarias:   snapshot_recuperar_sesion.referenciasBancarias    ?? [],
-        infoBancariaPagos:      snapshot_recuperar_sesion.infoBancariaPagos        ?? [],
+        juntaDirectiva: snapshot_recuperar_sesion.juntaDirectiva ?? [],
+        accionistas: snapshot_recuperar_sesion.accionistas ?? [],
+        beneficiarios: snapshot_recuperar_sesion.beneficiarios ?? [],
+        referenciasComerciales: snapshot_recuperar_sesion.referenciasComerciales ?? [],
+        referenciasBancarias: snapshot_recuperar_sesion.referenciasBancarias ?? [],
+        infoBancariaPagos: snapshot_recuperar_sesion.infoBancariaPagos ?? [],
       });
     }
     setJuntaDirectiva(
@@ -191,7 +220,7 @@ export function useRecuperacionSesion(setters) {
       const formulario = await api.recuperarSesionPorAcceso(codigoPeticion, pin);
       if (formulario) {
         credencialesRef.current = { codigo_peticion: codigoPeticion, pin };
-        const snap = _adaptarRespuestaServidor(formulario);
+        const snap = _adaptarRespuestaServidor(formulario, borradorLocal);
         _restaurarDesdeSnapshot(snap);
         eliminarBorradorDeStorage();
         setVisible(false);
@@ -201,7 +230,7 @@ export function useRecuperacionSesion(setters) {
     } finally {
       setCargando(false);
     }
-  }, [_restaurarDesdeSnapshot]);
+  }, [_restaurarDesdeSnapshot, borradorLocal]);
 
   // ── Descartar recuperación (comenzar desde cero) ───────────────────────────
   const descartar = useCallback(() => {
@@ -228,7 +257,7 @@ export function useRecuperacionSesion(setters) {
     visible,
     error,
     cargando,
-    fechaBorrador:          borradorLocal?.guardadoEn ?? null,
+    fechaBorrador: borradorLocal?.guardadoEn ?? null,
     codigoPeticionBorrador: borradorLocal?.codigoPeticion ?? null,
     abrirModal,
     abrirConError,

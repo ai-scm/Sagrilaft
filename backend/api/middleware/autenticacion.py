@@ -236,15 +236,7 @@ async def portal_interno(
     Uso accediendo al usuario autenticado:
         async def mi_endpoint(usuario: UsuarioPortalInterno = Depends(portal_interno)):
     """
-    if not keycloak.configurado:
-        if not _AUTH_DESHABILITADA:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=(
-                    "El servidor de autenticacion no esta configurado. "
-                    "Contacte al administrador del sistema."
-                ),
-            )
+    if _AUTH_DESHABILITADA:
         _log.warning(
             "PORTAL_AUTH_DISABLED=true - portal interno SIN AUTENTICACION. "
             "Solo valido en desarrollo local."
@@ -253,6 +245,15 @@ async def portal_interno(
             sub="dev",
             email="dev@localhost",
             roles=["acceso_clientes", "acceso_proveedores"],
+        )
+
+    if not keycloak.configurado:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "El servidor de autenticacion no esta configurado. "
+                "Contacte al administrador del sistema."
+            ),
         )
 
     if credenciales is None:

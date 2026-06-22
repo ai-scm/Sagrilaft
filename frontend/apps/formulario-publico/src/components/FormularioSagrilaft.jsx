@@ -295,7 +295,6 @@ export default function FormularioSagrilaft() {
             onSaveDraft={handleSaveDraft}
             onSubmit={handleSubmitConDisclaimer}
             bloqueadoPorAnalisis={bloqueadoPorAnalisis}
-            bloqueadoPorAlertas={hayAlertasActivas}
             bloqueadoPorDisclaimer={bloqueadoPorDisclaimer}
           />
         </main>

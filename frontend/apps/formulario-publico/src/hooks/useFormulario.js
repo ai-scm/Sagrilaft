@@ -369,18 +369,7 @@ export function useFormulario() {
 
   const handleNext = () => {
     const newErrors = validarPaso(step);
-    if (step === 1) {
-      const alertasPaso1 = [
-        { alertas: alertasRazonSocial,            clave: '_inconsistencias_nombre',                   mensaje: 'Corrige la razón social en el formulario o reemplaza el archivo adjunto para que los nombres coincidan.' },
-        { alertas: alertasNit,                    clave: '_inconsistencias_nit',                      mensaje: 'Corrige el NIT en el formulario o reemplaza el archivo adjunto para que los NITs coincidan.' },
-        { alertas: alertasNombreRepresentante,    clave: '_inconsistencias_nombre_representante',     mensaje: 'Corrige el nombre del representante en el formulario o reemplaza el archivo adjunto para que los nombres coincidan.' },
-        { alertas: alertasNumeroDocRepresentante, clave: '_inconsistencias_numero_doc_representante', mensaje: 'Corrige el No. de Identificación del representante en el formulario o reemplaza el archivo adjunto para que los números coincidan.' },
-        { alertas: alertasDireccion,              clave: '_inconsistencias_direccion',                mensaje: 'Corrige la dirección en el formulario o reemplaza el archivo adjunto para que las direcciones coincidan.' },
-      ];
-      for (const { alertas, clave, mensaje } of alertasPaso1) {
-        if (alertas.length > 0) newErrors[clave] = mensaje;
-      }
-    }
+
     if (step === 4) {
       Object.assign(newErrors, validarTablasPaso4({
         juntaDirectiva, accionistas, beneficiarios,

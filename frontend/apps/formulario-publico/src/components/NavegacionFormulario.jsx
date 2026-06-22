@@ -4,16 +4,14 @@
  *
  * La navegación se bloquea completamente cuando:
  * - `bloqueadoPorAnalisis`: hay documentos siendo procesados por IA.
- * - `bloqueadoPorAlertas`: hay alertas de inconsistencia activas sin resolver.
  */
 export default function NavegacionFormulario({
   step, totalSteps, saving, lastSaved,
   onPrev, onNext, onSaveDraft, onSubmit,
   bloqueadoPorAnalisis = false,
-  bloqueadoPorAlertas = false,
   bloqueadoPorDisclaimer = false,
 }) {
-  const navegacionBloqueada = bloqueadoPorAnalisis || bloqueadoPorAlertas;
+  const navegacionBloqueada = bloqueadoPorAnalisis;
   const envioBloqueado = saving || bloqueadoPorDisclaimer;
   const estiloBotonBloqueado = navegacionBloqueada
     ? { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' }
