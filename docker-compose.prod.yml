@@ -1,0 +1,48 @@
+# ============================================================
+# Overlay de produccion
+#
+# Usar junto con docker-compose.yml:
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Este archivo no cambia la topologia; solo hace explicitas las variables
+# que en produccion no pueden quedar vacias.
+# ============================================================
+
+services:
+  backend:
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+
+      ZOHO_CLIENT_ID: ${ZOHO_CLIENT_ID:?Define ZOHO_CLIENT_ID en .env}
+      ZOHO_CLIENT_SECRET: ${ZOHO_CLIENT_SECRET:?Define ZOHO_CLIENT_SECRET en .env}
+      ZOHO_REFRESH_TOKEN: ${ZOHO_REFRESH_TOKEN:?Define ZOHO_REFRESH_TOKEN en .env}
+      ZOHO_WEBHOOK_SECRET: ${ZOHO_WEBHOOK_SECRET:?Define ZOHO_WEBHOOK_SECRET en .env}
+
+      SMTP_HOST: ${SMTP_HOST:?Define SMTP_HOST en .env}
+      SMTP_USER: ${SMTP_USER:?Define SMTP_USER en .env}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Define SMTP_PASSWORD en .env}
+      SMTP_FROM: ${SMTP_FROM:?Define SMTP_FROM en .env}
+
+      KEYCLOAK_URL: ${KEYCLOAK_URL:?Define KEYCLOAK_URL en .env}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?Define KEYCLOAK_CLIENT_ID en .env}
+      KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:?Define KEYCLOAK_ISSUER_URL en .env}
+
+  formulario-publico:
+    build:
+      args:
+        VITE_PORTAL_INTERNO_URL: ${VITE_PORTAL_INTERNO_URL:?Define VITE_PORTAL_INTERNO_URL en .env}
+
+  portal-interno:
+    build:
+      args:
+        VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:?Define VITE_KEYCLOAK_URL en .env}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:?Define VITE_KEYCLOAK_REALM en .env}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:?Define VITE_KEYCLOAK_CLIENT_ID en .env}
+
+  keycloak:
+    environment:
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Define KEYCLOAK_ADMIN_PASSWORD en .env}
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:?Define KEYCLOAK_HOSTNAME en .env}
+      KC_DB_URL: ${KEYCLOAK_DB_URL:?Define KEYCLOAK_DB_URL en .env}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:?Define KEYCLOAK_DB_USER en .env}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Define KEYCLOAK_DB_PASSWORD en .env}

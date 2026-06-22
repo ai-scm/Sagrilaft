@@ -6,7 +6,7 @@
 # recarga automática de código y servidor web ligero.
 #
 # Cómo levantarlo:
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#   docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # Lo que cambia respecto a producción:
 #   - La base de datos corre aquí (en producción usa RDS de AWS)
@@ -112,7 +112,7 @@ services:
       # El backend asume que cualquier llamada viene de un usuario autorizado.
       # Cambiar a "false" (o eliminar esta línea) cuando quieras probar
       # el flujo de autenticación completo en local.
-      PORTAL_AUTH_DISABLED: "true"
+      PORTAL_AUTH_DISABLED: ${PORTAL_AUTH_DISABLED:-true}
 
       # Rango de IPs del que el backend acepta cabeceras de proxy (X-Forwarded-For).
       # 172.0.0.0/8 es la red interna de Docker. No cambiar salvo que
@@ -165,11 +165,9 @@ services:
     ports:
       - "5173:5173"
 
-    env_file:
-      - ./frontend/apps/formulario-publico/.env
-
     environment:
-      VITE_BACKEND_URL: http://backend:8000
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://backend:8000}
+      VITE_PORTAL_INTERNO_URL: ${VITE_PORTAL_INTERNO_URL:-http://localhost:5174}
 
     depends_on:
       backend:
@@ -201,11 +199,11 @@ services:
     ports:
       - "5174:5174"
 
-    env_file:
-      - ./frontend/apps/portal-interno/.env
-
     environment:
-      VITE_BACKEND_URL: http://backend:8000
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://backend:8000}
+      VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
+      VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-sagrilaft}
+      VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
 
     depends_on:
       backend:
@@ -227,7 +225,7 @@ services:
   #   PORTAL_AUTH_DISABLED=true  → el backend no exige token
   #   VITE_KEYCLOAK_URL vacío    → el frontend no redirige al login
   #
-  # Para activarlo completamente, define en tu .env:
+  # Para activarlo completamente, define en tu .env.dev:
   #   KEYCLOAK_URL=http://keycloak:8080
   #   VITE_KEYCLOAK_URL=http://localhost:8080
   #   PORTAL_AUTH_DISABLED=false   (o elimina esa línea)

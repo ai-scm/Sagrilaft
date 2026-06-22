@@ -2,6 +2,13 @@
 .env
 .env.*
 !.env.example
+!.env.dev.example
+!.env.prod.example
+!frontend/apps/formulario-publico/.env.dev.example
+!frontend/apps/portal-interno/.env.dev.example
+.env.prod.example
+.env.dev.example
+.env.example
 *.pem
 *.key
 *.p12
@@ -77,7 +84,6 @@ postgres_data/
 keycloak_data/
 uploads/
 realm-sagrilaft.dev.json
-.env.example
 !frontend/apps/portal-interno/.env.example
 !frontend/apps/formulario-publico/.env.example
 
@@ -86,3 +92,7 @@ sns-policy.json
 
 
 reset_entorno.sh
+
+README.md
+docs
+scripts

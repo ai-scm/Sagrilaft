@@ -15,7 +15,8 @@
 #   BD:      RDS PostgreSQL  (en la red privada de AWS, el servidor no la ve directamente)
 #   Archivos: uploads_data   (volumen EBS adjunto al EC2)
 #
-# Para desplegarlo: docker compose up -d --build
+# Para desplegarlo en producción:
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 # Variables requeridas: ver .env.example
 # ============================================================
 
@@ -139,7 +140,7 @@ services:
       # SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
       # SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
       
-      APP_ENV: production
+      APP_ENV: ${APP_ENV:-production}
 
     volumes:
       # Monta el volumen uploads_data en la carpeta /app/uploads del contenedor.
