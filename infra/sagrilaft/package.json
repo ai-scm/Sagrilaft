@@ -1,0 +1,25 @@
+{
+  "name": "sagrilaft-infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "synth:prod": "cdk synth -c environment=prod -c region=us-east-1",
+    "diff": "cdk diff",
+    "diff:prod": "cdk diff -c environment=prod -c region=us-east-1",
+    "deploy": "cdk deploy",
+    "deploy:prod": "cdk deploy -c environment=prod -c region=us-east-1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "aws-cdk": "^2.120.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.120.0",
+    "constructs": "^10.0.0"
+  }
+}

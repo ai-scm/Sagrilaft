@@ -1,0 +1,8 @@
+node_modules/
+cdk.out/
+__pycache__/
+*.pyc
+bin/*.js
+bin/*.d.ts
+lib/*.js
+lib/*.d.ts
