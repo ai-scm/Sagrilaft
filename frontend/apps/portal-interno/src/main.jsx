@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import keycloak from './keycloak.js';
-import { configurarTokenPortal } from './services/api.js';
+import { configurarTokenPortal, configurarManejadorAuthError } from './services/api.js';
 import './styles/global.css';
 
 async function inicializarPortal() {
@@ -31,6 +31,10 @@ async function inicializarPortal() {
         keycloak.login();
       }
       return keycloak.token;
+    });
+
+    configurarManejadorAuthError(() => {
+      keycloak.login();
     });
 
     keycloak.onTokenExpired = () =>

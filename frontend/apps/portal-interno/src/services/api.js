@@ -1,6 +1,6 @@
-import { API_BASE, getToken, leerDetalleError, requestJson, configurarTokenPortal } from '@shared/services/apiClient';
+import { API_BASE, getToken, leerDetalleError, requestJson, configurarTokenPortal, configurarManejadorAuthError } from '@shared/services/apiClient';
 
-export { configurarTokenPortal };
+export { configurarTokenPortal, configurarManejadorAuthError };
 
 export const api = {
   // Portal interno — accesos manuales

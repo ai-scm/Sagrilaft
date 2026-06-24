@@ -1,9 +1,14 @@
 export const API_BASE = '/api';
 
 let _tokenGetter = null;
+let _onAuthError = null;
 
 export function configurarTokenPortal(getter) {
   _tokenGetter = getter;
+}
+
+export function configurarManejadorAuthError(handler) {
+  _onAuthError = handler;
 }
 
 export async function getToken() {
@@ -60,6 +65,9 @@ export async function requestJson(path, options = {}) {
   }
   const res = await fetch(`${API_BASE}${path}`, options);
   if (!res.ok) {
+    if (res.status === 401 && _onAuthError) {
+      _onAuthError();
+    }
     const err = new Error(await leerDetalleError(res));
     err.status = res.status;
     throw err;
