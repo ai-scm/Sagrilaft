@@ -10,8 +10,10 @@
     "diff": "cdk diff",
     "diff:prod": "cdk diff -c environment=prod -c region=us-east-1",
     "deploy": "cdk deploy",
-    "deploy:prod": "cdk deploy -c environment=prod -c region=us-east-1"
+    "deploy:prod": "cdk deploy -c environment=prod -c region=us-east-1",
+    "deploy:prod:full": "cdk deploy -c environment=prod -c region=us-east-1 -c sesEmailOrigen=alertas@tudominio.com -c snsAlertasSub=equipo-analistas@tudominio.com"
   },
+  "_nota_cdk_v2": "aws-sns, aws-sns-subscriptions y aws-ses son sub-módulos de aws-cdk-lib. No requieren paquetes npm adicionales.",
   "devDependencies": {
     "@types/node": "^20.14.9",
     "aws-cdk": "^2.120.0",

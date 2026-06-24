@@ -10,6 +10,12 @@
 
 services:
   backend:
+    # Carga las variables inyectadas por el CDK al arrancar el EC2.
+    # El CDK escribe SNS_TOPIC_ARN y SES_EMAIL_ORIGEN en este archivo via UserData.
+    # Si el archivo no existe (ej. despliegue sin CDK), Docker ignora el env_file.
+    env_file:
+      - path: /opt/sagrilaft/.env.aws
+        required: false
     environment:
       SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
 
@@ -23,14 +29,35 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:?Define SMTP_PASSWORD en .env}
       SMTP_FROM: ${SMTP_FROM:?Define SMTP_FROM en .env}
 
+      # Alertas SES/SNS — ALERTAS_EMAIL_DESTINATARIO se llena en .env.prod
+      # SES_EMAIL_ORIGEN y SNS_TOPIC_ARN vienen de /opt/sagrilaft/.env.aws (CDK)
+      SES_NOTIFICACIONES_ENABLED: ${SES_NOTIFICACIONES_ENABLED:?Define SES_NOTIFICACIONES_ENABLED en .env}
+      ALERTAS_EMAIL_DESTINATARIO: ${ALERTAS_EMAIL_DESTINATARIO:?Define ALERTAS_EMAIL_DESTINATARIO en .env}
+
       KEYCLOAK_URL: ${KEYCLOAK_URL:?Define KEYCLOAK_URL en .env}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?Define KEYCLOAK_CLIENT_ID en .env}
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:?Define KEYCLOAK_ISSUER_URL en .env}
+
+    # Logs del backend → CloudWatch. CW_LOG_GROUP_BACKEND inyectado por CDK en .env.aws
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${CW_LOG_GROUP_BACKEND:-/sagrilaft/prod/backend}
+        awslogs-stream: backend
+        awslogs-create-group: "false"  # El grupo ya existe, creado por CDK
 
   formulario-publico:
     build:
       args:
         VITE_PORTAL_INTERNO_URL: ${VITE_PORTAL_INTERNO_URL:?Define VITE_PORTAL_INTERNO_URL en .env}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${CW_LOG_GROUP_FRONTEND:-/sagrilaft/prod/frontend}
+        awslogs-stream: formulario-publico
+        awslogs-create-group: "false"
 
   portal-interno:
     build:
@@ -38,6 +65,13 @@ services:
         VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:?Define VITE_KEYCLOAK_URL en .env}
         VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:?Define VITE_KEYCLOAK_REALM en .env}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:?Define VITE_KEYCLOAK_CLIENT_ID en .env}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${CW_LOG_GROUP_PORTAL:-/sagrilaft/prod/portal}
+        awslogs-stream: portal-interno
+        awslogs-create-group: "false"
 
   keycloak:
     environment:
@@ -46,3 +80,10 @@ services:
       KC_DB_URL: ${KEYCLOAK_DB_URL:?Define KEYCLOAK_DB_URL en .env}
       KC_DB_USERNAME: ${KEYCLOAK_DB_USER:?Define KEYCLOAK_DB_USER en .env}
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Define KEYCLOAK_DB_PASSWORD en .env}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: ${CW_LOG_GROUP_KEYCLOAK:-/sagrilaft/prod/keycloak}
+        awslogs-stream: keycloak
+        awslogs-create-group: "false"
