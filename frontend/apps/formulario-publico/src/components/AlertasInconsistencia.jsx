@@ -42,8 +42,8 @@ export default function AlertasInconsistencia({ alertas, tipoCampo, nombreCampo 
       </div>
 
       <p className="alertas-razon-social__instruccion">
-        Te sugerimos <strong>revisar el campo "{nombreCampo}"</strong> en
-        el formulario para que coincida con el documento adjunto. Aunque puedes continuar, es recomendable corregir esta diferencia.
+        Te sugerimos <strong>revisar el campo "{nombreCampo}"</strong> en 
+        <strong> el formulario</strong> para que coincida con el documento adjunto. Aunque puedes continuar, <strong>es recomendable corregir esta diferencia</strong>.
       </p>
 
       {alertas.map((alerta) => (
@@ -72,7 +72,7 @@ export default function AlertasInconsistencia({ alertas, tipoCampo, nombreCampo 
           </div>
 
           <p className="alerta-referencia">
-            Ubicación en el documento: <em>{alerta.seccionReferencia}</em>
+            Posible ubicación en el documento: <em>{alerta.seccionReferencia}</em>
           </p>
 
         </div>

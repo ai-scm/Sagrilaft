@@ -24,30 +24,30 @@ import {
 const DOCS_RAZON_SOCIAL = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
-    seccionReferencia: 'NOMBRE, IDENTIFICACIÓN Y DOMICILIO → Razón social',
+    seccionReferencia: 'Puede aparecer en la sección de “Nombre, identificación y domicilio” o en la sección de identificación del documento, donde aparece la razón social.',
   },
   rut: {
     nombreLegible:     'RUT (Registro Único Tributario)',
-    seccionReferencia: 'IDENTIFICACIÓN → campo 35. Razón social',
+    seccionReferencia: 'En la sección de identificación del contribuyente, donde aparece la razón social',
   },
   estados_financieros: {
     nombreLegible:     'Estados Financieros',
-    seccionReferencia: 'Encabezado del documento (razón social del emisor)',
+    seccionReferencia: 'En la parte superior del documento, donde aparece la razón social del emisor',
   },
   referencias_bancarias: {
     nombreLegible:     'Referencias Bancarias',
-    seccionReferencia: 'Nombre del titular de la cuenta',
+    seccionReferencia: 'Sección de datos de la cuenta, donde se identifica/informa el titular',
   },
 };
 
 const DOCS_NIT = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
-    seccionReferencia: 'NOMBRE, IDENTIFICACIÓN Y DOMICILIO → Nit',
+    seccionReferencia: 'puede aparecer en la sección “Nombre, identificación y domicilio” o en la sección de identificación (NIT)',
   },
   rut: {
     nombreLegible:     'RUT (Registro Único Tributario)',
-    seccionReferencia: 'IDENTIFICACIÓN → campo 5. Número de Identificación Tributaria (NIT)',
+    seccionReferencia: 'Parte superior o sección de identificación del documento (NIT)',
   },
   estados_financieros: {
     nombreLegible:     'Estados Financieros',
@@ -55,7 +55,7 @@ const DOCS_NIT = {
   },
   declaracion_renta: {
     nombreLegible:     'Declaración de Renta',
-    seccionReferencia: 'IDENTIFICACIÓN → campo 5. Número de Identificación Tributaria (NIT)',
+    seccionReferencia: 'En la sección de identificación del contribuyente (NIT)',
   },
   referencias_bancarias: {
     nombreLegible:     'Referencias Bancarias',
@@ -66,15 +66,15 @@ const DOCS_NIT = {
 const DOCS_NOMBRE_REPRESENTANTE = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
-    seccionReferencia: 'REPRESENTANTES LEGALES → NOMBRE',
+    seccionReferencia: 'Sección de representantes legales (nombres y apellidos del representante)',
   },
   rut: {
     nombreLegible:     'RUT (Registro Único Tributario)',
-    seccionReferencia: 'Representación → campos 106, 107, 104, 105 (Primer nombre, Otros nombres, Primer apellido, Segundo apellido)',
+    seccionReferencia: 'En la sección de identificación/representación del contribuyente (nombres y apellidos)',
   },
   estados_financieros: {
     nombreLegible:     'Estados Financieros',
-    seccionReferencia: 'Representante legal o firmante del documento',
+    seccionReferencia: 'Parte superior o inferior, seccion de representante legal',
   },
 };
 
@@ -85,15 +85,15 @@ const DOCS_NUMERO_DOC_REPRESENTANTE = {
   },
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
-    seccionReferencia: 'NOMBRAMIENTOS → REPRESENTANTES LEGALES → IDENTIFICACIÓN',
+    seccionReferencia: 'Seccion de representantes legales (número de documento del representante)',
   },
   rut: {
     nombreLegible:     'RUT (Registro Único Tributario)',
-    seccionReferencia: 'Representación → 101. Número de identificación',
+    seccionReferencia: 'En la sección de representacion del contribuyente, donde se encuentra el número de identificación (NIT)',
   },
   estados_financieros: {
     nombreLegible:     'Estados Financieros',
-    seccionReferencia: 'Número de documento del representante legal o firmante del documento',
+    seccionReferencia: 'Parte superior o inferior, seccion de representante legal',
   },
 };
 
@@ -104,7 +104,7 @@ const DOCS_DIRECCION = {
   },
   rut: {
     nombreLegible:     'RUT (Registro Único Tributario)',
-    seccionReferencia: 'Sección UBICACIÓN → campo 41. Dirección principal',
+    seccionReferencia: 'En la sección de ubicación o datos del contribuyente, donde aparece la dirección principal',
   },
 };
 
