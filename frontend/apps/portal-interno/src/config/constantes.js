@@ -122,3 +122,7 @@ export function formatearFechaHora(isoString) {
     hour12: false,
   });
 }
+
+// ── Mensajes comunes ──────────────────────────────────────────────────────────
+
+export const MENSAJE_ENLACE_NOTA = 'Al abrir el enlace el destinatario, registrará el correo donde recibirá notificaciones y documentos a firmar.';

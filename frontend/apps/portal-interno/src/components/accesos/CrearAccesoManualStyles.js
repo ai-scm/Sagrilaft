@@ -166,23 +166,6 @@ export const ESTILOS = {
     color: '#854d0e',
     marginBottom: '12px',
   },
-  notaCorreo: {
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    borderRadius: 'var(--radius-md, 8px)',
-    padding: '12px 16px',
-    fontSize: '0.82rem',
-    color: '#1e40af',
-    marginBottom: '20px',
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '10px',
-    lineHeight: '1.5',
-  },
-  notaCorreoIcono: {
-    flexShrink: 0,
-    marginTop: '1px',
-  },
   enlaceBox: {
     background: '#f0fdf4',
     border: '1px solid #bbf7d0',
@@ -203,6 +186,13 @@ export const ESTILOS = {
     color: '#166534',
     wordBreak: 'break-all',
     fontFamily: 'monospace',
+  },
+  enlaceNota: {
+    fontSize: '0.8rem',
+    color: '#166534',
+    marginTop: '8px',
+    marginBottom: '12px',
+    lineHeight: '1.4',
   },
   btnCopiar: {
     marginTop: '8px',

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { formatearFechaLarga, ETIQUETA_TIPO_CONTRAPARTE } from '../../config/constantes';
+import { formatearFechaLarga, ETIQUETA_TIPO_CONTRAPARTE, MENSAJE_ENLACE_NOTA } from '../../config/constantes';
 import { ESTILOS } from './CrearAccesoManualStyles';
 
 const estiloFondo = {
@@ -78,6 +78,7 @@ export default function ModalCredencialesRecientes({ credenciales, onClose }) {
             <div style={ESTILOS.enlaceBox}>
               <p style={ESTILOS.enlaceLabel}>Enlace de diligenciamiento</p>
               <p style={ESTILOS.enlaceTexto}>{credenciales.enlace_diligenciamiento}</p>
+              <p style={ESTILOS.enlaceNota}>{MENSAJE_ENLACE_NOTA}</p>
               <button style={ESTILOS.btnCopiar} onClick={handleCopiarEnlace} type="button">
                 {copiado ? 'Copiado' : 'Copiar enlace'}
               </button>

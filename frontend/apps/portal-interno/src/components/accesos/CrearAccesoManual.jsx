@@ -11,24 +11,25 @@ import {
   AREAS_RESPONSABLES,
   formatearFechaLarga,
   ETIQUETA_TIPO_CONTRAPARTE,
+  MENSAJE_ENLACE_NOTA,
 } from '../../config/constantes';
 import { guardarCredenciales } from '../../utils/credenciales';
 
 import { ESTILOS } from './CrearAccesoManualStyles';
 
 const ESTADO_INICIAL_ACCESO = {
-  tipo_contraparte:    '',
-  razon_social:        '',
-  area_responsable:    '',
+  tipo_contraparte: '',
+  razon_social: '',
+  area_responsable: '',
 };
 
 const ASTERISCO = <span style={{ color: 'var(--error, #ef4444)' }}>*</span>;
 
 function validarCamposAcceso(formData) {
   const errores = {};
-  if (!formData.tipo_contraparte)          errores.tipo_contraparte    = 'Seleccione el tipo de contraparte';
-  if (!formData.razon_social.trim())       errores.razon_social        = 'Ingrese la razón social';
-  if (!formData.area_responsable)          errores.area_responsable    = 'Seleccione el área de contacto';
+  if (!formData.tipo_contraparte) errores.tipo_contraparte = 'Seleccione el tipo de contraparte';
+  if (!formData.razon_social.trim()) errores.razon_social = 'Ingrese la razón social';
+  if (!formData.area_responsable) errores.area_responsable = 'Seleccione el área de contacto';
 
   return errores;
 }
@@ -88,13 +89,13 @@ function ItemCredencial({ label, valor, monospace = true }) {
 
 export default function CrearAccesoManual() {
   const navigate = useNavigate();
-  const [formData, setFormData]         = useState(ESTADO_INICIAL_ACCESO);
+  const [formData, setFormData] = useState(ESTADO_INICIAL_ACCESO);
   const [erroresCampo, setErroresCampo] = useState({});
-  const [errorGlobal, setErrorGlobal]   = useState(null);
-  const [cargando, setCargando]         = useState(false);
-  const [resultado, setResultado]       = useState(null);
-  const [copiado, setCopiado]           = useState(false);
-  const [campoEnfocado, setCampoEnfocado]  = useState(null);
+  const [errorGlobal, setErrorGlobal] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
+  const [campoEnfocado, setCampoEnfocado] = useState(null);
 
   const temporizadorRef = useRef(null);
 
@@ -165,23 +166,15 @@ export default function CrearAccesoManual() {
             de forma segura antes de cerrar esta pantalla. Tiene una ventana de 10 min para verlo en "Ver accesos" después de creado, pero luego se ocultará por seguridad.
           </div>
 
-          <div style={ESTILOS.notaCorreo}>
-            <span style={ESTILOS.notaCorreoIcono}>✉️</span>
-            <span>
-              <strong>Correo del destinatario:</strong> No es necesario ingresarlo aquí.
-              Cuando el destinatario acceda al enlace por primera vez, el sistema le solicitará
-              automáticamente su correo electrónico antes de mostrarle el formulario.
-            </span>
-          </div>
-
           <ItemCredencial label="Código de petición" valor={resultado.codigo_peticion} />
-          <ItemCredencial label="PIN de acceso"       valor={resultado.pin} />
-          {resultado.correo_destinatario && <ItemCredencial label="Destinatario"        valor={resultado.correo_destinatario} monospace={false} />}
-          <ItemCredencial label="Válido hasta"        valor={formatearFechaLarga(resultado.expires_at)} monospace={false} />
+          <ItemCredencial label="PIN de acceso" valor={resultado.pin} />
+          {resultado.correo_destinatario && <ItemCredencial label="Destinatario" valor={resultado.correo_destinatario} monospace={false} />}
+          <ItemCredencial label="Válido hasta" valor={formatearFechaLarga(resultado.expires_at)} monospace={false} />
 
           <div style={ESTILOS.enlaceBox}>
             <p style={ESTILOS.enlaceLabel}>Enlace de diligenciamiento</p>
             <p style={ESTILOS.enlaceTexto}>{resultado.enlace_diligenciamiento}</p>
+            <p style={ESTILOS.enlaceNota}>{MENSAJE_ENLACE_NOTA}</p>
             <button style={ESTILOS.btnCopiar} onClick={handleCopiarEnlace} type="button">
               {copiado ? 'Copiado' : 'Copiar enlace'}
             </button>
