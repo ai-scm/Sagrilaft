@@ -71,6 +71,26 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
+  async listarEventosExpediente(formularioId) {
+    return requestJson(`/auditoria/${formularioId}/eventos`);
+  },
+
+  async descargarReporteAuditoria(formularioId) {
+    const token = await getToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE}/auditoria/${formularioId}/reporte-pdf`, { headers });
+    if (!res.ok) throw new Error(await leerDetalleError(res));
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `auditoria_${formularioId.slice(0, 8)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
   urlDescargaDocumento(formularioId, docId) {
     return `${API_BASE}/expedientes/${formularioId}/documentos/${docId}/descargar`;
   },
