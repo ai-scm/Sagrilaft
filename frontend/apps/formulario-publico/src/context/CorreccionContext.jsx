@@ -39,6 +39,7 @@ const CorreccionContext = createContext({
   camposPendientes:               new Set(),
   pasoInicialCorreccion:          null,
   todasCorreccionesCompletadas:   false,
+  esActualizacionReabierta:       false,
   esCampoConCorreccion:           () => false,
   valorOriginalDeCampo:           () => undefined,
 });

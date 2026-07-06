@@ -12,6 +12,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { CATALOGO_CORRECCIONES } from '@shared/data/catalogoCorrecciones';
+import { MODO_TRABAJO_ACTUALIZACION_REABIERTA } from '@shared/utils/constantes';
 
 const ESTADO_EN_CORRECCION = 'en_correccion';
 
@@ -26,20 +27,21 @@ const ESTADO_EN_CORRECCION = 'en_correccion';
 
 /**
  * Parsea `campos_a_corregir` con compatibilidad hacia atrás:
- * - JSON nuevo: { especificaciones, campos: [...] }
+ * - JSON nuevo: { tipo?, especificaciones, campos: [...] }
  * - Texto plano (registros pre-migración): se trata como especificación sin campos marcados
  */
 function _parsearCorreccion(raw) {
-  if (!raw) return { especificaciones: '', campos: [] };
+  if (!raw) return { tipo: 'correccion', especificaciones: '', campos: [] };
   try {
     const parsed = JSON.parse(raw);
     return {
+      tipo:             parsed.tipo ?? 'correccion',
       especificaciones: parsed.especificaciones ?? '',
       campos:           Array.isArray(parsed.campos) ? parsed.campos : [],
     };
   } catch {
     // Compatibilidad con el formato de texto plano anterior
-    return { especificaciones: raw, campos: [] };
+    return { tipo: 'correccion', especificaciones: raw, campos: [] };
   }
 }
 
@@ -87,6 +89,7 @@ export function useCorreccionPendiente(estadoFormulario, camposACorregirRaw) {
 
   return {
     activa:                estadoFormulario === ESTADO_EN_CORRECCION,
+    esActualizacionReabierta: correccion.tipo === MODO_TRABAJO_ACTUALIZACION_REABIERTA,
     especificaciones:      correccion.especificaciones,
     camposIdentificados,
     pasoInicialCorreccion,
