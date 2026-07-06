@@ -11,6 +11,7 @@ Emails multipart/alternative:
 
 import logging
 import os
+import re
 from typing import Optional
 
 from botocore.exceptions import ClientError
@@ -34,6 +35,14 @@ _ASUNTO_POR_TIPO: dict[TipoAlerta, str] = {
     TipoAlerta.FORMULARIO_RECHAZADO: "[SAGRILAFT] Formulario rechazado",
     TipoAlerta.REPORTE_FINAL_CARGADO: "[SAGRILAFT] Reporte final cargado",
 }
+
+
+def _parsear_destinatarios(valor: str) -> list[str]:
+    return [
+        item.strip()
+        for item in re.split(r"[,;]", valor)
+        if item.strip()
+    ]
 
 
 class SesAlertasPortal:
@@ -137,14 +146,17 @@ class SesAlertasPortal:
                 incluir_cta=incluir_cta,
             )
 
-            # Obtener email destinatario (placeholder, se reemplaza en real)
-            # En producción, esto vendría de un parámetro adicional
-            email_destinatario = os.getenv("ALERTAS_EMAIL_DESTINATARIO", "alerts@sagrilaft.com")
+            destinatarios = _parsear_destinatarios(
+                os.getenv("ALERTAS_EMAIL_DESTINATARIO")
+            )
+            if not destinatarios:
+                logger.warning("SES alertas sin destinatarios configurados")
+                return False
 
             # Enviar via SES con estructura multipart/alternative
             respuesta = self._cliente.send_email(
                 Source=self._email_origen,
-                Destination={"ToAddresses": [email_destinatario]},
+                Destination={"ToAddresses": destinatarios},
                 Message={
                     "Subject": {"Data": _ASUNTO_POR_TIPO[tipo]},
                     "Body": {
@@ -157,7 +169,8 @@ class SesAlertasPortal:
             self._enviadas += 1
             logger.info(
                 f"Email enviado via SES: tipo={tipo.value}, "
-                f"formulario={formulario_id}, message_id={respuesta['MessageId']}"
+                f"formulario={formulario_id}, destinatarios={len(destinatarios)}, "
+                f"message_id={respuesta['MessageId']}"
             )
             return True
 
