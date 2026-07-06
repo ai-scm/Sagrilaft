@@ -53,3 +53,22 @@ class INotificador(Protocol):
         nueva actualización periódica.
         """
         ...
+
+    def enviar_notificacion_acceso_creado(
+        self,
+        correo_destinatario: str,
+        codigo_peticion: str,
+        pin: str,
+        fecha_validez: str,
+        enlace_diligenciamiento: str,
+        razon_social: str,
+    ) -> bool:
+        """
+        Envía al destinatario las credenciales de un acceso manual recién creado
+        (código de petición, PIN, vigencia y enlace de diligenciamiento).
+
+        Es la única vez que el PIN viaja en texto plano fuera del portal interno.
+
+        Returns True si el correo se entregó; False si no se pudo enviar.
+        """
+        ...

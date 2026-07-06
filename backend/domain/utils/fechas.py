@@ -46,6 +46,13 @@ NOMBRES_MESES_ES: list[str] = [
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
 
+
+def formatear_fecha_larga_es(valor: datetime) -> str:
+    """Formatea una fecha en formato largo en español, ej. '13 de julio de 2026'."""
+    fecha = normalizar_datetime_utc(valor)
+    return f"{fecha.day} de {NOMBRES_MESES_ES[fecha.month - 1]} de {fecha.year}"
+
+
 # Meses en español usados en cédulas colombianas (formato DD-MMM-AAAA)
 _MESES_ES: dict[str, int] = {
     "ene": 1,
