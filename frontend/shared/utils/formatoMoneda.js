@@ -5,28 +5,29 @@
  * consistente sin alterar el valor real que viaja por la API.
  */
 
-const SIMBOLO_POR_MONEDA = {
-  COP: '$',
-  USD: 'US$',
-  EUR: '€',
-  PEN: 'S/',
-  BRL: 'R$',
-  CLP: 'CL$',
-  ARS: 'AR$',
-  MXN: 'MX$',
-  OTRA: '', // Moneda personalizada: sin símbolo fijo conocido (ver moneda_declaracion_otra)
+const MONEDA_POR_CODIGO = {
+  COP: { simbolo: '$', locale: 'es-CO' },
+  USD: { simbolo: 'US$', locale: 'en-US' },
+  EUR: { simbolo: '€', locale: 'de-DE' },
+  PEN: { simbolo: 'S/', locale: 'es-PE' },
+  BRL: { simbolo: 'R$', locale: 'pt-BR' },
+  CLP: { simbolo: 'CL$', locale: 'es-CL' },
+  ARS: { simbolo: 'AR$', locale: 'es-AR' },
+  MXN: { simbolo: 'MX$', locale: 'es-MX' },
+  GBP: { simbolo: '£', locale: 'en-GB' },
+  JPY: { simbolo: '¥', locale: 'ja-JP' },
+  CHF: { simbolo: 'CHF', locale: 'de-CH' },
+  AUD: { simbolo: 'A$', locale: 'en-AU' },
+  CAD: { simbolo: 'C$', locale: 'en-CA' },
+  NZD: { simbolo: 'NZ$', locale: 'en-NZ' },
+  CNY: { simbolo: '¥', locale: 'zh-CN' },
+  HKD: { simbolo: 'HK$', locale: 'zh-HK' },
+  SGD: { simbolo: 'S$', locale: 'en-SG' },
+  OTRA: { simbolo: '', locale: 'es-CO' },
 };
 
-const LOCALE_POR_MONEDA = {
-  COP: 'es-CO',
-  USD: 'en-US',
-  EUR: 'de-DE',
-  PEN: 'es-PE',
-  BRL: 'pt-BR',
-  CLP: 'es-CL',
-  ARS: 'es-AR',
-  MXN: 'es-MX',
-};
+const MONEDA_PERSONALIZADA = 'OTRA';
+const MONEDA_PREDETERMINADA = 'COP';
 
 const CAMPOS_MONETARIOS = new Set([
   'ingresos_mensuales',
@@ -59,12 +60,27 @@ function extraerEntero(valor) {
 
 export function obtenerLocaleMoneda(moneda = 'COP') {
   const codigo = String(moneda || 'COP').trim().toUpperCase();
-  return LOCALE_POR_MONEDA[codigo] ?? 'es-CO';
+  return MONEDA_POR_CODIGO[codigo]?.locale ?? MONEDA_POR_CODIGO[MONEDA_PREDETERMINADA].locale;
 }
 
 export function obtenerSimboloMoneda(moneda = 'COP') {
   const codigo = String(moneda || 'COP').trim().toUpperCase();
-  return SIMBOLO_POR_MONEDA[codigo] ?? '$';
+  return MONEDA_POR_CODIGO[codigo]?.simbolo ?? '';
+}
+
+export function obtenerCodigoIsoMoneda(valor) {
+  const codigo = String(valor || '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(codigo) && MONEDA_POR_CODIGO[codigo] ? codigo : null;
+}
+
+export function resolverMonedaParaFormato(monedaDeclaracion = 'COP', monedaDeclaracionOtra = '') {
+  const codigoDeclaracion = String(monedaDeclaracion || '').trim().toUpperCase();
+
+  if (codigoDeclaracion === MONEDA_PERSONALIZADA) {
+    return obtenerCodigoIsoMoneda(monedaDeclaracionOtra) ?? MONEDA_PREDETERMINADA;
+  }
+
+  return obtenerCodigoIsoMoneda(codigoDeclaracion) ?? MONEDA_PREDETERMINADA;
 }
 
 export function esCampoMonetario(campo) {

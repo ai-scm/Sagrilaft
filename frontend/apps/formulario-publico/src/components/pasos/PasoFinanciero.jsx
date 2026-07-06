@@ -1,5 +1,10 @@
 import FormField from '../FormField';
 import CurrencyInput from '../CurrencyInput';
+import {
+  obtenerCodigoIsoMoneda,
+  obtenerSimboloMoneda,
+  resolverMonedaParaFormato,
+} from '../../../../../shared/utils/formatoMoneda';
 
 const MONEDAS_DISPONIBLES = [
   { value: 'COP', label: 'Pesos Colombianos (COP)' },
@@ -13,26 +18,16 @@ const MONEDAS_DISPONIBLES = [
   { value: 'OTRA', label: 'Otra' },
 ];
 
-const SIMBOLOS_MONEDA = {
-  'COP': '$',
-  'USD': 'US$',
-  'EUR': '€',
-  'PEN': 'S/',
-  'BRL': 'R$',
-  'CLP': 'CL$',
-  'ARS': 'AR$',
-  'MXN': 'MX$',
-  'OTRA': '',
-};
-
 /**
  * Paso 5 — Información Financiera.
  * Los valores se contrastan con los estados financieros adjuntos.
  */
 export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors, onMonedaDeclaracionChange }) {
   const monedaActual = formData.moneda_declaracion || '';
-  const simboloActual = SIMBOLOS_MONEDA[monedaActual] || '';
   const esOtraMoneda = monedaActual === 'OTRA';
+  const codigoOtraMoneda = obtenerCodigoIsoMoneda(formData.moneda_declaracion_otra);
+  const monedaFormato = resolverMonedaParaFormato(monedaActual, formData.moneda_declaracion_otra);
+  const simboloActual = esOtraMoneda && !codigoOtraMoneda ? '' : obtenerSimboloMoneda(monedaFormato);
 
   return (
     <div className="form-card">
@@ -69,19 +64,19 @@ export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors,
           label="Ingresos Mensuales" name="ingresos_mensuales" required
           value={formData.ingresos_mensuales} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.ingresos_mensuales} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
         <CurrencyInput
           label="Otros Ingresos" name="otros_ingresos"
           value={formData.otros_ingresos} onChange={onChange}
           onOpenHelp={onOpenHelp} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
         <CurrencyInput
           label="Egresos Mensuales" name="egresos_mensuales" required
           value={formData.egresos_mensuales} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.egresos_mensuales} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
       </div>
 
@@ -90,22 +85,21 @@ export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors,
           label="Total Activos" name="total_activos" required
           value={formData.total_activos} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.total_activos} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
         <CurrencyInput
           label="Total Pasivos" name="total_pasivos" required
           value={formData.total_pasivos} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.total_pasivos} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
         <CurrencyInput
           label="Patrimonio" name="patrimonio" required
           value={formData.patrimonio} onChange={onChange}
           onOpenHelp={onOpenHelp} error={errors.patrimonio} placeholder="0"
-          symbol={simboloActual} currency={monedaActual}
+          symbol={simboloActual} currency={monedaFormato}
         />
       </div>
     </div>
   );
 }
-
