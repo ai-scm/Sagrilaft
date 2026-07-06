@@ -8,7 +8,14 @@ import {
   ESTADO_ACCESO_ACTIVO, ESTADO_ACCESO_CONSUMIDO, ESTADO_ACCESO_EXPIRADO,
   TIPO_CONTRAPARTE_CLIENTE, TIPO_CONTRAPARTE_PROVEEDOR,
   TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
-  TIPO_DOCUMENTO_REPORTE_FINAL
+  TIPO_DOCUMENTO_REPORTE_FINAL,
+  CAUSAL_CIERRE_INFORME_FINAL,
+  CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,
+  CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL,
+  TIPO_SOLICITUD_ACTUALIZACION,
+  TIPO_SOLICITUD_VINCULACION,
+  MODO_TRABAJO_ACTUALIZACION_REABIERTA,
+  MODO_TRABAJO_CORRECCION
 } from '@shared/utils/constantes';
 
 const LOCALE_FECHA = 'es-CO';
@@ -59,7 +66,7 @@ export const TIPOS_CONTRAPARTE = [
 ];
 
 export const AREAS_RESPONSABLES = [
-  { valor: 'ventas',   etiqueta: 'Ventas'   },
+  { valor: 'ventas',   etiqueta: 'Ventas/Capture'   },
   { valor: 'legal',    etiqueta: 'Legal'    },
   { valor: 'finanzas', etiqueta: 'Finanzas' },
   { valor: 'recursos_humanos', etiqueta: 'Recursos Humanos' },
@@ -68,12 +75,38 @@ export const AREAS_RESPONSABLES = [
 export const ETIQUETA_TIPO_CONTRAPARTE = crearMapaEtiquetas(TIPOS_CONTRAPARTE);
 export const ETIQUETA_AREA_RESPONSABLE = crearMapaEtiquetas(AREAS_RESPONSABLES);
 
+export const CAUSALES_CIERRE_EXPEDIENTE = [
+  { valor: CAUSAL_CIERRE_INFORME_FINAL, etiqueta: 'Cierre aprobado con informe final' },
+  { valor: CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL, etiqueta: 'Cierre rechazado con informe final' },
+  { valor: CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS, etiqueta: 'No continuación de diálogos' },
+];
+
+export const ETIQUETA_CAUSAL_CIERRE = crearMapaEtiquetas(CAUSALES_CIERRE_EXPEDIENTE);
+
+export const TIPOS_SOLICITUD = [
+  { valor: TIPO_SOLICITUD_VINCULACION, etiqueta: 'Vinculación' },
+  { valor: TIPO_SOLICITUD_ACTUALIZACION, etiqueta: 'Actualización' },
+];
+
+export const ETIQUETA_TIPO_SOLICITUD = crearMapaEtiquetas(TIPOS_SOLICITUD);
+
 
 
 // ── Constantes de documentos ──────────────────────────────────────────────────
 // Sincronizar con: backend/domain/constantes.py
 
-export { TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT, TIPO_DOCUMENTO_REPORTE_FINAL };
+export {
+  TIPO_DOCUMENTO_FORMULARIO_PDF,
+  TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
+  TIPO_DOCUMENTO_REPORTE_FINAL,
+  CAUSAL_CIERRE_INFORME_FINAL,
+  CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,
+  CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL,
+  TIPO_SOLICITUD_ACTUALIZACION,
+  TIPO_SOLICITUD_VINCULACION,
+  MODO_TRABAJO_ACTUALIZACION_REABIERTA,
+  MODO_TRABAJO_CORRECCION,
+};
 
 
 

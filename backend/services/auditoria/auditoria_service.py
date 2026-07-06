@@ -31,6 +31,11 @@ _ETIQUETAS_EVENTO = {
     "FORMULARIO_APROBADO":  "Formulario aprobado",
     "FORMULARIO_RECHAZADO": "Formulario rechazado",
     "FORMULARIO_DEVUELTO":  "Devuelto para corrección",
+    "FORMULARIO_CARGADO_MANUALMENTE": "Formulario cargado manualmente",
+    "REPORTE_FINAL_CARGADO": "Informe final cargado",
+    "REPORTE_FINAL_ELIMINADO": "Informe final eliminado",
+    "EXPEDIENTE_CERRADO": "Expediente cerrado",
+    "EXPEDIENTE_REABIERTO_ACTUALIZACION": "Actualización reabierta",
     "FIRMA_INICIADA":       "Enviado a firma electrónica",
     "FIRMA_COMPLETADA":     "Firma electrónica completada",
     "FIRMA_CANCELADA":      "Firma electrónica cancelada",
@@ -47,6 +52,7 @@ _ETIQUETAS_ESTADO = {
     "en_correccion":   "En corrección",
     "pendiente_firma": "Pendiente de firma",
     "firmado":         "Firmado",
+    "cerrado":         "Cerrado",
 }
 
 _ETIQUETAS_ACTOR = {
@@ -82,17 +88,28 @@ def _firmar_reporte(contenido: str, secret_key: str) -> str:
 # ── HTML del reporte ──────────────────────────────────────────────────────────
 
 _CSS_REPORTE = """
+    @page { size: A4; margin: 16mm 12mm; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a2e; margin: 0; padding: 0; }
     .portada { background: #1a1a2e; color: white; padding: 40px 32px 32px; }
     .portada h1 { font-size: 22pt; margin: 0 0 8px; }
     .portada p { margin: 4px 0; font-size: 10pt; color: #c0c0d0; }
     .cuerpo { padding: 24px 32px; }
     h2 { font-size: 13pt; color: #1a1a2e; border-bottom: 2px solid #e0e0ef; padding-bottom: 4px; margin-top: 28px; }
-    table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9.5pt; margin-top: 8px; }
     th { background: #1a1a2e; color: white; padding: 6px 8px; text-align: left; }
-    td { padding: 5px 8px; border-bottom: 1px solid #e8e8f0; vertical-align: top; }
+    td { padding: 5px 8px; border-bottom: 1px solid #e8e8f0; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; }
     tr:nth-child(even) td { background: #f5f5fc; }
     .alerta td { background: #fff3cd !important; }
+    .tabla-documentos { font-size: 8.2pt; table-layout: fixed; }
+    .tabla-documentos th, .tabla-documentos td { padding: 4px 5px; }
+    .tabla-documentos .col-tipo { width: 18%; }
+    .tabla-documentos .col-archivo { width: 30%; }
+    .tabla-documentos .col-version { width: 8%; }
+    .tabla-documentos .col-tamano { width: 10%; }
+    .tabla-documentos .col-actor { width: 16%; }
+    .tabla-documentos .col-fecha { width: 18%; }
+    .hash-documento { font-family: monospace; font-size: 7.2pt; color: #475569; overflow-wrap: anywhere; word-break: break-all; }
+    .hash-documento strong { color: #1a1a2e; font-family: Arial, sans-serif; font-size: 7.6pt; }
     .firma-reporte { margin-top: 32px; padding: 12px 16px; background: #f0f4ff;
                      border-left: 4px solid #1a1a2e; font-size: 9pt; font-family: monospace;
                      word-break: break-all; }
@@ -165,7 +182,16 @@ def _html_documentos(documentos: List[Dict[str, Any]]) -> str:
     if not documentos:
         return "<h2>Documentos y cadena de custodia</h2><p class='sin-datos'>Sin documentos registrados.</p>"
 
-    encabezados = "<tr><th>Tipo</th><th>Nombre del archivo</th><th>Versión</th><th>Tamaño (bytes)</th><th>Cargado por</th><th>Fecha carga</th><th>Hash SHA-256</th></tr>"
+    encabezados = (
+        "<tr>"
+        "<th class='col-tipo'>Tipo</th>"
+        "<th class='col-archivo'>Archivo</th>"
+        "<th class='col-version'>Ver.</th>"
+        "<th class='col-tamano'>Tamaño</th>"
+        "<th class='col-actor'>Cargado por</th>"
+        "<th class='col-fecha'>Fecha carga</th>"
+        "</tr>"
+    )
     filas = "".join(
         f"<tr>"
         f"<td>{escape(str(d.get('tipo_documento', '—')))}</td>"
@@ -174,13 +200,15 @@ def _html_documentos(documentos: List[Dict[str, Any]]) -> str:
         f"<td>{escape(str(d.get('tamano') or '—'))}</td>"
         f"<td>{escape(str(d.get('subido_por') or '—'))}</td>"
         f"<td>{_ts(d.get('created_at'))}</td>"
-        f"<td style='font-family:monospace; font-size:8pt;'>{escape(str(d.get('hash_sha256') or '—'))}</td>"
         "</tr>"
+        f"<tr><td colspan='6' class='hash-documento'>"
+        f"<strong>Hash SHA-256:</strong> {escape(str(d.get('hash_sha256') or '—'))}"
+        "</td></tr>"
         for d in documentos
     )
     return (
         "<h2>Documentos y cadena de custodia</h2>"
-        f"<table><thead>{encabezados}</thead><tbody>{filas}</tbody></table>"
+        f"<table class='tabla-documentos'><thead>{encabezados}</thead><tbody>{filas}</tbody></table>"
     )
 
 
@@ -264,6 +292,7 @@ class AuditoriaService:
         estados_expediente = [
             EF.ENVIADO, EF.EN_CORRECCION, EF.VALIDADO,
             EF.RECHAZADO, EF.PENDIENTE_FIRMA, EF.FIRMADO,
+            EF.CERRADO,
         ]
         formulario = self._expediente.obtener(formulario_id, estados_expediente)
         if not formulario:
