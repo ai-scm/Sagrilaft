@@ -14,6 +14,7 @@ import {
   MENSAJE_ENLACE_NOTA,
 } from '../../config/constantes';
 import { guardarCredenciales } from '../../utils/credenciales';
+import { REGEX_CORREO, normalizarCorreo } from '../../utils/validadores';
 
 import { ESTILOS } from './CrearAccesoManualStyles';
 
@@ -21,6 +22,7 @@ const ESTADO_INICIAL_ACCESO = {
   tipo_contraparte: '',
   razon_social: '',
   area_responsable: '',
+  correo_destinatario: '',
 };
 
 const ASTERISCO = <span style={{ color: 'var(--error, #ef4444)' }}>*</span>;
@@ -30,6 +32,11 @@ function validarCamposAcceso(formData) {
   if (!formData.tipo_contraparte) errores.tipo_contraparte = 'Seleccione el tipo de contraparte';
   if (!formData.razon_social.trim()) errores.razon_social = 'Ingrese la razón social';
   if (!formData.area_responsable) errores.area_responsable = 'Seleccione el área de contacto';
+  if (!formData.correo_destinatario.trim()) {
+    errores.correo_destinatario = 'Ingrese el correo electrónico';
+  } else if (!REGEX_CORREO.test(formData.correo_destinatario.trim())) {
+    errores.correo_destinatario = 'Ingrese un correo electrónico válido';
+  }
 
   return errores;
 }
@@ -118,7 +125,11 @@ export default function CrearAccesoManual() {
     setCargando(true);
     setErrorGlobal(null);
     try {
-      const acceso = await api.crearAccesoManual(formData);
+      const datosNormalizados = {
+        ...formData,
+        correo_destinatario: normalizarCorreo(formData.correo_destinatario),
+      };
+      const acceso = await api.crearAccesoManual(datosNormalizados);
       guardarCredenciales(acceso);
       setResultado(acceso);
     } catch (errorCreacion) {
@@ -218,6 +229,15 @@ export default function CrearAccesoManual() {
           onFocus={() => setCampoEnfocado('razon_social')} onBlur={() => setCampoEnfocado(null)}
           style={estiloInput('razon_social')} error={erroresCampo.razon_social} disabled={cargando}
           autoComplete="off"
+        />
+        <CampoInput
+          id="correo_destinatario" label="Correo electrónico representante legal"
+          type="email"
+          placeholder="ejemplo@empresa.com"
+          value={formData.correo_destinatario} onChange={handleChange}
+          onFocus={() => setCampoEnfocado('correo_destinatario')} onBlur={() => setCampoEnfocado(null)}
+          style={estiloInput('correo_destinatario')} error={erroresCampo.correo_destinatario} disabled={cargando}
+          autoComplete="email"
         />
         <div style={ESTILOS.fila}>
           <div style={ESTILOS.campo}>
