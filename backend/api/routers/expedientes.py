@@ -20,13 +20,17 @@ from api.dependencies import (
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from domain.excepciones import SinPermisoError
+from domain.constantes import CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS
 from api.schemas import (
     ComparacionVersionFormulario,
     ExpedienteDetalle,
     ExpedienteResumen,
+    ResumenCierreExpediente,
     ResumenDevolucion,
+    ResumenReaperturaActualizacion,
     ResumenRechazo,
     SolicitudDevolucion,
+    SolicitudReaperturaActualizacion,
     SolicitudRechazo,
 )
 from services.expedientes.expediente_service import ExpedienteService
@@ -185,16 +189,35 @@ async def carga_manual_expediente(
 
 @enrutador.post(
     "/{formulario_id}/reporte-final",
-    summary="Cargar reporte final y cerrar carpeta",
-    description="Permite a un operador subir un PDF como reporte final, lo que cambia el estado de la carpeta a 'cerrado' y bloquea modificaciones posteriores.",
+    response_model=ResumenCierreExpediente,
+    summary="Cerrar expediente",
+    description=(
+        "Cierra el expediente con causal de cierre. El informe final PDF es obligatorio, "
+        "excepto cuando la causal es no_continuacion_dialogos."
+    ),
 )
 async def carga_reporte_final(
     formulario_id: str,
+    causal_cierre: str = Form(...),
     justificacion: Optional[str] = Form(""),
-    archivo: UploadFile = File(...),
+    archivo: Optional[UploadFile] = File(None),
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
-) -> dict:
+) -> ResumenCierreExpediente:
+    if archivo is None:
+        if causal_cierre != CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS:
+            raise HTTPException(status_code=400, detail="El informe final en PDF es obligatorio para esta causal de cierre.")
+        try:
+            return servicio.cerrar_sin_reporte_final(
+                formulario_id=formulario_id,
+                justificacion=justificacion or "",
+                actor_id=usuario.email,
+                causal_cierre=causal_cierre,
+                contrapartes_permitidas=_contrapartes_permitidas(usuario),
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     if archivo.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Solo se permite subir archivos PDF para el reporte final.")
         
@@ -207,10 +230,34 @@ async def carga_reporte_final(
             content_type=archivo.content_type,
             justificacion=justificacion,
             actor_id=usuario.email,
+            causal_cierre=causal_cierre,
             contrapartes_permitidas=_contrapartes_permitidas(usuario),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@enrutador.post(
+    "/{formulario_id}/reabrir-actualizacion",
+    response_model=ResumenReaperturaActualizacion,
+    summary="Reabrir expediente por actualización",
+    description=(
+        "Reabre una carpeta cerrada de tipo actualización para continuar el ciclo periódico. "
+        "Conserva documentos e informe final existentes."
+    ),
+)
+def reabrir_actualizacion(
+    formulario_id: str,
+    solicitud: SolicitudReaperturaActualizacion,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> ResumenReaperturaActualizacion:
+    return servicio.reabrir_por_actualizacion(
+        formulario_id=formulario_id,
+        justificacion=solicitud.justificacion,
+        actor_id=usuario.email,
+        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+    )
 
 
 # ─── 3. Transiciones de estado (Aprobar, Rechazar, Devolver) ──────────────────

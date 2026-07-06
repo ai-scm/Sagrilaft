@@ -352,14 +352,14 @@ class AccesoManualService:
         acceso = self._repo.obtener_acceso_por_formulario_id(formulario_id)
         return acceso.correo_destinatario if acceso else None
 
-    # ─── Reactivación para corrección ────────────────────────────────────────
+    # ─── Reactivación para trabajo externo ───────────────────────────────────
 
-    def reactivar_acceso_para_correccion(
+    def reactivar_acceso_para_trabajo_expediente(
         self, formulario_id: str
     ) -> Optional[dict]:
         """
         Regenera el token y restablece el vencimiento del acceso para una nueva
-        ronda de corrección.
+        ronda de trabajo externo sobre el expediente.
 
         El caller (ExpedienteService) agrupa este cambio en su propia transacción;
         reactivar_acceso NO hace commit — el commit lo emite RepositorioExpediente.
@@ -380,6 +380,12 @@ class AccesoManualService:
             "correo_destinatario":    acceso.correo_destinatario,
             "enlace_diligenciamiento": self._construir_enlace_diligenciamiento(nuevo_token),
         }
+
+    def reactivar_acceso_para_correccion(
+        self, formulario_id: str
+    ) -> Optional[dict]:
+        """Alias de negocio para el flujo histórico de devolución por corrección."""
+        return self.reactivar_acceso_para_trabajo_expediente(formulario_id)
 
     # ─── Consumo de token al enviar ──────────────────────────────────────────
 

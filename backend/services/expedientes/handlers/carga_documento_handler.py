@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, List
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
-from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_REPORTE_FINAL
+from domain.constantes import (
+    CAUSAL_CIERRE_INFORME_FINAL,
+    TIPO_DOCUMENTO_FORMULARIO_PDF,
+    TIPO_DOCUMENTO_REPORTE_FINAL,
+)
 from domain.excepciones import FormularioNoEncontradoError, SinPermisoError
 from domain.formulario.entidades import FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
@@ -26,6 +30,7 @@ class ComandoCargaDocumento:
     actor_id: str
     tipo_documento: str  # "FORMULARIO_PDF", "REPORTE_FINAL"
     contrapartes_permitidas: Optional[List[str]] = None
+    causal_cierre: Optional[str] = None
 
 
 class ValidadorCargaDocumento:
@@ -149,9 +154,6 @@ class CargaDocumentoHandler:
 
         # 6. Transicionar estado del formulario
         estado_nuevo = self._transicionar_estado(formulario, comando.tipo_documento)
-        self._repo.actualizar_estado(comando.formulario_id, estado_nuevo)
-
-        # 7. Registrar auditoría
         self._registrar_auditoria(
             comando,
             formulario,
@@ -159,8 +161,9 @@ class CargaDocumentoHandler:
             estado_nuevo,
             versionamiento["numero_version"],
         )
+        self._repo.actualizar_estado(comando.formulario_id, estado_nuevo)
 
-        # 8. Alertar al portal
+        # 7. Alertar al portal
         self._alertar_portal(comando, formulario)
 
         return {
@@ -275,6 +278,8 @@ class CargaDocumentoHandler:
             "upload_reason": comando.justificacion.strip(),
             "version": numero_version,
         }
+        if comando.tipo_documento == TIPO_DOCUMENTO_REPORTE_FINAL:
+            metadata["causal_cierre"] = comando.causal_cierre or CAUSAL_CIERRE_INFORME_FINAL
 
         evento = EventoAuditoria(
             formulario_id=comando.formulario_id,

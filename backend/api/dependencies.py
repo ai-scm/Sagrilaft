@@ -209,6 +209,9 @@ def obtener_servicio_expediente(
     solicitud: Request,
     repo: RepositorioExpediente = Depends(obtener_repo_expediente),
     storage: IAlmacenamiento = Depends(obtener_storage),
+    repo_auditoria: RepositorioAuditoria = Depends(obtener_repo_auditoria),
+    acceso_service: AccesoManualService = Depends(obtener_servicio_acceso),
+    email_service: INotificador = Depends(obtener_servicio_email),
     carga_handler: CargaDocumentoHandler = Depends(obtener_carga_handler),
     comparador: ComparadorService = Depends(obtener_comparador),
     aprobacion_rechazo: AprobacionRechazoHandler = Depends(obtener_aprobacion_rechazo_handler),
@@ -221,6 +224,9 @@ def obtener_servicio_expediente(
         comparador=comparador,
         aprobacion_rechazo_handler=aprobacion_rechazo,
         devolucion_handler=devolucion,
+        repo_auditoria=repo_auditoria,
+        acceso_service=acceso_service,
+        email_service=email_service,
     )
 
 

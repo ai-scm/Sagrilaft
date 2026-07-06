@@ -41,3 +41,15 @@ class INotificador(Protocol):
         de compliance. Returns True si la notificación se entregó.
         """
         ...
+
+    def enviar_notificacion_actualizacion_reabierta(
+        self,
+        correo_destinatario: str,
+        observaciones: str,
+        enlace_diligenciamiento: Optional[str] = None,
+    ) -> bool:
+        """
+        Notifica al destinatario que el expediente fue habilitado para una
+        nueva actualización periódica.
+        """
+        ...

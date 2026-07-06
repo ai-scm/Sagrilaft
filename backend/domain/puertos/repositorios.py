@@ -94,6 +94,13 @@ class RepositorioExpediente(Protocol):
         campos_a_corregir: str,
     ) -> None: ...
 
+    def actualizar_para_reapertura_actualizacion(
+        self,
+        formulario_id: str,
+        estado: str,
+        campos_a_corregir: str,
+    ) -> None: ...
+
 
 @runtime_checkable
 class RepositorioFirma(Protocol):

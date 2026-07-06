@@ -128,6 +128,39 @@ class EmailService:
         )
         return self._enviar(mensaje, correo_destinatario)
 
+    def enviar_notificacion_actualizacion_reabierta(
+        self,
+        correo_destinatario: str,
+        observaciones: str,
+        enlace_diligenciamiento: str | None = None,
+    ) -> bool:
+        """
+        Notifica al destinatario que su expediente quedó habilitado para una
+        nueva actualización periódica.
+        """
+        self._validar_correo_destinatario(correo_destinatario, "actualización reabierta")
+
+        if not self._smtp_configurado():
+            logger.warning(
+                "SMTP no configurado — se omite notificación de actualización reabierta a '%s'.",
+                correo_destinatario,
+            )
+            return False
+
+        remitente = self._config.remitente or self._config.usuario
+        mensaje = _construir_mensaje(
+            remitente=remitente,
+            destinatario=correo_destinatario,
+            asunto="Formulario SAGRILAFT — Actualización habilitada",
+            cuerpo_texto=_construir_cuerpo_texto_actualizacion_reabierta(
+                observaciones, enlace_diligenciamiento,
+            ),
+            cuerpo_html=_construir_cuerpo_html_actualizacion_reabierta(
+                observaciones, enlace_diligenciamiento,
+            ),
+        )
+        return self._enviar(mensaje, correo_destinatario)
+
     def _enviar(self, mensaje: MIMEMultipart, destinatario: str) -> bool:
         try:
             with smtplib.SMTP(self._config.host, self._config.puerto) as servidor:
@@ -138,11 +171,11 @@ class EmailService:
                     to_addrs=[destinatario],
                     msg=mensaje.as_string(),
                 )
-            logger.info("Notificación de devolución enviada a '%s'.", destinatario)
+            logger.info("Notificación enviada a '%s'.", destinatario)
             return True
         except Exception:
             logger.exception(
-                "Error al enviar notificación de devolución a '%s'.", destinatario
+                "Error al enviar notificación a '%s'.", destinatario
             )
             return False
 
@@ -201,6 +234,26 @@ def _construir_cuerpo_texto_rechazo(mensaje_para_destinatario: str) -> str:
     )
 
 
+def _construir_cuerpo_texto_actualizacion_reabierta(
+    observaciones: str,
+    enlace: str | None,
+) -> str:
+    seccion_enlace = (
+        f"\nAcceda aquí para actualizar la información:\n{enlace}\n"
+        if enlace
+        else "\nPor favor acceda al portal para actualizar la información solicitada.\n"
+    )
+    return (
+        "Estimado usuario,\n\n"
+        "Su expediente SAGRILAFT fue habilitado nuevamente para actualización.\n\n"
+        "Puede revisar y actualizar la información del cliente/proveedor, completar "
+        "nuevos cuestionarios y cargar documentos adicionales.\n\n"
+        f"Observaciones:\n{observaciones}\n"
+        f"{seccion_enlace}\n"
+        "Equipo SAGRILAFT"
+    )
+
+
 def _construir_cuerpo_html_rechazo(mensaje_para_destinatario: str) -> str:
     mensaje_escapado = (
         mensaje_para_destinatario
@@ -221,6 +274,45 @@ def _construir_cuerpo_html_rechazo(mensaje_para_destinatario: str) -> str:
   <div style="background: #f8fafc; border-left: 4px solid #94a3b8; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap; color: #334155;">
     {mensaje_escapado}
   </div>
+  <p style="color: #64748b; font-size: 0.85em; margin-top: 32px;">Equipo SAGRILAFT</p>
+</body>
+</html>"""
+
+
+def _construir_cuerpo_html_actualizacion_reabierta(
+    observaciones: str,
+    enlace: str | None,
+) -> str:
+    observaciones_escapadas = (
+        observaciones
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br>")
+    )
+    seccion_enlace_html = (
+        f'<p style="text-align:center; margin: 24px 0;">'
+        f'<a href="{enlace}" '
+        f'style="background:#0f766e; color:#fff; padding:12px 28px; border-radius:6px; '
+        f'text-decoration:none; font-weight:700; font-size:0.95em;">'
+        f'Actualizar expediente</a></p>'
+        if enlace
+        else '<p>Por favor acceda al portal para actualizar la información solicitada.</p>'
+    )
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #0f766e; margin-bottom: 4px;">Formulario SAGRILAFT</h2>
+  <p style="color: #64748b; margin-top: 0; font-size: 0.9em;">Actualización habilitada</p>
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+  <p>Estimado usuario,</p>
+  <p>Su expediente SAGRILAFT fue habilitado nuevamente para actualización.</p>
+  <p>Puede revisar y actualizar la información del cliente/proveedor, completar nuevos cuestionarios y cargar documentos adicionales.</p>
+  <div style="background: #ecfdf5; border-left: 4px solid #0f766e; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">
+    {observaciones_escapadas}
+  </div>
+  {seccion_enlace_html}
   <p style="color: #64748b; font-size: 0.85em; margin-top: 32px;">Equipo SAGRILAFT</p>
 </body>
 </html>"""
