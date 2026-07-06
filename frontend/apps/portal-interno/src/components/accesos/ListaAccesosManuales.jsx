@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../services/api';
 import BadgeEstadoAcceso from '../badges/BadgeEstadoAcceso';
+import InputBusqueda from '../ui/InputBusqueda';
+import ControlsPaginacion from '../ui/ControlsPaginacion';
 import { estilosBandeja } from '../ui/listaStyles';
 import Spinner from '@shared/components/ui/Spinner';
 import Alert from '@shared/components/ui/Alert';
@@ -13,6 +15,8 @@ import {
   formatearFechaCorta,
   generarTextoConteo,
 } from '../../config/constantes';
+import { ELEMENTOS_POR_PAGINA } from '../../config/constantesPaginacion';
+import { usePaginacion } from '../../hooks/usePaginacion';
 import { obtenerCredencialesRecientes } from '../../utils/credenciales';
 import ModalCredencialesRecientes from './ModalCredencialesRecientes';
 import ModalAlertaExpirada from './ModalAlertaExpirada';
@@ -21,15 +25,21 @@ import ModalAlertaExpirada from './ModalAlertaExpirada';
 
 const FILTRO_TODOS = '';
 
-const FILTROS_VACIOS = { estado: FILTRO_TODOS, area: FILTRO_TODOS, tipo: FILTRO_TODOS };
+const FILTROS_VACIOS = { estado: FILTRO_TODOS, area: FILTRO_TODOS, tipo: FILTRO_TODOS, busqueda: '' };
 
 // ── Lógica de filtrado ────────────────────────────────────────────────────────
 
-function aplicarFiltros(accesos, { estado, area, tipo }) {
+function aplicarFiltros(accesos, { estado, area, tipo, busqueda }) {
+  const terminoBusqueda = busqueda.trim().toLowerCase();
+
   return accesos
     .filter(a => !estado || a.estado_acceso    === estado)
     .filter(a => !area   || a.area_responsable === area)
-    .filter(a => !tipo   || a.tipo_contraparte === tipo);
+    .filter(a => !tipo   || a.tipo_contraparte === tipo)
+    .filter(a => !terminoBusqueda ||
+      (a.razon_social ?? '').toLowerCase().includes(terminoBusqueda) ||
+      (a.codigo_peticion ?? '').toLowerCase().includes(terminoBusqueda)
+    );
 }
 
 function hayFiltrosActivos(filtros) {
@@ -158,6 +168,12 @@ const s = {
 function BarraFiltros({ filtros, onCambiar, onLimpiar }) {
   return (
     <div style={s.barraFiltros}>
+      <InputBusqueda
+        valor={filtros.busqueda}
+        onChange={valor => onCambiar('busqueda', valor)}
+        placeholder="Buscar por razón social o código…"
+      />
+
       <select
         style={s.selectFiltro}
         value={filtros.estado}
@@ -257,6 +273,10 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
   const [credencialesSeleccionadas, setCredencialesSeleccionadas] = useState(null);
   const [alertaExpirada, setAlertaExpirada]   = useState(false);
 
+  // Lógica de paginación: gestiona página actual, cálculo de total de páginas, etc.
+  const accesosFiltrados = aplicarFiltros(accesosManuales, filtros);
+  const paginacion = usePaginacion(accesosFiltrados, ELEMENTOS_POR_PAGINA);
+
   const cargarAccesos = useCallback(async () => {
     setCargando(true);
     setError(null);
@@ -280,6 +300,11 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
     setFiltros(FILTROS_VACIOS);
   }
 
+  // Reinicia paginación cuando cambian los filtros
+  useEffect(() => {
+    paginacion.reiniciarPaginacion();
+  }, [filtros]);
+
   function handleAccesoClick(acceso) {
     const credenciales = obtenerCredencialesRecientes(acceso.codigo_peticion);
     if (credenciales) {
@@ -289,9 +314,8 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
     }
   }
 
-  const accesosFiltrados = aplicarFiltros(accesosManuales, filtros);
-  const listaVacia       = !cargando && !error && accesosManuales.length === 0;
-  const sinResultados    = !cargando && !error && accesosManuales.length > 0 && accesosFiltrados.length === 0;
+  const listaVacia    = !cargando && !error && accesosManuales.length === 0;
+  const sinResultados = !cargando && !error && accesosManuales.length > 0 && accesosFiltrados.length === 0;
 
   return (
     <div style={s.contenedor}>
@@ -311,9 +335,15 @@ export default function ListaAccesosManuales({ mensajeVacio = MENSAJE_VACIO_DEFA
       {listaVacia && <div style={s.estadoVacio}>{mensajeVacio}</div>}
       {sinResultados && <div style={s.estadoVacio}>{MENSAJE_SIN_RESULTADOS}</div>}
 
-      {!cargando && accesosFiltrados.map(acceso => (
+      {/* Tarjetas de la página actual */}
+      {!cargando && paginacion.elementosPagina.map(acceso => (
         <TarjetaAccesoManual key={acceso.id} acceso={acceso} onClick={handleAccesoClick} />
       ))}
+
+      {/* Controles de paginación */}
+      {!cargando && !error && accesosFiltrados.length > 0 && (
+        <ControlsPaginacion {...paginacion} />
+      )}
 
       <ModalCredencialesRecientes 
         credenciales={credencialesSeleccionadas}

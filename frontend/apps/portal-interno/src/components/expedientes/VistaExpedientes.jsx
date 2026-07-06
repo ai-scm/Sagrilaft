@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import DetalleExpediente from './DetalleExpediente';
 import { estilosBandeja } from '../ui/listaStyles';
+import InputBusqueda from '../ui/InputBusqueda';
+import ControlsPaginacion from '../ui/ControlsPaginacion';
 import useExpedientes from '../../hooks/useExpedientes';
 import Spinner from '@shared/components/ui/Spinner';
 import Alert from '@shared/components/ui/Alert';
@@ -20,6 +22,8 @@ import {
   formatearFechaCorta,
   generarTextoConteo,
 } from '../../config/constantes';
+import { ELEMENTOS_POR_PAGINA } from '../../config/constantesPaginacion';
+import { usePaginacion } from '../../hooks/usePaginacion';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
@@ -71,17 +75,6 @@ const s = {
     margin:     0,
     lineHeight: 1,
   }),
-  // Barra de búsqueda y filtros
-  inputBusqueda: {
-    flex:         1,
-    minWidth:     '160px',
-    padding:      '7px 12px',
-    border:       '1.5px solid var(--gray-200, #e2e8f0)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.82rem',
-    color:        'var(--gray-800, #1e293b)',
-    outline:      'none',
-  },
   // Tarjetas de expedientes
   tarjeta: {
     background:    '#fff',
@@ -189,7 +182,7 @@ function TarjetaExpediente({ expediente, onClick }) {
 
 export default function VistaExpedientes() {
   const { id: expedienteIdFromUrl } = useParams();
-  
+
   const [filtroTipo, setFiltroTipo]                 = useState(FILTRO_TODOS);
   const [filtroEstado, setFiltroEstado]             = useState(FILTRO_TODOS);
   const [busqueda, setBusqueda]                     = useState('');
@@ -204,6 +197,19 @@ export default function VistaExpedientes() {
     busquedaDebounced,
   } = useExpedientes({ filtroTipo, busqueda });
 
+  // Filtra expedientes y maneja paginación
+  const expedientesFiltrados = expedientes.filter(e => {
+    const coincideTipo    = !filtroTipo   || e.tipo_contraparte === filtroTipo;
+    const coincideEstado  = !filtroEstado || e.estado           === filtroEstado;
+    const terminoBusqueda = busquedaDebounced.trim().toLowerCase();
+    const coincideBusqueda = !terminoBusqueda ||
+      (e.razon_social ?? '').toLowerCase().includes(terminoBusqueda) ||
+      (e.codigo_peticion ?? '').toLowerCase().includes(terminoBusqueda);
+    return coincideTipo && coincideEstado && coincideBusqueda;
+  });
+
+  const paginacion = usePaginacion(expedientesFiltrados, ELEMENTOS_POR_PAGINA);
+
   // Si hay un ID en la URL, busca automáticamente ese expediente
   useEffect(() => {
     if (expedienteIdFromUrl && expedientes.length > 0 && !expedienteDetalle) {
@@ -214,15 +220,11 @@ export default function VistaExpedientes() {
     }
   }, [expedienteIdFromUrl, expedientes, expedienteDetalle]);
 
-  const expedientesFiltrados = expedientes.filter(e => {
-    const coincideTipo    = !filtroTipo   || e.tipo_contraparte === filtroTipo;
-    const coincideEstado  = !filtroEstado || e.estado           === filtroEstado;
-    const terminoBusqueda = busquedaDebounced.trim().toLowerCase();
-    const coincideBusqueda = !terminoBusqueda ||
-      (e.razon_social ?? '').toLowerCase().includes(terminoBusqueda) ||
-      (e.codigo_peticion ?? '').toLowerCase().includes(terminoBusqueda);
-    return coincideTipo && coincideEstado && coincideBusqueda;
-  });
+  // Reinicia paginación cuando cambian los filtros
+  useEffect(() => {
+    paginacion.reiniciarPaginacion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroTipo, filtroEstado, busquedaDebounced]);
 
   const totalClientes    = contarPorTipo(expedientesParaConteos, 'cliente');
   const totalProveedores = contarPorTipo(expedientesParaConteos, 'proveedor');
@@ -277,12 +279,10 @@ export default function VistaExpedientes() {
       {/* Barra de búsqueda */}
       {!cargando && !error && (
         <div style={s.barraFiltros}>
-          <input
-            type="search"
+          <InputBusqueda
+            valor={busqueda}
+            onChange={setBusqueda}
             placeholder="Buscar por razón social o código…"
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
-            style={s.inputBusqueda}
           />
           <select
             style={s.selectFiltro}
@@ -319,14 +319,19 @@ export default function VistaExpedientes() {
         <div style={s.estadoVacio}>Ningún formulario coincide con los filtros seleccionados.</div>
       )}
 
-      {/* Lista de tarjetas */}
-      {!cargando && expedientesFiltrados.map(expediente => (
+      {/* Lista de tarjetas de la página actual */}
+      {!cargando && paginacion.elementosPagina.map(expediente => (
         <TarjetaExpediente
           key={expediente.formulario_id}
           expediente={expediente}
           onClick={setExpedienteDetalle}
         />
       ))}
+
+      {/* Controles de paginación */}
+      {!cargando && !error && expedientesFiltrados.length > 0 && (
+        <ControlsPaginacion {...paginacion} />
+      )}
     </div>
   );
 }
