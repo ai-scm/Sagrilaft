@@ -161,6 +161,50 @@ class EmailService:
         )
         return self._enviar(mensaje, correo_destinatario)
 
+    def enviar_notificacion_acceso_creado(
+        self,
+        correo_destinatario: str,
+        codigo_peticion: str,
+        pin: str,
+        fecha_validez: str,
+        enlace_diligenciamiento: str,
+        razon_social: str,
+    ) -> bool:
+        """
+        Envía al destinatario las credenciales del acceso manual recién creado.
+
+        Es la única vez que el PIN viaja en texto plano fuera del portal interno;
+        el cuerpo del correo advierte que no debe compartirse con terceros.
+
+        Raises:
+            CorreoDestinatarioVacioError: si correo_destinatario es None o vacío.
+
+        Returns:
+            True si el correo se envió correctamente; False en caso contrario.
+        """
+        self._validar_correo_destinatario(correo_destinatario, "acceso creado")
+
+        if not self._smtp_configurado():
+            logger.warning(
+                "SMTP no configurado — se omite notificación de acceso creado a '%s'.",
+                correo_destinatario,
+            )
+            return False
+
+        remitente = self._config.remitente or self._config.usuario
+        mensaje = _construir_mensaje(
+            remitente=remitente,
+            destinatario=correo_destinatario,
+            asunto="SAGRILAFT — Credenciales de acceso a su formulario",
+            cuerpo_texto=_construir_cuerpo_texto_acceso_creado(
+                razon_social, codigo_peticion, pin, fecha_validez, enlace_diligenciamiento,
+            ),
+            cuerpo_html=_construir_cuerpo_html_acceso_creado(
+                razon_social, codigo_peticion, pin, fecha_validez, enlace_diligenciamiento,
+            ),
+        )
+        return self._enviar(mensaje, correo_destinatario)
+
     def _enviar(self, mensaje: MIMEMultipart, destinatario: str) -> bool:
         try:
             with smtplib.SMTP(self._config.host, self._config.puerto) as servidor:
@@ -313,6 +357,66 @@ def _construir_cuerpo_html_actualizacion_reabierta(
     {observaciones_escapadas}
   </div>
   {seccion_enlace_html}
+  <p style="color: #64748b; font-size: 0.85em; margin-top: 32px;">Equipo SAGRILAFT</p>
+</body>
+</html>"""
+
+
+def _construir_cuerpo_texto_acceso_creado(
+    razon_social: str,
+    codigo_peticion: str,
+    pin: str,
+    fecha_validez: str,
+    enlace: str,
+) -> str:
+    return (
+        "Estimado usuario,\n\n"
+        f"Se ha generado un acceso al formulario SAGRILAFT para '{razon_social}'. "
+        "Utilice las siguientes credenciales para recuperar autoguardado:\n\n"
+        f"  Código de petición: {codigo_peticion}\n"
+        f"  PIN de acceso:      {pin}\n"
+        f"  Válido hasta:       {fecha_validez}\n\n"
+        f"Acceda aquí para iniciar el diligenciamiento:\n{enlace}\n\n"
+        "Este PIN es de uso personal: no lo comparta con terceros. Si usted no "
+        "solicitó este acceso, ignore este mensaje.\n\n"
+        "Equipo SAGRILAFT"
+    )
+
+
+def _construir_cuerpo_html_acceso_creado(
+    razon_social: str,
+    codigo_peticion: str,
+    pin: str,
+    fecha_validez: str,
+    enlace: str,
+) -> str:
+    razon_social_esc = (
+        razon_social
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1d4ed8; margin-bottom: 4px;">Formulario SAGRILAFT</h2>
+  <p style="color: #64748b; margin-top: 0; font-size: 0.9em;">Credenciales de acceso</p>
+  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+  <p>Estimado usuario,</p>
+  <p>Se ha generado un acceso al formulario SAGRILAFT para <strong>{razon_social_esc}</strong>. Utilice las siguientes credenciales para diligenciarlo:</p>
+  <div style="background: #f1f5f9; border-left: 4px solid #1d4ed8; padding: 16px; border-radius: 4px; margin: 16px 0;">
+    <p style="margin: 0 0 8px;"><strong>Código de petición:</strong> {codigo_peticion}</p>
+    <p style="margin: 0 0 8px;"><strong>PIN de acceso:</strong> {pin}</p>
+    <p style="margin: 0;"><strong>Válido hasta:</strong> {fecha_validez}</p>
+  </div>
+  <p style="text-align:center; margin: 24px 0;">
+    <a href="{enlace}" style="background:#1d4ed8; color:#fff; padding:12px 28px; border-radius:6px; text-decoration:none; font-weight:700; font-size:0.95em;">
+      Diligenciar formulario</a>
+  </p>
+  <p style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; font-size: 0.85em; color: #78350f;">
+    Este PIN es de uso personal: no lo comparta con terceros. Si usted no solicitó este acceso, ignore este mensaje.
+  </p>
   <p style="color: #64748b; font-size: 0.85em; margin-top: 32px;">Equipo SAGRILAFT</p>
 </body>
 </html>"""
