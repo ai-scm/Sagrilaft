@@ -44,6 +44,11 @@ export const TIPO_DOCUMENTO_FORMULARIO_PDF        = 'FORMULARIO_PDF';
 export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';
 export const TIPO_DOCUMENTO_REPORTE_FINAL         = 'REPORTE_FINAL';
 
+// Causales de cierre de expediente
+export const CAUSAL_CIERRE_INFORME_FINAL = 'informe_final';
+export const CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS = 'no_continuacion_dialogos';
+export const CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL = 'rechazado_con_informe_final';
+
 // ─── Estados de Dominio ───────────────────────────────────────────────────────
 
 // Estados de Formulario / Expediente
@@ -54,6 +59,14 @@ export const ESTADO_FORM_RECHAZADO       = 'rechazado';
 export const ESTADO_FORM_PENDIENTE_FIRMA = 'pendiente_firma';
 export const ESTADO_FORM_FIRMADO         = 'firmado';
 export const ESTADO_FORM_CERRADO         = 'cerrado';
+
+// Tipos de solicitud
+export const TIPO_SOLICITUD_VINCULACION = 'vinculacion';
+export const TIPO_SOLICITUD_ACTUALIZACION = 'actualizacion';
+
+// Modos de trabajo editable
+export const MODO_TRABAJO_CORRECCION = 'correccion';
+export const MODO_TRABAJO_ACTUALIZACION_REABIERTA = 'actualizacion_reabierta';
 
 // Estados de Acceso Manual
 export const ESTADO_ACCESO_ACTIVO    = 'activo';
