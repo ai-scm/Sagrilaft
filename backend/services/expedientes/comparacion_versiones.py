@@ -193,11 +193,11 @@ def _presentar(campo: str, valor: Any, snapshot: Dict[str, Any]) -> str:
     if not normalizado:
         return "Sin información"
     if campo in _CAMPOS_MONETARIOS:
-        return _formatear_monto(valor, snapshot.get("moneda_declaracion"))
+        return _formatear_monto(valor, snapshot.get("moneda_declaracion"), snapshot.get("moneda_declaracion_otra"))
     if isinstance(valor, (list, dict)):
         return json.dumps(valor, ensure_ascii=False, sort_keys=True)
     return normalizado
 
 
-def _formatear_monto(valor: Any, moneda: Any) -> str:
-    return formatear_monto_monetario(valor, moneda) or _normalizar(valor)
+def _formatear_monto(valor: Any, moneda: Any, moneda_otra: Any = None) -> str:
+    return formatear_monto_monetario(valor, moneda, moneda_otra) or _normalizar(valor)

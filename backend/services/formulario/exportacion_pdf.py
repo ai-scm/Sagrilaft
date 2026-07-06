@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
+import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -29,6 +30,9 @@ _CAMPOS_FINANCIEROS: List[Tuple[str, str]] = [
     ("Total Pasivos",       "total_pasivos"),
     ("Patrimonio",          "patrimonio"),
 ]
+
+_RAZON_SOCIAL_EMPRESA = os.getenv("VITE_RAZON_SOCIAL", "HIGH TECH SOFTWARE S.A.S.")
+_CORREO_DATOS_PERSONALES = os.getenv("VITE_CORREO_DATOS", "administrativocol@blend360.com")
 
 
 # ─── Tipos del dominio ────────────────────────────────────────────────────────
@@ -61,6 +65,11 @@ _VALORES_AMIGABLES: Dict[str, str] = {
     "i": "Importador",
     "cuenta_corriente": "Cuenta corriente",
     "cuenta_ahorros": "Cuenta ahorros",
+    "importacion": "Importación",
+    "exportacion": "Exportación",
+    "inversiones": "Inversiones",
+    "pago_servicios": "Pago de servicios",
+    "otras": "Otras",
 }
 
 
@@ -81,7 +90,7 @@ def _valor_a_texto(valor: Any) -> str:
     return str(valor).strip()
 
 
-def _formatear_monto(valor: Any, moneda: str) -> str:
+def _formatear_monto(valor: Any, moneda: str, moneda_otra: Any = None) -> str:
     """
     Formatea un valor numérico monetario aplicando el separador de miles
     correcto según la moneda seleccionada (espejo exacto de CurrencyInput.jsx).
@@ -95,7 +104,7 @@ def _formatear_monto(valor: Any, moneda: str) -> str:
         EUR  → € 1.500.000
         PEN  → S/ 1,500,000
     """
-    return formatear_monto_monetario(valor, moneda)
+    return formatear_monto_monetario(valor, moneda, moneda_otra)
 
 
 def _normalizar_referencias_comerciales(
@@ -423,20 +432,22 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
         ]),
     ]),
     _PasoFormulario(7, "Contactos e Información Bancaria", [
-        _SeccionCampos("Contactos — Persona autorizada para recepción de órdenes", [
-            ("Órdenes — Nombre",   "contacto_ordenes_nombre"),
-            ("Órdenes — Cargo",    "contacto_ordenes_cargo"),
-            ("Órdenes — Teléfono", "contacto_ordenes_telefono"),
-            ("Órdenes — Correo",   "contacto_ordenes_correo"),
-            ("Pagos — Nombre",     "contacto_pagos_nombre"),
-            ("Pagos — Cargo",      "contacto_pagos_cargo"),
-            ("Pagos — Teléfono",   "contacto_pagos_telefono"),
-            ("Pagos — Correo",     "contacto_pagos_correo"),
+        _SeccionCampos("Persona autorizada para recepción de órdenes de compra y de servicio", [
+            ("Nombre",   "contacto_ordenes_nombre"),
+            ("Cargo",    "contacto_ordenes_cargo"),
+            ("Teléfono", "contacto_ordenes_telefono"),
+            ("Correo",   "contacto_ordenes_correo"),
+        ]),
+        _SeccionCampos("Persona autorizada para recepción de reportes de pago", [
+            ("Nombre",   "contacto_pagos_nombre"),
+            ("Cargo",    "contacto_pagos_cargo"),
+            ("Teléfono", "contacto_pagos_telefono"),
+            ("Correo",   "contacto_pagos_correo"),
         ]),
         _SeccionTabla("Información Bancaria para Pagos", "informacion_bancaria_pagos", [
             ("entidad_bancaria", "Banco"),
             ("ciudad_oficina",   "Ciudad oficina"),
-            ("tipo_cuenta",      "Tipo cuenta"),
+            ("tipo_cuenta",      "Tipo De Cuenta"),
             ("numero_cuenta",    "Número cuenta"),
         ]),
     ]),
@@ -461,6 +472,7 @@ def _renderizar_seccion_financiera(datos: Dict[str, Any]) -> str:
     consistentes con el frontend (CurrencyInput.jsx / PasoFinanciero.jsx).
     """
     moneda = (datos.get("moneda_declaracion") or "").strip().upper()
+    moneda_otra = datos.get("moneda_declaracion_otra")
 
     # Si el usuario declaró una moneda personalizada, se muestra el nombre
     # especificado en lugar del sentinel 'OTRA' (sin significado para el lector).
@@ -475,13 +487,64 @@ def _renderizar_seccion_financiera(datos: Dict[str, Any]) -> str:
 
     # Campos monetarios formateados con la moneda correcta
     pares_montos: List[Tuple[str, Any]] = [
-        (etiqueta, _formatear_monto(datos.get(clave), moneda))
+        (etiqueta, _formatear_monto(datos.get(clave), moneda, moneda_otra))
         for etiqueta, clave in _CAMPOS_FINANCIEROS
     ]
 
     return _render_seccion_campos(
         "Información Financiera",
         pares_escalares + pares_montos,
+    )
+
+
+def _renderizar_seccion_declaraciones(datos: Dict[str, Any]) -> str:
+    texto_autorizacion = (
+        "En cumplimiento de la Ley Estatutaria 1581 de 2012 de Protección de Datos (LEPD), "
+        "del Decreto 1377 de 2013 y de las medidas de seguridad definidas en la política de "
+        f"tratamiento desarrollada por {_RAZON_SOCIAL_EMPRESA}, a las cuales puede tener acceso "
+        f"a través del correo electrónico: {_CORREO_DATOS_PERSONALES}. Mediante el registro de "
+        "sus datos personales en el presente formulario usted autoriza a "
+        f"{_RAZON_SOCIAL_EMPRESA} para la recolección, almacenamiento y uso de los mismos con la "
+        "finalidad de llevar a cabo el procedimiento de conocimiento del cliente/proveedor de la "
+        "empresa. Usted, como titular de sus datos personales puede ejercer sus derechos de acceso, "
+        "corrección, supresión o revocación mediante un escrito dirigido a "
+        f"{_RAZON_SOCIAL_EMPRESA}, mediante correo electrónico a {_CORREO_DATOS_PERSONALES} "
+        "indicando en el asunto el derecho que desea ejercitar."
+    )
+    texto_origen = (
+        "Manifiesto que todo lo aquí consignado es veraz. Así mismo, realizo la siguiente "
+        "declaración de origen de fondos con el propósito de contribuir en la prevención y "
+        "control del Lavado de Activos y Financiación del Terrorismo."
+    )
+    declaracion_items = [
+        "Declaro que los recursos con los cuales esta sociedad fue constituida no provienen de "
+        "ninguna actividad ilícita de las contempladas en el Código Penal Colombiano o en cualquier "
+        "norma que lo modifique o adiciones.",
+        "No admitiré que terceros efectúen depósitos a mis cuentas con fondos de actividades "
+        "ilícitas contempladas en el Código Penal Colombiano o en cualquier norma que lo modifique "
+        "o adicione, ni efectuaré transacciones a tales actividades de o a favor de personas "
+        "relacionadas con las mismas.",
+    ]
+    bloques = [
+        _fila_etiqueta_valor("Autorización tratamiento de datos", datos.get("autorizacion_datos")),
+        _fila_etiqueta_valor("Declaración origen de fondos", datos.get("declaracion_origen_fondos")),
+        _fila_etiqueta_valor("Origen de fondos (detalle)", datos.get("origen_fondos")),
+    ]
+    bloques = [bloque for bloque in bloques if bloque]
+    items_html = "".join(f"<li>{escape(item)}</li>" for item in declaracion_items)
+
+    return (
+        "<section class='card'>"
+        "<h2>Autorizaciones y Origen de Fondos</h2>"
+        f"<p style='font-size:11px; color:var(--gray-800); line-height:1.7;'>{escape(texto_autorizacion)}</p>"
+        f"<p style='font-size:11px; color:var(--gray-800); line-height:1.7; margin-top:14px;'>{escape(texto_origen)}</p>"
+        "<ol style='margin:8px 0 14px 20px; padding:0; color:var(--gray-800); font-size:11px; line-height:1.7;'>"
+        f"{items_html}"
+        "</ol>"
+        "<div class='grid'>"
+        f"{''.join(bloques)}"
+        "</div>"
+        "</section>"
     )
 
 
@@ -492,6 +555,8 @@ def _renderizar_seccion(seccion: _SeccionFormulario, datos: Dict[str, Any]) -> s
         # La sección financiera tiene tratamiento especial: usa formateo por moneda.
         if seccion.titulo == "Información Financiera":
             return _renderizar_seccion_financiera(datos)
+        if seccion.titulo == "Autorizaciones y Origen de Fondos":
+            return _renderizar_seccion_declaraciones(datos)
         return _render_seccion_campos(
             seccion.titulo,
             [(etiqueta, datos.get(clave)) for etiqueta, clave in seccion.campos],
