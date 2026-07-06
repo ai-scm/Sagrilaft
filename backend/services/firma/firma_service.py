@@ -190,6 +190,7 @@ class FirmaService:
     # ─── Webhook ──────────────────────────────────────────────────────────────
 
     def procesar_webhook(self, *, secret_token: str, request_id: str, request_status: str) -> None:
+        """Compatibilidad con webhooks que envian secret_token en el payload."""
         if not self._webhook_secret:
             raise RuntimeError("ZOHO_WEBHOOK_SECRET no está configurado en el servidor.")
 
@@ -197,6 +198,9 @@ class FirmaService:
             logger.warning("Webhook ZohoSign rechazado: secret_token inválido")
             raise WebhookTokenInvalidoError()
 
+        self.procesar_webhook_verificado(request_id=request_id, request_status=request_status)
+
+    def procesar_webhook_verificado(self, *, request_id: str, request_status: str) -> None:
         if not request_id:
             logger.warning("Webhook ZohoSign sin request_id — ignorado")
             return
