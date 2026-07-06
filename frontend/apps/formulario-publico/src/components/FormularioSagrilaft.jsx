@@ -66,6 +66,7 @@ function BannerCorreccionPendiente({ onNavegar }) {
   const {
     activa,
     especificaciones,
+    esActualizacionReabierta,
     camposIdentificados,
     camposPendientes,
     pasoInicialCorreccion,
@@ -73,6 +74,20 @@ function BannerCorreccionPendiente({ onNavegar }) {
   } = useCorreccion();
 
   if (!activa) return null;
+
+  if (esActualizacionReabierta) {
+    return (
+      <div className="banner-correccion-completada" role="status" aria-live="polite">
+        <div className="banner-correccion-completada__icono" aria-hidden="true">✓</div>
+        <div className="banner-correccion-contenido">
+          <p className="banner-correccion-completada__titulo">Actualización habilitada</p>
+          <p className="banner-correccion-completada__texto">
+            Revise y actualice la información del expediente, complete los cuestionarios requeridos y cargue los documentos adicionales.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Corrección completada ─────────────────────────────────────────────────
   if (todasCorreccionesCompletadas) {
@@ -129,6 +144,7 @@ export default function FormularioSagrilaft() {
     referenciasBancarias, handleReferenciaBancariaChange, addReferenciaBancaria, eliminarReferenciaBancaria,
     infoBancariaPagos, handleInfoBancariaPagosChange, addInfoBancariaPagos, eliminarInfoBancariaPagos,
     handleChange, handleMonedaExtranjeraChange, handleActividadChange, handleTiposTransaccionChange,
+    handleMonedaDeclaracionChange,
     handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, irAPasoCorreccion, handleSubmit,
     handleJuntaChange, handleJuntaTipoIdChange, addJuntaMember, eliminarJuntaMember,
@@ -252,7 +268,7 @@ export default function FormularioSagrilaft() {
             />
           )}
 
-          {step === 5 && <PasoFinanciero {...pasoProps} />}
+          {step === 5 && <PasoFinanciero {...pasoProps} onMonedaDeclaracionChange={handleMonedaDeclaracionChange} />}
 
           {step === 6 && (
             <PasoContactosBancaria

@@ -13,6 +13,8 @@ const SIMBOLO_POR_MONEDA = {
   BRL: 'R$',
   CLP: 'CL$',
   ARS: 'AR$',
+  MXN: 'MX$',
+  OTRA: '', // Moneda personalizada: sin símbolo fijo conocido (ver moneda_declaracion_otra)
 };
 
 const LOCALE_POR_MONEDA = {
@@ -23,6 +25,7 @@ const LOCALE_POR_MONEDA = {
   BRL: 'pt-BR',
   CLP: 'es-CL',
   ARS: 'es-AR',
+  MXN: 'es-MX',
 };
 
 const CAMPOS_MONETARIOS = new Set([
@@ -81,9 +84,9 @@ export function formatearMontoMoneda(valor, moneda = 'COP') {
   }).format(numero).replace(/[\u202f\u00a0]/g, ' ');
 
   if (monto.includes(',') || monto.includes('.')) {
-    return `${simbolo} ${monto}`;
+    return `${simbolo} ${monto}`.trim();
   }
 
   const montosConSeparador = `${numero}`.replace(/\B(?=(\d{3})+(?!\d))/g, separadorMiles);
-  return `${simbolo} ${montosConSeparador}`;
+  return `${simbolo} ${montosConSeparador}`.trim();
 }

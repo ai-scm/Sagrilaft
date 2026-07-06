@@ -210,6 +210,28 @@ export function useFormulario() {
   }, [limpiarError]);
 
   /**
+   * Cambia la moneda de declaración y gestiona la dependencia con 'moneda_declaracion_otra'.
+   * Si no es 'OTRA', se fuerza el valor 'NA' para cumplir con la integridad del backend
+   * (mismo patrón que handleActividadChange).
+   */
+  const handleMonedaDeclaracionChange = useCallback((e) => {
+    const { value } = e.target;
+    setFormData(prev => {
+      const siguiente = { ...prev, moneda_declaracion: value };
+      if (value === 'OTRA') {
+        siguiente.moneda_declaracion_otra = '';
+      } else if (value !== '') {
+        siguiente.moneda_declaracion_otra = 'NA';
+      }
+      return siguiente;
+    });
+    limpiarError('moneda_declaracion');
+    if (value !== 'OTRA') {
+      limpiarError('moneda_declaracion_otra');
+    }
+  }, [limpiarError]);
+
+  /**
    * Cambia los tipos de transacción seleccionados y limpia el campo '¿Cuáles?'
    * cuando 'Otras' deja de estar seleccionado.
    */
@@ -526,6 +548,7 @@ export function useFormulario() {
     referenciasBancarias, handleReferenciaBancariaChange: onReferenciaBancariaChange, addReferenciaBancaria, eliminarReferenciaBancaria: onEliminarReferenciaBancaria,
     infoBancariaPagos, handleInfoBancariaPagosChange: onInfoBancariaPagosChange, addInfoBancariaPagos, eliminarInfoBancariaPagos: onEliminarInfoBancariaPagos,
     handleChange, handleMonedaExtranjeraChange, handleActividadChange, handleTiposTransaccionChange,
+    handleMonedaDeclaracionChange,
     handleFileChange, handleRemoveFile, handleSaveDraft,
     handleNext, handlePrev, handleStepClick, irAPasoCorreccion, handleSubmit,
     handleJuntaChange: onJuntaChange, handleJuntaTipoIdChange: onJuntaTipoIdChange, addJuntaMember, eliminarJuntaMember: onEliminarJuntaMember,

@@ -9,6 +9,8 @@ const MONEDAS_DISPONIBLES = [
   { value: 'BRL', label: 'Reales Brasileños (BRL)' },
   { value: 'CLP', label: 'Peso Chileno (CLP)' },
   { value: 'ARS', label: 'Peso Argentino (ARS)' },
+  { value: 'MXN', label: 'Pesos Mexicanos (MXN)' },
+  { value: 'OTRA', label: 'Otra' },
 ];
 
 const SIMBOLOS_MONEDA = {
@@ -19,15 +21,18 @@ const SIMBOLOS_MONEDA = {
   'BRL': 'R$',
   'CLP': 'CL$',
   'ARS': 'AR$',
+  'MXN': 'MX$',
+  'OTRA': '',
 };
 
 /**
  * Paso 5 — Información Financiera.
  * Los valores se contrastan con los estados financieros adjuntos.
  */
-export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors }) {
+export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors, onMonedaDeclaracionChange }) {
   const monedaActual = formData.moneda_declaracion || '';
   const simboloActual = SIMBOLOS_MONEDA[monedaActual] || '';
+  const esOtraMoneda = monedaActual === 'OTRA';
 
   return (
     <div className="form-card">
@@ -37,9 +42,15 @@ export default function PasoFinanciero({ formData, onChange, onOpenHelp, errors 
       <div className="form-row">
         <FormField
           label="Moneda de Declaración" name="moneda_declaracion" type="select" required
-          value={formData.moneda_declaracion || ''} onChange={onChange}
+          value={formData.moneda_declaracion || ''} onChange={onMonedaDeclaracionChange}
           onOpenHelp={onOpenHelp} error={errors.moneda_declaracion}
           options={MONEDAS_DISPONIBLES}
+        />
+        <FormField
+          label="¿Cuál? Especifique" name="moneda_declaracion_otra" required
+          disabled={!esOtraMoneda}
+          value={formData.moneda_declaracion_otra} onChange={onChange}
+          onOpenHelp={onOpenHelp} error={errors.moneda_declaracion_otra}
         />
         <FormField
           label="Actividad Económica Principal" name="actividad_economica" required

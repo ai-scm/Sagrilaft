@@ -210,6 +210,11 @@ La clasificación se relaciona con el CIIU
     descripcion: "Moneda en la que se declaran los valores financieros (ingresos, egresos, activos, pasivos y patrimonio).",
     ejemplo: "COP (Pesos Colombianos) o USD (Dólares Estadounidenses)"
   },
+  moneda_declaracion_otra: {
+    titulo: "¿Cuál? Especifique",
+    descripcion: "Ingrese el nombre o código ISO de la moneda (3 letras). Si no encuentra su moneda en la lista, búsquela en Google escribiendo 'código ISO de [nombre de la moneda]'. Por ejemplo: 'código ISO de peso mexicano' le mostrará 'MXN'.",
+    ejemplo: "Bitcoin (BTC), Libra Esterlina (GBP), Peso Argentino (ARS), etc."
+  },
 
   // Clasificación tributaria
   actividad_clasificacion: { titulo: "Actividad", descripcion: "Actividad principal de la empresa." },
