@@ -28,11 +28,13 @@ from domain.excepciones import (
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
 )
+from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioAccesoManual
 from domain.utils.estado_formulario import es_estado_editable
 from domain.utils.fechas import (
     DIAS_HABILES_VIGENCIA_ACCESO,
     ahora_utc,
+    formatear_fecha_larga_es,
     normalizar_datetime_utc,
     sumar_dias_habiles,
 )
@@ -122,9 +124,15 @@ class AccesoManualService:
     el enlace de diligenciamiento enviado al destinatario externo.
     """
 
-    def __init__(self, repo: RepositorioAccesoManual, url_base: str = "") -> None:
+    def __init__(
+        self,
+        repo: RepositorioAccesoManual,
+        url_base: str = "",
+        notificador: Optional[INotificador] = None,
+    ) -> None:
         self._repo = repo
         self._url_base = url_base.rstrip("/")
+        self._notificador = notificador
 
     # ─── Serialización / DTOs ───────────────────────────────────────────────
 
@@ -147,6 +155,28 @@ class AccesoManualService:
             "created_at":               resultado.created_at,
             "expires_at":               resultado.expires_at,
         }
+
+    def _notificar_credenciales_acceso(self, acceso: Dict[str, Any]) -> bool:
+        """
+        Envía por correo las credenciales del acceso recién creado.
+
+        No hay destinatario que notificar cuando el correo se captura después
+        desde el enlace de diligenciamiento (flujo de acceso sin correo previo).
+
+        Returns True si el correo se envió; False si no hay notificador
+        configurado, no hay destinatario, o el envío falló.
+        """
+        if not self._notificador or not acceso["correo_destinatario"]:
+            return False
+
+        return self._notificador.enviar_notificacion_acceso_creado(
+            correo_destinatario=acceso["correo_destinatario"],
+            codigo_peticion=acceso["codigo_peticion"],
+            pin=acceso["pin"],
+            fecha_validez=formatear_fecha_larga_es(acceso["expires_at"]),
+            enlace_diligenciamiento=acceso["enlace_diligenciamiento"],
+            razon_social=acceso["razon_social"],
+        )
 
     @staticmethod
     def _serializar_acceso_listado(acceso: AccesoManualDatos) -> Dict[str, Any]:
@@ -187,7 +217,9 @@ class AccesoManualService:
             resultado.codigo_peticion,
         )
 
-        return self._serializar_acceso_creado(resultado, pin)
+        acceso_creado = self._serializar_acceso_creado(resultado, pin)
+        acceso_creado["correo_enviado"] = self._notificar_credenciales_acceso(acceso_creado)
+        return acceso_creado
 
     # ─── Listado ─────────────────────────────────────────────────────────────
 

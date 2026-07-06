@@ -37,6 +37,7 @@ class AccesoManualCreado(BaseModel):
     created_at: datetime
     expires_at: datetime
     correo_destinatario: Optional[str] = None
+    correo_enviado: bool = False
 
     @field_serializer("created_at", "expires_at", when_used="json")
     def _serializar_fechas(self, valor: datetime) -> str:

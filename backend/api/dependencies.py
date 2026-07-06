@@ -76,17 +76,18 @@ def obtener_servicio_lista_cautela(solicitud: Request) -> ListaCautelaService:
 
 # ── Servicios de aplicación ──────────────────────────────────────────────────
 
-def obtener_servicio_acceso(
-    repo: RepositorioAccesoManual = Depends(obtener_repo_acceso),
-    config: AppConfig = Depends(obtener_config),
-) -> AccesoManualService:
-    return AccesoManualService(repo, config.frontend_urls[0])
-
-
 def obtener_servicio_email(
     config: AppConfig = Depends(obtener_config),
 ) -> INotificador:
     return EmailService(config.smtp)
+
+
+def obtener_servicio_acceso(
+    repo: RepositorioAccesoManual = Depends(obtener_repo_acceso),
+    config: AppConfig = Depends(obtener_config),
+    notificador: INotificador = Depends(obtener_servicio_email),
+) -> AccesoManualService:
+    return AccesoManualService(repo, config.frontend_urls[0], notificador)
 
 
 def obtener_alertas_portal(solicitud: Request) -> Optional[IAlertasPortal]:
