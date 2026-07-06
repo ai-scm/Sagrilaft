@@ -149,6 +149,7 @@ class FormularioBase(BaseModel):
 
     # 5. Información Financiera
     moneda_declaracion: Optional[str] = Field(None, description="Moneda en la que se declaran los valores financieros")
+    moneda_declaracion_otra: Optional[str] = Field(None, description="Nombre de la moneda cuando moneda_declaracion es 'OTRA'")
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: MontoPositivo = None

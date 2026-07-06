@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
-from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona
+from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona, TipoSolicitud
 from domain.catalogo_correcciones import validar_campos_corregibles
 
 from .comunes import a_iso_utc
@@ -20,7 +20,10 @@ class ExpedienteResumen(BaseModel):
     numero_identificacion: Optional[str] = None
     tipo_contraparte: Optional[TipoContraparte] = None
     tipo_persona: Optional[TipoPersona] = None
+    tipo_solicitud: Optional[TipoSolicitud] = None
     estado: EstadoFormulario
+    modo_trabajo: Optional[str] = None
+    numero_correccion: int = 0
     cantidad_documentos: int
     created_at: datetime
     updated_at: datetime
@@ -61,7 +64,12 @@ class ExpedienteDetalle(BaseModel):
     razon_social: Optional[str] = None
     tipo_contraparte: Optional[TipoContraparte] = None
     tipo_persona: Optional[TipoPersona] = None
+    tipo_solicitud: Optional[TipoSolicitud] = None
     estado: EstadoFormulario
+    modo_trabajo: Optional[str] = None
+    numero_correccion: int = 0
+    campos_a_corregir: Optional[str] = None
+    causal_cierre: Optional[str] = None
     updated_at: datetime
     documentos: List[DocumentoResumen] = Field(default_factory=list)
 
@@ -157,3 +165,31 @@ class ResumenRechazo(BaseModel):
     estado:               str
     motivo:               str
     notificacion_enviada: bool
+
+
+class ResumenCierreExpediente(BaseModel):
+    """Resultado de una operación de cierre de expediente."""
+
+    estado: str
+    causal_cierre: Optional[str] = None
+    reporte_final_cargado: Optional[bool] = None
+    version_numero: Optional[int] = None
+
+
+class SolicitudReaperturaActualizacion(BaseModel):
+    """Datos requeridos para reabrir un expediente cerrado por actualización."""
+
+    justificacion: str = Field(
+        min_length=20,
+        max_length=1000,
+        description="Justificación interna de la reapertura para auditoría.",
+    )
+
+
+class ResumenReaperturaActualizacion(BaseModel):
+    """Resultado de una reapertura por actualización periódica."""
+
+    estado: str
+    modo_trabajo: str
+    correo_notificado: Optional[str] = None
+    correo_enviado: bool = False

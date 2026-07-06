@@ -36,9 +36,12 @@ from .expedientes import (
     ComparacionVersionFormulario,
     ExpedienteDetalle,
     ExpedienteResumen,
+    ResumenCierreExpediente,
     ResumenDevolucion,
+    ResumenReaperturaActualizacion,
     ResumenRechazo,
     SolicitudDevolucion,
+    SolicitudReaperturaActualizacion,
     SolicitudRechazo,
 )
 from .listas_cautela import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
@@ -77,9 +80,12 @@ __all__ = [
     "ExpedienteDetalle",
     "ExpedienteResumen",
     "ComparacionVersionFormulario",
+    "ResumenCierreExpediente",
     "ResumenDevolucion",
+    "ResumenReaperturaActualizacion",
     "ResumenRechazo",
     "SolicitudDevolucion",
+    "SolicitudReaperturaActualizacion",
     "SolicitudRechazo",
     # Listas de cautela
     "BusquedaListaCautela",
