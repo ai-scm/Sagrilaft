@@ -21,13 +21,18 @@ import ModalCargaManual from '../modals/ModalCargaManual';
 import ModalConfirmacion from '../modals/ModalConfirmacion';
 import ModalCargaReporteFinal from '../modals/ModalCargaReporteFinal';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
+import HistorialExpediente from './HistorialExpediente';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
+  ETIQUETA_CAUSAL_CIERRE,
   formatearFechaHora,
   formatearBytes,
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
   TIPO_DOCUMENTO_REPORTE_FINAL,
+  TIPO_SOLICITUD_ACTUALIZACION,
+  ETIQUETA_TIPO_SOLICITUD,
+  MODO_TRABAJO_ACTUALIZACION_REABIERTA,
 } from '../../config/constantes';
 import { ESTADO_FORM_CERRADO } from '@shared/utils/constantes';
 
@@ -362,7 +367,7 @@ function BtnDescargaFirmado({ formularioId }) {
   );
 }
 
-function BannerFirma({ estado, formularioId, tipoPersona, onFirmaEnviada }) {
+function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEnviada }) {
   const [enviando, setEnviando]                         = useState(false); // enviar a ZohoSign (VALIDADO)
   const [aprobando, setAprobando]                       = useState(false); // aprobar expediente (ENVIADO)
   const [cancelando, setCancelando]                     = useState(false);
@@ -490,6 +495,19 @@ function BannerFirma({ estado, formularioId, tipoPersona, onFirmaEnviada }) {
   }
 
   if (estado === ESTADO_EN_CORRECCION) {
+    if (modoTrabajo === MODO_TRABAJO_ACTUALIZACION_REABIERTA) {
+      return (
+        <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }}>
+          <div style={s.bannerFirmaTextos}>
+            <p style={s.bannerFirmaTitulo}>Actualización reabierta - en trabajo</p>
+            <p style={s.bannerFirmaSubtitulo}>
+              El expediente quedó habilitado para actualizar información, cargar documentos y completar nuevos cuestionarios.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)' }}>
         <div style={s.bannerFirmaTextos}>
@@ -571,13 +589,98 @@ function BannerFirma({ estado, formularioId, tipoPersona, onFirmaEnviada }) {
   return null;
 }
 
+function ModalReaperturaActualizacion({ visible, onConfirmar, onCancelar, ocupado, error }) {
+  const [justificacion, setJustificacion] = useState('');
+  const justificacionValida = justificacion.trim().length >= 20;
+
+  if (!visible) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(15, 23, 42, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 300,
+      padding: '16px',
+    }} role="dialog" aria-modal="true" aria-labelledby="titulo-reapertura">
+      <div style={{
+        background: '#fff',
+        borderRadius: 'var(--radius-md, 10px)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+        width: '100%',
+        maxWidth: '460px',
+        padding: '24px',
+      }}>
+        <h3 id="titulo-reapertura" style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 10px', color: '#0f172a' }}>
+          Reabrir actualización
+        </h3>
+        <p style={{ fontSize: '0.9rem', color: '#475569', margin: '0 0 16px', lineHeight: 1.5 }}>
+          La carpeta volverá a estado En corrección para continuar el ciclo periódico. Los documentos y reportes finales existentes se conservarán.
+        </p>
+        <label htmlFor="justificacion-reapertura" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+          Justificación de reapertura
+        </label>
+        <textarea
+          id="justificacion-reapertura"
+          value={justificacion}
+          onChange={e => setJustificacion(e.target.value)}
+          disabled={ocupado}
+          rows={4}
+          maxLength={1000}
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: '6px',
+            padding: '10px 12px',
+            fontFamily: 'inherit',
+            fontSize: '0.88rem',
+            lineHeight: 1.5,
+          }}
+        />
+        <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+          <span style={{ color: '#94a3b8' }}>
+            {justificacion.trim().length} / 1000
+          </span>
+          <span style={{ color: justificacionValida ? '#15803d' : '#dc2626' }}>
+            {justificacionValida ? '✓ Mínimo 20 caracteres cumplido' : `Mínimo 20 caracteres (${justificacion.trim().length}/20)`}
+          </span>
+        </div>
+        {error && <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#dc2626', fontSize: '0.85rem' }}>{error}</div>}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+          <button type="button" onClick={onCancelar} disabled={ocupado} style={{ padding: '9px 18px', background: '#fff', color: '#475569', border: '1.5px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: ocupado ? 'not-allowed' : 'pointer' }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirmar(justificacion.trim())}
+            disabled={ocupado || !justificacionValida}
+            style={{ padding: '9px 18px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: ocupado || !justificacionValida ? 'not-allowed' : 'pointer', opacity: ocupado || !justificacionValida ? 0.6 : 1 }}
+          >
+            {ocupado ? 'Reabriendo...' : 'Reabrir'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function DetalleExpediente({ formularioId, razonSocial, onVolver }) {
   const { expediente, cargando, error, recargarExpediente } = useExpedienteDetalle(formularioId);
   const [mostrarModalCargaManual, setMostrarModalCargaManual] = useState(false);
+  const [mostrarModalReapertura, setMostrarModalReapertura] = useState(false);
+  const [reabriendo, setReabriendo] = useState(false);
+  const [errorReapertura, setErrorReapertura] = useState(null);
+  const [avisoReapertura, setAvisoReapertura] = useState(null);
 
   const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
+  const tipoSolicitudLabel = expediente ? (ETIQUETA_TIPO_SOLICITUD[expediente.tipo_solicitud] ?? expediente.tipo_solicitud) : '';
   const todosDocumentos   = expediente?.documentos ?? [];
   // Puede haber varias versiones del PDF; la activa es la de mayor version_numero.
   const pdfFormulario     = [...todosDocumentos]
@@ -589,7 +692,30 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));
 
   const estaCerrado = expediente?.estado === ESTADO_FORM_CERRADO;
+  const permiteReaperturaActualizacion = estaCerrado && expediente?.tipo_solicitud === TIPO_SOLICITUD_ACTUALIZACION;
   const [mostrarModalReporteFinal, setMostrarModalReporteFinal] = useState(false);
+
+  async function handleReabrirActualizacion(justificacion) {
+    setReabriendo(true);
+    setErrorReapertura(null);
+    setAvisoReapertura(null);
+    try {
+      const resultado = await api.reabrirActualizacion(formularioId, justificacion);
+      setMostrarModalReapertura(false);
+      if (!resultado?.correo_enviado) {
+        setAvisoReapertura(
+          resultado?.correo_notificado
+            ? `La actualización fue reabierta, pero no se pudo enviar el correo a ${resultado.correo_notificado}.`
+            : 'La actualización fue reabierta, pero no hay correo de destinatario registrado para notificar.',
+        );
+      }
+      recargarExpediente();
+    } catch (err) {
+      setErrorReapertura(err.message || 'Error al reabrir la actualización.');
+    } finally {
+      setReabriendo(false);
+    }
+  }
 
   return (
     <div style={s.overlay}>
@@ -613,9 +739,13 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                   overrides={{ fontSize: '0.75rem', padding: '3px 12px' }}
                 />
                 {tipoLabel && <span style={s.chip}>{tipoLabel}</span>}
+                {tipoSolicitudLabel && <span style={s.chip}>{tipoSolicitudLabel}</span>}
                 <span style={s.chipCodigo}>{expediente.codigo_peticion}</span>
+                {expediente.causal_cierre && (
+                  <span style={s.chip}>Causal: {ETIQUETA_CAUSAL_CIERRE[expediente.causal_cierre] || expediente.causal_cierre}</span>
+                )}
                 {expediente.updated_at && (
-                  <span style={s.chip}>Enviado {formatearFechaHora(expediente.updated_at)}</span>
+                  <span style={s.chip}>{estaCerrado ? 'Cerrado' : 'Enviado'} {formatearFechaHora(expediente.updated_at)}</span>
                 )}
               </div>
             </div>
@@ -636,9 +766,33 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 onClick={() => setMostrarModalReporteFinal(true)}
                 type="button"
               >
-                Cargar Reporte Final
+                Cerrar Expediente
               </button>
+              {permiteReaperturaActualizacion && (
+                <button
+                  style={{ ...s.btnDescargarPdf, background: '#fff', border: '1.5px solid #0f766e', color: '#0f766e' }}
+                  onClick={() => {
+                    setErrorReapertura(null);
+                    setMostrarModalReapertura(true);
+                  }}
+                  type="button"
+                >
+                  Reabrir Actualización
+                </button>
+              )}
             </div>
+
+            {avisoReapertura && (
+              <Alert
+                mensaje={avisoReapertura}
+                style={{
+                  marginBottom: '16px',
+                  background: '#fffbeb',
+                  borderColor: '#fbbf24',
+                  color: '#92400e',
+                }}
+              />
+            )}
 
             <ModalCargaManual
               visible={mostrarModalCargaManual}
@@ -652,6 +806,14 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               formularioId={formularioId}
               onCargado={() => { setMostrarModalReporteFinal(false); recargarExpediente(); }}
               onCancelar={() => setMostrarModalReporteFinal(false)}
+            />
+
+            <ModalReaperturaActualizacion
+              visible={mostrarModalReapertura}
+              onConfirmar={handleReabrirActualizacion}
+              onCancelar={() => setMostrarModalReapertura(false)}
+              ocupado={reabriendo}
+              error={errorReapertura}
             />
 
             {/* PDF oficial del formulario — versión activa */}
@@ -685,9 +847,12 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               />
             )}
 
+            <HistorialExpediente formularioId={formularioId} />
+
             {/* Firma electrónica */}
             <BannerFirma
               estado={expediente.estado}
+              modoTrabajo={expediente.modo_trabajo}
               formularioId={formularioId}
               tipoPersona={expediente.tipo_persona}
               onFirmaEnviada={recargarExpediente}

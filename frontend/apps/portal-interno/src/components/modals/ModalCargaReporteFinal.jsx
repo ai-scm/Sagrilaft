@@ -1,5 +1,10 @@
 import { useState } from 'react';
 import { api } from '../../services/api';
+import {
+  CAUSAL_CIERRE_INFORME_FINAL,
+  CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,
+  CAUSALES_CIERRE_EXPEDIENTE,
+} from '../../config/constantes';
 
 const LONGITUD_MAXIMA_JUSTIFICACION = 1000;
 
@@ -84,6 +89,19 @@ const s = {
     cursor:       'pointer',
     marginBottom: '20px',
   },
+  select: {
+    width:        '100%',
+    padding:      '10px 12px',
+    borderWidth:  '1.5px',
+    borderStyle:  'solid',
+    borderColor:  'var(--gray-300, #cbd5e1)',
+    borderRadius: 'var(--radius-sm, 6px)',
+    fontSize:     '0.88rem',
+    color:        'var(--gray-900, #0f172a)',
+    background:   '#fff',
+    marginBottom: '16px',
+    boxSizing:    'border-box',
+  },
   contadorCaracteres: {
     display:        'flex',
     justifyContent: 'space-between',
@@ -149,12 +167,14 @@ const s = {
 export default function ModalCargaReporteFinal({ visible, formularioId, onCargado, onCancelar }) {
   const [justificacion, setJustificacion] = useState('');
   const [archivo, setArchivo]             = useState(null);
+  const [causalCierre, setCausalCierre]   = useState(CAUSAL_CIERRE_INFORME_FINAL);
   const [enviando, setEnviando]           = useState(false);
   const [error, setError]                 = useState(null);
 
   function resetearEstado() {
     setJustificacion('');
     setArchivo(null);
+    setCausalCierre(CAUSAL_CIERRE_INFORME_FINAL);
     setError(null);
   }
 
@@ -164,8 +184,8 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
   }
 
   const archivoValido = archivo && archivo.type === 'application/pdf';
-  // La justificación puede ser opcional o requerida, según la regla. Por ahora opcional (o longitud libre).
-  const formularioValido = archivoValido;
+  const permiteCierreSinPdf = causalCierre === CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS;
+  const formularioValido = permiteCierreSinPdf ? (!archivo || archivoValido) : archivoValido;
 
   async function handleConfirmar() {
     if (!formularioValido) return;
@@ -174,7 +194,7 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
     setError(null);
 
     try {
-      await api.cargarReporteFinal(formularioId, archivo, justificacion.trim());
+      await api.cargarReporteFinal(formularioId, archivo, justificacion.trim(), causalCierre);
       resetearEstado();
       onCargado(); // refrescar expediente
     } catch (err) {
@@ -193,18 +213,36 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
         {/* Encabezado */}
         <div style={s.encabezado}>
           <h2 style={s.titulo} id="titulo-modal-carga-reporte">
-            Cargar Reporte Final
+            Cerrar expediente
           </h2>
           <p style={s.descripcion}>
-            Suba el reporte final en PDF. Este documento cerrará el proceso y bloqueará la carpeta para evitar futuras modificaciones.
+            Seleccione la causal de cierre. El informe final en PDF es obligatorio, excepto cuando el proceso termina por no continuación de diálogos.
           </p>
         </div>
 
         {/* Cuerpo */}
         <div style={s.cuerpo}>
 
+          <label style={s.etiqueta} htmlFor="campo-causal-cierre">
+            Causal de cierre
+          </label>
+          <select
+            id="campo-causal-cierre"
+            value={causalCierre}
+            onChange={e => {
+              setCausalCierre(e.target.value);
+              setError(null);
+            }}
+            disabled={enviando}
+            style={s.select}
+          >
+            {CAUSALES_CIERRE_EXPEDIENTE.map(causal => (
+              <option key={causal.valor} value={causal.valor}>{causal.etiqueta}</option>
+            ))}
+          </select>
+
           <label style={s.etiqueta} htmlFor="campo-archivo">
-            Archivo PDF
+            Informe final PDF {permiteCierreSinPdf ? '(Opcional)' : '(Obligatorio)'}
           </label>
           <input
             id="campo-archivo"
@@ -236,7 +274,7 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
           </div>
 
           <div style={s.avisoInformativo}>
-            <strong>¡Atención!</strong> La carga de este reporte cambiará el estado de la carpeta a <strong>Cerrado</strong> y pasará a modo de Solo Lectura.
+            <strong>Atención.</strong> Esta acción cambiará el estado de la carpeta a <strong>Cerrado</strong>. Si es una actualización periódica, podrá reabrirse luego conservando el historial.
           </div>
 
           {error && <div style={s.bannerError}>{error}</div>}

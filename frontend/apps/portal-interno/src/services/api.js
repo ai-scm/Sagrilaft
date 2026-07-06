@@ -35,15 +35,26 @@ export const api = {
     });
   },
 
-  async cargarReporteFinal(formularioId, archivoFile, justificacion) {
+  async cargarReporteFinal(formularioId, archivoFile, justificacion, causalCierre) {
     const formData = new FormData();
-    formData.append('archivo', archivoFile);
+    if (archivoFile) {
+      formData.append('archivo', archivoFile);
+    }
+    formData.append('causal_cierre', causalCierre);
     if (justificacion) {
       formData.append('justificacion', justificacion);
     }
     return requestJson(`/expedientes/${formularioId}/reporte-final`, {
       method: 'POST',
       body: formData,
+    });
+  },
+
+  async reabrirActualizacion(formularioId, justificacion) {
+    return requestJson(`/expedientes/${formularioId}/reabrir-actualizacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ justificacion }),
     });
   },
 
