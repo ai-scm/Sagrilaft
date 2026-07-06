@@ -20,3 +20,18 @@ PORCENTAJE_MAXIMO_PERMITIDO = 100
 
 # Reporte final cargado manualmente para marcar el cierre de la carpeta del proceso.
 TIPO_DOCUMENTO_REPORTE_FINAL = "REPORTE_FINAL"
+
+# Causales de cierre de expediente.
+CAUSAL_CIERRE_INFORME_FINAL = "informe_final"
+CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS = "no_continuacion_dialogos"
+CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL = "rechazado_con_informe_final"
+
+CAUSALES_CIERRE_EXPEDIENTE = {
+    CAUSAL_CIERRE_INFORME_FINAL,
+    CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,
+    CAUSAL_CIERRE_RECHAZADO_CON_INFORME_FINAL,
+}
+
+# Modos de trabajo cuando un expediente vuelve a estar editable.
+MODO_TRABAJO_CORRECCION = "correccion"
+MODO_TRABAJO_ACTUALIZACION_REABIERTA = "actualizacion_reabierta"
