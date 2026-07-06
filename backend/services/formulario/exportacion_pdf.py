@@ -462,9 +462,13 @@ def _renderizar_seccion_financiera(datos: Dict[str, Any]) -> str:
     """
     moneda = (datos.get("moneda_declaracion") or "").strip().upper()
 
+    # Si el usuario declaró una moneda personalizada, se muestra el nombre
+    # especificado en lugar del sentinel 'OTRA' (sin significado para el lector).
+    moneda_mostrada = datos.get("moneda_declaracion_otra") if moneda == "OTRA" else moneda
+
     # Campos no monetarios (se muestran tal cual)
     pares_escalares: List[Tuple[str, Any]] = [
-        ("Moneda de Declaración",         moneda),
+        ("Moneda de Declaración",         moneda_mostrada),
         ("Actividad Económica Principal", datos.get("actividad_economica")),
         ("Código CIIU",                   datos.get("codigo_ciiu")),
     ]

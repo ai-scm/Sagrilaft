@@ -10,6 +10,8 @@ _SIMBOLO_POR_MONEDA = {
     "BRL": "R$",
     "CLP": "CL$",
     "ARS": "AR$",
+    "MXN": "MX$",
+    "OTRA": "",  # Moneda personalizada: sin símbolo fijo conocido (ver moneda_declaracion_otra)
 }
 
 _LOCALE_POR_MONEDA = {
@@ -20,6 +22,7 @@ _LOCALE_POR_MONEDA = {
     "BRL": "pt-BR",
     "CLP": "es-CL",
     "ARS": "es-AR",
+    "MXN": "es-MX",
 }
 
 _MONEDAS_CON_SEPARADOR_COMA = {"USD", "PEN"}
@@ -53,5 +56,5 @@ def formatear_monto_monetario(valor: Any, moneda: Any) -> str:
     simbolo = _SIMBOLO_POR_MONEDA.get(codigo_moneda, "$")
     separador_miles = "," if codigo_moneda in _MONEDAS_CON_SEPARADOR_COMA else "."
     monto = f"{numero:,}".replace(",", separador_miles)
-    return f"{simbolo} {monto}"
+    return f"{simbolo} {monto}".strip()
 

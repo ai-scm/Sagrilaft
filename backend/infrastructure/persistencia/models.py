@@ -93,6 +93,7 @@ class Formulario(Base):
 
     # --- 5. Información Financiera ---
     moneda_declaracion = Column(String, nullable=True)
+    moneda_declaracion_otra = Column(String, nullable=True)  # Especifica la moneda cuando moneda_declaracion == 'OTRA'
     actividad_economica = Column(String, nullable=True)
     codigo_ciiu = Column(String, nullable=True)
     ingresos_mensuales = Column(Float, nullable=True)

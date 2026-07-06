@@ -87,6 +87,7 @@ class FormularioDatos:
 
     # ── Información Financiera ────────────────────────────────────────────────
     moneda_declaracion: Optional[str] = None
+    moneda_declaracion_otra: Optional[str] = None
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
     ingresos_mensuales: Optional[float] = None
@@ -298,3 +299,11 @@ class FormularioDominio:
                 "No se puede cerrar una carpeta que ha sido rechazada."
             )
         self.estado = EstadoFormulario.CERRADO
+
+    def reabrir_por_actualizacion(self) -> None:
+        """CERRADO → EN_CORRECCION para continuar una actualización periódica."""
+        if self.estado != EstadoFormulario.CERRADO:
+            raise FormularioNoEditableError(
+                "Solo se puede reabrir una carpeta que está cerrada."
+            )
+        self.estado = EstadoFormulario.EN_CORRECCION

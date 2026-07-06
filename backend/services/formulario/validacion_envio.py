@@ -65,6 +65,7 @@ class ValidadorEnvioFormulario:
         ("pais_funciones",          "País donde ejerce funciones"),
         ("departamento_funciones",  "Departamento donde ejerce funciones"),
         ("ciudad_funciones",        "Ciudad donde ejerce funciones"),
+        ("moneda_declaracion_otra", "¿Cuál? Especifique (Moneda)"),
         ("actividad_economica",     "Actividad Económica Principal"),
         ("codigo_ciiu",             "Código CIIU"),
         ("ingresos_mensuales",      "Ingresos Mensuales"),

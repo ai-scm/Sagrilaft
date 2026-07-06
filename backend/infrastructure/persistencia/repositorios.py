@@ -146,6 +146,7 @@ def _orm_formulario_a_datos(
         direccion_residencia=orm.direccion_residencia,
         ciudad_residencia=orm.ciudad_residencia,
         moneda_declaracion=orm.moneda_declaracion,
+        moneda_declaracion_otra=orm.moneda_declaracion_otra,
         actividad_economica=orm.actividad_economica,
         codigo_ciiu=orm.codigo_ciiu,
         ingresos_mensuales=orm.ingresos_mensuales,
@@ -537,6 +538,25 @@ class RepositorioExpedienteSQLAlchemy:
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
             orm.estado = estado
             orm.numero_correccion = numero_correccion
+            orm.campos_a_corregir = campos_a_corregir
+            self._sesion.commit()
+
+    def actualizar_para_reapertura_actualizacion(
+        self,
+        formulario_id: str,
+        estado: str,
+        campos_a_corregir: str,
+    ) -> None:
+        """
+        Persiste la reapertura de una actualización y hace commit.
+
+        El commit confirma también la reactivación del AccesoManual pendiente
+        en la misma sesión.
+        """
+        orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
+        if orm:
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
+            orm.estado = estado
             orm.campos_a_corregir = campos_a_corregir
             self._sesion.commit()
 
