@@ -11,6 +11,7 @@ Alarmas que implementa:
 """
 
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional, Tuple
 
 from domain.contratos import HallazgoValidacion, ResultadoExtraccion
@@ -18,10 +19,10 @@ from domain.contratos import HallazgoValidacion, ResultadoExtraccion
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
 
-_FACTOR_POR_UNIDAD: Dict[str, float] = {
-    "pesos": 1.0,
-    "miles": 1_000.0,
-    "millones": 1_000_000.0,
+_FACTOR_POR_UNIDAD: Dict[str, Decimal] = {
+    "pesos": Decimal("1"),
+    "miles": Decimal("1000"),
+    "millones": Decimal("1000000"),
 }
 
 _CIFRAS_FINANCIERAS: List[Tuple[str, str]] = [
@@ -40,7 +41,7 @@ class ValidadorEstadosFinancieros:
     LSP : intercambiable con cualquier ValidadorDocumentoImp sin romper el orquestador.
     """
 
-    TOLERANCIA_PORCENTUAL: float = 0.05  # 5 % de margen por redondeo o diferencia de unidades
+    TOLERANCIA_PORCENTUAL = Decimal("0.05")  # 5 % de margen por redondeo o diferencia de unidades
 
     @property
     def tipo_documento(self) -> str:
@@ -94,7 +95,7 @@ class ValidadorEstadosFinancieros:
         self,
         valor_doc: Any,
         valor_form: Any,
-        factor: float,
+        factor: Decimal,
         campo: str,
         nombre: str,
     ) -> Optional[HallazgoValidacion]:
@@ -116,8 +117,8 @@ class ValidadorEstadosFinancieros:
             return None
 
         try:
-            monto_doc = float(valor_doc) * factor
-            monto_formulario = float(valor_form)
+            monto_doc = _a_decimal(valor_doc) * factor
+            monto_formulario = _a_decimal(valor_form)
             diferencia = abs(monto_doc - monto_formulario)
             tolerancia = abs(monto_doc) * self.TOLERANCIA_PORCENTUAL if monto_doc != 0 else 0
 
@@ -134,7 +135,7 @@ class ValidadorEstadosFinancieros:
                 valor_formulario=f"${monto_formulario:,.0f}",
                 valor_documento=f"${monto_doc:,.0f}",
             )
-        except (ValueError, TypeError):
+        except (InvalidOperation, ValueError, TypeError):
             return HallazgoValidacion.advertencia(
                 campo=campo,
                 detalle=f"No se pudo comparar {nombre}: valores no numéricos.",
@@ -147,7 +148,13 @@ class ValidadorEstadosFinancieros:
 # Se definen fuera de la clase porque no dependen del estado del objeto
 # y son potencialmente reutilizables por otros validadores.
 
-def _obtener_factor(cifras_en: str) -> float:
+def _a_decimal(valor: Any) -> Decimal:
+    if isinstance(valor, bool):
+        raise ValueError("valor booleano no es monto")
+    return Decimal(str(valor))
+
+
+def _obtener_factor(cifras_en: str) -> Decimal:
     """
     Retorna el multiplicador necesario para convertir la unidad
     reportada en los estados financieros a pesos colombianos.
@@ -159,8 +166,8 @@ def _obtener_factor(cifras_en: str) -> float:
         Factor de conversión (1.0, 1_000.0 o 1_000_000.0).
     """
     if not cifras_en:
-        return 1.0
-    return _FACTOR_POR_UNIDAD.get(cifras_en.lower().strip(), 1.0)
+        return Decimal("1")
+    return _FACTOR_POR_UNIDAD.get(cifras_en.lower().strip(), Decimal("1"))
 
 
 def _validar_comparativo(tiene_comparativo: Optional[bool]) -> Optional[HallazgoValidacion]:

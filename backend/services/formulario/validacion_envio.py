@@ -413,7 +413,7 @@ class ValidadorEnvioFormulario:
 
     @staticmethod
     def _realiza_operaciones_en_moneda_extranjera(formulario: FormularioDatos) -> bool:
-        return (formulario.realiza_operaciones_moneda_extranjera or "").lower() == "si"
+        return formulario.realiza_operaciones_moneda_extranjera is True
 
     # ── Helpers de deserialización ────────────────────────────────────────────
 

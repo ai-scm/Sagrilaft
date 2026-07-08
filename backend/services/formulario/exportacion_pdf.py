@@ -10,14 +10,14 @@ Objetivo de dominio:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from html import escape
 import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from domain.formulario.entidades import FormularioDatos
-from domain.utils.fechas import NOMBRES_MESES_ES
+from domain.utils.fechas import NOMBRES_MESES_ES, formatear_fecha_larga_es
 from services.formulario.formato_moneda import formatear_monto_monetario
 from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
 
@@ -78,6 +78,8 @@ def _valor_a_texto(valor: Any) -> str:
         return ""
     if isinstance(valor, bool):
         return "Sí" if valor else "No"
+    if isinstance(valor, date):
+        return formatear_fecha_larga_es(valor)
     if isinstance(valor, (int, float)):
         if isinstance(valor, float) and valor.is_integer():
             valor = int(valor)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any, Optional
 
 _MONEDA_PREDETERMINADA = "COP"
@@ -46,7 +47,7 @@ def extraer_entero_monetario(valor: Any) -> Optional[int]:
         return None
     if isinstance(valor, bool):
         return None
-    if isinstance(valor, (int, float)):
+    if isinstance(valor, (int, float, Decimal)):
         return int(valor)
 
     texto = str(valor).strip()

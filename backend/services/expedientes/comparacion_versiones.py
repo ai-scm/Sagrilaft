@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
 from domain.catalogo_correcciones import (
@@ -25,10 +27,6 @@ _CAMPOS_EXCLUIDOS = frozenset({
     "id",
     "codigo_peticion",
     "numero_correccion",
-    "dia_firma",
-    "mes_firma",
-    "year_firma",
-    "ciudad_firma",
 })
 
 _CAMPOS_MONETARIOS = frozenset({
@@ -183,9 +181,24 @@ def _normalizar(valor: Any) -> str:
         return ""
     if isinstance(valor, str):
         return " ".join(valor.split())
+    if isinstance(valor, (date, datetime)):
+        return valor.isoformat()
     if isinstance(valor, (list, dict)):
         return json.dumps(valor, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if isinstance(valor, (int, float, Decimal)) and not isinstance(valor, bool):
+        try:
+            return _normalizar_numero(valor)
+        except (InvalidOperation, ValueError):
+            pass
     return str(valor)
+
+
+def _normalizar_numero(valor: int | float | Decimal) -> str:
+    decimal = Decimal(str(valor))
+    texto = format(decimal, "f")
+    if "." in texto:
+        texto = texto.rstrip("0").rstrip(".")
+    return texto or "0"
 
 
 def _presentar(campo: str, valor: Any, snapshot: Dict[str, Any]) -> str:

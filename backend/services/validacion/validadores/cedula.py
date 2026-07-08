@@ -124,9 +124,8 @@ class ValidadorCedula:
         """
         Compara la fecha de nacimiento entre la cédula y el formulario.
 
-        La cédula usa formato DD-MMM-AAAA (ej: '01-SEP-1995');
-        el formulario usa YYYY-MM-DD. Ambas se normalizan a `date` antes
-        de comparar para evitar falsos negativos por diferencia de formato.
+        El formulario ya llega como `date`; la fecha extraída del documento se
+        normaliza con el parser colombiano para comparar fechas calendario.
         """
         fecha_en_doc = datos.get("fecha_nacimiento")
         fecha_en_formulario = datos_formulario.get("fecha_nacimiento")
@@ -135,27 +134,27 @@ class ValidadorCedula:
             return None
 
         fecha_doc = parsear_fecha(fecha_en_doc)
-        fecha_formulario = parsear_fecha(fecha_en_formulario)
+        fecha_formulario = fecha_en_formulario
 
-        if fecha_doc and fecha_formulario:
-            coincide = fecha_doc == fecha_formulario
-            return (
-                HallazgoValidacion.ok(
-                    campo="fecha_nacimiento_cedula",
-                    detalle="Fecha de nacimiento coincide con la cédula.",
-                    valor_formulario=str(fecha_en_formulario),
-                    valor_documento=str(fecha_en_doc),
-                ) if coincide else HallazgoValidacion.advertencia(
-                    campo="fecha_nacimiento_cedula",
-                    detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
-                    valor_formulario=str(fecha_en_formulario),
-                    valor_documento=str(fecha_en_doc),
-                )
+        if not fecha_doc:
+            return HallazgoValidacion.advertencia(
+                campo="fecha_nacimiento_cedula",
+                detalle="No se pudo comparar la fecha de nacimiento del documento. Verifique manualmente.",
+                valor_formulario=str(fecha_en_formulario),
+                valor_documento=str(fecha_en_doc),
             )
 
-        return HallazgoValidacion.advertencia(
-            campo="fecha_nacimiento_cedula",
-            detalle="No se pudo comparar la fecha de nacimiento (formato no reconocido). Verifique manualmente.",
-            valor_formulario=str(fecha_en_formulario),
-            valor_documento=str(fecha_en_doc),
+        coincide = fecha_doc == fecha_formulario
+        return (
+            HallazgoValidacion.ok(
+                campo="fecha_nacimiento_cedula",
+                detalle="Fecha de nacimiento coincide con la cédula.",
+                valor_formulario=str(fecha_en_formulario),
+                valor_documento=str(fecha_en_doc),
+            ) if coincide else HallazgoValidacion.advertencia(
+                campo="fecha_nacimiento_cedula",
+                detalle="Fecha de nacimiento difiere entre la cédula y el formulario. Verifique.",
+                valor_formulario=str(fecha_en_formulario),
+                valor_documento=str(fecha_en_doc),
+            )
         )
