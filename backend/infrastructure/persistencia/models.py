@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     BigInteger, Column, String, Integer, Float, Boolean, Text, DateTime, Numeric,
-    Date, ForeignKey, Index, UniqueConstraint,
+    Date, ForeignKey, Index, UniqueConstraint, CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
@@ -39,6 +39,15 @@ def generate_expires_at() -> datetime:
 
 class Formulario(Base):
     __tablename__ = "formularios"
+    __table_args__ = (
+        CheckConstraint(
+            "digito_verificacion IS NULL OR digito_verificacion IN ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'NA')",
+            name="ck_formularios_digito_verificacion_formato",
+        ),
+        CheckConstraint("dia_firma IS NULL OR dia_firma BETWEEN 1 AND 31", name="ck_formularios_dia_firma_rango"),
+        CheckConstraint("mes_firma IS NULL OR mes_firma BETWEEN 1 AND 12", name="ck_formularios_mes_firma_rango"),
+        CheckConstraint("year_firma IS NULL OR year_firma BETWEEN 2000 AND 2100", name="ck_formularios_year_firma_rango"),
+    )
 
     id = Column(String, primary_key=True, default=generate_uuid)
     codigo_peticion = Column(String, unique=True, default=generate_codigo)
@@ -103,7 +112,6 @@ class Formulario(Base):
     # --- 6. Operaciones en Moneda Extranjera ---
     realiza_operaciones_moneda_extranjera = Column(Boolean, nullable=False, default=False, server_default="false")
     paises_operaciones = Column(String, nullable=True)
-    tipos_transaccion = Column(Text, nullable=True)    # JSON array ['importacion', ...]
     tipos_transaccion_otros = Column(String, nullable=True)
 
     # --- 8. Clasificación Empresa y Régimen Tributario ---
@@ -197,6 +205,7 @@ class MiembroJuntaDirectiva(Base):
 class AccionistaFormulario(Base):
     __tablename__ = "formulario_accionistas"
     __table_args__ = (
+        CheckConstraint("porcentaje IS NULL OR porcentaje BETWEEN 0 AND 100", name="ck_formulario_accionistas_porcentaje_rango"),
         Index("ix_formulario_accionistas_formulario_id", "formulario_id"),
     )
 
@@ -216,6 +225,7 @@ class AccionistaFormulario(Base):
 class BeneficiarioFinalFormulario(Base):
     __tablename__ = "formulario_beneficiarios_finales"
     __table_args__ = (
+        CheckConstraint("porcentaje IS NULL OR porcentaje BETWEEN 0 AND 100", name="ck_formulario_beneficiarios_finales_porcentaje_rango"),
         Index("ix_formulario_beneficiarios_finales_formulario_id", "formulario_id"),
     )
 
