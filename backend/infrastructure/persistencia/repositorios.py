@@ -10,7 +10,8 @@ transaccional entre servicios.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, or_, text
@@ -30,19 +31,153 @@ from domain.formulario.entidades import FormularioDatos
 from domain.validacion.resultado import ResultadoValidacionDominio
 from infrastructure.persistencia.models import (
     AccesoManual,
+    AccionistaFormulario,
+    BeneficiarioFinalFormulario,
+    ContactoFormulario,
+    CuentaPagoFormulario,
     DocumentoAdjunto,
     Formulario,
+    MiembroJuntaDirectiva,
+    ReferenciaBancariaDeclarada,
+    ReferenciaComercialFormulario,
     ResultadoValidacion,
+    TipoTransaccionFormulario,
 )
 
 # Campos que se almacenan como JSON string en la base de datos.
 # Deben serializarse al escribir y deserializarse al leer.
-_CAMPOS_JSON = [
-    "junta_directiva", "accionistas", "beneficiario_final",
-    "referencias_comerciales", "referencias_bancarias",
-    "informacion_bancaria_pagos", "clasificaciones", "tipos_transaccion",
-    "snapshot_datos",
-]
+_CAMPOS_JSON = ["snapshot_datos"]
+
+_CONTACTOS_FORMULARIO = {
+    "ordenes": "contacto_ordenes",
+    "pagos": "contacto_pagos",
+}
+
+_ATRIBUTOS_CONTACTO = ["nombre", "cargo", "telefono", "correo"]
+
+_CAMPOS_BOOLEANOS_SI_NO = {
+    "realiza_operaciones_moneda_extranjera",
+    "autorretenedor",
+    "gran_contribuyente",
+    "entidad_sin_animo_lucro",
+    "retencion_ica",
+    "impuesto_ica",
+    "entidad_oficial",
+    "exento_retencion_fuente",
+}
+
+# Listas dinámicas del formulario que hoy viven en tablas 1:N propias
+# (Cambio 1 del rediseño de esquema). Cada entrada mapea el nombre de la
+# relación en Formulario -> (clase ORM hija, atributos que expone al dominio).
+# Los atributos son exactamente el shape que ya esperaban dominio/API/PDF/
+# validación cuando estos campos eran JSON — la costura no cambia su forma.
+_TABLAS_LISTA_FORMULARIO = {
+    "junta_directiva": (MiembroJuntaDirectiva, [
+        "cargo", "nombre", "tipo_id", "numero_id", "es_pep", "vinculos_pep",
+    ]),
+    "accionistas": (AccionistaFormulario, [
+        "nombre", "tipo_id", "numero_id", "es_pep", "vinculos_pep", "porcentaje",
+    ]),
+    "beneficiario_final": (BeneficiarioFinalFormulario, [
+        "nombre", "tipo_id", "numero_id", "es_pep", "vinculos_pep", "porcentaje",
+    ]),
+    "referencias_comerciales": (ReferenciaComercialFormulario, [
+        "nombre_establecimiento", "persona_contacto", "telefono", "ciudad",
+    ]),
+    "referencias_bancarias": (ReferenciaBancariaDeclarada, ["entidad", "producto"]),
+    "informacion_bancaria_pagos": (CuentaPagoFormulario, [
+        "entidad_bancaria", "ciudad_oficina", "tipo_cuenta", "numero_cuenta",
+    ]),
+}
+
+
+def _fila_orm_a_dict(fila: Any, atributos: List[str]) -> Dict[str, Any]:
+    """Convierte una fila ORM hija (ej. MiembroJuntaDirectiva) al dict plano que espera el dominio."""
+    return {atributo: getattr(fila, atributo) for atributo in atributos}
+
+
+def _construir_filas_hijas(modelo_cls: type, atributos: List[str], valor: Any) -> List[Any]:
+    """Convierte una lista de dicts (payload del cliente) en instancias ORM hijas, preservando orden."""
+    filas = valor or []
+    return [
+        modelo_cls(orden=indice, **{atributo: fila.get(atributo) for atributo in atributos})
+        for indice, fila in enumerate(filas)
+    ]
+
+
+def _construir_relaciones_dinamicas(datos: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Reemplaza, para las claves presentes en `datos`, las listas de dicts de las
+    tablas dinámicas del formulario por listas de instancias ORM hijas listas
+    para asignar a la relación (SQLAlchemy reemplaza la colección completa,
+    incluyendo el borrado de las filas huérfanas gracias a delete-orphan).
+    """
+    resultado = dict(datos)
+    for campo, (modelo_cls, atributos) in _TABLAS_LISTA_FORMULARIO.items():
+        if campo in resultado:
+            resultado[campo] = _construir_filas_hijas(modelo_cls, atributos, resultado[campo])
+    if "tipos_transaccion" in resultado:
+        resultado["tipos_transaccion"] = [
+            TipoTransaccionFormulario(tipo=tipo) for tipo in (resultado["tipos_transaccion"] or [])
+        ]
+    return resultado
+
+
+def _extraer_campos_contacto(datos: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Agrupa los campos planos contacto_* por tipo interno de contacto."""
+    contactos: Dict[str, Dict[str, Any]] = {}
+    for tipo, prefijo in _CONTACTOS_FORMULARIO.items():
+        valores = {
+            atributo: datos[f"{prefijo}_{atributo}"]
+            for atributo in _ATRIBUTOS_CONTACTO
+            if f"{prefijo}_{atributo}" in datos
+        }
+        if valores:
+            contactos[tipo] = valores
+    return contactos
+
+
+def _extraer_contactos_para_creacion(datos: Dict[str, Any]) -> Dict[str, Any]:
+    """Convierte campos planos de contacto en filas hijas y los remueve del payload del ORM padre."""
+    resultado = dict(datos)
+    contactos = _extraer_campos_contacto(resultado)
+    for prefijo in _CONTACTOS_FORMULARIO.values():
+        for atributo in _ATRIBUTOS_CONTACTO:
+            resultado.pop(f"{prefijo}_{atributo}", None)
+    if contactos:
+        resultado["contactos"] = [
+            ContactoFormulario(tipo=tipo, **valores)
+            for tipo, valores in contactos.items()
+        ]
+    return resultado
+
+
+def _aplicar_actualizacion_contactos(orm: Formulario, campos: Dict[str, Any]) -> None:
+    """Aplica cambios parciales de los 8 campos planos a la relación contactos."""
+    contactos = _extraer_campos_contacto(campos)
+    if not contactos:
+        return
+
+    existentes = {contacto.tipo: contacto for contacto in orm.contactos}
+    for tipo, valores in contactos.items():
+        contacto = existentes.get(tipo)
+        if contacto is None:
+            contacto = ContactoFormulario(tipo=tipo)
+            orm.contactos.append(contacto)
+        for atributo, valor in valores.items():
+            setattr(contacto, atributo, valor)
+
+
+def _contacto_por_tipo(orm: Formulario, tipo: str) -> Optional[ContactoFormulario]:
+    for contacto in orm.contactos:
+        if contacto.tipo == tipo:
+            return contacto
+    return None
+
+
+def _valor_contacto(orm: Formulario, tipo: str, atributo: str) -> Optional[str]:
+    contacto = _contacto_por_tipo(orm, tipo)
+    return getattr(contacto, atributo) if contacto else None
 
 
 def _deserializar_json(valor: Any) -> Any:
@@ -58,8 +193,16 @@ def _deserializar_json(valor: Any) -> Any:
 def _serializar_json(valor: Any) -> Any:
     """Convierte listas/dicts Python a JSON string para almacenar en BD."""
     if isinstance(valor, (list, dict)):
-        return json.dumps(valor, ensure_ascii=False)
+        return json.dumps(valor, ensure_ascii=False, default=_valor_json)
     return valor
+
+
+def _valor_json(valor: Any) -> Any:
+    if isinstance(valor, (date, datetime)):
+        return valor.isoformat()
+    if isinstance(valor, Decimal):
+        return float(valor)
+    raise TypeError(f"Object of type {type(valor).__name__} is not JSON serializable")
 
 
 def _aplicar_serializacion(datos: Dict[str, Any]) -> Dict[str, Any]:
@@ -68,6 +211,15 @@ def _aplicar_serializacion(datos: Dict[str, Any]) -> Dict[str, Any]:
     for campo in _CAMPOS_JSON:
         if campo in resultado:
             resultado[campo] = _serializar_json(resultado[campo])
+    return resultado
+
+
+def _normalizar_booleanos_no_nulos(datos: Dict[str, Any]) -> Dict[str, Any]:
+    """Evita NULL en columnas Boolean no nulas cuando un borrador envía campo vacío."""
+    resultado = dict(datos)
+    for campo in _CAMPOS_BOOLEANOS_SI_NO:
+        if campo in resultado and resultado[campo] is None:
+            resultado[campo] = False
     return resultado
 
 
@@ -157,7 +309,7 @@ def _orm_formulario_a_datos(
         patrimonio=orm.patrimonio,
         realiza_operaciones_moneda_extranjera=orm.realiza_operaciones_moneda_extranjera,
         paises_operaciones=orm.paises_operaciones,
-        tipos_transaccion=_deserializar_json(orm.tipos_transaccion),
+        tipos_transaccion=[fila.tipo for fila in orm.tipos_transaccion],
         tipos_transaccion_otros=orm.tipos_transaccion_otros,
         actividad_clasificacion=orm.actividad_clasificacion,
         actividad_especifica=orm.actividad_especifica,
@@ -173,14 +325,14 @@ def _orm_formulario_a_datos(
         impuesto_ica=orm.impuesto_ica,
         entidad_oficial=orm.entidad_oficial,
         exento_retencion_fuente=orm.exento_retencion_fuente,
-        contacto_ordenes_nombre=orm.contacto_ordenes_nombre,
-        contacto_ordenes_cargo=orm.contacto_ordenes_cargo,
-        contacto_ordenes_telefono=orm.contacto_ordenes_telefono,
-        contacto_ordenes_correo=orm.contacto_ordenes_correo,
-        contacto_pagos_nombre=orm.contacto_pagos_nombre,
-        contacto_pagos_cargo=orm.contacto_pagos_cargo,
-        contacto_pagos_telefono=orm.contacto_pagos_telefono,
-        contacto_pagos_correo=orm.contacto_pagos_correo,
+        contacto_ordenes_nombre=_valor_contacto(orm, "ordenes", "nombre"),
+        contacto_ordenes_cargo=_valor_contacto(orm, "ordenes", "cargo"),
+        contacto_ordenes_telefono=_valor_contacto(orm, "ordenes", "telefono"),
+        contacto_ordenes_correo=_valor_contacto(orm, "ordenes", "correo"),
+        contacto_pagos_nombre=_valor_contacto(orm, "pagos", "nombre"),
+        contacto_pagos_cargo=_valor_contacto(orm, "pagos", "cargo"),
+        contacto_pagos_telefono=_valor_contacto(orm, "pagos", "telefono"),
+        contacto_pagos_correo=_valor_contacto(orm, "pagos", "correo"),
         autorizacion_datos=orm.autorizacion_datos,
         declaracion_origen_fondos=orm.declaracion_origen_fondos,
         origen_fondos=orm.origen_fondos,
@@ -191,13 +343,12 @@ def _orm_formulario_a_datos(
         campos_a_corregir=orm.campos_a_corregir,
         zoho_request_id=orm.zoho_request_id,
         ruta_documento_firmado=orm.ruta_documento_firmado,
-        junta_directiva=_deserializar_json(orm.junta_directiva),
-        accionistas=_deserializar_json(orm.accionistas),
-        beneficiario_final=_deserializar_json(orm.beneficiario_final),
-        referencias_comerciales=_deserializar_json(orm.referencias_comerciales),
-        referencias_bancarias=_deserializar_json(orm.referencias_bancarias),
-        informacion_bancaria_pagos=_deserializar_json(orm.informacion_bancaria_pagos),
-        clasificaciones=_deserializar_json(orm.clasificaciones),
+        junta_directiva=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["junta_directiva"][1]) for f in orm.junta_directiva],
+        accionistas=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["accionistas"][1]) for f in orm.accionistas],
+        beneficiario_final=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["beneficiario_final"][1]) for f in orm.beneficiario_final],
+        referencias_comerciales=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["referencias_comerciales"][1]) for f in orm.referencias_comerciales],
+        referencias_bancarias=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["referencias_bancarias"][1]) for f in orm.referencias_bancarias],
+        informacion_bancaria_pagos=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["informacion_bancaria_pagos"][1]) for f in orm.informacion_bancaria_pagos],
         documentos=documentos,
         validaciones=validaciones,
     )
@@ -295,7 +446,10 @@ class RepositorioFormularioSQLAlchemy:
 
     def crear(self, datos: Dict[str, Any]) -> FormularioDatos:
         """Persiste un nuevo formulario y retorna su representación de dominio."""
-        orm = Formulario(**_aplicar_serializacion(datos))
+        datos_orm = _extraer_contactos_para_creacion(
+            _construir_relaciones_dinamicas(_normalizar_booleanos_no_nulos(datos))
+        )
+        orm = Formulario(**datos_orm)
         self._sesion.add(orm)
         self._sesion.commit()
         self._sesion.refresh(orm)
@@ -310,7 +464,11 @@ class RepositorioFormularioSQLAlchemy:
         )
         if "estado" in campos:
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
-        for clave, valor in _aplicar_serializacion(campos).items():
+        campos = _normalizar_booleanos_no_nulos(campos)
+        _aplicar_actualizacion_contactos(orm, campos)
+        campos_orm = _extraer_contactos_para_creacion(_construir_relaciones_dinamicas(campos))
+        campos_orm.pop("contactos", None)
+        for clave, valor in campos_orm.items():
             setattr(orm, clave, valor)
         self._sesion.commit()
         self._sesion.refresh(orm)

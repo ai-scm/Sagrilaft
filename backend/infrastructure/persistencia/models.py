@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    BigInteger, Column, String, Integer, Float, Boolean, Text, DateTime,
-    ForeignKey, Index,
+    BigInteger, Column, String, Integer, Float, Boolean, Text, DateTime, Numeric,
+    Date, ForeignKey, Index, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from infrastructure.persistencia.database import Base
@@ -14,11 +14,8 @@ from domain.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 from domain.formulario.tipos import (  # noqa: F401
     ActividadClasificacion,
     AreaResponsable,
-    Autorretenedor,
     ClasificacionActividad,
     EstadoFormulario,
-    GranContribuyente,
-    OperacionesMonedaExtranjera,
     RegimenIva,
     ResponsabilidadIva,
     ResponsabilidadRenta,
@@ -76,10 +73,10 @@ class Formulario(Base):
     nombre_representante = Column(String, nullable=True)
     tipo_doc_representante = Column(String, nullable=True)
     numero_doc_representante = Column(String, nullable=True)
-    fecha_expedicion = Column(String, nullable=True)
+    fecha_expedicion = Column(Date, nullable=True)
     ciudad_expedicion = Column(String, nullable=True)
     nacionalidad = Column(String, nullable=True)
-    fecha_nacimiento = Column(String, nullable=True)
+    fecha_nacimiento = Column(Date, nullable=True)
     ciudad_nacimiento = Column(String, nullable=True)
     profesion = Column(String, nullable=True)
     correo_representante = Column(String, nullable=True)
@@ -96,15 +93,15 @@ class Formulario(Base):
     moneda_declaracion_otra = Column(String, nullable=True)  # Especifica la moneda cuando moneda_declaracion == 'OTRA'
     actividad_economica = Column(String, nullable=True)
     codigo_ciiu = Column(String, nullable=True)
-    ingresos_mensuales = Column(Float, nullable=True)
-    otros_ingresos = Column(Float, nullable=True)
-    egresos_mensuales = Column(Float, nullable=True)
-    total_activos = Column(Float, nullable=True)
-    total_pasivos = Column(Float, nullable=True)
-    patrimonio = Column(Float, nullable=True)
+    ingresos_mensuales = Column(Numeric(18, 2), nullable=True)
+    otros_ingresos = Column(Numeric(18, 2), nullable=True)
+    egresos_mensuales = Column(Numeric(18, 2), nullable=True)
+    total_activos = Column(Numeric(18, 2), nullable=True)
+    total_pasivos = Column(Numeric(18, 2), nullable=True)
+    patrimonio = Column(Numeric(18, 2), nullable=True)
 
     # --- 6. Operaciones en Moneda Extranjera ---
-    realiza_operaciones_moneda_extranjera = Column(String, nullable=True)
+    realiza_operaciones_moneda_extranjera = Column(Boolean, nullable=False, default=False, server_default="false")
     paises_operaciones = Column(String, nullable=True)
     tipos_transaccion = Column(Text, nullable=True)    # JSON array ['importacion', ...]
     tipos_transaccion_otros = Column(String, nullable=True)
@@ -115,25 +112,15 @@ class Formulario(Base):
     sector = Column(String, nullable=True)
     superintendencia = Column(String, nullable=True)
     responsabilidades_renta = Column(String, nullable=True)
-    autorretenedor = Column(String, nullable=True)
+    autorretenedor = Column(Boolean, nullable=False, default=False, server_default="false")
     responsabilidades_iva = Column(String, nullable=True)
     regimen_iva = Column(String, nullable=True)
-    gran_contribuyente = Column(String, nullable=True)
-    entidad_sin_animo_lucro = Column(String, nullable=True)
-    retencion_ica = Column(String, nullable=True)
-    impuesto_ica = Column(String, nullable=True)
-    entidad_oficial = Column(String, nullable=True)
-    exento_retencion_fuente = Column(String, nullable=True)
-
-    # --- 9. Contactos ---
-    contacto_ordenes_nombre = Column(String, nullable=True)
-    contacto_ordenes_cargo = Column(String, nullable=True)
-    contacto_ordenes_telefono = Column(String, nullable=True)
-    contacto_ordenes_correo = Column(String, nullable=True)
-    contacto_pagos_nombre = Column(String, nullable=True)
-    contacto_pagos_cargo = Column(String, nullable=True)
-    contacto_pagos_telefono = Column(String, nullable=True)
-    contacto_pagos_correo = Column(String, nullable=True)
+    gran_contribuyente = Column(Boolean, nullable=False, default=False, server_default="false")
+    entidad_sin_animo_lucro = Column(Boolean, nullable=False, default=False, server_default="false")
+    retencion_ica = Column(Boolean, nullable=False, default=False, server_default="false")
+    impuesto_ica = Column(Boolean, nullable=False, default=False, server_default="false")
+    entidad_oficial = Column(Boolean, nullable=False, default=False, server_default="false")
+    exento_retencion_fuente = Column(Boolean, nullable=False, default=False, server_default="false")
 
     # --- 11-12. Autorizaciones ---
     autorizacion_datos = Column(Boolean, default=False)
@@ -154,21 +141,185 @@ class Formulario(Base):
     zoho_request_id        = Column(String, nullable=True)
     ruta_documento_firmado = Column(String, nullable=True)
 
-    # --- Datos dinámicos (JSON) ---
-    junta_directiva = Column(Text, nullable=True)              # JSON array
-    accionistas = Column(Text, nullable=True)                   # JSON array
-    beneficiario_final = Column(Text, nullable=True)            # JSON array
-    referencias_comerciales = Column(Text, nullable=True)       # JSON array
-    referencias_bancarias = Column(Text, nullable=True)         # JSON array
-    informacion_bancaria_pagos = Column(Text, nullable=True)    # JSON array
-    clasificaciones = Column(Text, nullable=True)               # JSON array
-
     # Relaciones
     documentos = relationship("DocumentoAdjunto", back_populates="formulario",
                               cascade="all, delete-orphan",
                               primaryjoin="and_(Formulario.id==DocumentoAdjunto.formulario_id, DocumentoAdjunto.deleted_at.is_(None))")
     validaciones = relationship("ResultadoValidacion", back_populates="formulario",
                                 cascade="all, delete-orphan")
+    contactos = relationship("ContactoFormulario", back_populates="formulario",
+                             cascade="all, delete-orphan", lazy="selectin")
+
+    # --- Datos dinámicos (listas 1:N — Cambio 1 del rediseño de esquema) ---
+    # lazy="selectin": evita N+1 en listados de expedientes (RepositorioExpedienteSQLAlchemy.listar),
+    # que hoy recorren muchos formularios y acceden a estas 7 relaciones por cada uno.
+    junta_directiva = relationship("MiembroJuntaDirectiva", back_populates="formulario",
+                                   cascade="all, delete-orphan", order_by="MiembroJuntaDirectiva.orden",
+                                   lazy="selectin")
+    accionistas = relationship("AccionistaFormulario", back_populates="formulario",
+                               cascade="all, delete-orphan", order_by="AccionistaFormulario.orden",
+                               lazy="selectin")
+    beneficiario_final = relationship("BeneficiarioFinalFormulario", back_populates="formulario",
+                                      cascade="all, delete-orphan", order_by="BeneficiarioFinalFormulario.orden",
+                                      lazy="selectin")
+    referencias_comerciales = relationship("ReferenciaComercialFormulario", back_populates="formulario",
+                                           cascade="all, delete-orphan", order_by="ReferenciaComercialFormulario.orden",
+                                           lazy="selectin")
+    referencias_bancarias = relationship("ReferenciaBancariaDeclarada", back_populates="formulario",
+                                         cascade="all, delete-orphan", order_by="ReferenciaBancariaDeclarada.orden",
+                                         lazy="selectin")
+    informacion_bancaria_pagos = relationship("CuentaPagoFormulario", back_populates="formulario",
+                                              cascade="all, delete-orphan", order_by="CuentaPagoFormulario.orden",
+                                              lazy="selectin")
+    tipos_transaccion = relationship("TipoTransaccionFormulario", back_populates="formulario",
+                                     cascade="all, delete-orphan", lazy="selectin")
+
+
+class MiembroJuntaDirectiva(Base):
+    __tablename__ = "formulario_junta_directiva"
+    __table_args__ = (
+        Index("ix_formulario_junta_directiva_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    cargo = Column(String, nullable=True)
+    nombre = Column(String, nullable=True)
+    tipo_id = Column(String, nullable=True)
+    numero_id = Column(String, nullable=True)
+    es_pep = Column(String, nullable=True)
+    vinculos_pep = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="junta_directiva")
+
+
+class AccionistaFormulario(Base):
+    __tablename__ = "formulario_accionistas"
+    __table_args__ = (
+        Index("ix_formulario_accionistas_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    nombre = Column(String, nullable=True)
+    tipo_id = Column(String, nullable=True)
+    numero_id = Column(String, nullable=True)
+    es_pep = Column(String, nullable=True)
+    vinculos_pep = Column(String, nullable=True)
+    porcentaje = Column(Float, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="accionistas")
+
+
+class BeneficiarioFinalFormulario(Base):
+    __tablename__ = "formulario_beneficiarios_finales"
+    __table_args__ = (
+        Index("ix_formulario_beneficiarios_finales_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    nombre = Column(String, nullable=True)
+    tipo_id = Column(String, nullable=True)
+    numero_id = Column(String, nullable=True)
+    es_pep = Column(String, nullable=True)
+    vinculos_pep = Column(String, nullable=True)
+    porcentaje = Column(Float, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="beneficiario_final")
+
+
+class ReferenciaComercialFormulario(Base):
+    __tablename__ = "formulario_referencias_comerciales"
+    __table_args__ = (
+        Index("ix_formulario_referencias_comerciales_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    nombre_establecimiento = Column(String, nullable=True)
+    persona_contacto = Column(String, nullable=True)
+    telefono = Column(String, nullable=True)
+    ciudad = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="referencias_comerciales")
+
+
+class ReferenciaBancariaDeclarada(Base):
+    """Referencia bancaria declarada por la contraparte en el formulario (Paso 6).
+
+    No confundir con `documentos_adjuntos.tipo_documento == 'referencias_bancarias'`,
+    que es un certificado bancario adjunto con datos extraídos por IA — dominio distinto.
+    """
+    __tablename__ = "formulario_referencias_bancarias_declaradas"
+    __table_args__ = (
+        Index("ix_formulario_referencias_bancarias_declaradas_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    entidad = Column(String, nullable=True)
+    producto = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="referencias_bancarias")
+
+
+class CuentaPagoFormulario(Base):
+    __tablename__ = "formulario_cuentas_pago"
+    __table_args__ = (
+        Index("ix_formulario_cuentas_pago_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    orden = Column(Integer, nullable=False, default=0)
+    entidad_bancaria = Column(String, nullable=True)
+    ciudad_oficina = Column(String, nullable=True)
+    tipo_cuenta = Column(String, nullable=True)
+    numero_cuenta = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="informacion_bancaria_pagos")
+
+
+class TipoTransaccionFormulario(Base):
+    """Multi-select de tipos de transacción en moneda extranjera (Paso 6).
+
+    Tabla de unión simple: cada tag es un valor atómico, no una entidad con
+    atributos propios (a diferencia de las demás tablas de este bloque).
+    """
+    __tablename__ = "formulario_tipos_transaccion"
+    __table_args__ = (
+        Index("ix_formulario_tipos_transaccion_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    tipo = Column(String, nullable=False)
+
+    formulario = relationship("Formulario", back_populates="tipos_transaccion")
+
+
+class ContactoFormulario(Base):
+    __tablename__ = "contactos"
+    __table_args__ = (
+        UniqueConstraint("formulario_id", "tipo", name="uq_contactos_formulario_tipo"),
+        Index("ix_contactos_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    tipo = Column(String, nullable=False)
+    nombre = Column(String, nullable=True)
+    cargo = Column(String, nullable=True)
+    telefono = Column(String, nullable=True)
+    correo = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="contactos")
 
 
 class DocumentoAdjunto(Base):
