@@ -88,13 +88,13 @@ export const CAMPOS_CONDICIONALES = {
   ],
   6: [
     {
-      condicion: (fd) => fd.realiza_operaciones_moneda_extranjera === 'si',
+      condicion: (fd) => fd.realiza_operaciones_moneda_extranjera === true,
       campos: ['paises_operaciones', 'tipos_transaccion'],
       mensajes: MENSAJES_VALIDACION_MONEDA_EXTRANJERA,
     },
     {
       condicion: (fd) =>
-        fd.realiza_operaciones_moneda_extranjera === 'si' &&
+        fd.realiza_operaciones_moneda_extranjera === true &&
         Array.isArray(fd.tipos_transaccion) &&
         fd.tipos_transaccion.includes('otras'),
       campos: ['tipos_transaccion_otros'],

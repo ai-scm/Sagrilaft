@@ -32,14 +32,42 @@ const _CAMPOS_EXCLUIR_DE_FORMDATA = new Set([
   'campos_a_corregir',
   'junta_directiva', 'accionistas', 'beneficiario_final',
   'referencias_comerciales', 'referencias_bancarias', 'informacion_bancaria_pagos',
-  'clasificaciones', 'documentos', 'validaciones',
+  'documentos', 'validaciones',
 ]);
+
+const _CAMPOS_BOOLEANOS_SI_NO = [
+  'realiza_operaciones_moneda_extranjera',
+  'autorretenedor',
+  'gran_contribuyente',
+  'entidad_sin_animo_lucro',
+  'retencion_ica',
+  'impuesto_ica',
+  'entidad_oficial',
+  'exento_retencion_fuente',
+];
 
 const ERRORES_RECUPERACION = {
   CREDENCIALES_INVALIDAS: 'Código de petición o PIN incorrecto. Verifique los datos',
   FORMULARIO_YA_ENVIADO: 'Este formulario ya fue enviado y no puede recuperarse.',
   ACCESO_EXPIRADO: 'El acceso ha expirado. Solicite un nuevo enlace al área responsable.',
 };
+
+function _normalizarBooleanoSiNo(valor) {
+  if (valor === true || valor === false || valor === null || valor === undefined) return valor;
+  if (typeof valor !== 'string') return valor;
+  const normalizado = valor.trim().toLowerCase();
+  if (normalizado === 'si' || normalizado === 'sí' || normalizado === 'true') return true;
+  if (normalizado === 'no' || normalizado === 'false') return false;
+  return valor;
+}
+
+function _normalizarBooleanosFormulario(formData) {
+  const normalizado = { ...(formData ?? {}) };
+  _CAMPOS_BOOLEANOS_SI_NO.forEach(campo => {
+    if (campo in normalizado) normalizado[campo] = _normalizarBooleanoSiNo(normalizado[campo]);
+  });
+  return normalizado;
+}
 
 function _normalizarDocumentos(documentosArray) {
   if (!Array.isArray(documentosArray)) return {};
@@ -50,9 +78,9 @@ function _normalizarDocumentos(documentosArray) {
 }
 
 function _adaptarRespuestaServidor(formulario, borradorLocal = null) {
-  const formData = Object.fromEntries(
+  const formData = _normalizarBooleanosFormulario(Object.fromEntries(
     Object.entries(formulario).filter(([k]) => !_CAMPOS_EXCLUIR_DE_FORMDATA.has(k)),
-  );
+  ));
 
   const documentos = _normalizarDocumentos(formulario.documentos);
 
@@ -122,14 +150,14 @@ export function useRecuperacionSesion(setters) {
   // Declarado antes de los effects para que las closures capturen la referencia
   // estable via ref y siempre usen la versión más reciente del callback.
   const _restaurarDesdeSnapshot = useCallback((snapshot_recuperar_sesion) => {
-    setFormData(snapshot_recuperar_sesion.formData ?? {});
+    setFormData(_normalizarBooleanosFormulario(snapshot_recuperar_sesion.formData ?? {}));
     setStep(snapshot_recuperar_sesion.step ?? 1);
     setFormularioId(snapshot_recuperar_sesion.formularioId ?? null);
     setCodigoPeticion(snapshot_recuperar_sesion.codigoPeticion ?? null);
     setEstadoFormulario(snapshot_recuperar_sesion.estadoFormulario ?? null);
     setCamposACorregir(snapshot_recuperar_sesion.camposACorregir ?? null);
     if (snapshot_recuperar_sesion.estadoFormulario === 'en_correccion') {
-      setFormDataOriginal(snapshot_recuperar_sesion.formData ?? {});
+      setFormDataOriginal(_normalizarBooleanosFormulario(snapshot_recuperar_sesion.formData ?? {}));
       // Guarda snapshot de tablas para detectar modificaciones durante la corrección
       setTablasOriginales({
         juntaDirectiva: snapshot_recuperar_sesion.juntaDirectiva ?? [],

@@ -9,8 +9,8 @@ import { fueValorModificado, normalizarValorComparable } from '../../utils/compa
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const OPCIONES_MONEDA = [
-  { value: 'si', label: 'Sí' },
-  { value: 'no', label: 'No' },
+  { value: true, label: 'Sí' },
+  { value: false, label: 'No' },
 ];
 
 const TIPOS_TRANSACCION = [
@@ -142,10 +142,10 @@ export default function PasoContactosBancaria({
   const errFilasComerciales = errors.referencias_comerciales_filas ?? [];
   const errFilasBancarias   = errors.referencias_bancarias_filas   ?? [];
 
-  const realizaOperacionesMonedaExtranjera = formData.realiza_operaciones_moneda_extranjera === 'si';
+  const realizaOperacionesMonedaExtranjera = formData.realiza_operaciones_moneda_extranjera === true;
   const tiposSeleccionados                 = formData.tipos_transaccion ?? [];
 
-  const handleMonedaChange = (opcion) => onMonedaChange(opcion?.value ?? '');
+  const handleMonedaChange = (opcion) => onMonedaChange(opcion?.value ?? false);
   const handleTiposChange  = (opciones) => onTiposChange(opciones.map(o => o.value));
 
   const tiposValue  = TIPOS_TRANSACCION.filter(o => tiposSeleccionados.includes(o.value));
@@ -287,7 +287,6 @@ export default function PasoContactosBancaria({
             value={monedaValue}
             onChange={handleMonedaChange}
             options={OPCIONES_MONEDA}
-            isClearable
             placeholder="Seleccione..."
             noOptionsMessage={() => 'Sin opciones'}
             styles={buildSelectStyles(!!errors.realiza_operaciones_moneda_extranjera, !!monedaValue, monedaPendiente)}

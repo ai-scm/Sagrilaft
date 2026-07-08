@@ -21,8 +21,8 @@ import { useCorreccion } from '../../context/CorreccionContext';
 // ── Constantes de dominio ──────────────────────────────────────────────────────
 
 const OPCIONES_SI_NO = [
-  { value: 'si', label: 'Sí' },
-  { value: 'no', label: 'No' },
+  { value: 'true', label: 'Sí' },
+  { value: 'false', label: 'No' },
 ];
 
 /**

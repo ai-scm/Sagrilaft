@@ -32,6 +32,7 @@ export default function FormField({
   const tieneAyuda = !!textosAyudaCampos[name];
   const placeholderText = placeholder || (textosAyudaCampos[name]?.ejemplo ? `Ej: ${textosAyudaCampos[name].ejemplo}` : '');
   const inputProps = type !== 'select' && type !== 'textarea' ? getInputProps(name) : {};
+  const valorSelect = typeof value === 'boolean' ? String(value) : (value ?? '');
 
   const clasesCampo = [
     type === 'textarea' ? 'form-textarea' : (type === 'select' ? 'form-select' : 'form-input'),
@@ -65,7 +66,7 @@ export default function FormField({
       </label>
 
       {type === 'select' ? (
-        <select name={name} className={clasesCampo} value={value ?? ''} onChange={onChange} {...rest}>
+        <select name={name} className={clasesCampo} value={valorSelect} onChange={onChange} {...rest}>
           <option value="">Seleccione...</option>
           {options?.map(opcion => (
             <option key={opcion.value} value={opcion.value}>{opcion.label}</option>

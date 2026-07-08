@@ -26,6 +26,17 @@ import { calcularValorDv } from '../utils/inputValidation';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
+const CAMPOS_BOOLEANOS_SI_NO = new Set([
+  'realiza_operaciones_moneda_extranjera',
+  'autorretenedor',
+  'gran_contribuyente',
+  'entidad_sin_animo_lucro',
+  'retencion_ica',
+  'impuesto_ica',
+  'entidad_oficial',
+  'exento_retencion_fuente',
+]);
+
 /** Campos que dependen de la respuesta a 'realiza_operaciones_moneda_extranjera'. */
 const CAMPOS_DEPENDIENTES_MONEDA_EXTRANJERA = [
   'paises_operaciones',
@@ -35,12 +46,12 @@ const CAMPOS_DEPENDIENTES_MONEDA_EXTRANJERA = [
 
 /**
  * Retorna el nuevo estado del formulario tras cambiar la opción de moneda extranjera.
- * Si el nuevo valor es distinto de 'si', purga los campos dependientes para evitar
+ * Si el nuevo valor es distinto de true, purga los campos dependientes para evitar
  * que datos residuales contaminen el envío o persistan en el borrador.
  */
 function _actualizarMonedaConDependientes(estadoAnterior, nuevoValor) {
   const siguiente = { ...estadoAnterior, realiza_operaciones_moneda_extranjera: nuevoValor };
-  if (nuevoValor !== 'si') {
+  if (nuevoValor !== true) {
     siguiente.paises_operaciones      = '';
     siguiente.tipos_transaccion       = [];
     siguiente.tipos_transaccion_otros = '';
@@ -148,7 +159,11 @@ export function useFormulario() {
 
   const handleChange = useCallback((e) => {
     const { name, value, type, checked } = e.target;
-    const nuevoValor = type === 'checkbox' ? checked : value;
+    const nuevoValor = type === 'checkbox'
+      ? checked
+      : CAMPOS_BOOLEANOS_SI_NO.has(name)
+        ? value === 'true'
+        : value;
     setFormData(prev => {
       const next = { ...prev, [name]: nuevoValor };
       if (name === 'tipo_identificacion') {
@@ -178,7 +193,7 @@ export function useFormulario() {
 
   /**
    * Cambia '¿Realiza Operaciones en Moneda Extranjera?' y limpia atómicamente
-   * todos los campos dependientes cuando la respuesta pasa a ser 'no' o vacío.
+   * todos los campos dependientes cuando la respuesta pasa a ser false o vacío.
    *
    * Centralizar aquí la lógica de cascada garantiza que el formulario nunca
    * persista datos de campos que el usuario ya no ve.
