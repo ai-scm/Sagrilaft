@@ -1,6 +1,9 @@
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
+from domain.utils.fechas import parsear_fecha_colombia
 
 
 def limpiar_numero_id_si_tipo_ausente(data: Any) -> Any:
@@ -22,20 +25,55 @@ def vacio_a_nulo(v: object) -> object:
     return None if v == "" else v
 
 
-def coercionar_monto(v: object) -> float | None:
+def coercionar_bool_si_no(v: object) -> bool | None:
     """
-    Coerciona un valor de entrada (str o float) a float no negativo.
+    Coerciona booleanos del formulario.
+    Acepta bool real y, por compatibilidad con borradores antiguos, "si"/"no".
+    """
+    if v is None or v == '':
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int) and v in (0, 1):
+        return bool(v)
+    if isinstance(v, str):
+        normalizado = v.strip().lower()
+        if normalizado in {"si", "sí", "true", "1"}:
+            return True
+        if normalizado in {"no", "false", "0"}:
+            return False
+    raise ValueError('Debe ser verdadero o falso')
+
+
+def coercionar_monto(v: object) -> Decimal | None:
+    """
+    Coerciona un valor de entrada (str, int, float o Decimal) a Decimal no negativo.
     Cadenas vacías y None se interpretan como ausencia de valor (None).
     Rechaza valores negativos ya que los montos financieros no pueden serlo.
     """
     if v is None or v == '':
         return None
+    if isinstance(v, bool):
+        raise ValueError('Debe ser un número válido')
     try:
-        valor = float(v)
-    except (TypeError, ValueError):
+        valor = Decimal(str(v))
+    except (InvalidOperation, TypeError, ValueError):
         raise ValueError('Debe ser un número válido')
     if valor < 0:
         raise ValueError('El monto no puede ser negativo')
+    return valor
+
+
+def coercionar_fecha_colombia(v: object) -> date | None:
+    """
+    Coerciona fechas del formulario a `date`.
+    Acepta YYYY-MM-DD y DD-MMM-AAAA; rechaza explícitamente formatos libres.
+    """
+    if v is None or v == '':
+        return None
+    valor = parsear_fecha_colombia(v)
+    if valor is None:
+        raise ValueError('Debe ser una fecha válida')
     return valor
 
 

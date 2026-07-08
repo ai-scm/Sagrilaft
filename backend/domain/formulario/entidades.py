@@ -13,7 +13,8 @@ y estas entidades.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from domain.contratos import DocumentoDatos
@@ -70,10 +71,10 @@ class FormularioDatos:
     nombre_representante: Optional[str] = None
     tipo_doc_representante: Optional[str] = None
     numero_doc_representante: Optional[str] = None
-    fecha_expedicion: Optional[str] = None
+    fecha_expedicion: Optional[date] = None
     ciudad_expedicion: Optional[str] = None
     nacionalidad: Optional[str] = None
-    fecha_nacimiento: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
     ciudad_nacimiento: Optional[str] = None
     profesion: Optional[str] = None
     correo_representante: Optional[str] = None
@@ -90,15 +91,15 @@ class FormularioDatos:
     moneda_declaracion_otra: Optional[str] = None
     actividad_economica: Optional[str] = None
     codigo_ciiu: Optional[str] = None
-    ingresos_mensuales: Optional[float] = None
-    otros_ingresos: Optional[float] = None
-    egresos_mensuales: Optional[float] = None
-    total_activos: Optional[float] = None
-    total_pasivos: Optional[float] = None
-    patrimonio: Optional[float] = None
+    ingresos_mensuales: Optional[Decimal] = None
+    otros_ingresos: Optional[Decimal] = None
+    egresos_mensuales: Optional[Decimal] = None
+    total_activos: Optional[Decimal] = None
+    total_pasivos: Optional[Decimal] = None
+    patrimonio: Optional[Decimal] = None
 
     # ── Moneda Extranjera ─────────────────────────────────────────────────────
-    realiza_operaciones_moneda_extranjera: Optional[str] = None
+    realiza_operaciones_moneda_extranjera: Optional[bool] = None
     paises_operaciones: Optional[str] = None
     tipos_transaccion: Optional[Any] = None          # lista Python (ya deserializada)
     tipos_transaccion_otros: Optional[str] = None
@@ -109,15 +110,15 @@ class FormularioDatos:
     sector: Optional[str] = None
     superintendencia: Optional[str] = None
     responsabilidades_renta: Optional[str] = None
-    autorretenedor: Optional[str] = None
+    autorretenedor: Optional[bool] = None
     responsabilidades_iva: Optional[str] = None
     regimen_iva: Optional[str] = None
-    gran_contribuyente: Optional[str] = None
-    entidad_sin_animo_lucro: Optional[str] = None
-    retencion_ica: Optional[str] = None
-    impuesto_ica: Optional[str] = None
-    entidad_oficial: Optional[str] = None
-    exento_retencion_fuente: Optional[str] = None
+    gran_contribuyente: Optional[bool] = None
+    entidad_sin_animo_lucro: Optional[bool] = None
+    retencion_ica: Optional[bool] = None
+    impuesto_ica: Optional[bool] = None
+    entidad_oficial: Optional[bool] = None
+    exento_retencion_fuente: Optional[bool] = None
 
     # ── Contactos ─────────────────────────────────────────────────────────────
     contacto_ordenes_nombre: Optional[str] = None
@@ -154,7 +155,6 @@ class FormularioDatos:
     referencias_comerciales: Optional[Any] = None
     referencias_bancarias: Optional[Any] = None
     informacion_bancaria_pagos: Optional[Any] = None
-    clasificaciones: Optional[Any] = None
 
     # ── Relaciones (populadas solo en snapshot completo) ──────────────────────
     documentos: List[DocumentoDatos] = field(default_factory=list)

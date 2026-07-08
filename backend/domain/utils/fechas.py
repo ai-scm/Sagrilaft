@@ -47,9 +47,9 @@ NOMBRES_MESES_ES: list[str] = [
 ]
 
 
-def formatear_fecha_larga_es(valor: datetime) -> str:
+def formatear_fecha_larga_es(valor: date | datetime) -> str:
     """Formatea una fecha en formato largo en español, ej. '13 de julio de 2026'."""
-    fecha = normalizar_datetime_utc(valor)
+    fecha = normalizar_datetime_utc(valor) if isinstance(valor, datetime) else valor
     return f"{fecha.day} de {NOMBRES_MESES_ES[fecha.month - 1]} de {fecha.year}"
 
 
@@ -79,6 +79,10 @@ def parsear_fecha_colombia(valor: Any) -> Optional[date]:
     """
     if not valor:
         return None
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
 
     cadena = str(valor).strip()
 

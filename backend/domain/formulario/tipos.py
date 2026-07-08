@@ -95,20 +95,3 @@ class AreaResponsable(str, enum.Enum):
     FINANZAS = "finanzas"
     RECURSOS_HUMANOS = "recursos_humanos"
 
-
-class OperacionesMonedaExtranjera(str, enum.Enum):
-    """Operaciones en Moneda Extranjera - Sección 6."""
-    OPERACIONES_SI = "si"
-    OPERACIONES_NO = "no"
-
-
-class Autorretenedor(str, enum.Enum):
-    """Indica si el contribuyente es autorretenedor (Paso 7)."""
-    AUTORRETENEDOR_SI = "si"
-    AUTORRETENEDOR_NO = "no"
-
-
-class GranContribuyente(str, enum.Enum):
-    """Indica si el contribuyente es gran contribuyente (Paso 7)."""
-    GRAN_CONTRIBUYENTE_SI = "si"
-    GRAN_CONTRIBUYENTE_NO = "no"

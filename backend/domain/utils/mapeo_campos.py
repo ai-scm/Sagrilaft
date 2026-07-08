@@ -16,6 +16,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Dict, List, Optional
 
+from domain.utils.fechas import parsear_fecha_colombia
+
 
 # ═══════════════════════════════════════════════════════════════
 # Normalizadores de valor (OCP: agregar aquí sin tocar el motor)
@@ -99,6 +101,11 @@ def _normalizar_tipo_identificacion(valor: Any) -> Optional[str]:
     return _TABLA_NORMALIZACION.get(texto)
 
 
+def _normalizar_fecha_colombia(valor: Any):
+    """Retorna `date` si la fecha extraída es reconocible; si no, omite el campo."""
+    return parsear_fecha_colombia(valor)
+
+
 class MapeadorCamposFormulario:
     """
     Mapea los campos extraídos por IA de un documento a los campos del formulario.
@@ -165,6 +172,10 @@ class MapeadorCamposFormulario:
         "certificado_existencia": {
             "tipo_persona":        _normalizar_tipo_persona,
             "tipo_identificacion": _normalizar_tipo_identificacion,
+        },
+        "cedula_representante": {
+            "fecha_nacimiento":    _normalizar_fecha_colombia,
+            "fecha_expedicion":    _normalizar_fecha_colombia,
         },
     }
 

@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from domain.formulario.tipos import (
     ActividadClasificacion,
-    Autorretenedor,
     ClasificacionActividad,
     EstadoFormulario,
-    GranContribuyente,
-    OperacionesMonedaExtranjera,
     RegimenIva,
     ResponsabilidadIva,
     ResponsabilidadRenta,
@@ -32,9 +29,11 @@ class ErrorValidacion(BaseModel):
     mensaje: str
 
 from .comunes import (
+    BooleanoFormulario,
     DropdownSiNo,
     DropdownTipoId,
     EnumLimpio,
+    FechaFormulario,
     MontoPositivo,
     PorcentajeParticipacion,
     a_iso_utc,
@@ -46,9 +45,6 @@ SectorEmpresaLimpio = EnumLimpio[SectorEmpresa]
 ResponsabilidadRentaLimpio = EnumLimpio[ResponsabilidadRenta]
 ResponsabilidadIvaLimpio = EnumLimpio[ResponsabilidadIva]
 RegimenIvaLimpio = EnumLimpio[RegimenIva]
-OperacionesMonedaExtranjeraLimpio = EnumLimpio[OperacionesMonedaExtranjera]
-AutorretenedorLimpio = EnumLimpio[Autorretenedor]
-GranContribuyenteLimpio = EnumLimpio[GranContribuyente]
 
 
 class PersonaVinculadaBase(BaseModel):
@@ -132,10 +128,10 @@ class FormularioBase(BaseModel):
     nombre_representante: Optional[str] = None
     tipo_doc_representante: Optional[str] = None
     numero_doc_representante: Optional[str] = None
-    fecha_expedicion: Optional[str] = None
+    fecha_expedicion: FechaFormulario = None
     ciudad_expedicion: Optional[str] = None
     nacionalidad: Optional[str] = None
-    fecha_nacimiento: Optional[str] = None
+    fecha_nacimiento: FechaFormulario = None
     ciudad_nacimiento: Optional[str] = None
     profesion: Optional[str] = None
     correo_representante: Optional[str] = None
@@ -160,7 +156,7 @@ class FormularioBase(BaseModel):
     patrimonio: MontoPositivo = None
 
     # 6. Operaciones en Moneda Extranjera
-    realiza_operaciones_moneda_extranjera: EnumLimpio[OperacionesMonedaExtranjera] = None
+    realiza_operaciones_moneda_extranjera: BooleanoFormulario = None
     paises_operaciones: Optional[str] = None
     tipos_transaccion: Optional[List[str]] = None
     tipos_transaccion_otros: Optional[str] = None
@@ -171,15 +167,15 @@ class FormularioBase(BaseModel):
     sector: SectorEmpresaLimpio = None
     superintendencia: Optional[str] = None
     responsabilidades_renta: ResponsabilidadRentaLimpio = None
-    autorretenedor: EnumLimpio[Autorretenedor] = None
+    autorretenedor: BooleanoFormulario = None
     responsabilidades_iva: ResponsabilidadIvaLimpio = None
     regimen_iva: RegimenIvaLimpio = None
-    gran_contribuyente: EnumLimpio[GranContribuyente] = None
-    entidad_sin_animo_lucro: Optional[str] = None
-    retencion_ica: Optional[str] = None
-    impuesto_ica: Optional[str] = None
-    entidad_oficial: Optional[str] = None
-    exento_retencion_fuente: Optional[str] = None
+    gran_contribuyente: BooleanoFormulario = None
+    entidad_sin_animo_lucro: BooleanoFormulario = None
+    retencion_ica: BooleanoFormulario = None
+    impuesto_ica: BooleanoFormulario = None
+    entidad_oficial: BooleanoFormulario = None
+    exento_retencion_fuente: BooleanoFormulario = None
 
     # 9. Contactos
     contacto_ordenes_nombre: Optional[str] = None
@@ -209,7 +205,6 @@ class FormularioBase(BaseModel):
     referencias_comerciales: Optional[List[ReferenciaComercial]] = None
     referencias_bancarias: Optional[List[ReferenciaBancaria]] = None
     informacion_bancaria_pagos: Optional[List[InformacionBancariaPago]] = None
-    clasificaciones: Optional[List[str]] = None
 
     # Metadata
     pagina_actual: Optional[int] = 1
@@ -235,15 +230,21 @@ class FormularioBase(BaseModel):
             raise ValueError("El dígito de verificación debe ser un único dígito numérico (0-9)")
         return limpio
 
-    @field_validator("retencion_ica", "impuesto_ica")
-    @classmethod
-    def validar_ica_si_no(cls, v: object) -> str | None:
-        _valores_validos = {"si", "no"}
-        if v is None or v == "":
-            return None
-        if v not in _valores_validos:
-            raise ValueError("El valor de ICA debe ser estrictamente 'si' o 'no'")
-        return str(v)
+    @field_serializer(
+        "ingresos_mensuales",
+        "otros_ingresos",
+        "egresos_mensuales",
+        "total_activos",
+        "total_pasivos",
+        "patrimonio",
+        when_used="json",
+    )
+    def _serializar_montos(self, valor: Decimal | None) -> float | None:
+        return float(valor) if valor is not None else None
+
+    @field_serializer("fecha_expedicion", "fecha_nacimiento", when_used="json")
+    def _serializar_fechas_formulario(self, valor: date | None) -> str | None:
+        return valor.isoformat() if valor else None
 
 
 class FormularioCreate(FormularioBase):
@@ -269,25 +270,6 @@ class FormularioResponse(FormularioBase):
     def _serializar_fechas(self, valor: datetime) -> str:
         return a_iso_utc(valor) or ""
 
-    @field_validator(
-        "junta_directiva",
-        "accionistas",
-        "beneficiario_final",
-        "referencias_comerciales",
-        "referencias_bancarias",
-        "informacion_bancaria_pagos",
-        "clasificaciones",
-        mode="before",
-    )
-    @classmethod
-    def parse_json_strings(cls, v: object):
-        if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except (json.JSONDecodeError, TypeError):
-                return None
-        return v
-
 
 class FormularioConDetalles(FormularioResponse):
     documentos: List[DocumentoResponse] = Field(default_factory=list)
@@ -309,4 +291,3 @@ class CredencialesEnvioFormulario(BaseModel):
     token_diligenciamiento: Optional[str] = None
     codigo_peticion: Optional[str] = None
     pin: Optional[str] = None
-

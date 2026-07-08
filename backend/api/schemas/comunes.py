@@ -7,12 +7,15 @@ Nota: por compatibilidad, algunos validadores aún dependen de helpers en
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Optional, TypeVar, Literal
 
 from pydantic import BeforeValidator, BaseModel
 
 from domain.utils.coercion import (
+    coercionar_bool_si_no,
+    coercionar_fecha_colombia,
     coercionar_monto,
     coercionar_porcentaje,
     coercionar_porcentaje_participacion,
@@ -30,7 +33,9 @@ DropdownSiNo = Annotated[Literal["si", "no"] | None, BeforeValidator(vacio_a_nul
 DropdownTipoId = Annotated[Literal["NIT", "CC", "CE", "PAS"] | None, BeforeValidator(vacio_a_nulo)]
 
 # Tipos reutilizables en cualquier schema que maneje montos o porcentajes
-MontoPositivo = Annotated[Optional[float], BeforeValidator(coercionar_monto)]
+BooleanoFormulario = Annotated[Optional[bool], BeforeValidator(coercionar_bool_si_no)]
+FechaFormulario = Annotated[Optional[date], BeforeValidator(coercionar_fecha_colombia)]
+MontoPositivo = Annotated[Optional[Decimal], BeforeValidator(coercionar_monto)]
 PorcentajeValido = Annotated[Optional[float], BeforeValidator(coercionar_porcentaje)]
 PorcentajeParticipacion = Annotated[Optional[float], BeforeValidator(coercionar_porcentaje_participacion)]
 
