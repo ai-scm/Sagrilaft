@@ -86,6 +86,7 @@ export class Networking extends Construct {
     ].forEach(([id, service]) => {
       this.vpc.addInterfaceEndpoint(id as string, {
         service: service as ec2.IInterfaceVpcEndpointService,
+        privateDnsEnabled: true,
         open: false,
         securityGroups: [sgVpcEndpoints],
         subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
