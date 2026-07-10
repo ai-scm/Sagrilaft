@@ -9,7 +9,6 @@
 import { useEffect, useRef } from 'react';
 import HelpPanel from './HelpPanel';
 import ProgressBar from './ProgressBar';
-import ModalRecuperacionSesion from './ModalRecuperacionSesion';
 import ModalConfirmacion from '@shared/components/ui/ModalConfirmacion';
 import { useFormulario } from '../hooks/useFormulario';
 import { TOTAL_STEPS } from '../data/formularioConfig';
@@ -189,16 +188,6 @@ export default function FormularioSagrilaft() {
       <AutoNavegacion onNavegar={irAPasoCorreccion} />
 
       <div className="app-container">
-        <ModalRecuperacionSesion
-          visible={recuperacion.visible}
-          error={recuperacion.error}
-          cargando={recuperacion.cargando}
-          fechaBorrador={recuperacion.fechaBorrador}
-          codigoInicial={codigoPeticion || recuperacion.codigoPeticionBorrador}
-          onRecuperar={recuperacion.recuperarSesion}
-          onDescartar={recuperacion.descartar}
-        />
-
         <ModalConfirmacion
           visible={estadoConfirmacion.visible}
           titulo="Eliminar documento"
@@ -210,15 +199,6 @@ export default function FormularioSagrilaft() {
         <header className="app-header">
           <h1>FORMULARIO DE VINCULACIÓN O ACTUALIZACIÓN DE CONTRAPARTE</h1>
           <p className="subtitle">SAGRILAFT - Sistema de Autocontrol de Riesgo de LA/FT</p>
-          {!recuperacion.visible && (
-            <button
-              type="button"
-              onClick={recuperacion.abrirModal}
-              className="btn-recuperar-sesion"
-            >
-              ¿Tiene un formulario previo? Recuperar sesión
-            </button>
-          )}
         </header>
 
         <main className="main-content">
