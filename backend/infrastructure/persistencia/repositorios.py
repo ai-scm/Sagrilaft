@@ -33,8 +33,10 @@ from infrastructure.persistencia.models import (
     AccesoManual,
     AccionistaFormulario,
     BeneficiarioFinalFormulario,
+    ClasificacionTributariaFormulario,
     ContactoFormulario,
     CuentaPagoFormulario,
+    DatosPersonaNaturalFormulario,
     DocumentoAdjunto,
     Formulario,
     MiembroJuntaDirectiva,
@@ -54,6 +56,28 @@ _CONTACTOS_FORMULARIO = {
 }
 
 _ATRIBUTOS_CONTACTO = ["nombre", "cargo", "telefono", "correo"]
+
+_CAMPOS_PERSONA_NATURAL = [
+    "direccion_residencia",
+    "ciudad_residencia",
+]
+
+_CAMPOS_CLASIFICACION_TRIBUTARIA = [
+    "actividad_clasificacion",
+    "actividad_especifica",
+    "sector",
+    "superintendencia",
+    "responsabilidades_renta",
+    "autorretenedor",
+    "responsabilidades_iva",
+    "regimen_iva",
+    "gran_contribuyente",
+    "entidad_sin_animo_lucro",
+    "retencion_ica",
+    "impuesto_ica",
+    "entidad_oficial",
+    "exento_retencion_fuente",
+]
 
 _CAMPOS_BOOLEANOS_SI_NO = {
     "realiza_operaciones_moneda_extranjera",
@@ -150,6 +174,92 @@ def _extraer_contactos_para_creacion(datos: Dict[str, Any]) -> Dict[str, Any]:
             for tipo, valores in contactos.items()
         ]
     return resultado
+
+
+def _extraer_relaciones_uno_a_uno_para_creacion(datos: Dict[str, Any]) -> Dict[str, Any]:
+    """Convierte campos planos condicionales en sus tablas 1:1 de lenguaje de negocio."""
+    resultado = dict(datos)
+
+    datos_natural = {
+        campo: resultado.pop(campo)
+        for campo in _CAMPOS_PERSONA_NATURAL
+        if campo in resultado
+    }
+    if datos_natural:
+        resultado["datos_persona_natural"] = DatosPersonaNaturalFormulario(**datos_natural)
+
+    clasificacion = {
+        campo: resultado.pop(campo)
+        for campo in _CAMPOS_CLASIFICACION_TRIBUTARIA
+        if campo in resultado
+    }
+    if clasificacion:
+        resultado["clasificacion_tributaria"] = ClasificacionTributariaFormulario(**clasificacion)
+
+    return resultado
+
+
+def _aplicar_actualizacion_relaciones_uno_a_uno(orm: Formulario, campos: Dict[str, Any]) -> Dict[str, Any]:
+    """Aplica campos condicionales 1:1 y devuelve solo los campos que pertenecen a formularios."""
+    restantes = dict(campos)
+
+    datos_natural = {
+        campo: restantes.pop(campo)
+        for campo in _CAMPOS_PERSONA_NATURAL
+        if campo in restantes
+    }
+    if datos_natural:
+        if orm.datos_persona_natural is None:
+            orm.datos_persona_natural = DatosPersonaNaturalFormulario()
+        for campo, valor in datos_natural.items():
+            setattr(orm.datos_persona_natural, campo, valor)
+
+    clasificacion = {
+        campo: restantes.pop(campo)
+        for campo in _CAMPOS_CLASIFICACION_TRIBUTARIA
+        if campo in restantes
+    }
+    if clasificacion:
+        if orm.clasificacion_tributaria is None:
+            orm.clasificacion_tributaria = ClasificacionTributariaFormulario()
+        for campo, valor in clasificacion.items():
+            setattr(orm.clasificacion_tributaria, campo, valor)
+
+    return restantes
+
+
+def _tipo_persona_efectivo(orm: Optional[Formulario], datos: Dict[str, Any]) -> str:
+    return str(datos.get("tipo_persona") or getattr(orm, "tipo_persona", "") or "").lower()
+
+
+def _purgar_datos_no_aplicables_en_payload(datos: Dict[str, Any], orm: Optional[Formulario] = None) -> Dict[str, Any]:
+    """
+    Quita del payload los bloques que no corresponden al tipo de persona.
+    Esta defensa vive en backend para que la integridad no dependa solo del UI.
+    """
+    resultado = dict(datos)
+    tipo_persona = _tipo_persona_efectivo(orm, resultado)
+    if tipo_persona == "natural":
+        for campo in _CAMPOS_CLASIFICACION_TRIBUTARIA:
+            resultado.pop(campo, None)
+        resultado["junta_directiva"] = []
+        resultado["accionistas"] = []
+        resultado["beneficiario_final"] = []
+    elif tipo_persona == "juridica":
+        for campo in _CAMPOS_PERSONA_NATURAL:
+            resultado.pop(campo, None)
+    return resultado
+
+
+def _purgar_relaciones_no_aplicables(orm: Formulario, datos: Dict[str, Any]) -> None:
+    tipo_persona = _tipo_persona_efectivo(orm, datos)
+    if tipo_persona == "natural":
+        orm.clasificacion_tributaria = None
+        orm.junta_directiva = []
+        orm.accionistas = []
+        orm.beneficiario_final = []
+    elif tipo_persona == "juridica":
+        orm.datos_persona_natural = None
 
 
 def _aplicar_actualizacion_contactos(orm: Formulario, campos: Dict[str, Any]) -> None:
@@ -446,8 +556,12 @@ class RepositorioFormularioSQLAlchemy:
 
     def crear(self, datos: Dict[str, Any]) -> FormularioDatos:
         """Persiste un nuevo formulario y retorna su representación de dominio."""
-        datos_orm = _extraer_contactos_para_creacion(
-            _construir_relaciones_dinamicas(_normalizar_booleanos_no_nulos(datos))
+        datos_orm = _extraer_relaciones_uno_a_uno_para_creacion(
+            _extraer_contactos_para_creacion(
+                _construir_relaciones_dinamicas(
+                    _normalizar_booleanos_no_nulos(_purgar_datos_no_aplicables_en_payload(datos))
+                )
+            )
         )
         orm = Formulario(**datos_orm)
         self._sesion.add(orm)
@@ -464,9 +578,11 @@ class RepositorioFormularioSQLAlchemy:
         )
         if "estado" in campos:
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
-        campos = _normalizar_booleanos_no_nulos(campos)
+        campos = _normalizar_booleanos_no_nulos(_purgar_datos_no_aplicables_en_payload(campos, orm))
+        _purgar_relaciones_no_aplicables(orm, campos)
         _aplicar_actualizacion_contactos(orm, campos)
-        campos_orm = _extraer_contactos_para_creacion(_construir_relaciones_dinamicas(campos))
+        campos_relacionales = _aplicar_actualizacion_relaciones_uno_a_uno(orm, campos)
+        campos_orm = _extraer_contactos_para_creacion(_construir_relaciones_dinamicas(campos_relacionales))
         campos_orm.pop("contactos", None)
         for clave, valor in campos_orm.items():
             setattr(orm, clave, valor)

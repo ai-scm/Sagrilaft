@@ -94,8 +94,6 @@ class Formulario(Base):
     pais_funciones = Column(String, nullable=True)
     departamento_funciones = Column(String, nullable=True)
     ciudad_funciones = Column(String, nullable=True)
-    direccion_residencia = Column(String, nullable=True)
-    ciudad_residencia = Column(String, nullable=True)
 
     # --- 5. Información Financiera ---
     moneda_declaracion = Column(String, nullable=True)
@@ -113,22 +111,6 @@ class Formulario(Base):
     realiza_operaciones_moneda_extranjera = Column(Boolean, nullable=False, default=False, server_default="false")
     paises_operaciones = Column(String, nullable=True)
     tipos_transaccion_otros = Column(String, nullable=True)
-
-    # --- 8. Clasificación Empresa y Régimen Tributario ---
-    actividad_clasificacion = Column(String, nullable=True)
-    actividad_especifica = Column(String, nullable=True)
-    sector = Column(String, nullable=True)
-    superintendencia = Column(String, nullable=True)
-    responsabilidades_renta = Column(String, nullable=True)
-    autorretenedor = Column(Boolean, nullable=False, default=False, server_default="false")
-    responsabilidades_iva = Column(String, nullable=True)
-    regimen_iva = Column(String, nullable=True)
-    gran_contribuyente = Column(Boolean, nullable=False, default=False, server_default="false")
-    entidad_sin_animo_lucro = Column(Boolean, nullable=False, default=False, server_default="false")
-    retencion_ica = Column(Boolean, nullable=False, default=False, server_default="false")
-    impuesto_ica = Column(Boolean, nullable=False, default=False, server_default="false")
-    entidad_oficial = Column(Boolean, nullable=False, default=False, server_default="false")
-    exento_retencion_fuente = Column(Boolean, nullable=False, default=False, server_default="false")
 
     # --- 11-12. Autorizaciones ---
     autorizacion_datos = Column(Boolean, default=False)
@@ -157,6 +139,10 @@ class Formulario(Base):
                                 cascade="all, delete-orphan")
     contactos = relationship("ContactoFormulario", back_populates="formulario",
                              cascade="all, delete-orphan", lazy="selectin")
+    datos_persona_natural = relationship("DatosPersonaNaturalFormulario", back_populates="formulario",
+                                         cascade="all, delete-orphan", uselist=False, lazy="selectin")
+    clasificacion_tributaria = relationship("ClasificacionTributariaFormulario", back_populates="formulario",
+                                            cascade="all, delete-orphan", uselist=False, lazy="selectin")
 
     # --- Datos dinámicos (listas 1:N — Cambio 1 del rediseño de esquema) ---
     # lazy="selectin": evita N+1 en listados de expedientes (RepositorioExpedienteSQLAlchemy.listar),
@@ -181,6 +167,214 @@ class Formulario(Base):
                                               lazy="selectin")
     tipos_transaccion = relationship("TipoTransaccionFormulario", back_populates="formulario",
                                      cascade="all, delete-orphan", lazy="selectin")
+
+    def _obtener_o_crear_datos_persona_natural(self):
+        if self.datos_persona_natural is None:
+            self.datos_persona_natural = DatosPersonaNaturalFormulario()
+        return self.datos_persona_natural
+
+    def _obtener_o_crear_clasificacion_tributaria(self):
+        if self.clasificacion_tributaria is None:
+            self.clasificacion_tributaria = ClasificacionTributariaFormulario()
+        return self.clasificacion_tributaria
+
+    @property
+    def direccion_residencia(self):
+        return self.datos_persona_natural.direccion_residencia if self.datos_persona_natural else None
+
+    @direccion_residencia.setter
+    def direccion_residencia(self, valor):
+        if valor is None and self.datos_persona_natural is None:
+            return
+        self._obtener_o_crear_datos_persona_natural().direccion_residencia = valor
+
+    @property
+    def ciudad_residencia(self):
+        return self.datos_persona_natural.ciudad_residencia if self.datos_persona_natural else None
+
+    @ciudad_residencia.setter
+    def ciudad_residencia(self, valor):
+        if valor is None and self.datos_persona_natural is None:
+            return
+        self._obtener_o_crear_datos_persona_natural().ciudad_residencia = valor
+
+    @property
+    def actividad_clasificacion(self):
+        return self.clasificacion_tributaria.actividad_clasificacion if self.clasificacion_tributaria else None
+
+    @actividad_clasificacion.setter
+    def actividad_clasificacion(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().actividad_clasificacion = valor
+
+    @property
+    def actividad_especifica(self):
+        return self.clasificacion_tributaria.actividad_especifica if self.clasificacion_tributaria else None
+
+    @actividad_especifica.setter
+    def actividad_especifica(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().actividad_especifica = valor
+
+    @property
+    def sector(self):
+        return self.clasificacion_tributaria.sector if self.clasificacion_tributaria else None
+
+    @sector.setter
+    def sector(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().sector = valor
+
+    @property
+    def superintendencia(self):
+        return self.clasificacion_tributaria.superintendencia if self.clasificacion_tributaria else None
+
+    @superintendencia.setter
+    def superintendencia(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().superintendencia = valor
+
+    @property
+    def responsabilidades_renta(self):
+        return self.clasificacion_tributaria.responsabilidades_renta if self.clasificacion_tributaria else None
+
+    @responsabilidades_renta.setter
+    def responsabilidades_renta(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().responsabilidades_renta = valor
+
+    @property
+    def autorretenedor(self):
+        return self.clasificacion_tributaria.autorretenedor if self.clasificacion_tributaria else False
+
+    @autorretenedor.setter
+    def autorretenedor(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().autorretenedor = bool(valor)
+
+    @property
+    def responsabilidades_iva(self):
+        return self.clasificacion_tributaria.responsabilidades_iva if self.clasificacion_tributaria else None
+
+    @responsabilidades_iva.setter
+    def responsabilidades_iva(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().responsabilidades_iva = valor
+
+    @property
+    def regimen_iva(self):
+        return self.clasificacion_tributaria.regimen_iva if self.clasificacion_tributaria else None
+
+    @regimen_iva.setter
+    def regimen_iva(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().regimen_iva = valor
+
+    @property
+    def gran_contribuyente(self):
+        return self.clasificacion_tributaria.gran_contribuyente if self.clasificacion_tributaria else False
+
+    @gran_contribuyente.setter
+    def gran_contribuyente(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().gran_contribuyente = bool(valor)
+
+    @property
+    def entidad_sin_animo_lucro(self):
+        return self.clasificacion_tributaria.entidad_sin_animo_lucro if self.clasificacion_tributaria else False
+
+    @entidad_sin_animo_lucro.setter
+    def entidad_sin_animo_lucro(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().entidad_sin_animo_lucro = bool(valor)
+
+    @property
+    def retencion_ica(self):
+        return self.clasificacion_tributaria.retencion_ica if self.clasificacion_tributaria else False
+
+    @retencion_ica.setter
+    def retencion_ica(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().retencion_ica = bool(valor)
+
+    @property
+    def impuesto_ica(self):
+        return self.clasificacion_tributaria.impuesto_ica if self.clasificacion_tributaria else False
+
+    @impuesto_ica.setter
+    def impuesto_ica(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().impuesto_ica = bool(valor)
+
+    @property
+    def entidad_oficial(self):
+        return self.clasificacion_tributaria.entidad_oficial if self.clasificacion_tributaria else False
+
+    @entidad_oficial.setter
+    def entidad_oficial(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().entidad_oficial = bool(valor)
+
+    @property
+    def exento_retencion_fuente(self):
+        return self.clasificacion_tributaria.exento_retencion_fuente if self.clasificacion_tributaria else False
+
+    @exento_retencion_fuente.setter
+    def exento_retencion_fuente(self, valor):
+        if valor is None and self.clasificacion_tributaria is None:
+            return
+        self._obtener_o_crear_clasificacion_tributaria().exento_retencion_fuente = bool(valor)
+
+
+class DatosPersonaNaturalFormulario(Base):
+    __tablename__ = "formulario_persona_natural"
+    __table_args__ = (
+        Index("ix_formulario_persona_natural_formulario_id", "formulario_id"),
+    )
+
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), primary_key=True)
+    direccion_residencia = Column(String, nullable=True)
+    ciudad_residencia = Column(String, nullable=True)
+
+    formulario = relationship("Formulario", back_populates="datos_persona_natural")
+
+
+class ClasificacionTributariaFormulario(Base):
+    __tablename__ = "formulario_clasificacion_tributaria"
+    __table_args__ = (
+        Index("ix_formulario_clasificacion_tributaria_formulario_id", "formulario_id"),
+    )
+
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), primary_key=True)
+    actividad_clasificacion = Column(String, nullable=True)
+    actividad_especifica = Column(String, nullable=True)
+    sector = Column(String, nullable=True)
+    superintendencia = Column(String, nullable=True)
+    responsabilidades_renta = Column(String, nullable=True)
+    autorretenedor = Column(Boolean, nullable=False, default=False, server_default="false")
+    responsabilidades_iva = Column(String, nullable=True)
+    regimen_iva = Column(String, nullable=True)
+    gran_contribuyente = Column(Boolean, nullable=False, default=False, server_default="false")
+    entidad_sin_animo_lucro = Column(Boolean, nullable=False, default=False, server_default="false")
+    retencion_ica = Column(Boolean, nullable=False, default=False, server_default="false")
+    impuesto_ica = Column(Boolean, nullable=False, default=False, server_default="false")
+    entidad_oficial = Column(Boolean, nullable=False, default=False, server_default="false")
+    exento_retencion_fuente = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    formulario = relationship("Formulario", back_populates="clasificacion_tributaria")
 
 
 class MiembroJuntaDirectiva(Base):
