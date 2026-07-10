@@ -255,4 +255,49 @@ export const ESTILOS = {
     marginTop: '4px',
     display: 'block',
   },
+  confirmacionTexto: {
+    fontSize: '0.9rem',
+    color: 'var(--gray-600, #475569)',
+    margin: '0 0 16px',
+    lineHeight: 1.5,
+  },
+  resumenConfirmacion: {
+    border: '1px solid var(--gray-200, #e2e8f0)',
+    borderRadius: 'var(--radius-md, 8px)',
+    overflow: 'hidden',
+    marginBottom: '20px',
+  },
+  itemResumen: {
+    display: 'grid',
+    gridTemplateColumns: '130px 1fr',
+    gap: '12px',
+    padding: '10px 12px',
+    borderBottom: '1px solid var(--gray-100, #f1f5f9)',
+    fontSize: '0.84rem',
+  },
+  itemResumenFinal: {
+    borderBottom: 'none',
+  },
+  itemResumenCorreo: {
+    background: '#eff6ff',
+  },
+  resumenLabel: {
+    color: 'var(--gray-500, #64748b)',
+    fontWeight: '700',
+  },
+  resumenValor: {
+    color: 'var(--gray-900, #0f172a)',
+    fontWeight: '600',
+    overflowWrap: 'anywhere',
+  },
+  avisoConfirmacion: {
+    background: '#fefce8',
+    border: '1px solid #fde047',
+    borderRadius: 'var(--radius-md, 8px)',
+    padding: '10px 12px',
+    fontSize: '0.82rem',
+    color: '#854d0e',
+    marginBottom: '20px',
+    lineHeight: 1.4,
+  },
 };

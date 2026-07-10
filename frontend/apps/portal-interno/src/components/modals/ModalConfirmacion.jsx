@@ -70,6 +70,7 @@ export default function ModalConfirmacion({
   visible,
   titulo,
   mensaje,
+  children,
   textoConfirmar = 'Confirmar',
   textoCancelar = 'Cancelar',
   onConfirmar,
@@ -83,7 +84,7 @@ export default function ModalConfirmacion({
     <div style={s.fondo} role="dialog" aria-modal="true" aria-labelledby="titulo-modal-confirmacion">
       <div style={s.modal}>
         <h3 style={s.titulo} id="titulo-modal-confirmacion">{titulo}</h3>
-        <p style={s.mensaje}>{mensaje}</p>
+        {children ?? <p style={s.mensaje}>{mensaje}</p>}
         <div style={s.botones}>
           <button
             style={s.btnCancelar}

@@ -451,11 +451,12 @@ export function useFormulario() {
   };
 
   const handleStepClick = useCallback((stepNum) => {
-    if (stepNum < step) {
+    const visibles = calcularPasosVisibles(formData);
+    if (stepNum < step && visibles.includes(stepNum)) {
       setStep(stepNum);
       scrollTop();
     }
-  }, [step]);
+  }, [formData, step]);
 
   // Navegación incondicional usada exclusivamente por el flujo de corrección.
   // No aplica la restricción de "solo hacia atrás" de handleStepClick porque
@@ -555,6 +556,7 @@ export function useFormulario() {
 
   return {
     step, formData, errors, helpField, setHelpField,
+    pasosVisibles: calcularPasosVisibles(formData),
     recuperacion,
     codigoPeticion, estadoFormulario, camposACorregir, formDataOriginal, tablasOriginales, documentos, saving, uploadingDoc, eliminandoDoc,
     estadoConfirmacion, confirmarEliminacion, cancelarEliminacion,

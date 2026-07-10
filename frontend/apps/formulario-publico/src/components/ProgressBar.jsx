@@ -28,17 +28,21 @@ function _pasosConCorrección(camposIdentificados) {
   return pasos;
 }
 
-export default function ProgressBar({ currentStep, totalSteps, onStepClick }) {
+export default function ProgressBar({ currentStep, totalSteps, pasosVisibles, onStepClick }) {
   const { activa, camposIdentificados } = useCorreccion();
   const pasosConCorrecciones = activa ? _pasosConCorrección(camposIdentificados) : new Set();
+  const pasos = pasosVisibles?.length ? pasosVisibles : Array.from({ length: totalSteps }, (_, i) => i + 1);
+  const indiceActual = Math.max(pasos.indexOf(currentStep), 0);
+  const totalVisible = pasos.length;
+  const numeroPasoVisible = indiceActual + 1;
 
-  const percentage = ((currentStep) / totalSteps) * 100;
+  const percentage = (numeroPasoVisible / totalVisible) * 100;
 
   return (
     <div className="progress-container">
       <div className="progress-header">
         <span className="progress-title">Progreso del formulario</span>
-        <span className="progress-step-info">Paso {currentStep} de {totalSteps}</span>
+        <span className="progress-step-info">Paso {numeroPasoVisible} de {totalVisible}</span>
       </div>
 
       <div className="progress-bar-track">
@@ -49,15 +53,15 @@ export default function ProgressBar({ currentStep, totalSteps, onStepClick }) {
       </div>
 
       <div className="progress-steps">
-        {STEP_LABELS.map((label, index) => {
-          const stepNum = index + 1;
+        {pasos.map((stepNum) => {
+          const label = STEP_LABELS[stepNum - 1];
           const isActive    = stepNum === currentStep;
-          const isCompleted = stepNum < currentStep;
+          const isCompleted = pasos.indexOf(stepNum) < indiceActual;
           const tieneCorrecciones = pasosConCorrecciones.has(stepNum);
 
           return (
             <div
-              key={index}
+              key={stepNum}
               className={[
                 'progress-step-dot',
                 isActive         ? 'active'             : '',

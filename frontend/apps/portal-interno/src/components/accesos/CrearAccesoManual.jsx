@@ -11,10 +11,12 @@ import {
   AREAS_RESPONSABLES,
   formatearFechaLarga,
   ETIQUETA_TIPO_CONTRAPARTE,
+  ETIQUETA_AREA_RESPONSABLE,
   MENSAJE_ENLACE_NOTA,
 } from '../../config/constantes';
 import { guardarCredenciales } from '../../utils/credenciales';
-import { REGEX_CORREO, normalizarCorreo } from '../../utils/validadores';
+import { esCorreoValido, normalizarCorreo } from '../../utils/validadores';
+import ModalConfirmacion from '../modals/ModalConfirmacion';
 
 import { ESTILOS } from './CrearAccesoManualStyles';
 
@@ -34,11 +36,19 @@ function validarCamposAcceso(formData) {
   if (!formData.area_responsable) errores.area_responsable = 'Seleccione el área de contacto';
   if (!formData.correo_destinatario.trim()) {
     errores.correo_destinatario = 'Ingrese el correo electrónico';
-  } else if (!REGEX_CORREO.test(formData.correo_destinatario.trim())) {
+  } else if (!esCorreoValido(formData.correo_destinatario)) {
     errores.correo_destinatario = 'Ingrese un correo electrónico válido';
   }
 
   return errores;
+}
+
+function normalizarDatosAcceso(formData) {
+  return {
+    ...formData,
+    razon_social: formData.razon_social.trim(),
+    correo_destinatario: normalizarCorreo(formData.correo_destinatario),
+  };
 }
 
 function CampoSelect({ id, label, value, onChange, options, error, disabled }) {
@@ -94,6 +104,56 @@ function ItemCredencial({ label, valor, monospace = true }) {
   );
 }
 
+function ItemResumenConfirmacion({ label, valor, destacado = false, ultimo = false }) {
+  return (
+    <div
+      style={{
+        ...ESTILOS.itemResumen,
+        ...(destacado ? ESTILOS.itemResumenCorreo : {}),
+        ...(ultimo ? ESTILOS.itemResumenFinal : {}),
+      }}
+    >
+      <span style={ESTILOS.resumenLabel}>{label}</span>
+      <span style={ESTILOS.resumenValor}>{valor}</span>
+    </div>
+  );
+}
+
+function ResumenConfirmacionAcceso({ datos }) {
+  const datosNormalizados = normalizarDatosAcceso(datos);
+
+  return (
+    <>
+      <p style={ESTILOS.confirmacionTexto}>
+        Revise cuidadosamente estos datos antes de generar y enviar el acceso.
+      </p>
+      <div style={ESTILOS.resumenConfirmacion}>
+        <ItemResumenConfirmacion
+          label="Correo"
+          valor={datosNormalizados.correo_destinatario}
+          destacado
+        />
+        <ItemResumenConfirmacion
+          label="Contraparte"
+          valor={ETIQUETA_TIPO_CONTRAPARTE[datosNormalizados.tipo_contraparte] ?? datosNormalizados.tipo_contraparte}
+        />
+        <ItemResumenConfirmacion
+          label="Razón social"
+          valor={datosNormalizados.razon_social}
+        />
+        <ItemResumenConfirmacion
+          label="Área"
+          valor={ETIQUETA_AREA_RESPONSABLE[datosNormalizados.area_responsable] ?? datosNormalizados.area_responsable}
+          ultimo
+        />
+      </div>
+      <div style={ESTILOS.avisoConfirmacion}>
+        El correo indicado recibirá el acceso para diligenciar el formulario.
+      </div>
+    </>
+  );
+}
+
 export default function CrearAccesoManual() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(ESTADO_INICIAL_ACCESO);
@@ -103,6 +163,7 @@ export default function CrearAccesoManual() {
   const [resultado, setResultado] = useState(null);
   const [copiado, setCopiado] = useState(false);
   const [campoEnfocado, setCampoEnfocado] = useState(null);
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
 
   const temporizadorRef = useRef(null);
 
@@ -114,7 +175,7 @@ export default function CrearAccesoManual() {
     setErrorGlobal(null);
   }, []);
 
-  const handleSubmit = useCallback(async (e) => {
+  const handleSubmit = useCallback((e) => {
     e.preventDefault();
     const errores = validarCamposAcceso(formData);
     if (Object.keys(errores).length > 0) {
@@ -122,22 +183,33 @@ export default function CrearAccesoManual() {
       return;
     }
 
+    setMostrarConfirmacion(true);
+  }, [formData]);
+
+  const handleConfirmarCreacion = useCallback(async () => {
+    if (cargando) return;
+
+    const errores = validarCamposAcceso(formData);
+    if (Object.keys(errores).length > 0) {
+      setErroresCampo(errores);
+      setMostrarConfirmacion(false);
+      return;
+    }
+
     setCargando(true);
     setErrorGlobal(null);
     try {
-      const datosNormalizados = {
-        ...formData,
-        correo_destinatario: normalizarCorreo(formData.correo_destinatario),
-      };
-      const acceso = await api.crearAccesoManual(datosNormalizados);
+      const acceso = await api.crearAccesoManual(normalizarDatosAcceso(formData));
       guardarCredenciales(acceso);
       setResultado(acceso);
+      setMostrarConfirmacion(false);
     } catch (errorCreacion) {
       setErrorGlobal('Error al crear el acceso. Verifique los datos e intente nuevamente.');
+      setMostrarConfirmacion(false);
     } finally {
       setCargando(false);
     }
-  }, [formData]);
+  }, [cargando, formData]);
 
   const handleCopiarEnlace = () => {
     if (!resultado) return;
@@ -153,6 +225,7 @@ export default function CrearAccesoManual() {
     setFormData(ESTADO_INICIAL_ACCESO);
     setErroresCampo({});
     setErrorGlobal(null);
+    setMostrarConfirmacion(false);
   };
 
   const estiloInput = (campo) => ({
@@ -207,60 +280,73 @@ export default function CrearAccesoManual() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      <div style={ESTILOS.tarjeta}>
-        {errorGlobal && <div style={ESTILOS.errorGlobal}>{errorGlobal}</div>}
-        <div style={ESTILOS.fila}>
-          <CampoSelect
-            id="tipo_contraparte" label="Tipo de contraparte"
-            value={formData.tipo_contraparte} onChange={handleChange}
-            options={TIPOS_CONTRAPARTE} error={erroresCampo.tipo_contraparte} disabled={cargando}
-          />
-          <CampoSelect
-            id="area_responsable" label="Área de Contacto"
-            value={formData.area_responsable} onChange={handleChange}
-            options={AREAS_RESPONSABLES} error={erroresCampo.area_responsable} disabled={cargando}
-          />
-        </div>
-        <CampoInput
-          id="razon_social" label="Nombre o Razón social empresa"
-          placeholder="Nombre completo de la empresa"
-          value={formData.razon_social} onChange={handleChange}
-          onFocus={() => setCampoEnfocado('razon_social')} onBlur={() => setCampoEnfocado(null)}
-          style={estiloInput('razon_social')} error={erroresCampo.razon_social} disabled={cargando}
-          autoComplete="off"
-        />
-        <CampoInput
-          id="correo_destinatario" label="Correo electrónico representante legal"
-          type="email"
-          placeholder="ejemplo@empresa.com"
-          value={formData.correo_destinatario} onChange={handleChange}
-          onFocus={() => setCampoEnfocado('correo_destinatario')} onBlur={() => setCampoEnfocado(null)}
-          style={estiloInput('correo_destinatario')} error={erroresCampo.correo_destinatario} disabled={cargando}
-          autoComplete="email"
-        />
-        <div style={ESTILOS.fila}>
-          <div style={ESTILOS.campo}>
-            <label style={ESTILOS.label}>Código de petición</label>
-            <input type="text" value="Se genera automáticamente" readOnly style={{ ...ESTILOS.input, ...ESTILOS.inputReadonly }} />
+    <>
+      <form onSubmit={handleSubmit} noValidate>
+        <div style={ESTILOS.tarjeta}>
+          {errorGlobal && <div style={ESTILOS.errorGlobal}>{errorGlobal}</div>}
+          <div style={ESTILOS.fila}>
+            <CampoSelect
+              id="tipo_contraparte" label="Tipo de contraparte"
+              value={formData.tipo_contraparte} onChange={handleChange}
+              options={TIPOS_CONTRAPARTE} error={erroresCampo.tipo_contraparte} disabled={cargando}
+            />
+            <CampoSelect
+              id="area_responsable" label="Área de Contacto"
+              value={formData.area_responsable} onChange={handleChange}
+              options={AREAS_RESPONSABLES} error={erroresCampo.area_responsable} disabled={cargando}
+            />
           </div>
-          <div style={ESTILOS.campo}>
-            <label style={ESTILOS.label}>PIN de acceso</label>
-            <input type="text" value="Se genera automáticamente" readOnly style={{ ...ESTILOS.input, ...ESTILOS.inputReadonly }} />
+          <CampoInput
+            id="razon_social" label="Nombre o Razón social empresa"
+            placeholder="Nombre completo de la empresa"
+            value={formData.razon_social} onChange={handleChange}
+            onFocus={() => setCampoEnfocado('razon_social')} onBlur={() => setCampoEnfocado(null)}
+            style={estiloInput('razon_social')} error={erroresCampo.razon_social} disabled={cargando}
+            autoComplete="off"
+          />
+          <CampoInput
+            id="correo_destinatario" label="Correo electrónico representante legal"
+            type="email"
+            placeholder="ejemplo@empresa.com"
+            value={formData.correo_destinatario} onChange={handleChange}
+            onFocus={() => setCampoEnfocado('correo_destinatario')} onBlur={() => setCampoEnfocado(null)}
+            style={estiloInput('correo_destinatario')} error={erroresCampo.correo_destinatario} disabled={cargando}
+            autoComplete="email"
+          />
+          <div style={ESTILOS.fila}>
+            <div style={ESTILOS.campo}>
+              <label style={ESTILOS.label}>Código de petición</label>
+              <input type="text" value="Se genera automáticamente" readOnly style={{ ...ESTILOS.input, ...ESTILOS.inputReadonly }} />
+            </div>
+            <div style={ESTILOS.campo}>
+              <label style={ESTILOS.label}>PIN de acceso</label>
+              <input type="text" value="Se genera automáticamente" readOnly style={{ ...ESTILOS.input, ...ESTILOS.inputReadonly }} />
+            </div>
           </div>
         </div>
-      </div>
-      <button
-        type="submit"
-        style={{
-          ...ESTILOS.btnPrincipal,
-          opacity: cargando ? 0.6 : 1,
-          cursor: cargando ? 'not-allowed' : 'pointer',
-        }}
-        disabled={cargando}
+        <button
+          type="submit"
+          style={{
+            ...ESTILOS.btnPrincipal,
+            opacity: cargando ? 0.6 : 1,
+            cursor: cargando ? 'not-allowed' : 'pointer',
+          }}
+          disabled={cargando}
+        >
+          {cargando ? 'Generando acceso…' : 'Crear acceso'}
+        </button>
+      </form>
+      <ModalConfirmacion
+        visible={mostrarConfirmacion}
+        titulo="Confirmar creación del acceso"
+        textoConfirmar="Crear acceso"
+        textoCancelar="Editar datos"
+        onConfirmar={handleConfirmarCreacion}
+        onCancelar={() => setMostrarConfirmacion(false)}
+        ocupado={cargando}
       >
-        {cargando ? 'Generando acceso…' : 'Crear acceso'}
-      </button>
-    </form>
+        <ResumenConfirmacionAcceso datos={formData} />
+      </ModalConfirmacion>
+    </>
   );
 }

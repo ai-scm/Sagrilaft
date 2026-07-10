@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sagrilaft/shared": "file:../../shared",
     "country-state-city": "^3.2.1",
     "i18n-iso-countries": "^7.14.0",
     "keycloak-js": "^26.0.0",

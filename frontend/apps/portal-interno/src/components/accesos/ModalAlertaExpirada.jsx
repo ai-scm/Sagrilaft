@@ -69,7 +69,7 @@ export default function ModalAlertaExpirada({ isOpen, onClose }) {
 
         <div style={{ background: '#FEFCE8', borderLeft: '3px solid #FDE047', padding: '10px 14px', borderRadius: '0 6px 6px 0', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
           <span style={{ color: '#854D0E', fontSize: '0.85rem', lineHeight: 1.4 }}>
-            <strong>Por tu seguridad:</strong> El PIN ha sido descartado permanentemente del sistema. Genere un nuevo acceso para obtener un nuevo PIN y código de petición si aún necesitas que el destinatario acceda al formulario.
+            <strong>Por tu seguridad:</strong> El PIN ha sido descartado permanentemente del sistema. Genere un nuevo acceso para obtener un nuevo PIN y código de petición si aún necesitas que el destinatario acceda al formulario. (Recordar que las credenciales le llega al Correo electrónico representante legal *)
           </span>
         </div>
 

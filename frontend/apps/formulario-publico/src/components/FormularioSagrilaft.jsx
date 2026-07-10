@@ -134,7 +134,7 @@ function BannerCorreccionPendiente({ onNavegar }) {
 
 export default function FormularioSagrilaft() {
   const {
-    step, formData, errors, helpField, setHelpField,
+    step, formData, errors, helpField, setHelpField, pasosVisibles,
     recuperacion,
     codigoPeticion, estadoFormulario, camposACorregir, formDataOriginal, tablasOriginales,
     documentos, saving, uploadingDoc, eliminandoDoc,
@@ -225,7 +225,12 @@ export default function FormularioSagrilaft() {
           <BannerCorreccionPendiente onNavegar={irAPasoCorreccion} />
           <DisclaimerCamposNoAplicables />
 
-          <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} onStepClick={handleStepClick} />
+          <ProgressBar
+            currentStep={step}
+            totalSteps={TOTAL_STEPS}
+            pasosVisibles={pasosVisibles}
+            onStepClick={handleStepClick}
+          />
 
           {step === 1 && (
             <PasoDocumentos
