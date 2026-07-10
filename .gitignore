@@ -3,12 +3,10 @@
 .env.*
 !.env.example
 !.env.dev.example
+!.env.staging.example
 !.env.prod.example
 !frontend/apps/formulario-publico/.env.dev.example
 !frontend/apps/portal-interno/.env.dev.example
-.env.prod.example
-.env.dev.example
-.env.example
 *.pem
 *.key
 *.p12
@@ -75,8 +73,8 @@ desktop.ini
 # ── CDK ──────────────────────────────────────────────────
 infra/sagrilaft/cdk.out/
 infra/sagrilaft/.venv/
-infra/sagrilaft/.cdk.staging/      # ← agregar esto
-infra/sagrilaft/cdk.context.json   # ← agregar esto (contiene account ID de AWS)
+infra/sagrilaft/.cdk.staging/
+infra/sagrilaft/cdk.context.json
 
 
 # ── Docker volumes locales ───────────────────────────────
@@ -87,12 +85,10 @@ realm-sagrilaft.dev.json
 !frontend/apps/portal-interno/.env.example
 !frontend/apps/formulario-publico/.env.example
 
-
 sns-policy.json
 
-
+infra/sagrilaft/cdk.context.json
 reset_entorno.sh
-
-README.md
 docs
-scripts
+tmp/
+PLAN.md

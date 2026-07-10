@@ -6,3 +6,4 @@ bin/*.js
 bin/*.d.ts
 lib/*.js
 lib/*.d.ts
+infra/sagrilaft/cdk.context.json
