@@ -38,8 +38,16 @@ export class Notifications extends Construct {
       topicName: `sagrilaft-alertas-${ambiente}`,
     });
 
-    this.alertasTopic.addSubscription(
-      new subscriptions.EmailSubscription(snsAlertasSub),
-    );
+    snsAlertasSub
+      .split(',')
+      .map((email) => email.trim())
+      .filter((email) => email.length > 0)
+      .forEach((email) => {
+        this.alertasTopic.addSubscription(
+          new subscriptions.EmailSubscription(email, {
+            json: false,
+          }),
+        );
+      });
   }
 }

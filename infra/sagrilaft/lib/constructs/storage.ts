@@ -2,6 +2,10 @@ import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
+export interface StorageProps {
+  readonly ambiente: string;
+}
+
 /**
  * Storage: Bucket S3 con estructura de carpetas por empresa.
  *
@@ -17,13 +21,13 @@ import { Construct } from 'constructs';
 export class Storage extends Construct {
   public readonly bucket: s3.Bucket;
 
-  constructor(scope: Construct, id: string) {
+  constructor(scope: Construct, id: string, props: StorageProps) {
     super(scope, id);
 
     this.bucket = new s3.Bucket(this, 'Uploads', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: false,
+      versioned: props.ambiente === 'prod',
       removalPolicy: RemovalPolicy.RETAIN,
       lifecycleRules: [
         {
