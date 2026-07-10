@@ -19,21 +19,29 @@ class ZohoSignConfig:
     client_id:      str = field(default_factory=lambda: os.getenv("ZOHO_CLIENT_ID", ""))
     client_secret:  str = field(default_factory=lambda: os.getenv("ZOHO_CLIENT_SECRET", ""))
     refresh_token:  str = field(default_factory=lambda: os.getenv("ZOHO_REFRESH_TOKEN", ""))
+    redirect_uri:   str = field(default_factory=lambda: os.getenv("ZOHO_REDIRECT_URI", ""))
     webhook_secret: str = field(default_factory=lambda: os.getenv("ZOHO_WEBHOOK_SECRET", ""))
+    webhook_signature_header: str = field(
+        default_factory=lambda: os.getenv("ZOHO_WEBHOOK_SIGNATURE_HEADER", "X-ZS-WEBHOOK-SIGNATURE")
+    )
     modo_prueba:    bool = field(
         default_factory=lambda: os.getenv("ZOHO_SIGN_TESTING", "false").lower() == "true"
     )
 
     def validar(self) -> None:
-        """Lanza RuntimeError si las credenciales OAuth de ZohoSign no están configuradas.
+        """Lanza RuntimeError si ZohoSign real no está configurado.
 
         webhook_secret se omite: se valida en FirmaService al recibir el webhook,
         ya que puede estar ausente en entornos sin URL pública.
         """
+        if self.modo_prueba:
+            return
+
         _REQUERIDAS = {
             "client_id":     "ZOHO_CLIENT_ID",
             "client_secret": "ZOHO_CLIENT_SECRET",
             "refresh_token": "ZOHO_REFRESH_TOKEN",
+            "redirect_uri":  "ZOHO_REDIRECT_URI",
         }
         faltantes = [
             var_env
@@ -179,9 +187,15 @@ class AppConfig:
     # "local" usa el volumen del servidor; "s3" usa Amazon S3
     storage_backend: str = field(default_factory=lambda: os.getenv("STORAGE_BACKEND", "local"))
     # Clave para firmar reportes de auditoría con HMAC-SHA256
-    secret_key: str = field(default_factory=lambda: os.getenv("SECRET_KEY", "cambiar-en-produccion"))
+    secret_key: str = field(
+    default_factory=lambda:
+        os.environ["SECRET_KEY"]
+)
     # "development" | "production" — controla comportamiento del health check y logs
-    entorno: str = field(default_factory=lambda: os.getenv("APP_ENV", "development").lower())
+    entorno: str = field(
+    default_factory=lambda:
+        os.environ["APP_ENV"].lower()
+)
 
 def load_config() -> AppConfig:
     """Carga la configuración desde variables de entorno."""
@@ -193,6 +207,19 @@ def load_config() -> AppConfig:
 
     cfg = AppConfig()
 
+    storage_backend = cfg.storage_backend.lower()
+
+    if cfg.entorno in {"production", "staging"}:
+        if storage_backend != "s3":
+            raise RuntimeError(
+                f"STORAGE_BACKEND={cfg.storage_backend!r} no permitido en APP_ENV={cfg.entorno}. "
+                "Produccion y staging deben usar STORAGE_BACKEND=s3."
+            )
+        if not cfg.s3.bucket:
+            raise RuntimeError(
+                f"S3_BUCKET es obligatorio en APP_ENV={cfg.entorno} con STORAGE_BACKEND=s3."
+            )
+
     if not cfg.aws.model_id:
         _log.warning(
             "BEDROCK_MODEL_ID no configurado — el análisis IA estará deshabilitado."
@@ -200,7 +227,7 @@ def load_config() -> AppConfig:
     elif not (cfg.aws.access_key_id and cfg.aws.secret_access_key):
         _log.info(
             "AWS sin credenciales explícitas (AWS_ACCESS_KEY_ID vacío). "
-            "Se usará el IAM Role del entorno — correcto en EC2, "
+            "Se usará el IAM Role/Task Role del entorno — correcto en ECS, "
             "configura AWS_ACCESS_KEY_ID si corres fuera de AWS."
         )
 

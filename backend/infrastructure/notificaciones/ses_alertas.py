@@ -208,3 +208,7 @@ class SesAlertasPortal:
             "fallidas": self._fallidas,
             "total": self._enviadas + self._fallidas,
         }
+
+    def metricas(self) -> dict:
+        """Expone contadores en memoria para el endpoint /health."""
+        return self.estadisticas

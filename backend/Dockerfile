@@ -72,12 +72,13 @@ USER appuser
 
 # Documenta que el proceso escucha en el puerto 8000.
 # Esto es informativo — no abre el puerto por sí solo.
-# El puerto se expone realmente en docker-compose.yml con la sección "ports".
+# En ECS Fargate este puerto se registra en la task definition y target group.
+# En desarrollo local se expone mediante docker-compose.yml.
 EXPOSE 8000
 
 # Comando que se ejecuta cuando el contenedor arranca.
-# entrypoint.sh espera a que la base de datos esté disponible, aplica
-# las migraciones pendientes (alembic upgrade head) y luego lanza Uvicorn.
+# entrypoint.sh espera a que la base de datos esté disponible y lanza Uvicorn.
+# En ECS, las migraciones se ejecutan con RUN_MODE=migrate en una task puntual.
 # En desarrollo, docker-compose.dev.yml reemplaza este CMD por uno con
 # --reload para que el servidor se reinicie al guardar código.
 CMD ["sh", "entrypoint.sh"]

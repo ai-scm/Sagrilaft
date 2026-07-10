@@ -125,9 +125,26 @@ class ExtractorBedrock:
           no de esta clase directamente.
     """
 
+    # Tiempo máximo de espera para que Bedrock complete la extracción de un PDF.
+    # Claude Sonnet puede tardar entre 30 y 90 s en documentos complejos.
+    # El valor debe ser menor al idleTimeout del ALB (300 s) para que la
+    # respuesta de error de boto3 llegue antes de que el gateway corte la conexión.
+    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 280
+
     def __init__(self, region: str, modelo_id: str, max_tokens: int = 4096) -> None:
         import boto3
-        self._cliente = boto3.client("bedrock-runtime", region_name=region)
+        from botocore.config import Config
+
+        configuracion_cliente = Config(
+            connect_timeout=10,
+            read_timeout=self._TIMEOUT_LECTURA_BEDROCK_SEGUNDOS,
+            retries={"max_attempts": 0},  # sin reintentos automáticos — el caller decide
+        )
+        self._cliente = boto3.client(
+            "bedrock-runtime",
+            region_name=region,
+            config=configuracion_cliente,
+        )
         self._modelo_id = modelo_id
         self._max_tokens = max_tokens
 

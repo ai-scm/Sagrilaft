@@ -1,20 +1,29 @@
 #!/bin/sh
 # Este script se ejecuta cada vez que el contenedor del backend arranca.
-# Hace tres cosas en orden: espera a que la base de datos esté lista,
-# aplica los cambios pendientes en su estructura, y arranca el servidor.
+# Espera a que la base de datos esté lista y luego arranca el servidor.
+# En ECS, las migraciones se ejecutan como task puntual antes del deploy.
 
 # Si cualquier paso falla, el script se detiene de inmediato.
-# Sin esto, un error en las migraciones podría pasar desapercibido y el
-# servidor arrancaría con la base de datos en un estado incorrecto.
 set -e
+
+if [ "${APP_ENV:-development}" = "production" ] || [ "${APP_ENV:-development}" = "staging" ]; then
+    if [ "${STORAGE_BACKEND:-local}" != "s3" ]; then
+        echo "[entrypoint] ERROR: APP_ENV=${APP_ENV} requiere STORAGE_BACKEND=s3." >&2
+        exit 1
+    fi
+
+    if [ -z "${S3_BUCKET:-}" ]; then
+        echo "[entrypoint] ERROR: APP_ENV=${APP_ENV} requiere S3_BUCKET." >&2
+        exit 1
+    fi
+fi
 
 
 # ── 1. Esperar a que la base de datos esté disponible ─────────────────────
 #
-# Cuando el servidor arranca en AWS, la base de datos (RDS) puede tardar
-# entre 10 y 60 segundos en estar lista para recibir conexiones, aunque
-# Docker Compose ya la marque como "healthy". Sin esta espera, el servidor
-# intentaría conectarse demasiado pronto y fallaría.
+# Cuando el servidor arranca en ECS, la base de datos (RDS) puede tardar
+# entre 10 y 60 segundos en estar lista para recibir conexiones. En desarrollo
+# local tambien evita que el backend arranque antes que PostgreSQL.
 #
 # El bloque python - <<'EOF' ... EOF ejecuta un script Python escrito
 # directamente aquí dentro del shell, sin necesidad de un archivo separado.
@@ -43,30 +52,26 @@ for i in range(1, intentos + 1):
         print(f"[entrypoint] BD no disponible ({i}/{intentos}): {type(e).__name__}", flush=True)
 
         if i == intentos:
-            # Si se agotan los intentos el contenedor falla con error,
-            # Docker lo registra en los logs y puede reiniciarlo si
-            # restart: unless-stopped está configurado en docker-compose.yml.
+            # Si se agotan los intentos el contenedor falla con error.
+            # En ECS, el servicio intentara reemplazar la task fallida.
             sys.exit(1)
 
         time.sleep(2)
 EOF
 
 
-# ── 2. Aplicar migraciones de base de datos ───────────────────────────────
+# ── 2. Aplicar migraciones de base de datos solo cuando se solicite ───────
 #
 # Alembic gestiona la estructura de la base de datos (tablas, columnas,
 # índices). Cada vez que el código añade o modifica algo en el modelo de
 # datos, se genera un archivo de migración en alembic/versions/.
 #
-# "upgrade head" aplica todos los archivos de migración pendientes en orden,
-# dejando la base de datos sincronizada con el código que está a punto de
-# arrancar. Si ya estaba al día, el comando termina en menos de un segundo
-# sin hacer nada.
-#
-# Si una migración falla (ej: conflicto de datos), el script se detiene aquí
-# gracias al "set -e" del inicio — el servidor no arranca en estado inválido.
-echo "[entrypoint] Aplicando migraciones Alembic..."
-alembic upgrade head
+if [ "${RUN_MODE:-server}" = "migrate" ]; then
+    echo "[entrypoint] Aplicando migraciones Alembic..."
+    alembic upgrade head
+    echo "[entrypoint] Migraciones completadas."
+    exit 0
+fi
 
 
 # ── 3. Arrancar el servidor ───────────────────────────────────────────────
@@ -83,9 +88,13 @@ echo "[entrypoint] Iniciando Uvicorn (workers=${UVICORN_WORKERS:-4})..."
 #   --workers: Número de procesos paralelos.
 #   --proxy-headers: Activa la lectura de cabeceras HTTP de proxies.
 #   --forwarded-allow-ips: Rango de IPs permitidas para confiar en cabeceras de proxy.
+#   --timeout-keep-alive: Segundos que Uvicorn mantiene una conexión keep-alive abierta.
+#     Debe ser mayor al idleTimeout del ALB (300 s) para evitar la race condition en la
+#     que Uvicorn cierra el socket TCP justo antes de que el ALB lea la respuesta.
 exec uvicorn main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers "${UVICORN_WORKERS:-4}" \
     --proxy-headers \
-    --forwarded-allow-ips "${TRUSTED_PROXY_IPS:-127.0.0.1}"
+    --forwarded-allow-ips "${TRUSTED_PROXY_IPS:-127.0.0.1}" \
+    --timeout-keep-alive 310

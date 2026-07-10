@@ -52,6 +52,7 @@ class ZohoSignService:
                 "client_id":     self._config.client_id,
                 "client_secret": self._config.client_secret,
                 "refresh_token": self._config.refresh_token,
+                "redirect_uri":  self._config.redirect_uri,
             },
             timeout=15,
         )
