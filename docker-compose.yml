@@ -1,23 +1,16 @@
 # ============================================================
-# Producción — EC2 + docker-compose
+# Desarrollo local — Docker Compose
 #
-# Este archivo describe los tres programas que corren juntos en el servidor:
+# Este archivo describe los servicios locales del proyecto:
 #   - backend  : la API que procesa formularios, usuarios y documentos
 #   - frontend : la web pública que ven los usuarios en el navegador
 #   - keycloak : el sistema de login del portal interno
 #
-# Arquitectura:
-#   Internet
-#     └─ ALB (HTTPS — el candado del navegador lo gestiona AWS)
-#          └─ EC2 (este archivo)
-#               ├─ frontend :80   ← Nginx entrega la web pública y redirige /api al backend
-#               └─ backend  :8000 ← No está expuesto a internet, solo al frontend
-#   BD:      RDS PostgreSQL  (en la red privada de AWS, el servidor no la ve directamente)
-#   Archivos: uploads_data   (volumen EBS adjunto al EC2)
+# Produccion/staging NO usan Docker Compose. La arquitectura productiva se
+# despliega con CDK sobre ECS Fargate: ALB -> services ECS -> RDS/S3.
 #
-# Para desplegarlo en producción:
-#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# Variables requeridas: ver .env.example
+# Para desarrollo:
+#   docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 # ============================================================
 
 services:
@@ -54,7 +47,7 @@ services:
       UPLOAD_DIR: /app/uploads
 
       # Número de procesos paralelos del servidor. Regla general: 2 × número de CPUs.
-      # Con una EC2 t3.medium (2 vCPUs) el valor 4 es adecuado.
+      # En ECS se ajusta segun CPU asignada a la task.
       UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
 
       # El backend está detrás de un balanceador (ALB) y de Nginx. Estos intermediarios
@@ -64,8 +57,8 @@ services:
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.0.0.0/8}
 
       # ── AWS ───────────────────────────────────────────────────────────────
-      # En producción NO hace falta definir ACCESS_KEY ni SECRET_ACCESS_KEY:
-      # el EC2 tiene un IAM Role que le da permisos automáticamente (más seguro
+      # En AWS NO hace falta definir ACCESS_KEY ni SECRET_ACCESS_KEY:
+      # ECS usa un Task Role que le da permisos automáticamente (más seguro
       # que guardar credenciales en un archivo). Solo rellenar si corres esto
       # fuera de AWS (CI, portátil de desarrollo, etc.).
       AWS_REGION: ${AWS_REGION:-us-east-1}
@@ -77,9 +70,7 @@ services:
       # Ej: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-...
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID}
 
-      # "local" guarda los archivos en el disco del EC2 (volumen EBS).
-      # "s3" los guarda en Amazon S3 — recomendado si planeas escalar a varios
-      # servidores o necesitas que los archivos sobrevivan si el EC2 se reemplaza.
+      # "local" solo debe usarse en dev. Produccion/staging deben usar S3.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
 
       # Solo necesario si STORAGE_BACKEND=s3. Nombre del bucket S3 donde
@@ -92,12 +83,12 @@ services:
       ZOHO_CLIENT_ID: ${ZOHO_CLIENT_ID}
       ZOHO_CLIENT_SECRET: ${ZOHO_CLIENT_SECRET}
       ZOHO_REFRESH_TOKEN: ${ZOHO_REFRESH_TOKEN}
+      ZOHO_REDIRECT_URI: ${ZOHO_REDIRECT_URI:-}
 
-      # Token secreto que Zoho envía en cada notificación de estado (webhook).
-      # El backend lo verifica para confirmar que la notificación es legítima
-      # y no fue enviada por alguien externo. Generar con:
+      # Clave usada para validar HMAC de cada webhook de Zoho. Generar con:
       # python3 -c "import secrets; print(secrets.token_hex(32))"
       ZOHO_WEBHOOK_SECRET: ${ZOHO_WEBHOOK_SECRET:-}
+      ZOHO_WEBHOOK_SIGNATURE_HEADER: ${ZOHO_WEBHOOK_SIGNATURE_HEADER:-X-ZS-WEBHOOK-SIGNATURE}
 
       # "false" en producción: las firmas son reales y los correos se envían.
       # "true" solo para pruebas: Zoho simula el proceso sin enviar nada.
@@ -106,7 +97,7 @@ services:
       # ── SMTP — correo electrónico (AWS SES) ────────────────────────────────
       # El backend envía correos cuando se crea un acceso o se devuelve un formulario.
       # AWS SES requiere credenciales SMTP propias (se generan en IAM → SES SMTP settings),
-      # distintas a las credenciales IAM del EC2.
+      # distintas a las credenciales IAM usadas por ECS.
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
@@ -126,6 +117,10 @@ services:
       # URL pública de Keycloak tal como la ve el navegador del usuario.
       # Debe coincidir con el hostname configurado en Keycloak (KC_HOSTNAME).
       KEYCLOAK_ISSUER_URL: ${KEYCLOAK_ISSUER_URL:-}
+
+      # Clave para firmar reportes de auditoría con HMAC-SHA256.
+      # Es obligatoria: si no se define, el backend no arranca.
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
 
       # ── Alertas por Email (SES directo) ────────────────────────────────────
       # URL del portal interno para enlaces en notificaciones de correo
@@ -224,8 +219,7 @@ services:
   # interno. Cuando alguien inicia sesión, Keycloak comprueba su usuario y
   # contraseña y emite un token que el backend valida en cada solicitud.
   #
-  # Requiere una base de datos PostgreSQL propia. Puede ser la misma instancia
-  # RDS que usa el backend, pero en una base de datos separada (nombre: keycloak).
+  # Requiere PostgreSQL. En ECS usa RDS; en dev usa el Postgres local.
   # Configurar KEYCLOAK_DB_URL, KEYCLOAK_DB_USER y KEYCLOAK_DB_PASSWORD en .env
   keycloak:
     # Versión fija para evitar actualizaciones automáticas que puedan romper
@@ -272,8 +266,8 @@ services:
       - ./keycloak/realm-sagrilaft.json:/opt/keycloak/data/import/realm-sagrilaft.json:ro
 
     ports:
-      # Puerto de la consola de administración. En producción, considera
-      # no exponerlo públicamente y acceder solo desde una VPN o bastion host.
+      # Puerto de la consola de administración para desarrollo local.
+      # En ECS el acceso público lo controla el ALB y sus reglas de seguridad.
       - "8080:8080"
 
     restart: unless-stopped
@@ -297,14 +291,12 @@ services:
 # los contenedores se detienen, se eliminan o se reconstruyen.
 volumes:
   # Almacena los documentos subidos por los usuarios (PDFs, imágenes de documentos).
-  # En producción este volumen vive en el disco EBS adjunto al EC2.
-  # Si el EC2 se reemplaza y el EBS no se migra, los archivos se pierden.
-  # Para mayor resiliencia, cambiar STORAGE_BACKEND=s3 en .env y usar S3.
+  # Solo para dev. Produccion y staging usan S3_BUCKET en ECS.
   uploads_data:
 
-    # ── Redes ──────────────────────────────────────────────────────────────────
-    # La red "interna" conecta los tres contenedores entre sí de forma privada.
-    # Desde fuera del servidor solo es accesible lo que está en "ports" — el resto
-    # no es visible en internet aunque los contenedores estén corriendo.
+# ── Redes ──────────────────────────────────────────────────────────────────
+# La red "interna" conecta los tres contenedores entre sí de forma privada.
+# Desde fuera del servidor solo es accesible lo que está en "ports" — el resto
+# no es visible en internet aunque los contenedores estén corriendo.
 networks:
   interna:
