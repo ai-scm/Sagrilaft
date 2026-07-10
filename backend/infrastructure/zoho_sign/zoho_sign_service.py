@@ -99,6 +99,14 @@ class ZohoSignService:
             if not p.exists():
                 raise FileNotFoundError(f"PDF no encontrado: {p}")
 
+        if self._config.modo_prueba:
+            request_id = f"test-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+            logger.info(
+                "ZohoSign en modo prueba: solicitud simulada request_id=%s, docs=%d, firmante=%s",
+                request_id, len(pdf_paths), correo_firmante,
+            )
+            return SolicitudFirmaCreada(request_id=request_id)
+
         data_crear = {
             "requests": {
                 "request_name":    nombre_documento,
@@ -204,6 +212,10 @@ class ZohoSignService:
         POST /api/v1/requests/{id}/recall
         No requiere cuerpo. Después del recall los destinatarios ya no pueden firmar.
         """
+        if self._config.modo_prueba:
+            logger.info("ZohoSign en modo prueba: cancelación simulada request_id=%s", request_id)
+            return
+
         resp = httpx.post(
             f"{_API_BASE}/requests/{request_id}/recall",
             headers=self._headers(),
@@ -224,6 +236,10 @@ class ZohoSignService:
 
     def obtener_estado_solicitud(self, request_id: str) -> str:
         """Devuelve el request_status actual de una solicitud en ZohoSign."""
+        if self._config.modo_prueba:
+            logger.info("ZohoSign en modo prueba: estado simulado request_id=%s", request_id)
+            return "InProgress"
+
         resp = httpx.get(
             f"{_API_BASE}/requests/{request_id}",
             headers=self._headers(),
