@@ -1,0 +1,94 @@
+name: CI - Build and Push ECS Images
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY_BACKEND: sagrilaft-prod-backend
+  ECR_REPOSITORY_FORMULARIO: sagrilaft-prod-formulario-publico
+  ECR_REPOSITORY_PORTAL: sagrilaft-prod-portal-interno
+  ECR_REPOSITORY_KEYCLOAK: sagrilaft-prod-keycloak
+
+jobs:
+  build-and-push:
+    name: Build and Push ECS Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Backend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest \
+            ./backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
+
+      - name: Build and push Formulario Publico image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VITE_BACKEND_URL=${{ vars.VITE_BACKEND_URL }} \
+            --build-arg VITE_PORTAL_INTERNO_URL=${{ vars.VITE_PORTAL_INTERNO_URL }} \
+            --build-arg VITE_RAZON_SOCIAL="${{ vars.VITE_RAZON_SOCIAL }}" \
+            --build-arg VITE_CORREO_DATOS=${{ vars.VITE_CORREO_DATOS }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_FORMULARIO:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_FORMULARIO:latest \
+            -f ./frontend/apps/formulario-publico/Dockerfile ./frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FORMULARIO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FORMULARIO:latest
+
+      - name: Build and push Portal Interno image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VITE_BACKEND_URL=${{ vars.VITE_BACKEND_URL }} \
+            --build-arg VITE_KEYCLOAK_URL=${{ vars.VITE_KEYCLOAK_URL }} \
+            --build-arg VITE_KEYCLOAK_REALM=${{ vars.VITE_KEYCLOAK_REALM }} \
+            --build-arg VITE_KEYCLOAK_CLIENT_ID=${{ vars.VITE_KEYCLOAK_CLIENT_ID }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_PORTAL:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_PORTAL:latest \
+            -f ./frontend/apps/portal-interno/Dockerfile ./frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_PORTAL:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_PORTAL:latest
+
+      - name: Build and push Keycloak image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg KEYCLOAK_PORTAL_URL=${{ vars.KEYCLOAK_PORTAL_URL }} \
+            --build-arg KEYCLOAK_FORMULARIO_URL=${{ vars.KEYCLOAK_FORMULARIO_URL }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_KEYCLOAK:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_KEYCLOAK:latest \
+            ./keycloak
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_KEYCLOAK:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_KEYCLOAK:latest
