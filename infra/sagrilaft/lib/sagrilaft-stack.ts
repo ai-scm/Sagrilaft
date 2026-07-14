@@ -35,10 +35,10 @@ import { DEFAULT_BEDROCK_MODEL_ID } from './deployment-constants';
 //     -c imageTag=<commit-sha> \
 //     -c bedrockModelId=<model-id-o-inference-profile>
 // ─────────────────────────────────────────────────────────────────────────────
-const DEFAULT_HOSTED_ZONE      = 'ia.blend360.com';
-const DEFAULT_HOSTED_ZONE_ID   = 'Z10446292T6I6L9P7R8AQ';
-const DEFAULT_DOMINIO          = 'forms-sagrilaft.ia.blend360.com';
-const DEFAULT_DOMINIO_PORTAL   = 'sagrilaft.ia.blend360.com';
+const DEFAULT_HOSTED_ZONE = 'ia.blend360.com';
+const DEFAULT_HOSTED_ZONE_ID = 'Z10446292T6I6L9P7R8AQ';
+const DEFAULT_DOMINIO = 'forms-sagrilaft.ia.blend360.com';
+const DEFAULT_DOMINIO_PORTAL = 'sagrilaft.ia.blend360.com';
 const DEFAULT_DOMINIO_KEYCLOAK = 'login-sagrilaft.ia.blend360.com';
 
 export class SagrilaftStack extends cdk.Stack {
@@ -46,35 +46,25 @@ export class SagrilaftStack extends cdk.Stack {
     super(scope, constructId, props);
 
     // ── Parámetros de contexto ─────────────────────────────────────────────
-    const ambiente        = String(this.node.tryGetContext('environment')       ?? 'prod');
-    const hostedZoneName  = String(this.node.tryGetContext('hostedZoneName')    ?? DEFAULT_HOSTED_ZONE);
-    const hostedZoneId    = String(this.node.tryGetContext('hostedZoneId')      ?? DEFAULT_HOSTED_ZONE_ID);
-    const dominio         = String(this.node.tryGetContext('domainName')        ?? DEFAULT_DOMINIO);
-    const dominioPortal   = String(this.node.tryGetContext('portalDomainName')  ?? DEFAULT_DOMINIO_PORTAL);
-    const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName')?? DEFAULT_DOMINIO_KEYCLOAK);
-    const certArn         = String(this.node.tryGetContext('certificateArn')    ?? '');
+    const ambiente = String(this.node.tryGetContext('environment') ?? 'prod');
+    const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? DEFAULT_HOSTED_ZONE);
+    const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? DEFAULT_HOSTED_ZONE_ID);
+    const dominio = String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
+    const dominioPortal = String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
+    const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
+    const certArn = String(this.node.tryGetContext('certificateArn') ?? '');
     const defaultSesEmailOrigen = ambiente === 'staging'
       ? 'legal@blend360.com'
       : 'legal@blend360.com';
     const defaultAlertasEmailDestino = [
-      'Diana.Villamizar@blend360.com',
-      'Adriana.Castiblanco@blend360.com',
-      'Isabel.Castrillon@blend360.com',
-      'Alba.Beltran@blend360.com',
-      'Oficial.Cumplimiento@blend360.com',
-      'Felipe.Bernal@blend360.com',
-      'Alejandra.Archila@blend360.com',
-      'Anyely.Escarraga@blend360.com',
-      'Karen.Arandia@blend360.com',
-      'Valentina.Gonzalez@blend360.com',
-      'Maribel.Novoa@blend360.com',
+      'Bryan.Ariza@blend360.com',
     ].join(',');
-    const sesEmailOrigen  = String(this.node.tryGetContext('sesEmailOrigen')    ?? defaultSesEmailOrigen);
-    const snsAlertasSub   = String(this.node.tryGetContext('snsAlertasSub')     ?? defaultAlertasEmailDestino);
-    const imageTag        = String(this.node.tryGetContext('imageTag')          ?? '');
-    const bedrockModelId  = String(this.node.tryGetContext('bedrockModelId')    ?? DEFAULT_BEDROCK_MODEL_ID);
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount')      ?? '1');
-    const desiredCount    = Number.parseInt(desiredCountRaw, 10);
+    const sesEmailOrigen = String(this.node.tryGetContext('sesEmailOrigen') ?? defaultSesEmailOrigen);
+    const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
+    const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
+    const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '1');
+    const desiredCount = Number.parseInt(desiredCountRaw, 10);
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
@@ -96,12 +86,12 @@ export class SagrilaftStack extends cdk.Stack {
       : undefined;
 
     // ── Constructs ─────────────────────────────────────────────────────────
-    const networking    = new Networking(this, 'Networking');
-    const storage       = new Storage(this, 'Storage', { ambiente });
-    const secrets       = new Secrets(this, 'Secrets', { ambiente });
+    const networking = new Networking(this, 'Networking');
+    const storage = new Storage(this, 'Storage', { ambiente });
+    const secrets = new Secrets(this, 'Secrets', { ambiente });
     const notifications = new Notifications(this, 'Notifications', { ambiente, sesEmailOrigen, snsAlertasSub });
-    const ecrRepos      = new Ecr(this, 'Ecr', { ambiente });
-    const configParams  = new ConfigParameters(this, 'ConfigParameters', {
+    const ecrRepos = new Ecr(this, 'Ecr', { ambiente });
+    const configParams = new ConfigParameters(this, 'ConfigParameters', {
       ambiente,
       dominio,
       dominioPortal,
@@ -190,28 +180,28 @@ export class SagrilaftStack extends cdk.Stack {
     }
 
     // ── Outputs ────────────────────────────────────────────────────────────
-    new CfnOutput(this, 'AlbDns',            { value: lb.alb.loadBalancerDnsName, description: 'DNS del ALB publico creado para SAGRILAFT' });
-    new CfnOutput(this, 'HostedZoneName',    { value: hostedZoneName || 'no-configurada', description: 'Zona Route 53 usada para crear registros A Alias' });
+    new CfnOutput(this, 'AlbDns', { value: lb.alb.loadBalancerDnsName, description: 'DNS del ALB publico creado para SAGRILAFT' });
+    new CfnOutput(this, 'HostedZoneName', { value: hostedZoneName || 'no-configurada', description: 'Zona Route 53 usada para crear registros A Alias' });
     new CfnOutput(this, 'DominiosEsperados', { value: `${dominio}, ${dominioPortal}, ${dominioKeycloak}`, description: 'Hostnames que deben apuntar al ALB' });
-    new CfnOutput(this, 'S3Bucket',          { value: storage.bucket.bucketName, description: 'Nombre del bucket S3 para uploads' });
-    new CfnOutput(this, 'RdsEndpoint',       { value: database.instance.dbInstanceEndpointAddress, description: 'Host RDS PostgreSQL' });
-    new CfnOutput(this, 'KeycloakDbName',    { value: 'sagrilaft', description: 'Base de datos RDS usada por Keycloak en ECS' });
-    new CfnOutput(this, 'DbSecretArn',       { value: secrets.dbSecret.secretArn, description: 'ARN del secreto con la contrasena de la BD' });
-    new CfnOutput(this, 'AppSecretArn',      { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });
-    new CfnOutput(this, 'ZohoSecretArn',     { value: secrets.zohoSecret.secretArn, description: 'ARN del secreto de credenciales Zoho' });
-    new CfnOutput(this, 'SmtpSecretArn',     { value: secrets.smtpSecret.secretArn, description: 'ARN del secreto de credenciales SMTP/SES' });
+    new CfnOutput(this, 'S3Bucket', { value: storage.bucket.bucketName, description: 'Nombre del bucket S3 para uploads' });
+    new CfnOutput(this, 'RdsEndpoint', { value: database.instance.dbInstanceEndpointAddress, description: 'Host RDS PostgreSQL' });
+    new CfnOutput(this, 'KeycloakDbName', { value: 'sagrilaft', description: 'Base de datos RDS usada por Keycloak en ECS' });
+    new CfnOutput(this, 'DbSecretArn', { value: secrets.dbSecret.secretArn, description: 'ARN del secreto con la contrasena de la BD' });
+    new CfnOutput(this, 'AppSecretArn', { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });
+    new CfnOutput(this, 'ZohoSecretArn', { value: secrets.zohoSecret.secretArn, description: 'ARN del secreto de credenciales Zoho' });
+    new CfnOutput(this, 'SmtpSecretArn', { value: secrets.smtpSecret.secretArn, description: 'ARN del secreto de credenciales SMTP/SES' });
     new CfnOutput(this, 'KeycloakAdminSecretArn', { value: secrets.keycloakAdminSecret.secretArn, description: 'ARN del secreto admin de Keycloak' });
-    new CfnOutput(this, 'RuntimeConfigPrefix',{ value: `/sagrilaft/${ambiente}/config/`, description: 'Prefijo SSM Parameter Store para runtime config no sensible' });
-    new CfnOutput(this, 'BedrockModelId',    { value: bedrockModelId, description: 'Modelo o inference profile Bedrock inyectado al backend desde SSM' });
-    new CfnOutput(this, 'SnsAlertasTopicArn',{ value: notifications.alertasTopic.topicArn, description: 'ARN del Topic SNS para alertas al equipo interno' });
-    new CfnOutput(this, 'SesEmailOrigen',    { value: sesEmailOrigen, description: 'Email autorizado como origen en SES' });
-    new CfnOutput(this, 'EcrBackendUri',     { value: ecrRepos.backendRepo.repositoryUri, description: 'URI del repositorio ECR Backend' });
+    new CfnOutput(this, 'RuntimeConfigPrefix', { value: `/sagrilaft/${ambiente}/config/`, description: 'Prefijo SSM Parameter Store para runtime config no sensible' });
+    new CfnOutput(this, 'BedrockModelId', { value: bedrockModelId, description: 'Modelo o inference profile Bedrock inyectado al backend desde SSM' });
+    new CfnOutput(this, 'SnsAlertasTopicArn', { value: notifications.alertasTopic.topicArn, description: 'ARN del Topic SNS para alertas al equipo interno' });
+    new CfnOutput(this, 'SesEmailOrigen', { value: sesEmailOrigen, description: 'Email autorizado como origen en SES' });
+    new CfnOutput(this, 'EcrBackendUri', { value: ecrRepos.backendRepo.repositoryUri, description: 'URI del repositorio ECR Backend' });
     new CfnOutput(this, 'EcrFormularioPublicoUri', { value: ecrRepos.formularioPublicoRepo.repositoryUri, description: 'URI del repositorio ECR Formulario Publico' });
     new CfnOutput(this, 'EcrPortalInternoUri', { value: ecrRepos.portalInternoRepo.repositoryUri, description: 'URI del repositorio ECR Portal Interno' });
-    new CfnOutput(this, 'EcrKeycloakUri',    { value: ecrRepos.keycloakRepo.repositoryUri, description: 'URI del repositorio ECR Keycloak' });
-    new CfnOutput(this, 'EcsClusterName',    { value: ecsFargate.cluster.clusterName, description: 'Cluster ECS/Fargate productivo' });
-    new CfnOutput(this, 'EcsDesiredCount',   { value: String(desiredCount), description: 'Desired count configurado para servicios ECS' });
-    new CfnOutput(this, 'EcsSecurityGroupId',{ value: networking.sgEcs.securityGroupId, description: 'Security Group para servicios ECS Fargate' });
+    new CfnOutput(this, 'EcrKeycloakUri', { value: ecrRepos.keycloakRepo.repositoryUri, description: 'URI del repositorio ECR Keycloak' });
+    new CfnOutput(this, 'EcsClusterName', { value: ecsFargate.cluster.clusterName, description: 'Cluster ECS/Fargate productivo' });
+    new CfnOutput(this, 'EcsDesiredCount', { value: String(desiredCount), description: 'Desired count configurado para servicios ECS' });
+    new CfnOutput(this, 'EcsSecurityGroupId', { value: networking.sgEcs.securityGroupId, description: 'Security Group para servicios ECS Fargate' });
     new CfnOutput(this, 'EcsTaskExecutionRoleArn', { value: ecsFargate.executionRole.roleArn, description: 'Task Execution Role ECS para pull ECR, logs y secrets/SSM' });
     new CfnOutput(this, 'EcsBackendTaskRoleArn', { value: ecsFargate.backendTaskRole.roleArn, description: 'Task Role ECS para backend' });
     new CfnOutput(this, 'EcsFrontendServiceName', { value: ecsFargate.frontend.service.serviceName, description: 'Servicio ECS formulario publico conectado al ALB' });

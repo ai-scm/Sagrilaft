@@ -108,7 +108,7 @@ class Formulario(Base):
     patrimonio = Column(Numeric(18, 2), nullable=True)
 
     # --- 6. Operaciones en Moneda Extranjera ---
-    realiza_operaciones_moneda_extranjera = Column(Boolean, nullable=False, default=False, server_default="false")
+    realiza_operaciones_moneda_extranjera = Column(Boolean, nullable=True)
     paises_operaciones = Column(String, nullable=True)
     tipos_transaccion_otros = Column(String, nullable=True)
 
@@ -250,13 +250,13 @@ class Formulario(Base):
 
     @property
     def autorretenedor(self):
-        return self.clasificacion_tributaria.autorretenedor if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.autorretenedor if self.clasificacion_tributaria else None
 
     @autorretenedor.setter
     def autorretenedor(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().autorretenedor = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().autorretenedor = valor if valor is None else bool(valor)
 
     @property
     def responsabilidades_iva(self):
@@ -280,63 +280,63 @@ class Formulario(Base):
 
     @property
     def gran_contribuyente(self):
-        return self.clasificacion_tributaria.gran_contribuyente if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.gran_contribuyente if self.clasificacion_tributaria else None
 
     @gran_contribuyente.setter
     def gran_contribuyente(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().gran_contribuyente = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().gran_contribuyente = valor if valor is None else bool(valor)
 
     @property
     def entidad_sin_animo_lucro(self):
-        return self.clasificacion_tributaria.entidad_sin_animo_lucro if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.entidad_sin_animo_lucro if self.clasificacion_tributaria else None
 
     @entidad_sin_animo_lucro.setter
     def entidad_sin_animo_lucro(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().entidad_sin_animo_lucro = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().entidad_sin_animo_lucro = valor if valor is None else bool(valor)
 
     @property
     def retencion_ica(self):
-        return self.clasificacion_tributaria.retencion_ica if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.retencion_ica if self.clasificacion_tributaria else None
 
     @retencion_ica.setter
     def retencion_ica(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().retencion_ica = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().retencion_ica = valor if valor is None else bool(valor)
 
     @property
     def impuesto_ica(self):
-        return self.clasificacion_tributaria.impuesto_ica if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.impuesto_ica if self.clasificacion_tributaria else None
 
     @impuesto_ica.setter
     def impuesto_ica(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().impuesto_ica = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().impuesto_ica = valor if valor is None else bool(valor)
 
     @property
     def entidad_oficial(self):
-        return self.clasificacion_tributaria.entidad_oficial if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.entidad_oficial if self.clasificacion_tributaria else None
 
     @entidad_oficial.setter
     def entidad_oficial(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().entidad_oficial = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().entidad_oficial = valor if valor is None else bool(valor)
 
     @property
     def exento_retencion_fuente(self):
-        return self.clasificacion_tributaria.exento_retencion_fuente if self.clasificacion_tributaria else False
+        return self.clasificacion_tributaria.exento_retencion_fuente if self.clasificacion_tributaria else None
 
     @exento_retencion_fuente.setter
     def exento_retencion_fuente(self, valor):
         if valor is None and self.clasificacion_tributaria is None:
             return
-        self._obtener_o_crear_clasificacion_tributaria().exento_retencion_fuente = bool(valor)
+        self._obtener_o_crear_clasificacion_tributaria().exento_retencion_fuente = valor if valor is None else bool(valor)
 
 
 class DatosPersonaNaturalFormulario(Base):
@@ -364,15 +364,15 @@ class ClasificacionTributariaFormulario(Base):
     sector = Column(String, nullable=True)
     superintendencia = Column(String, nullable=True)
     responsabilidades_renta = Column(String, nullable=True)
-    autorretenedor = Column(Boolean, nullable=False, default=False, server_default="false")
+    autorretenedor = Column(Boolean, nullable=True)
     responsabilidades_iva = Column(String, nullable=True)
     regimen_iva = Column(String, nullable=True)
-    gran_contribuyente = Column(Boolean, nullable=False, default=False, server_default="false")
-    entidad_sin_animo_lucro = Column(Boolean, nullable=False, default=False, server_default="false")
-    retencion_ica = Column(Boolean, nullable=False, default=False, server_default="false")
-    impuesto_ica = Column(Boolean, nullable=False, default=False, server_default="false")
-    entidad_oficial = Column(Boolean, nullable=False, default=False, server_default="false")
-    exento_retencion_fuente = Column(Boolean, nullable=False, default=False, server_default="false")
+    gran_contribuyente = Column(Boolean, nullable=True)
+    entidad_sin_animo_lucro = Column(Boolean, nullable=True)
+    retencion_ica = Column(Boolean, nullable=True)
+    impuesto_ica = Column(Boolean, nullable=True)
+    entidad_oficial = Column(Boolean, nullable=True)
+    exento_retencion_fuente = Column(Boolean, nullable=True)
 
     formulario = relationship("Formulario", back_populates="clasificacion_tributaria")
 
