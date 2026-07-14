@@ -155,7 +155,7 @@ export function useRecuperacionSesion(setters) {
     setJuntaDirectiva(
       snapshot_recuperar_sesion.juntaDirectiva?.length > 0
         ? snapshot_recuperar_sesion.juntaDirectiva
-        : [{ cargo: 'Presidente' }, { cargo: 'Gerente General / Rep. Legal' }],
+        : [{ cargo: 'Seleccione...' }],
     );
     setAccionistas(snapshot_recuperar_sesion.accionistas?.length > 0 ? snapshot_recuperar_sesion.accionistas : [{}]);
     setBeneficiarios(snapshot_recuperar_sesion.beneficiarios?.length > 0 ? snapshot_recuperar_sesion.beneficiarios : [{}]);
