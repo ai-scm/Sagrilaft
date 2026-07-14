@@ -193,9 +193,9 @@ class FormularioBase(BaseModel):
     origen_fondos: Optional[str] = None
 
     # 13. Firma
-    dia_firma:    Optional[int] = None   # 1–31
-    mes_firma:    Optional[int] = None   # 1–12
-    year_firma:   Optional[int] = None   # ej: 2025
+    dia_firma:    Optional[int] = Field(None, ge=1, le=31, description="Día de la firma (1-31)")
+    mes_firma:    Optional[int] = Field(None, ge=1, le=12, description="Mes de la firma (1-12)")
+    year_firma:   Optional[int] = Field(None, ge=2000, le=2100, description="Año de la firma")
     ciudad_firma: Optional[str] = None
 
     # Datos dinámicos
@@ -207,7 +207,7 @@ class FormularioBase(BaseModel):
     informacion_bancaria_pagos: Optional[List[InformacionBancariaPago]] = None
 
     # Metadata
-    pagina_actual: Optional[int] = 1
+    pagina_actual: Optional[int] = Field(1, ge=1, description="Página en la que quedó guardado el borrador")
 
     @field_validator("digito_verificacion")
     @classmethod

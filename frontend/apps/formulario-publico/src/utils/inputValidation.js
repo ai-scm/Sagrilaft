@@ -112,25 +112,28 @@ export const onPorcentajePaste = (e) => {
  *   formatoCorreo  → valida estructura usuario@dominio.ext
  */
 export const REGLAS_INPUT = {
-  numero_identificacion:    { soloNumericos: true },
-  digito_verificacion:      { soloNumericos: true },
+  numero_identificacion: { soloNumericos: true },
+  digito_verificacion: { soloNumericos: true },
   numero_doc_representante: { soloNumericos: true },
-  telefono:                 { soloNumericos: true },
-  telefono_representante:   { soloNumericos: true },
-  codigo_ciiu:              { soloNumericos: true, longitudMaxima: 4 },
-  codigo_ica:               { soloNumericos: true, longitudMaxima: 4 },
-  ingresos_mensuales:       { soloNumericos: true, soloPositivo: true },
-  otros_ingresos:           { soloNumericos: true, soloPositivo: true },
-  egresos_mensuales:        { soloNumericos: true, soloPositivo: true },
-  total_activos:            { soloNumericos: true, soloPositivo: true },
-  total_pasivos:            { soloNumericos: true, soloPositivo: true },
-  patrimonio:               { soloNumericos: true, soloPositivo: true },
-  correo:                   { formatoCorreo: true },
-  correo_representante:     { formatoCorreo: true },
+  telefono: { soloNumericos: true },
+  telefono_representante: { soloNumericos: true },
+  codigo_ciiu: { soloNumericos: true, longitudMaxima: 4 },
+  codigo_ica: { soloNumericos: true, longitudMaxima: 4 },
+  ingresos_mensuales: { soloNumericos: true, soloPositivo: true },
+  otros_ingresos: { soloNumericos: true, soloPositivo: true },
+  egresos_mensuales: { soloNumericos: true, soloPositivo: true },
+  total_activos: { soloNumericos: true, soloPositivo: true },
+  total_pasivos: { soloNumericos: true, soloPositivo: true },
+  patrimonio: { soloNumericos: true, soloPositivo: true },
+  correo: { formatoCorreo: true },
+  correo_representante: { formatoCorreo: true },
   contacto_ordenes_telefono: { soloNumericos: true },
-  contacto_pagos_telefono:   { soloNumericos: true },
-  contacto_ordenes_correo:   { formatoCorreo: true },
-  contacto_pagos_correo:     { formatoCorreo: true },
+  contacto_pagos_telefono: { soloNumericos: true },
+  contacto_ordenes_correo: { formatoCorreo: true },
+  contacto_pagos_correo: { formatoCorreo: true },
+  dia_firma: { soloNumericos: true, valorMinimo: 1, valorMaximo: 31 },
+  mes_firma: { soloNumericos: true, valorMinimo: 1, valorMaximo: 12 },
+  year_firma: { soloNumericos: true, valorMinimo: 2026, valorMaximo: 2028 },
 };
 
 /**
@@ -144,7 +147,7 @@ export function getInputProps(fieldName) {
   const props = {};
   if (reglas.soloNumericos) {
     props.onKeyDown = onlyNumericKeyDown;
-    props.onPaste   = onlyNumericPaste;
+    props.onPaste = onlyNumericPaste;
     props.inputMode = 'numeric';
   }
   if (reglas.soloPositivo) {
@@ -253,6 +256,12 @@ export function validarReglasEspeciales(formData, camposDePaso) {
     }
     if (reglas.soloPositivo && parseFloat(valor) < 0) {
       errores[campo] = 'El valor debe ser mayor o igual a 0';
+    }
+    if (reglas.valorMinimo && parseFloat(valor) < reglas.valorMinimo) {
+      errores[campo] = `El valor no puede ser menor a ${reglas.valorMinimo}`;
+    }
+    if (reglas.valorMaximo && parseFloat(valor) > reglas.valorMaximo) {
+      errores[campo] = `El valor no puede ser mayor a ${reglas.valorMaximo}`;
     }
     if (reglas.formatoCorreo && !REGEX_CORREO.test(valor)) {
       errores[campo] = 'Ingrese un correo electrónico válido (ej: nombre@dominio.com)';
