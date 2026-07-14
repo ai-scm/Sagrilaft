@@ -247,7 +247,7 @@ export default function CrearAccesoManual() {
         <div style={ESTILOS.cuerpoExito}>
           <div style={ESTILOS.advertenciaPIN}>
             <strong>Nota de seguridad:</strong> El PIN se muestra una sola vez. Anótelo o compártalo
-            de forma segura antes de cerrar esta pantalla. Tiene una ventana de 10 min para verlo en "Ver accesos" después de creado, pero luego se ocultará por seguridad.
+            de forma segura antes de cerrar esta pantalla si no le llego al correo del responsable legal las credenciales. Tiene una ventana de 10 min para verlo en "Ver accesos" después de creado, pero luego se ocultará por seguridad.
           </div>
 
           <ItemCredencial label="Código de petición" valor={resultado.codigo_peticion} />
