@@ -36,10 +36,14 @@ const estilos = {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
-  icono: {
-    fontSize: '2.5rem',
-    marginBottom: '16px',
+  logoContenedor: {
     textAlign: 'center',
+    marginBottom: '20px',
+  },
+  logoImagen: {
+    height: '60px',
+    width: 'auto',
+    objectFit: 'contain',
   },
   titulo: {
     fontSize: '1.3rem',
@@ -174,7 +178,9 @@ export default function PantallaIngreso() {
       </div>
 
       <div style={estilos.tarjeta}>
-        <div style={estilos.icono}>🔐</div>
+        <div style={estilos.logoContenedor}>
+          <img src="/blendlatam_logo.png" alt="Blend360 Logo" style={estilos.logoImagen} />
+        </div>
 
         <h2 style={estilos.titulo}>
           Acceso Seguro

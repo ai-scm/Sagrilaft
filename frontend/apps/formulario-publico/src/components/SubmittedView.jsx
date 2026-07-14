@@ -11,7 +11,9 @@ export default function SubmittedView({ codigoPeticion }) {
       </header>
       <main className="main-content">
         <div className="form-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+            <img src="/check_final.gif" alt="¡Éxito!" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+          </div>
           <h2 style={{ color: 'var(--gray-900)', marginBottom: '12px' }}>¡Formulario Enviado!</h2>
           <p style={{ color: 'var(--gray-500)', fontSize: '0.95rem', maxWidth: '500px', margin: '0 auto' }}>
             Su formulario ha sido recibido exitosamente. Se realizarán las validaciones
