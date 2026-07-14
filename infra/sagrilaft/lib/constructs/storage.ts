@@ -4,6 +4,7 @@ import { Construct } from 'constructs';
 
 export interface StorageProps {
   readonly ambiente: string;
+  readonly dominioPortal: string;
 }
 
 /**
@@ -29,6 +30,24 @@ export class Storage extends Construct {
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: props.ambiente === 'prod',
       removalPolicy: RemovalPolicy.RETAIN,
+      cors: [
+        {
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: [
+            `https://${props.dominioPortal}`, // Dominio inyectado por ambiente
+            'http://localhost:3000',          // Desarrollo local de React
+            'http://localhost:5173'           // Desarrollo local de Vite
+          ],
+          allowedHeaders: ['*'],
+          exposedHeaders: [
+            'Content-Disposition',
+            'Content-Type',
+            'Content-Length',
+            'ETag'
+          ],
+          maxAge: 3000,
+        }
+      ],
       lifecycleRules: [
         {
           id: 'expire-tmp',

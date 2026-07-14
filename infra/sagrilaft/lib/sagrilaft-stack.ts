@@ -87,7 +87,10 @@ export class SagrilaftStack extends cdk.Stack {
 
     // ── Constructs ─────────────────────────────────────────────────────────
     const networking = new Networking(this, 'Networking');
-    const storage = new Storage(this, 'Storage', { ambiente });
+    const storage = new Storage(this, 'Storage', { 
+      ambiente,
+      dominioPortal,
+    });
     const secrets = new Secrets(this, 'Secrets', { ambiente });
     const notifications = new Notifications(this, 'Notifications', { ambiente, sesEmailOrigen, snsAlertasSub });
     const ecrRepos = new Ecr(this, 'Ecr', { ambiente });
