@@ -39,8 +39,8 @@ class DocumentoService:
     # ─── Keys ─────────────────────────────────────────────────────────────────
 
     def key_borrador(self, codigo_peticion: str, nombre_archivo: str) -> str:
-        """Key temporal en el backend mientras el formulario está en borrador."""
-        return f"{codigo_peticion}/{_sanitizar_nombre_archivo(nombre_archivo)}"
+        """Key temporal (espacio efímero). Al estar en tmp/, S3 lo borra automáticamente en 7 días si es abandonado."""
+        return f"tmp/{codigo_peticion}/{_sanitizar_nombre_archivo(nombre_archivo)}"
 
     # ─── Escritura ─────────────────────────────────────────────────────────────
 
@@ -114,8 +114,8 @@ class DocumentoService:
             logger.warning(f"[MOVER] No hay documentos para mover en {formulario_id}")
             return
 
-        # Extrae el prefijo origen del primer documento (ej: "SAG-705A5125" de "SAG-705A5125/archivo.pdf")
-        prefijo_origen = Path(documentos[0].ruta_archivo).parent.name if len(Path(documentos[0].ruta_archivo).parts) > 1 else None
+        # Extrae la carpeta origen (ej: "tmp/SAG-705A5125" de "tmp/SAG-705A5125/archivo.pdf")
+        prefijo_origen = str(Path(documentos[0].ruta_archivo).parent) if len(Path(documentos[0].ruta_archivo).parts) > 1 else None
 
         rutas_nuevas: dict[str, str] = {}
         for doc in documentos:
