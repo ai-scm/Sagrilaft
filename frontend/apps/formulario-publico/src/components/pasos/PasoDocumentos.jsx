@@ -21,14 +21,14 @@ export default function PasoDocumentos({
       </p>
 
       <div className="info-box">
-        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo esté correcto).</p>
+        <p>💡 Cada documento se analiza con IA en el momento de carga. Los campos del formulario se completan solos. (Recuerda validar que todo esté correcto, la IA puede cometer errores).</p>
       </div>
 
-      <AlertasInconsistencia alertas={alertasRazonSocial}           tipoCampo="nombre sin resolver"                              nombreCampo="Nombre o Razón Social" />
-      <AlertasInconsistencia alertas={alertasNit}                  tipoCampo="NIT sin resolver"                                 nombreCampo="Número de Identificación" />
-      <AlertasInconsistencia alertas={alertasNombreRepresentante}  tipoCampo="nombre del representante sin resolver"            nombreCampo="Nombres y Apellidos" />
+      <AlertasInconsistencia alertas={alertasRazonSocial} tipoCampo="nombre sin resolver" nombreCampo="Nombre o Razón Social" />
+      <AlertasInconsistencia alertas={alertasNit} tipoCampo="NIT sin resolver" nombreCampo="Número de Identificación" />
+      <AlertasInconsistencia alertas={alertasNombreRepresentante} tipoCampo="nombre del representante sin resolver" nombreCampo="Nombres y Apellidos" />
       <AlertasInconsistencia alertas={alertasNumeroDocRepresentante} tipoCampo="No. de Identificación del representante sin resolver" nombreCampo="No. de Identificación" />
-      <AlertasInconsistencia alertas={alertasDireccion}            tipoCampo="dirección sin resolver"                           nombreCampo="Dirección" />
+      <AlertasInconsistencia alertas={alertasDireccion} tipoCampo="dirección sin resolver" nombreCampo="Dirección" />
 
       {DOCUMENTOS_CONFIG.map(d => (
         <FileUploadField

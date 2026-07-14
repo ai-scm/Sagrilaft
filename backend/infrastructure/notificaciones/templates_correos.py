@@ -124,7 +124,8 @@ def _construir_estilos_css(color_primario: str) -> str:
       overflow: hidden;
     }}
     .encabezado {{
-      background: linear-gradient(135deg, {color_primario}, {color_primario}dd);
+      background-color: {color_primario};
+      background-image: linear-gradient(135deg, {color_primario}, {color_primario}dd);
       color: #ffffff;
       padding: 24px;
       text-align: center;
@@ -373,7 +374,7 @@ def construir_html_notificacion(
   <div class="contenedor">
     <div class="envoltura-correo">
       <!-- Encabezado -->
-      <div class="encabezado">
+      <div class="encabezado" style="background-color: {config['color']};">
         <h1>{config['icono']} {config['titulo']}</h1>
         <div class="encabezado-subtitulo">SAGRILAFT — Portal de Gestión</div>
       </div>
