@@ -100,9 +100,9 @@ services:
       UVICORN_WORKERS: "1"
 
       # Activa el modo sandbox de Zoho Sign: los correos de firma se simulan,
-      # no se envían de verdad. Cambiar a "false" solo si necesitas probar
+      # no se envían de verdad. Cambiar a "false" en .env para probar
       # el flujo de firma real con cuentas de Zoho reales.
-      ZOHO_SIGN_TESTING: "true"
+      ZOHO_SIGN_TESTING: ${ZOHO_SIGN_TESTING:-true}
 
       # Los archivos subidos (PDFs, imágenes) se guardan en disco local.
       # En producción esto cambia a "s3" para guardarlos en Amazon S3.
@@ -123,17 +123,17 @@ services:
       # URL del portal interno para enlaces en notificaciones de correo
       # En desarrollo: http://localhost:5174 (puerto local del portal-interno con Vite)
       PORTAL_INTERNO_URL: ${PORTAL_INTERNO_URL:-http://localhost:5174}
-      
+
       # SES DIRECTO (RECOMENDADO - control total sobre Content-Type)
       # Envía HTML puro sin conversión a markdown
       SES_EMAIL_ORIGEN: ${SES_EMAIL_ORIGEN:-}
       SES_NOTIFICACIONES_ENABLED: ${SES_NOTIFICACIONES_ENABLED:-false}
       ALERTAS_EMAIL_DESTINATARIO: ${ALERTAS_EMAIL_DESTINATARIO:-}
-      
+
       # SNS LEGACY (comentado - se envía como text/plain)
       # SNS_TOPIC_ARN: ${SNS_TOPIC_ARN:-}
       # SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
-      
+
       APP_ENV: ${APP_ENV:-development}
 
     # El backend no arranca hasta que Postgres haya pasado su healthcheck.

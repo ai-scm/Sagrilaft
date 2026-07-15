@@ -29,14 +29,15 @@ class ZohoSignConfig:
     )
 
     def validar(self) -> None:
-        """Lanza RuntimeError si ZohoSign real no está configurado.
+        """Lanza RuntimeError si ZohoSign no está configurado correctamente.
+
+        Siempre valida las credenciales OAuth, tanto en sandbox (modo_prueba=True)
+        como en producción (modo_prueba=False), ya que ambos modos hacen llamadas
+        reales a la API de Zoho.
 
         webhook_secret se omite: se valida en FirmaService al recibir el webhook,
         ya que puede estar ausente en entornos sin URL pública.
         """
-        if self.modo_prueba:
-            return
-
         _REQUERIDAS = {
             "client_id":     "ZOHO_CLIENT_ID",
             "client_secret": "ZOHO_CLIENT_SECRET",

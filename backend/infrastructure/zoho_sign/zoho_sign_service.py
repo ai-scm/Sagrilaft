@@ -99,13 +99,10 @@ class ZohoSignService:
             if not p.exists():
                 raise FileNotFoundError(f"PDF no encontrado: {p}")
 
-        if self._config.modo_prueba:
-            request_id = f"test-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
-            logger.info(
-                "ZohoSign en modo prueba: solicitud simulada request_id=%s, docs=%d, firmante=%s",
-                request_id, len(pdf_paths), correo_firmante,
-            )
-            return SolicitudFirmaCreada(request_id=request_id)
+        # modo_prueba=True → sandbox: llamadas reales a Zoho con testing=true
+        #   → emails reales a la contraparte, firma real, sin consumo de créditos
+        # modo_prueba=False → producción: llamadas reales sin testing param
+        params = {"testing": "true"} if self._config.modo_prueba else {}
 
         data_crear = {
             "requests": {
@@ -122,10 +119,9 @@ class ZohoSignService:
                 ],
             }
         }
-        params = {"testing": "true"} if self._config.modo_prueba else {}
 
         logger.info(
-            "Paso 1/2 ZohoSign (paquete %d docs) — '%s' → %s [modo_prueba=%s]",
+            "Paso 1/2 ZohoSign (paquete %d docs) — '%s' → %s [sandbox=%s]",
             len(pdf_paths), nombre_documento, correo_firmante, self._config.modo_prueba,
         )
 
@@ -213,8 +209,7 @@ class ZohoSignService:
         No requiere cuerpo. Después del recall los destinatarios ya no pueden firmar.
         """
         if self._config.modo_prueba:
-            logger.info("ZohoSign en modo prueba: cancelación simulada request_id=%s", request_id)
-            return
+            logger.info("ZohoSign sandbox: cancelando solicitud real request_id=%s", request_id)
 
         resp = httpx.post(
             f"{_API_BASE}/requests/{request_id}/recall",
@@ -237,8 +232,7 @@ class ZohoSignService:
     def obtener_estado_solicitud(self, request_id: str) -> str:
         """Devuelve el request_status actual de una solicitud en ZohoSign."""
         if self._config.modo_prueba:
-            logger.info("ZohoSign en modo prueba: estado simulado request_id=%s", request_id)
-            return "InProgress"
+            logger.info("ZohoSign sandbox: consultando estado real request_id=%s", request_id)
 
         resp = httpx.get(
             f"{_API_BASE}/requests/{request_id}",
