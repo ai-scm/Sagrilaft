@@ -36,9 +36,21 @@ from api.routers import acceso_manual, auditoria, expedientes, formulario, lista
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.notificaciones.email_service import CorreoDestinatarioVacioError
 from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
+from api.middleware.trazabilidad import trazabilidad_middleware, RequestIdFilter, request_id_context
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+import sys
+from pythonjsonlogger import jsonlogger
 
-
-logging.basicConfig(level=logging.INFO)
+formatter = jsonlogger.JsonFormatter(
+    fmt="%(asctime)s %(levelname)s %(name)s %(request_id)s %(message)s",
+    rename_fields={"levelname": "level", "asctime": "timestamp"}
+)
+log_handler = logging.StreamHandler(sys.stdout)
+log_handler.setFormatter(formatter)
+log_handler.addFilter(RequestIdFilter())
+logging.root.handlers = [log_handler]
+logging.root.setLevel(logging.INFO)
 _log_seg = logging.getLogger("sagrilaft.security")
 for _nombre in ("fontTools", "fontTools.ttLib", "fontTools.ttLib.ttFont",
                 "fontTools.subset", "fontTools.subset.timer", "weasyprint"):
@@ -51,7 +63,10 @@ _ESTADO = 'activo'
 _MODO_IA = 'bedrock'
 
 def _respuesta_error(status_code: int, detalle: str, *, hint: str | None = None) -> JSONResponse:
-    contenido = {"detail": detalle}
+    contenido = {
+        "detail": detalle,
+        "referencia": request_id_context.get()
+    }
     if hint is not None:
         contenido["hint"] = hint
     return JSONResponse(status_code=status_code, content=contenido)
@@ -162,8 +177,22 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         ),
     )
 
+    @app.exception_handler(Exception)
+    async def handler_global_excepciones(req: Request, exc: Exception) -> JSONResponse:
+        if isinstance(exc, StarletteHTTPException):
+            return _respuesta_error(exc.status_code, str(exc.detail))
+        logger.exception("Error inesperado en el servidor")
+        return _respuesta_error(
+            500,
+            "Ha ocurrido un error inesperado en el servidor.",
+            hint="Proporcione la referencia técnica al equipo de soporte para su diagnóstico."
+        )
+
 
 def _configurar_middlewares(app: FastAPI) -> None:
+    # Middleware de trazabilidad (X-Request-ID) va primero para capturar desde el inicio
+    app.add_middleware(BaseHTTPMiddleware, dispatch=trazabilidad_middleware)
+
     # Se mantiene el comportamiento original: `load_config()` se evalúa al crear la app.
     #TENER EN CUENTA EN DESPLIEGUE Y PRODUCCION.
     app.add_middleware(
