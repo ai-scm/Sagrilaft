@@ -1,6 +1,7 @@
 import Spinner from '@shared/components/ui/Spinner';
 import { esCampoMonetario, formatearMontoMoneda } from '../../../../../shared/utils/formatoMoneda';
 import ComparadorRegistros, { esCampoComparableComoRegistro } from '@shared/components/cambios/ComparadorRegistros';
+import { formatClasificacionActividad } from '../../utils/formateadores';
 
 const s = {
   fondo: {
@@ -135,13 +136,21 @@ export default function ModalComparacionVersiones({
     : 'Comparando versiones';
 
   function presentarCambio(cambio, moneda) {
-    if (!esCampoMonetario(cambio.campo)) return cambio.valor_anterior;
-    return formatearMontoMoneda(cambio.valor_anterior, moneda);
+    const valor = cambio.valor_anterior;
+    if (cambio.campo === 'actividad_clasificacion' || cambio.campo === 'clasificacion_actividad') {
+      return formatClasificacionActividad(valor);
+    }
+    if (!esCampoMonetario(cambio.campo)) return valor;
+    return formatearMontoMoneda(valor, moneda);
   }
 
   function presentarCambioCorregido(cambio, moneda) {
-    if (!esCampoMonetario(cambio.campo)) return cambio.valor_corregido;
-    return formatearMontoMoneda(cambio.valor_corregido, moneda);
+    const valor = cambio.valor_corregido;
+    if (cambio.campo === 'actividad_clasificacion' || cambio.campo === 'clasificacion_actividad') {
+      return formatClasificacionActividad(valor);
+    }
+    if (!esCampoMonetario(cambio.campo)) return valor;
+    return formatearMontoMoneda(valor, moneda);
   }
 
   return (

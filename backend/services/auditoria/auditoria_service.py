@@ -27,9 +27,10 @@ from domain.formulario.tipos import EstadoFormulario
 
 _ETIQUETAS_EVENTO = {
     "FORMULARIO_CREADO":    "Formulario creado",
-    "FORMULARIO_ENVIADO":   "Formulario enviado por contraparte",
-    "FORMULARIO_APROBADO":  "Formulario aprobado",
-    "FORMULARIO_RECHAZADO": "Formulario rechazado",
+    "FORMULARIO_ENVIADO":       "Formulario enviado a revisión",
+    "FORMULARIO_APROBADO":      "Formulario validado (aprobado internamente)",
+    "FORMULARIO_APROBACION_REVERTIDA": "Validación de formulario revertida",
+    "FORMULARIO_RECHAZADO":     "Formulario rechazado (cierre definitivo)",
     "FORMULARIO_DEVUELTO":  "Devuelto para corrección",
     "FORMULARIO_CARGADO_MANUALMENTE": "Formulario cargado manualmente",
     "REPORTE_FINAL_CARGADO": "Informe final cargado",
@@ -62,6 +63,20 @@ _ETIQUETAS_ACTOR = {
     "DB_DIRECTO":  "Base de datos (acceso directo)",
 }
 
+_ETIQUETAS_DOCUMENTO = {
+    "cedula_representante":   "Documento de Identidad del Representante Legal",
+    "certificado_existencia": "Certificado de Existencia y Representación Legal",
+    "estados_financieros":    "Estados Financieros",
+    "declaracion_renta":      "Declaración de Renta",
+    "rut":                    "RUT (Registro Único Tributario)",
+    "referencias_bancarias":  "Certificaciones Bancarias",
+    "FORMULARIO_PDF":         "Formulario SAGRILAFT (Oficial)",
+    "CERTIFICADO_SAGRILAFT":  "Certificado de Firma Electrónica",
+    "REPORTE_FINAL":          "Informe Final de Evaluación",
+}
+
+def _documento_label(tipo: Optional[str]) -> str:
+    return _ETIQUETAS_DOCUMENTO.get(tipo or "", tipo or "—")
 
 def _estado_label(estado: Optional[str]) -> str:
     return _ETIQUETAS_ESTADO.get(estado or "", estado or "—")
@@ -194,7 +209,7 @@ def _html_documentos(documentos: List[Dict[str, Any]]) -> str:
     )
     filas = "".join(
         f"<tr>"
-        f"<td>{escape(str(d.get('tipo_documento', '—')))}</td>"
+        f"<td>{escape(_documento_label(d.get('tipo_documento')))}</td>"
         f"<td>{escape(str(d.get('nombre_archivo', '—')))}</td>"
         f"<td>{escape(str(d.get('version_numero', 1)))}</td>"
         f"<td>{escape(str(d.get('tamano') or '—'))}</td>"

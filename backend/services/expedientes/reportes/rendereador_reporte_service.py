@@ -18,6 +18,23 @@ from services.expedientes.reportes.generador_fichas import (
     generar_fichas_registro_comparadas,
 )
 
+_ETIQUETAS_CLASIFICACION_ACTIVIDAD = {
+    "C": "Comercializador (C)",
+    "D": "Distribuidor autorizado (D)",
+    "R": "Representante (R)",
+    "F": "Fabricante (F)",
+    "I": "Importador (I)",
+}
+
+def _formatear_valor_simple(campo: str, valor: Any) -> str:
+    """Formatea valores simples para presentación, como clasificaciones."""
+    if valor is None:
+        return ""
+    valor_str = str(valor)
+    if campo in ("actividad_clasificacion", "clasificacion_actividad"):
+        return _ETIQUETAS_CLASIFICACION_ACTIVIDAD.get(valor_str, valor_str)
+    return valor_str
+
 
 class RendereadorReporteService:
     """
@@ -83,11 +100,13 @@ class RendereadorReporteService:
             </tr>
             ''')
             else:
+                valor_ant_fmt = _formatear_valor_simple(cambio["campo"], cambio["valor_anterior"])
+                valor_cor_fmt = _formatear_valor_simple(cambio["campo"], cambio["valor_corregido"])
                 filasHtml.append(f'''
             <tr>
               <td>{escape(cambio["etiqueta"])}</td>
-              <td>{escape(cambio["valor_anterior"])}</td>
-              <td>{escape(cambio["valor_corregido"])}</td>
+              <td>{escape(valor_ant_fmt)}</td>
+              <td>{escape(valor_cor_fmt)}</td>
             </tr>
             ''')
 
