@@ -27,7 +27,7 @@ export const OPCIONES_ESTADOS_FORMULARIO = Object.entries(CONFIG_ESTADOS_FORMULA
 
 const ESTILO_POR_DEFECTO = { bg: '#f1f5f9', color: '#64748b', borde: '#e2e8f0' };
 
-export default function BadgeEstadoFormulario({ estado, overrides = {} }) {
+export default function BadgeEstadoFormulario({ estado, overrides = {}, className = '' }) {
   const config = CONFIG_ESTADOS_FORMULARIO[estado];
   if (process.env.NODE_ENV !== 'production' && !config) {
     console.warn(`BadgeEstadoFormulario: estado desconocido "${estado}".`);
@@ -37,15 +37,19 @@ export default function BadgeEstadoFormulario({ estado, overrides = {} }) {
   const etiqueta = config?.etiqueta ?? estado;
 
   const estiloFinal = {
-    fontWeight:    '700',
+    display:       'inline-flex',
+    alignItems:    'center',
+    padding:       '4px 12px',
+    fontSize:      '13px',
+    fontWeight:    '600',
     background:    estiloBase.bg,
     color:         estiloBase.color,
     border:        `1px solid ${estiloBase.borde}`,
-    borderRadius:  '999px',
+    borderRadius:  '9999px',
     whiteSpace:    'nowrap',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.01em',
     ...overrides,
   };
 
-  return <span style={estiloFinal}>{etiqueta}</span>;
+  return <span style={estiloFinal} className={className}>{etiqueta}</span>;
 }

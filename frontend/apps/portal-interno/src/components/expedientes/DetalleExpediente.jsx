@@ -10,6 +10,9 @@
  */
 
 import { useState } from 'react';
+import { Download, Upload, ShieldCheck, FileText, FileBarChart } from 'lucide-react';
+import './DetalleExpediente.css';
+import '../modals/Modals.css';
 import { api } from '../../services/api';
 import { useExpedienteDetalle } from '../../hooks/useExpedienteDetalle';
 import Spinner from '@shared/components/ui/Spinner';
@@ -35,257 +38,24 @@ import {
   MODO_TRABAJO_ACTUALIZACION_REABIERTA,
 } from '../../config/constantes';
 import { ESTADO_FORM_CERRADO } from '@shared/utils/constantes';
+import { formatTipoDocumento } from '../../utils/formateadores';
 
-const ESTADO_ENVIADO         = 'enviado';
-const ESTADO_EN_CORRECCION   = 'en_correccion';
-const ESTADO_VALIDADO        = 'validado';
+const ESTADO_ENVIADO = 'enviado';
+const ESTADO_EN_CORRECCION = 'en_correccion';
+const ESTADO_VALIDADO = 'validado';
 const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
-const ESTADO_FIRMADO         = 'firmado';
+const ESTADO_FIRMADO = 'firmado';
 
 const TIPOS_EXCLUIDOS_DE_ADJUNTOS = [TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT, TIPO_DOCUMENTO_REPORTE_FINAL];
 
 // ── Estilos ─────────────────────────────────────────────────────────────────
 
-const s = {
-  overlay: {
-    position:   'fixed',
-    inset:      0,
-    background: 'var(--gray-50, #f8fafc)',
-    overflowY:  'auto',
-    zIndex:     100,
-  },
-  contenedor: {
-    maxWidth: '800px',
-    margin:   '0 auto',
-    padding:  '32px 24px 64px',
-  },
-  // Encabezado
-  encabezado: {
-    marginBottom: '28px',
-  },
-  btnVolver: {
-    display:      'inline-flex',
-    alignItems:   'center',
-    gap:          '6px',
-    padding:      '6px 0',
-    background:   'transparent',
-    color:        'var(--primary-600, #2563eb)',
-    border:       'none',
-    fontSize:     '0.85rem',
-    fontWeight:   '600',
-    cursor:       'pointer',
-    marginBottom: '16px',
-  },
-  tituloEncabezado: {
-    display:    'flex',
-    alignItems: 'flex-start',
-    gap:        '12px',
-    flexWrap:   'wrap',
-  },
-  razonSocial: {
-    fontSize:   '1.5rem',
-    fontWeight: '800',
-    color:      'var(--gray-900, #0f172a)',
-    margin:     '0 0 6px',
-    lineHeight: 1.2,
-  },
-  metaEncabezado: {
-    display:    'flex',
-    gap:        '8px',
-    flexWrap:   'wrap',
-    alignItems: 'center',
-  },
-  chip: {
-    fontSize:      '0.75rem',
-    color:         'var(--gray-500, #64748b)',
-    background:    'var(--gray-100, #f1f5f9)',
-    border:        '1px solid var(--gray-200, #e2e8f0)',
-    borderRadius:  '999px',
-    padding:       '3px 10px',
-    fontFamily:    'inherit',
-    whiteSpace:    'nowrap',
-  },
-  chipCodigo: {
-    fontSize:      '0.75rem',
-    color:         'var(--gray-500, #64748b)',
-    fontFamily:    'monospace',
-    letterSpacing: '0.06em',
-  },
-  // Sección de documentos adjuntos
-  seccion: {
-    background:   '#fff',
-    borderRadius: 'var(--radius-md, 8px)',
-    border:       '1px solid var(--gray-200, #e2e8f0)',
-    marginBottom: '16px',
-    overflow:     'hidden',
-  },
-  seccionTitulo: {
-    fontSize:      '0.8rem',
-    fontWeight:    '700',
-    color:         'var(--gray-500, #64748b)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    padding:       '12px 20px',
-    background:    'var(--gray-50, #f8fafc)',
-    borderBottom:  '1px solid var(--gray-100, #f1f5f9)',
-    margin:        0,
-  },
-  // Banner PDF oficial
-  bannerPdf: {
-    display:       'flex',
-    alignItems:    'center',
-    justifyContent: 'space-between',
-    gap:           '16px',
-    background:    'linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)',
-    borderRadius:  'var(--radius-md, 8px)',
-    padding:       '20px 24px',
-    marginBottom:  '20px',
-    flexWrap:      'wrap',
-  },
-  bannerPdfTextos: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '3px',
-  },
-  bannerPdfTitulo: {
-    fontSize:   '0.92rem',
-    fontWeight: '700',
-    color:      '#fff',
-    margin:     0,
-  },
-  bannerPdfSubtitulo: {
-    fontSize: '0.78rem',
-    color:    'rgba(255,255,255,0.7)',
-    margin:   0,
-  },
-  btnDescargarPdf: {
-    padding:        '9px 20px',
-    background:     '#fff',
-    color:          '#1d4ed8',
-    border:         'none',
-    borderRadius:   'var(--radius-sm, 6px)',
-    fontSize:       '0.85rem',
-    fontWeight:     '700',
-    cursor:         'pointer',
-    textDecoration: 'none',
-    whiteSpace:     'nowrap',
-    flexShrink:     0,
-  },
-  // Documentos
-  listaDocumentos: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '0',
-  },
-  filaDocumento: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    padding:        '12px 20px',
-    borderBottom:   '1px solid var(--gray-50, #f8fafc)',
-    gap:            '12px',
-  },
-  infoDocumento: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '2px',
-    flex:          1,
-    minWidth:      0,
-  },
-  nombreArchivo: {
-    fontSize:     '0.88rem',
-    fontWeight:   '500',
-    color:        'var(--gray-800, #1e293b)',
-    overflow:     'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace:   'nowrap',
-  },
-  tipoTamano: {
-    fontSize: '0.75rem',
-    color:    'var(--gray-400, #94a3b8)',
-  },
-  btnDescargar: {
-    padding:      '5px 14px',
-    background:   'var(--primary-50, #eff6ff)',
-    color:        'var(--primary-700, #1d4ed8)',
-    border:       '1px solid var(--primary-200, #bfdbfe)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.78rem',
-    fontWeight:   '600',
-    cursor:       'pointer',
-    textDecoration: 'none',
-    whiteSpace:   'nowrap',
-    flexShrink:   0,
-  },
-  sinDocumentos: {
-    padding:   '20px',
-    textAlign: 'center',
-    color:     'var(--gray-400, #94a3b8)',
-    fontSize:  '0.85rem',
-  },
-  // Banner firma
-  bannerFirma: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    gap:            '16px',
-    borderRadius:   'var(--radius-md, 8px)',
-    padding:        '16px 20px',
-    marginBottom:   '16px',
-    flexWrap:       'wrap',
-  },
-  bannerFirmaValidado: {
-    background: 'linear-gradient(135deg, #854d0e 0%, #ca8a04 100%)',
-  },
-  bannerFirmaPendiente: {
-    background: 'linear-gradient(135deg, #78350f 0%, #d97706 100%)',
-  },
-  bannerFirmaFirmado: {
-    background: 'linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%)',
-  },
-  bannerFirmaTextos: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '3px',
-  },
-  bannerFirmaTitulo: {
-    fontSize:   '0.92rem',
-    fontWeight: '700',
-    color:      '#fff',
-    margin:     0,
-  },
-  bannerFirmaSubtitulo: {
-    fontSize: '0.78rem',
-    color:    'rgba(255,255,255,0.75)',
-    margin:   0,
-  },
-  btnFirma: {
-    padding:        '9px 20px',
-    background:     '#fff',
-    border:         'none',
-    borderRadius:   'var(--radius-sm, 6px)',
-    fontSize:       '0.85rem',
-    fontWeight:     '700',
-    cursor:         'pointer',
-    textDecoration: 'none',
-    whiteSpace:     'nowrap',
-    flexShrink:     0,
-  },
-  btnFirmaColor: { color: '#854d0e' },
-  btnFirmaColorFirmado: { color: '#6d28d9' },
-  btnFirmaDeshabilitado: {
-    opacity: 0.6,
-    cursor:  'not-allowed',
-  },
-};
-
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 
 function BannerPdfFormulario({ documento, formularioId }) {
   const [descargando, setDescargando] = useState(false);
-  const tamano = documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : '';
+  const tamano = documento.tamano ? formatearBytes(documento.tamano) : '';
   const fecha = documento.created_at ? formatearFechaHora(documento.created_at) : null;
-  const fechaTexto = fecha ? ` · ${fecha}` : '';
 
   async function handleDescargar() {
     setDescargando(true);
@@ -297,19 +67,26 @@ function BannerPdfFormulario({ documento, formularioId }) {
   }
 
   return (
-    <div style={s.bannerPdf}>
-      <div style={s.bannerPdfTextos}>
-        <p style={s.bannerPdfTitulo}>Formulario SAGRILAFT — PDF oficial</p>
-        <p style={s.bannerPdfSubtitulo}>
-          {documento.nombre_archivo}{tamano}{fechaTexto}
-        </p>
+    <div className="card summary-card">
+      <div className="card-icon">
+        <FileText className="text-blue-500" size={24} />
+      </div>
+      <div className="card-content">
+        <h3 className="doc-title">Formulario Oficial SAGRILAFT</h3>
+        <div className="doc-meta">
+          <span>{documento.nombre_archivo}</span>
+          {fecha && <><span className="separator">•</span><span>{fecha}</span></>}
+          {tamano && <><span className="separator">•</span><span>{tamano}</span></>}
+        </div>
       </div>
       <button
+        className="btn-icon"
         onClick={handleDescargar}
         disabled={descargando}
-        style={{ ...s.btnDescargarPdf, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
+        title="Descargar"
+        style={{ opacity: descargando ? 0.5 : 1 }}
       >
-        {descargando ? 'Descargando…' : 'Descargar PDF'}
+        <Download size={18} />
       </button>
     </div>
   );
@@ -327,25 +104,33 @@ function FilaDocumento({ documento, formularioId }) {
     }
   }
 
+  const tamano = documento.tamano ? formatearBytes(documento.tamano) : '—';
+  const fecha = documento.created_at ? formatearFechaHora(documento.created_at) : '—';
+
   return (
-    <div style={s.filaDocumento}>
-      <div style={s.infoDocumento}>
-        <span style={s.nombreArchivo} title={documento.nombre_archivo}>
-          {documento.nombre_archivo}
-        </span>
-        <span style={s.tipoTamano}>
-          {documento.tipo_documento}
-          {documento.tamano ? ` · ${formatearBytes(documento.tamano)}` : ''}
-        </span>
-      </div>
-      <button
-        onClick={handleDescargar}
-        disabled={descargando}
-        style={{ ...s.btnDescargar, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
-      >
-        {descargando ? 'Descargando…' : 'Descargar'}
-      </button>
-    </div>
+    <tr>
+      <td>
+        <div className="cell-doc-name">
+          <FileText size={16} className="text-gray-400" />
+          <span title={documento.nombre_archivo}>{documento.nombre_archivo}</span>
+        </div>
+      </td>
+      <td>{formatTipoDocumento(documento.tipo_documento)}</td>
+      <td>{tamano}</td>
+      <td>{documento.subido_por || '—'}</td>
+      <td>{fecha}</td>
+      <td className="text-right">
+        <button
+          className="btn-icon-small"
+          onClick={handleDescargar}
+          disabled={descargando}
+          title="Descargar"
+          style={{ opacity: descargando ? 0.5 : 1 }}
+        >
+          <Download size={16} />
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -360,7 +145,7 @@ function BtnDescargaFirmado({ formularioId }) {
     <button
       onClick={handleDescargar}
       disabled={descargando}
-      style={{ ...s.btnFirma, ...s.btnFirmaColorFirmado, opacity: descargando ? 0.6 : 1, cursor: descargando ? 'not-allowed' : 'pointer' }}
+      className="btn-firma btn-firma-color-firmado"
     >
       {descargando ? 'Descargando…' : 'Descargar firmado'}
     </button>
@@ -368,13 +153,14 @@ function BtnDescargaFirmado({ formularioId }) {
 }
 
 function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEnviada }) {
-  const [enviando, setEnviando]                         = useState(false); // enviar a ZohoSign (VALIDADO)
-  const [aprobando, setAprobando]                       = useState(false); // aprobar expediente (ENVIADO)
-  const [cancelando, setCancelando]                     = useState(false);
-  const [verificando, setVerificando]                   = useState(false);
-  const [errorFirma, setErrorFirma]                     = useState(null);
+  const [enviando, setEnviando] = useState(false); // enviar a ZohoSign (VALIDADO)
+  const [aprobando, setAprobando] = useState(false); // aprobar expediente (ENVIADO)
+  const [cancelando, setCancelando] = useState(false);
+  const [verificando, setVerificando] = useState(false);
+  const [errorFirma, setErrorFirma] = useState(null);
+  const [deshaciendoAprobacion, setDeshaciendoAprobacion] = useState(false);
   const [mostrarModalDevolucion, setMostrarModalDevolucion] = useState(false);
-  const [mostrarModalRechazo, setMostrarModalRechazo]   = useState(false);
+  const [mostrarModalRechazo, setMostrarModalRechazo] = useState(false);
   const [mostrarModalAprobacion, setMostrarModalAprobacion] = useState(false);
 
   async function handleEnviarAFirma() {
@@ -430,20 +216,36 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
     }
   }
 
+  async function handleDeshacerAprobacion() {
+    if (!window.confirm('¿Está seguro de que desea deshacer la aprobación de este formulario?')) {
+      return;
+    }
+    setDeshaciendoAprobacion(true);
+    setErrorFirma(null);
+    try {
+      await api.deshacerAprobacionExpediente(formularioId);
+      onFirmaEnviada();
+    } catch (err) {
+      setErrorFirma(err.message || 'Error al deshacer aprobación.');
+    } finally {
+      setDeshaciendoAprobacion(false);
+    }
+  }
+
   if (estado === ESTADO_ENVIADO) {
     const ocupado = aprobando;
     return (
       <>
-        <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)' }}>
-          <div style={s.bannerFirmaTextos}>
-            <p style={s.bannerFirmaTitulo}>Formulario recibido — pendiente de revisión</p>
-            <p style={s.bannerFirmaSubtitulo}>
+        <div className="banner-firma banner-firma-revisar">
+          <div className="banner-firma-textos">
+            <p className="banner-firma-titulo">Formulario recibido — pendiente de revisión</p>
+            <p className="banner-firma-subtitulo">
               {errorFirma || 'Revise los documentos adjuntos y apruebe, rechace o devuelva el formulario.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
             <button
-              style={{ ...s.btnFirma, color: '#1d4ed8', ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
+              className="btn-firma btn-firma-color-revisar"
               onClick={() => setMostrarModalAprobacion(true)}
               disabled={ocupado}
               type="button"
@@ -451,7 +253,7 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
               Aprobar
             </button>
             <button
-              style={{ ...s.btnFirma, color: '#991b1b', opacity: 0.85, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
+              className="btn-firma btn-firma-color-correccion"
               onClick={() => setMostrarModalRechazo(true)}
               disabled={ocupado}
               type="button"
@@ -459,7 +261,7 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
               Rechazar
             </button>
             <button
-              style={{ ...s.btnFirma, color: '#c2410c', opacity: 0.9, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
+              className="btn-firma btn-firma-color-correccion"
               onClick={() => setMostrarModalDevolucion(true)}
               disabled={ocupado}
               type="button"
@@ -497,10 +299,10 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
   if (estado === ESTADO_EN_CORRECCION) {
     if (modoTrabajo === MODO_TRABAJO_ACTUALIZACION_REABIERTA) {
       return (
-        <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' }}>
-          <div style={s.bannerFirmaTextos}>
-            <p style={s.bannerFirmaTitulo}>Actualización reabierta - en trabajo</p>
-            <p style={s.bannerFirmaSubtitulo}>
+        <div className="banner-firma banner-firma-revisar">
+          <div className="banner-firma-textos">
+            <p className="banner-firma-titulo">Actualización reabierta - en trabajo</p>
+            <p className="banner-firma-subtitulo">
               El expediente quedó habilitado para actualizar información, cargar documentos y completar nuevos cuestionarios.
             </p>
           </div>
@@ -509,10 +311,10 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
     }
 
     return (
-      <div style={{ ...s.bannerFirma, background: 'linear-gradient(135deg, #7c2d12 0%, #c2410c 100%)' }}>
-        <div style={s.bannerFirmaTextos}>
-          <p style={s.bannerFirmaTitulo}>Formulario devuelto — en corrección</p>
-          <p style={s.bannerFirmaSubtitulo}>
+      <div className="banner-firma banner-firma-correccion">
+        <div className="banner-firma-textos">
+          <p className="banner-firma-titulo">Formulario devuelto — en corrección</p>
+          <p className="banner-firma-subtitulo">
             Se notificó al destinatario. El formulario estará disponible nuevamente
             cuando el remitente reenvíe la versión corregida.
           </p>
@@ -523,21 +325,31 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
 
   if (estado === ESTADO_VALIDADO) {
     return (
-      <div style={{ ...s.bannerFirma, ...s.bannerFirmaValidado }}>
-        <div style={s.bannerFirmaTextos}>
-          <p style={s.bannerFirmaTitulo}>Formulario listo para firma electrónica</p>
-          <p style={s.bannerFirmaSubtitulo}>
+      <div className="banner-firma banner-firma-validado">
+        <div className="banner-firma-textos">
+          <p className="banner-firma-titulo">Formulario listo para firma electrónica</p>
+          <p className="banner-firma-subtitulo">
             {errorFirma || 'El formulario fue validado. Envíelo a ZohoSign para que la contraparte firme.'}
           </p>
         </div>
-        <button
-          style={{ ...s.btnFirma, ...s.btnFirmaColor, ...(enviando ? s.btnFirmaDeshabilitado : {}) }}
-          onClick={handleEnviarAFirma}
-          disabled={enviando}
-          type="button"
-        >
-          {enviando ? 'Enviando…' : 'Enviar a firma'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          <button
+            className="btn-outline"
+            onClick={handleDeshacerAprobacion}
+            disabled={enviando || deshaciendoAprobacion}
+            type="button"
+          >
+            {deshaciendoAprobacion ? 'Deshaciendo…' : 'Deshacer aprobación'}
+          </button>
+          <button
+            className="btn-firma btn-firma-color-validado"
+            onClick={handleEnviarAFirma}
+            disabled={enviando || deshaciendoAprobacion}
+            type="button"
+          >
+            {enviando ? 'Enviando…' : 'Enviar a firma'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -545,16 +357,16 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
   if (estado === ESTADO_PENDIENTE_FIRMA) {
     const ocupado = cancelando || verificando;
     return (
-      <div style={{ ...s.bannerFirma, ...s.bannerFirmaPendiente }}>
-        <div style={s.bannerFirmaTextos}>
-          <p style={s.bannerFirmaTitulo}>Firma electrónica pendiente</p>
-          <p style={s.bannerFirmaSubtitulo}>
+      <div className="banner-firma banner-firma-pendiente">
+        <div className="banner-firma-textos">
+          <p className="banner-firma-titulo">Firma electrónica pendiente</p>
+          <p className="banner-firma-subtitulo">
             {errorFirma || 'Se envió la solicitud de firma a ZohoSign. Esperando que la contraparte firme.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
           <button
-            style={{ ...s.btnFirma, color: '#78350f', ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
+            className="btn-firma btn-firma-color-pendiente"
             onClick={handleVerificarFirma}
             disabled={ocupado}
             type="button"
@@ -562,7 +374,7 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
             {verificando ? 'Verificando…' : 'Verificar estado'}
           </button>
           <button
-            style={{ ...s.btnFirma, color: '#78350f', opacity: 0.7, ...(ocupado ? s.btnFirmaDeshabilitado : {}) }}
+            className="btn-firma btn-firma-color-pendiente"
             onClick={handleCancelarFirma}
             disabled={ocupado}
             type="button"
@@ -576,10 +388,10 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
 
   if (estado === ESTADO_FIRMADO) {
     return (
-      <div style={{ ...s.bannerFirma, ...s.bannerFirmaFirmado }}>
-        <div style={s.bannerFirmaTextos}>
-          <p style={s.bannerFirmaTitulo}>Documentos firmados electrónicamente</p>
-          <p style={s.bannerFirmaSubtitulo}>La contraparte firmó el formulario y Certificado vía ZohoSign.</p>
+      <div className="banner-firma banner-firma-firmado">
+        <div className="banner-firma-textos">
+          <p className="banner-firma-titulo">Documentos firmados electrónicamente</p>
+          <p className="banner-firma-subtitulo">La contraparte firmó el formulario y Certificado vía ZohoSign.</p>
         </div>
         <BtnDescargaFirmado formularioId={formularioId} />
       </div>
@@ -596,70 +408,56 @@ function ModalReaperturaActualizacion({ visible, onConfirmar, onCancelar, ocupad
   if (!visible) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 23, 42, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 300,
-      padding: '16px',
-    }} role="dialog" aria-modal="true" aria-labelledby="titulo-reapertura">
-      <div style={{
-        background: '#fff',
-        borderRadius: 'var(--radius-md, 10px)',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-        width: '100%',
-        maxWidth: '460px',
-        padding: '24px',
-      }}>
-        <h3 id="titulo-reapertura" style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0 0 10px', color: '#0f172a' }}>
-          Reabrir actualización
-        </h3>
-        <p style={{ fontSize: '0.9rem', color: '#475569', margin: '0 0 16px', lineHeight: 1.5 }}>
-          La carpeta volverá a estado En corrección para continuar el ciclo periódico. Los documentos y reportes finales existentes se conservarán.
-        </p>
-        <label htmlFor="justificacion-reapertura" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-          Justificación de reapertura
-        </label>
-        <textarea
-          id="justificacion-reapertura"
-          value={justificacion}
-          onChange={e => setJustificacion(e.target.value)}
-          disabled={ocupado}
-          rows={4}
-          maxLength={1000}
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            resize: 'vertical',
-            border: '1.5px solid #cbd5e1',
-            borderRadius: '6px',
-            padding: '10px 12px',
-            fontFamily: 'inherit',
-            fontSize: '0.88rem',
-            lineHeight: 1.5,
-          }}
-        />
-        <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
-          <span style={{ color: '#94a3b8' }}>
-            {justificacion.trim().length} / 1000
-          </span>
-          <span style={{ color: justificacionValida ? '#15803d' : '#dc2626' }}>
-            {justificacionValida ? '✓ Mínimo 20 caracteres cumplido' : `Mínimo 20 caracteres (${justificacion.trim().length}/20)`}
-          </span>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-reapertura">
+      <div className="modal-container" style={{ maxWidth: '460px' }}>
+        <div className="modal-header">
+          <h3 className="modal-title" id="titulo-reapertura">
+            Reabrir actualización
+          </h3>
+          <p className="modal-desc">
+            La carpeta volverá a estado En corrección para continuar el ciclo periódico. Los documentos y reportes finales existentes se conservarán.
+          </p>
         </div>
-        {error && <div style={{ marginTop: '12px', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', color: '#dc2626', fontSize: '0.85rem' }}>{error}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-          <button type="button" onClick={onCancelar} disabled={ocupado} style={{ padding: '9px 18px', background: '#fff', color: '#475569', border: '1.5px solid #cbd5e1', borderRadius: '6px', fontWeight: 600, cursor: ocupado ? 'not-allowed' : 'pointer' }}>
+        
+        <div className="modal-body">
+          <div className="form-group">
+            <label htmlFor="justificacion-reapertura" className="form-label">
+              Justificación de reapertura
+            </label>
+            <textarea
+              id="justificacion-reapertura"
+              className="form-input form-textarea"
+              value={justificacion}
+              onChange={e => setJustificacion(e.target.value)}
+              placeholder="Ej. Se requieren nuevos soportes financieros..."
+              rows={4}
+              maxLength={1000}
+              disabled={ocupado}
+            />
+            <div className="char-counter">
+              <span>{justificacion.trim().length} / 1000</span>
+              <span style={{ color: justificacionValida ? '#166534' : '#DC2626' }}>
+                {justificacionValida ? '✓ Mínimo cumplido' : `Mínimo 20 caracteres (${justificacion.trim().length}/20)`}
+              </span>
+            </div>
+          </div>
+          {error && <div className="alert-error">{error}</div>}
+        </div>
+
+        <div className="modal-footer">
+          <button 
+            type="button" 
+            onClick={onCancelar} 
+            disabled={ocupado} 
+            className="btn-modal btn-modal-secondary"
+          >
             Cancelar
           </button>
           <button
             type="button"
             onClick={() => onConfirmar(justificacion.trim())}
             disabled={ocupado || !justificacionValida}
-            style={{ padding: '9px 18px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: ocupado || !justificacionValida ? 'not-allowed' : 'pointer', opacity: ocupado || !justificacionValida ? 0.6 : 1 }}
+            className="btn-modal btn-modal-primary"
           >
             {ocupado ? 'Reabriendo...' : 'Reabrir'}
           </button>
@@ -679,21 +477,38 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const [errorReapertura, setErrorReapertura] = useState(null);
   const [avisoReapertura, setAvisoReapertura] = useState(null);
 
-  const tipoLabel         = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
+  const tipoLabel = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
   const tipoSolicitudLabel = expediente ? (ETIQUETA_TIPO_SOLICITUD[expediente.tipo_solicitud] ?? expediente.tipo_solicitud) : '';
-  const todosDocumentos   = expediente?.documentos ?? [];
+  const todosDocumentos = expediente?.documentos ?? [];
   // Puede haber varias versiones del PDF; la activa es la de mayor version_numero.
-  const pdfFormulario     = [...todosDocumentos]
+  const pdfFormulario = [...todosDocumentos]
     .filter(d => d.tipo_documento === TIPO_DOCUMENTO_FORMULARIO_PDF)
     .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
-  const reporteFinal      = [...todosDocumentos]
+  const reporteFinal = [...todosDocumentos]
     .filter(d => d.tipo_documento === TIPO_DOCUMENTO_REPORTE_FINAL)
     .sort((a, b) => b.version_numero - a.version_numero)[0] ?? null;
   const documentosAdjuntos = todosDocumentos.filter(d => !TIPOS_EXCLUIDOS_DE_ADJUNTOS.includes(d.tipo_documento));
 
   const estaCerrado = expediente?.estado === ESTADO_FORM_CERRADO;
-  const permiteReaperturaActualizacion = estaCerrado && expediente?.tipo_solicitud === TIPO_SOLICITUD_ACTUALIZACION;
+  // Permitir reapertura para iniciar un proceso de actualización desde cualquier expediente cerrado (ej. Vinculación)
+  const permiteReaperturaActualizacion = estaCerrado;
   const [mostrarModalReporteFinal, setMostrarModalReporteFinal] = useState(false);
+  const [descargandoTodos, setDescargandoTodos] = useState(false);
+
+  async function handleDescargarTodos() {
+    if (documentosAdjuntos.length === 0 || descargandoTodos) return;
+    setDescargandoTodos(true);
+    try {
+      for (const doc of documentosAdjuntos) {
+        await api.descargarDocumento(formularioId, doc.id, doc.nombre_archivo);
+        await new Promise(resolve => setTimeout(resolve, 300)); // Prevenir bloqueo del navegador
+      }
+    } catch (err) {
+      console.error('Error al descargar todos:', err);
+    } finally {
+      setDescargandoTodos(false);
+    }
+  }
 
   async function handleReabrirActualizacion(justificacion) {
     setReabriendo(true);
@@ -718,96 +533,88 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   }
 
   return (
-    <div style={s.overlay}>
-      <div style={s.contenedor}>
+    <div className="expediente-overlay">
+      <div className="expediente-container">
         {/* Botón volver */}
-        <button style={s.btnVolver} onClick={onVolver} type="button">
+        <button className="btn-volver" onClick={onVolver} type="button">
           ← Volver a formularios
         </button>
 
         {cargando && <Spinner texto="Cargando expediente…" style={{ padding: '80px 0' }} />}
-        {error    && <Alert mensaje={error} style={{ margin: '24px 0' }} />}
+        {error && <Alert mensaje={error} style={{ margin: '24px 0' }} />}
 
         {!cargando && expediente && (
           <>
-            {/* Encabezado */}
-            <div style={s.encabezado}>
-              <h1 style={s.razonSocial}>{expediente.razon_social ?? razonSocial ?? '(Sin razón social)'}</h1>
-              <div style={s.metaEncabezado}>
-                <BadgeEstadoFormulario
-                  estado={expediente.estado}
-                  overrides={{ fontSize: '0.75rem', padding: '3px 12px' }}
-                />
-                {tipoLabel && <span style={s.chip}>{tipoLabel}</span>}
-                {tipoSolicitudLabel && <span style={s.chip}>{tipoSolicitudLabel}</span>}
-                <span style={s.chipCodigo}>{expediente.codigo_peticion}</span>
-                {expediente.causal_cierre && (
-                  <span style={s.chip}>Causal: {ETIQUETA_CAUSAL_CIERRE[expediente.causal_cierre] || expediente.causal_cierre}</span>
-                )}
-                {expediente.updated_at && (
-                  <span style={s.chip}>{estaCerrado ? 'Cerrado' : 'Enviado'} {formatearFechaHora(expediente.updated_at)}</span>
-                )}
+            {/* Header Section */}
+            <header className="expediente-header">
+              <div className="header-left">
+                <div className="title-group">
+                  <h1 className="company-name">{expediente.razon_social ?? razonSocial ?? '(Sin razón social)'}</h1>
+                  <span className="case-code">{expediente.codigo_peticion}</span>
+                </div>
+                <div className="badge-group">
+                  {tipoLabel && <span className="badge badge-neutral">{tipoLabel}</span>}
+                  {tipoSolicitudLabel && <span className="badge badge-neutral">{tipoSolicitudLabel}</span>}
+                  <BadgeEstadoFormulario estado={expediente.estado} />
+                  {expediente.causal_cierre && (
+                    <span className="badge badge-neutral">Causal: {ETIQUETA_CAUSAL_CIERRE[expediente.causal_cierre] || expediente.causal_cierre}</span>
+                  )}
+                  {expediente.updated_at && (
+                    <span className="badge badge-neutral">{estaCerrado ? 'Cerrado' : 'Enviado'} {formatearFechaHora(expediente.updated_at)}</span>
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Botones de acción manual */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '16px' }}>
-              <button 
-                style={{ ...s.btnDescargarPdf, background: '#fff', border: '1.5px solid #1d4ed8', color: '#1d4ed8', opacity: estaCerrado ? 0.5 : 1, cursor: estaCerrado ? 'not-allowed' : 'pointer' }}
-                onClick={() => { if (!estaCerrado) setMostrarModalCargaManual(true); }}
-                disabled={estaCerrado}
-                type="button"
-                title={estaCerrado ? "No se puede modificar un expediente cerrado" : ""}
-              >
-                Cargar Formulario Manual
-              </button>
-              <button 
-                style={{ ...s.btnDescargarPdf, background: '#1d4ed8', border: '1.5px solid #1d4ed8', color: '#fff' }}
-                onClick={() => setMostrarModalReporteFinal(true)}
-                type="button"
-              >
-                Cerrar Expediente
-              </button>
-              {permiteReaperturaActualizacion && (
+              <div className="header-actions">
+                {permiteReaperturaActualizacion && (
+                  <button
+                    className="btn btn-outline-green"
+                    onClick={() => { setErrorReapertura(null); setMostrarModalReapertura(true); }}
+                    type="button"
+                  >
+                    Reabrir Actualización
+                  </button>
+                )}
                 <button
-                  style={{ ...s.btnDescargarPdf, background: '#fff', border: '1.5px solid #0f766e', color: '#0f766e' }}
-                  onClick={() => {
-                    setErrorReapertura(null);
-                    setMostrarModalReapertura(true);
-                  }}
+                  className="btn btn-secondary"
+                  onClick={() => { if (!estaCerrado) setMostrarModalCargaManual(true); }}
+                  disabled={estaCerrado}
+                  type="button"
+                  title={estaCerrado ? "No se puede modificar un expediente cerrado" : ""}
+                >
+                  <Upload size={16} />
+                  Cargar Formulario Manual
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setMostrarModalReporteFinal(true)}
                   type="button"
                 >
-                  Reabrir Actualización
+                  <ShieldCheck size={16} />
+                  Cerrar Expediente
                 </button>
-              )}
-            </div>
+              </div>
+            </header>
 
             {avisoReapertura && (
               <Alert
                 mensaje={avisoReapertura}
-                style={{
-                  marginBottom: '16px',
-                  background: '#fffbeb',
-                  borderColor: '#fbbf24',
-                  color: '#92400e',
-                }}
+                style={{ marginBottom: '16px', background: '#fffbeb', borderColor: '#fbbf24', color: '#92400e' }}
               />
             )}
 
+            {/* Modales */}
             <ModalCargaManual
               visible={mostrarModalCargaManual}
               formularioId={formularioId}
               onCargado={() => { setMostrarModalCargaManual(false); recargarExpediente(); }}
               onCancelar={() => setMostrarModalCargaManual(false)}
             />
-
             <ModalCargaReporteFinal
               visible={mostrarModalReporteFinal}
               formularioId={formularioId}
               onCargado={() => { setMostrarModalReporteFinal(false); recargarExpediente(); }}
               onCancelar={() => setMostrarModalReporteFinal(false)}
             />
-
             <ModalReaperturaActualizacion
               visible={mostrarModalReapertura}
               onConfirmar={handleReabrirActualizacion}
@@ -816,65 +623,113 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               error={errorReapertura}
             />
 
-            {/* PDF oficial del formulario — versión activa */}
-            {pdfFormulario && (
-              <BannerPdfFormulario documento={pdfFormulario} formularioId={formularioId} />
-            )}
+            <div className="expediente-grid">
+              {/* Main Content Column */}
+              <div className="main-column">
 
-            {/* Reporte Final */}
-            {reporteFinal && (
-              <div style={{ ...s.bannerPdf, background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' }}>
-                <div style={s.bannerPdfTextos}>
-                  <p style={s.bannerPdfTitulo}>Reporte Final de Cierre</p>
-                  <p style={s.bannerPdfSubtitulo}>
-                    {reporteFinal.nombre_archivo}{reporteFinal.tamano ? ` · ${formatearBytes(reporteFinal.tamano)}` : ''}{reporteFinal.created_at ? ` · ${formatearFechaHora(reporteFinal.created_at)}` : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={() => api.descargarDocumento(formularioId, reporteFinal.id, reporteFinal.nombre_archivo)}
-                  style={s.btnDescargarPdf}
-                >
-                  Descargar Reporte
-                </button>
-              </div>
-            )}
+                {/* Banner de Firma */}
+                <BannerFirma
+                  estado={expediente.estado}
+                  modoTrabajo={expediente.modo_trabajo}
+                  formularioId={formularioId}
+                  tipoPersona={expediente.tipo_persona}
+                  onFirmaEnviada={recargarExpediente}
+                />
 
-            {/* Historial de versiones — visible cuando hay más de una */}
-            {todosDocumentos.length > 0 && (
-              <HistorialVersionesFormulario
-                documentos={todosDocumentos}
-                formularioId={formularioId}
-              />
-            )}
-
-            <HistorialExpediente formularioId={formularioId} />
-
-            {/* Firma electrónica */}
-            <BannerFirma
-              estado={expediente.estado}
-              modoTrabajo={expediente.modo_trabajo}
-              formularioId={formularioId}
-              tipoPersona={expediente.tipo_persona}
-              onFirmaEnviada={recargarExpediente}
-            />
-
-            {/* Documentos adjuntos por el cliente/proveedor */}
-            <div style={s.seccion}>
-              <p style={s.seccionTitulo}>
-                Documentos adjuntos ({documentosAdjuntos.length})
-              </p>
-              <div style={s.listaDocumentos}>
-                {documentosAdjuntos.length === 0 ? (
-                  <div style={s.sinDocumentos}>No hay documentos adjuntos en este formulario.</div>
-                ) : (
-                  documentosAdjuntos.map(doc => (
-                    <FilaDocumento
-                      key={doc.id}
-                      documento={doc}
-                      formularioId={formularioId}
-                    />
-                  ))
+                {/* Summary Cards */}
+                {(pdfFormulario || reporteFinal) && (
+                  <section className="section-block">
+                    <div className="section-header">
+                      <h2 className="section-title">Resumen del Expediente</h2>
+                    </div>
+                    <div className="summary-cards">
+                      {pdfFormulario && <BannerPdfFormulario documento={pdfFormulario} formularioId={formularioId} />}
+                      {reporteFinal && (
+                        <div className="card summary-card">
+                          <div className="card-icon green">
+                            <FileBarChart className="text-green-500" size={24} />
+                          </div>
+                          <div className="card-content">
+                            <h3 className="doc-title">Reporte Final de Cierre</h3>
+                            <div className="doc-meta">
+                              <span>{reporteFinal.nombre_archivo}</span>
+                              {reporteFinal.created_at && <><span className="separator">•</span><span>{formatearFechaHora(reporteFinal.created_at)}</span></>}
+                              {reporteFinal.tamano && <><span className="separator">•</span><span>{formatearBytes(reporteFinal.tamano)}</span></>}
+                            </div>
+                          </div>
+                          <button
+                            className="btn-outline"
+                            onClick={() => api.descargarDocumento(formularioId, reporteFinal.id, reporteFinal.nombre_archivo)}
+                            title="Descargar Reporte"
+                          >
+                            <Download size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 )}
+
+                <section className="section-block">
+                  {todosDocumentos.length > 0 ? (
+                    <HistorialVersionesFormulario documentos={todosDocumentos} formularioId={formularioId} />
+                  ) : (
+                    <>
+                      <div className="section-header">
+                        <h2 className="section-title">Historial de Versiones del Formulario</h2>
+                      </div>
+                      <div className="card timeline-card" style={{ padding: '24px', color: '#9CA3AF', fontSize: '13px' }}>
+                        Sin versiones disponibles.
+                      </div>
+                    </>
+                  )}
+                </section>
+
+                {/* Attached Documents Table */}
+                <section className="section-block">
+                  <div className="section-header">
+                    <h2 className="section-title">Documentos Adjuntos ({documentosAdjuntos.length})</h2>
+                    {documentosAdjuntos.length > 0 && (
+                      <button 
+                        className="btn-outline btn-outline-gray"
+                        onClick={handleDescargarTodos}
+                        disabled={descargandoTodos}
+                        type="button"
+                      >
+                        <Download size={14} /> {descargandoTodos ? 'Descargando...' : 'Descargar todos'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="card table-card">
+                    {documentosAdjuntos.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#9CA3AF' }}>
+                        No hay documentos adjuntos en este formulario.
+                      </div>
+                    ) : (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Documento</th>
+                            <th>Tipo</th>
+                            <th>Tamaño</th>
+                            <th>Cargado por</th>
+                            <th>Fecha de carga</th>
+                            <th className="text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {documentosAdjuntos.map(doc => (
+                            <FilaDocumento key={doc.id} documento={doc} formularioId={formularioId} />
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </section>
+
+                <section className="section-block">
+                  <HistorialExpediente formularioId={formularioId} />
+                </section>
               </div>
             </div>
           </>

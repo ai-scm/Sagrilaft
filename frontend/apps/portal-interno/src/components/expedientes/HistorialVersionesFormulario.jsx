@@ -1,13 +1,5 @@
-/**
- * HistorialVersionesFormulario — línea de tiempo de PDFs generados por el sistema.
- *
- * Cada vez que la contraparte envía o corrige el formulario, el sistema genera
- * un nuevo PDF versionado. Este componente los lista en orden cronológico,
- * con la versión activa destacada y todas las versiones anteriores descargables
- * para trazabilidad y auditoría SAGRILAFT.
- */
-
 import { useState } from 'react';
+import { Download, GitCompare } from 'lucide-react';
 import { api } from '../../services/api';
 import ModalComparacionVersiones from './ModalComparacionVersiones';
 import {
@@ -16,134 +8,7 @@ import {
   formatearBytes,
 } from '../../config/constantes';
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
-const s = {
-  contenedor: {
-    background:   '#fff',
-    borderRadius: 'var(--radius-md, 8px)',
-    border:       '1px solid var(--gray-200, #e2e8f0)',
-    marginBottom: '16px',
-    overflow:     'hidden',
-  },
-  encabezado: {
-    fontSize:      '0.8rem',
-    fontWeight:    '700',
-    color:         'var(--gray-500, #64748b)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    padding:       '12px 20px',
-    background:    'var(--gray-50, #f8fafc)',
-    borderBottom:  '1px solid var(--gray-100, #f1f5f9)',
-    margin:        0,
-  },
-  filaVersion: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    padding:        '12px 20px',
-    borderBottom:   '1px solid var(--gray-50, #f8fafc)',
-    gap:            '12px',
-  },
-  filaVersionActiva: {
-    background: '#f0fdf4',
-  },
-  infoVersion: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '3px',
-    flex:          1,
-    minWidth:      0,
-  },
-  nombreArchivo: {
-    fontSize:     '0.88rem',
-    fontWeight:   '500',
-    color:        'var(--gray-800, #1e293b)',
-    overflow:     'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace:   'nowrap',
-  },
-  metaVersion: {
-    display:    'flex',
-    gap:        '8px',
-    alignItems: 'center',
-    flexWrap:   'wrap',
-  },
-  fechaTamano: {
-    fontSize: '0.75rem',
-    color:    'var(--gray-400, #94a3b8)',
-  },
-  badgeVersionActiva: {
-    fontSize:      '0.68rem',
-    fontWeight:    '700',
-    color:         '#166534',
-    background:    '#dcfce7',
-    border:        '1px solid #bbf7d0',
-    borderRadius:  '999px',
-    padding:       '2px 8px',
-    letterSpacing: '0.03em',
-    textTransform: 'uppercase',
-    whiteSpace:    'nowrap',
-  },
-  badgeVersionAnterior: {
-    fontSize:      '0.68rem',
-    fontWeight:    '600',
-    color:         'var(--gray-500, #64748b)',
-    background:    'var(--gray-100, #f1f5f9)',
-    border:        '1px solid var(--gray-200, #e2e8f0)',
-    borderRadius:  '999px',
-    padding:       '2px 8px',
-    whiteSpace:    'nowrap',
-  },
-  badgeManual: {
-    fontSize:      '0.68rem',
-    fontWeight:    '700',
-    color:         '#0f172a',
-    background:    '#f8fafc',
-    border:        '1px solid #94a3b8',
-    borderRadius:  '999px',
-    padding:       '2px 8px',
-    letterSpacing: '0.03em',
-    textTransform: 'uppercase',
-    whiteSpace:    'nowrap',
-    marginLeft:    '8px',
-  },
-  btnDescargar: {
-    padding:        '5px 14px',
-    background:     'var(--primary-50, #eff6ff)',
-    color:          'var(--primary-700, #1d4ed8)',
-    border:         '1px solid var(--primary-200, #bfdbfe)',
-    borderRadius:   'var(--radius-sm, 6px)',
-    fontSize:       '0.78rem',
-    fontWeight:     '600',
-    cursor:         'pointer',
-    textDecoration: 'none',
-    whiteSpace:     'nowrap',
-    flexShrink:     0,
-  },
-  acciones: {
-    display: 'flex',
-    gap: '8px',
-    flexShrink: 0,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-  },
-  btnComparar: {
-    padding:        '5px 14px',
-    background:     '#f0fdf4',
-    color:          '#166534',
-    border:         '1px solid #bbf7d0',
-    borderRadius:   'var(--radius-sm, 6px)',
-    fontSize:       '0.78rem',
-    fontWeight:     '700',
-    cursor:         'pointer',
-    whiteSpace:     'nowrap',
-    flexShrink:     0,
-  },
-};
-
 // ── Sub-componente ────────────────────────────────────────────────────────────
-
 function FilaVersion({ documento, esVersionActiva, formularioId }) {
   const [descargando, setDescargando] = useState(false);
 
@@ -156,45 +21,44 @@ function FilaVersion({ documento, esVersionActiva, formularioId }) {
     }
   }
 
-  const tamano    = documento.tamano ? formatearBytes(documento.tamano) : null;
-  const fecha     = documento.created_at ? formatearFechaHora(documento.created_at) : null;
-  const metaTexto = [fecha, tamano].filter(Boolean).join(' · ');
+  const tamano = documento.tamano ? formatearBytes(documento.tamano) : null;
+  const fecha = documento.created_at ? formatearFechaHora(documento.created_at) : null;
 
   return (
-    <div style={{ ...s.filaVersion, ...(esVersionActiva ? s.filaVersionActiva : {}) }}>
-      <div style={s.infoVersion}>
-        <span style={s.nombreArchivo} title={documento.nombre_archivo}>
-          {documento.nombre_archivo}
-        </span>
-        <div style={s.metaVersion}>
-          {metaTexto && <span style={s.fechaTamano} title={documento.created_at ?? undefined}>{metaTexto}</span>}
-          {esVersionActiva
-            ? <span style={s.badgeVersionActiva}>Versión activa</span>
-            : <span style={s.badgeVersionAnterior}>v{documento.version_numero}</span>
-          }
-          {documento.subido_por && documento.subido_por !== 'SISTEMA' && (
-            <span style={s.badgeManual} title={`Subido por: ${documento.subido_por}`}>Carga Manual</span>
-          )}
+    <div className={`timeline-row ${esVersionActiva ? 'active-row' : ''}`}>
+      <div className="timeline-marker">
+        <div className={`marker-dot ${esVersionActiva ? 'active' : ''}`}></div>
+      </div>
+      <div className="timeline-content">
+        <div className="timeline-info">
+          <span className="version-name">v{documento.version_numero}</span>
+          <div className="doc-tags">
+            {esVersionActiva && <span className="badge-version-active">Versión activa</span>}
+            {documento.subido_por && documento.subido_por !== 'SISTEMA' && (
+              <span className="badge-version-manual" title={`Subido por: ${documento.subido_por}`}>Carga manual</span>
+            )}
+          </div>
+          <div className="version-meta">
+            {fecha && <span>{fecha}</span>}
+            {tamano && <><span className="separator">•</span><span>{tamano}</span></>}
+            <><span className="separator">•</span><span>{documento.nombre_archivo}</span></>
+          </div>
+        </div>
+        <div className="timeline-actions">
+          <button 
+            className="btn-outline btn-outline-gray" 
+            onClick={handleDescargar}
+            disabled={descargando}
+          >
+            <Download size={14} /> Descargar
+          </button>
         </div>
       </div>
-      <button
-        onClick={handleDescargar}
-        disabled={descargando}
-        style={{
-          ...s.btnDescargar,
-          opacity: descargando ? 0.6 : 1,
-          cursor:  descargando ? 'not-allowed' : 'pointer',
-        }}
-        type="button"
-      >
-        {descargando ? 'Descargando…' : 'Descargar'}
-      </button>
     </div>
   );
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-
 export default function HistorialVersionesFormulario({ documentos, formularioId }) {
   const [comparacion, setComparacion] = useState(null);
   const [cargandoComparacion, setCargandoComparacion] = useState(false);
@@ -244,25 +108,28 @@ export default function HistorialVersionesFormulario({ documentos, formularioId 
 
   return (
     <>
-      <div style={s.contenedor}>
-        <div style={{ ...s.encabezado, display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-          <span>Historial de versiones del formulario ({versionesDelFormulario.length})</span>
-          {versionesDelFormulario.length > 1 && (
-            <button type="button" style={s.btnComparar} onClick={handleVerCambios}>
-              Ver cambios
-            </button>
-          )}
-        </div>
-
-        {versionesDelFormulario.map(doc => (
-          <FilaVersion
-            key={doc.id}
-            documento={doc}
-            esVersionActiva={doc.version_numero === numeroVersionMaxima}
-            formularioId={formularioId}
-          />
-        ))}
+      <div className="section-header">
+        <h2 className="section-title">Historial de versiones del formulario</h2>
+        {versionesDelFormulario.length > 1 && (
+          <button type="button" className="btn-outline" onClick={handleVerCambios}>
+            <GitCompare size={14} /> Ver todos los cambios
+          </button>
+        )}
       </div>
+
+      <div className="card timeline-card">
+        <div className="timeline-list">
+          {versionesDelFormulario.map(doc => (
+            <FilaVersion
+              key={doc.id}
+              documento={doc}
+              esVersionActiva={doc.version_numero === numeroVersionMaxima}
+              formularioId={formularioId}
+            />
+          ))}
+        </div>
+      </div>
+
       <ModalComparacionVersiones
         visible={mostrarComparacion}
         comparacion={comparacion}
