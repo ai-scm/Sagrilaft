@@ -1,0 +1,221 @@
+/* Shared Styles for Enterprise SaaS Modals */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.4); /* backdrop blur is often handled via CSS backdrop-filter but plain rgba is safer */
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-container {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+  border: 1px solid #E5E7EB;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.modal-desc {
+  font-size: 14px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.form-help {
+  font-size: 12px;
+  color: #64748B;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #0F172A;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.2s;
+  background-color: #FFFFFF;
+}
+
+.form-input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.file-dropzone {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed #CBD5E1;
+  border-radius: 6px;
+  background-color: #F8FAFC;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.file-dropzone:hover {
+  border-color: #94A3B8;
+  background-color: #F1F5F9;
+}
+
+.char-counter {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #94A3B8;
+  margin-top: 6px;
+}
+
+.text-error {
+  color: #EF4444;
+}
+
+.alert-info {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #166534;
+  line-height: 1.5;
+}
+
+.alert-error {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #DC2626;
+  line-height: 1.5;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  background-color: #FFFFFF;
+  border-top: 1px solid #F1F5F9;
+}
+
+/* Base Modal Buttons */
+.btn-modal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-family: inherit;
+}
+
+.btn-modal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-modal-secondary {
+  background-color: #FFFFFF;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.btn-modal-secondary:hover:not(:disabled) {
+  background-color: #F8FAFC;
+}
+
+.btn-modal-primary {
+  background-color: #1D4ED8;
+  color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.btn-modal-primary:hover:not(:disabled) {
+  background-color: #1E40AF;
+}
+
+.btn-modal-danger {
+  background-color: #EF4444;
+  color: #FFFFFF;
+}
+
+.btn-modal-danger:hover:not(:disabled) {
+  background-color: #DC2626;
+}

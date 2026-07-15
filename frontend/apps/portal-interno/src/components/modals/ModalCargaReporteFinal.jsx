@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../services/api';
+import './Modals.css';
 import {
   CAUSAL_CIERRE_INFORME_FINAL,
   CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,
@@ -7,162 +8,6 @@ import {
 } from '../../config/constantes';
 
 const LONGITUD_MAXIMA_JUSTIFICACION = 1000;
-
-// ── Estilos ───────────────────────────────────────────────────────────────────
-
-const s = {
-  fondo: {
-    position:       'fixed',
-    inset:          0,
-    background:     'rgba(15, 23, 42, 0.5)',
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'center',
-    zIndex:         200,
-    padding:        '16px',
-  },
-  modal: {
-    background:    '#fff',
-    borderRadius:  'var(--radius-md, 10px)',
-    boxShadow:     '0 20px 60px rgba(0,0,0,0.2)',
-    width:         '100%',
-    maxWidth:      '520px',
-    maxHeight:     '90vh',
-    overflowY:     'auto',
-    display:       'flex',
-    flexDirection: 'column',
-  },
-  encabezado: {
-    padding: '24px 24px 0',
-  },
-  titulo: {
-    fontSize:   '1.15rem',
-    fontWeight: '800',
-    color:      'var(--gray-900, #0f172a)',
-    margin:     '0 0 8px',
-  },
-  descripcion: {
-    fontSize:   '0.85rem',
-    color:      'var(--gray-500, #64748b)',
-    margin:     '0 0 24px',
-    lineHeight: 1.5,
-  },
-  cuerpo: {
-    padding: '0 24px',
-    flex:    1,
-  },
-  etiqueta: {
-    display:       'block',
-    fontSize:      '0.8rem',
-    fontWeight:    '700',
-    color:         'var(--gray-700, #334155)',
-    marginBottom:  '4px',
-    letterSpacing: '0.03em',
-  },
-  descripcionCampo: {
-    fontSize:     '0.78rem',
-    color:        'var(--gray-500, #64748b)',
-    margin:       '0 0 8px',
-    lineHeight:   1.4,
-  },
-  textarea: {
-    width:        '100%',
-    padding:      '10px 12px',
-    borderWidth:  '1.5px',
-    borderStyle:  'solid',
-    borderColor:  'var(--gray-300, #cbd5e1)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.88rem',
-    lineHeight:   1.6,
-    color:        'var(--gray-900, #0f172a)',
-    resize:       'vertical',
-    fontFamily:   'inherit',
-    boxSizing:    'border-box',
-    outline:      'none',
-    transition:   'border-color 0.15s',
-  },
-  inputFile: {
-    width:        '100%',
-    padding:      '10px',
-    border:       '1px dashed var(--gray-300, #cbd5e1)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    cursor:       'pointer',
-    marginBottom: '20px',
-  },
-  select: {
-    width:        '100%',
-    padding:      '10px 12px',
-    borderWidth:  '1.5px',
-    borderStyle:  'solid',
-    borderColor:  'var(--gray-300, #cbd5e1)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.88rem',
-    color:        'var(--gray-900, #0f172a)',
-    background:   '#fff',
-    marginBottom: '16px',
-    boxSizing:    'border-box',
-  },
-  contadorCaracteres: {
-    display:        'flex',
-    justifyContent: 'space-between',
-    alignItems:     'center',
-    marginTop:      '4px',
-    fontSize:       '0.75rem',
-    color:          'var(--gray-400, #94a3b8)',
-  },
-  avisoInformativo: {
-    marginTop:    '20px',
-    padding:      '12px 14px',
-    background:   '#fef2f2',
-    border:       '1px solid #fca5a5',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.83rem',
-    color:        '#dc2626',
-    lineHeight:   1.5,
-  },
-  bannerError: {
-    marginTop:    '16px',
-    padding:      '10px 14px',
-    background:   '#fef2f2',
-    border:       '1px solid #fca5a5',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.85rem',
-    color:        '#dc2626',
-  },
-  pie: {
-    display:        'flex',
-    justifyContent: 'flex-end',
-    gap:            '10px',
-    padding:        '20px 24px 24px',
-    borderTop:      '1px solid var(--gray-100, #f1f5f9)',
-    marginTop:      '20px',
-  },
-  btnCancelar: {
-    padding:      '9px 20px',
-    background:   '#fff',
-    color:        'var(--gray-600, #475569)',
-    border:       '1.5px solid var(--gray-300, #cbd5e1)',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.88rem',
-    fontWeight:   '600',
-    cursor:       'pointer',
-  },
-  btnConfirmar: {
-    padding:      '9px 20px',
-    background:   '#0f172a',
-    color:        '#fff',
-    border:       'none',
-    borderRadius: 'var(--radius-sm, 6px)',
-    fontSize:     '0.88rem',
-    fontWeight:   '700',
-    cursor:       'pointer',
-    transition:   'opacity 0.15s',
-  },
-  btnDeshabilitado: {
-    opacity: 0.5,
-    cursor:  'not-allowed',
-  },
-};
 
 export default function ModalCargaReporteFinal({ visible, formularioId, onCargado, onCancelar }) {
   const [justificacion, setJustificacion] = useState('');
@@ -196,7 +41,7 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
     try {
       await api.cargarReporteFinal(formularioId, archivo, justificacion.trim(), causalCierre);
       resetearEstado();
-      onCargado(); // refrescar expediente
+      onCargado();
     } catch (err) {
       setError(err.message || 'Error al cargar el reporte final. Intente nuevamente.');
     } finally {
@@ -207,84 +52,79 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
   if (!visible) return null;
 
   return (
-    <div style={s.fondo} role="dialog" aria-modal="true" aria-labelledby="titulo-modal-carga-reporte">
-      <div style={s.modal}>
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-carga-reporte">
+      <div className="modal-container">
         
-        {/* Encabezado */}
-        <div style={s.encabezado}>
-          <h2 style={s.titulo} id="titulo-modal-carga-reporte">
+        <div className="modal-header">
+          <h2 className="modal-title" id="titulo-modal-carga-reporte">
             Cerrar expediente
           </h2>
-          <p style={s.descripcion}>
+          <p className="modal-desc">
             Seleccione la causal de cierre. El informe final en PDF es obligatorio, excepto cuando el proceso termina por no continuación de diálogos.
           </p>
         </div>
 
-        {/* Cuerpo */}
-        <div style={s.cuerpo}>
-
-          <label style={s.etiqueta} htmlFor="campo-causal-cierre">
-            Causal de cierre
-          </label>
-          <select
-            id="campo-causal-cierre"
-            value={causalCierre}
-            onChange={e => {
-              setCausalCierre(e.target.value);
-              setError(null);
-            }}
-            disabled={enviando}
-            style={s.select}
-          >
-            {CAUSALES_CIERRE_EXPEDIENTE.map(causal => (
-              <option key={causal.valor} value={causal.valor}>{causal.etiqueta}</option>
-            ))}
-          </select>
-
-          <label style={s.etiqueta} htmlFor="campo-archivo">
-            Informe final PDF {permiteCierreSinPdf ? '(Opcional)' : '(Obligatorio)'}
-          </label>
-          <input
-            id="campo-archivo"
-            type="file"
-            accept="application/pdf"
-            onChange={e => setArchivo(e.target.files[0])}
-            disabled={enviando}
-            style={s.inputFile}
-          />
-
-          <label style={s.etiqueta} htmlFor="campo-justificacion">
-            Comentario (Opcional)
-          </label>
-          <p style={s.descripcionCampo}>
-            Añada un comentario o justificación para la auditoría.
-          </p>
-          <textarea
-            id="campo-justificacion"
-            style={s.textarea}
-            value={justificacion}
-            onChange={e => setJustificacion(e.target.value)}
-            placeholder="Comentarios de cierre..."
-            rows={4}
-            maxLength={LONGITUD_MAXIMA_JUSTIFICACION}
-            disabled={enviando}
-          />
-          <div style={s.contadorCaracteres}>
-            <span>{justificacion.trim().length} / {LONGITUD_MAXIMA_JUSTIFICACION}</span>
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label" htmlFor="campo-causal-cierre">Causal de cierre</label>
+            <select
+              id="campo-causal-cierre"
+              value={causalCierre}
+              onChange={e => {
+                setCausalCierre(e.target.value);
+                setError(null);
+              }}
+              disabled={enviando}
+              className="form-input"
+            >
+              {CAUSALES_CIERRE_EXPEDIENTE.map(causal => (
+                <option key={causal.valor} value={causal.valor}>{causal.etiqueta}</option>
+              ))}
+            </select>
           </div>
 
-          <div style={s.avisoInformativo}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="campo-archivo">
+              Informe final PDF {permiteCierreSinPdf ? '(Opcional)' : '(Obligatorio)'}
+            </label>
+            <input
+              id="campo-archivo"
+              type="file"
+              accept="application/pdf"
+              onChange={e => setArchivo(e.target.files[0])}
+              disabled={enviando}
+              className="file-dropzone"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="campo-justificacion">Comentario (Opcional)</label>
+            <p className="form-help">Añada un comentario o justificación para la auditoría.</p>
+            <textarea
+              id="campo-justificacion"
+              className="form-input form-textarea"
+              value={justificacion}
+              onChange={e => setJustificacion(e.target.value)}
+              placeholder="Comentarios de cierre..."
+              rows={3}
+              maxLength={LONGITUD_MAXIMA_JUSTIFICACION}
+              disabled={enviando}
+            />
+            <div className="char-counter">
+              <span>{justificacion.trim().length} / {LONGITUD_MAXIMA_JUSTIFICACION}</span>
+            </div>
+          </div>
+
+          <div className="alert-error" style={{ backgroundColor: '#FFFBEB', borderColor: '#FBBF24', color: '#92400E' }}>
             <strong>Atención.</strong> Esta acción cambiará el estado de la carpeta a <strong>Cerrado</strong>. Si es una actualización periódica, podrá reabrirse luego conservando el historial.
           </div>
 
-          {error && <div style={s.bannerError}>{error}</div>}
-
+          {error && <div className="alert-error">{error}</div>}
         </div>
 
-        {/* Pie */}
-        <div style={s.pie}>
+        <div className="modal-footer">
           <button
-            style={s.btnCancelar}
+            className="btn-modal btn-modal-secondary"
             onClick={limpiarYCerrar}
             disabled={enviando}
             type="button"
@@ -292,10 +132,7 @@ export default function ModalCargaReporteFinal({ visible, formularioId, onCargad
             Cancelar
           </button>
           <button
-            style={{
-              ...s.btnConfirmar,
-              ...(!formularioValido || enviando ? s.btnDeshabilitado : {}),
-            }}
+            className="btn-modal btn-modal-primary"
             onClick={handleConfirmar}
             disabled={!formularioValido || enviando}
             type="button"
