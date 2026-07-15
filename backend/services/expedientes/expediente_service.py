@@ -41,6 +41,7 @@ from services.expedientes.handlers import (
     CargaDocumentoHandler,
     ComandoAprobacion,
     ComandoCargaDocumento,
+    ComandoDeshacerAprobacion,
     ComandoDevolucion,
     ComandoRechazo,
     DevolucionCorreccionHandler,
@@ -296,11 +297,6 @@ class ExpedienteService:
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
-        if formulario.tipo_solicitud != TipoSolicitud.ACTUALIZACION.value:
-            raise FormularioNoEditableError(
-                "Solo los expedientes de actualización pueden reabrirse para continuar el proceso."
-            )
-
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.reabrir_por_actualizacion()
@@ -351,6 +347,18 @@ class ExpedienteService:
         actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         return self._aprobacion_rechazo.ejecutar_aprobacion(ComandoAprobacion(
+            formulario_id=formulario_id,
+            actor_id=actor_id,
+            contrapartes_permitidas=contrapartes_permitidas,
+        ))
+
+    def deshacer_aprobacion_expediente(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return self._aprobacion_rechazo.ejecutar_deshacer_aprobacion(ComandoDeshacerAprobacion(
             formulario_id=formulario_id,
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,

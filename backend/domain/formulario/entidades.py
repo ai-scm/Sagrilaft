@@ -231,6 +231,15 @@ class FormularioDominio:
             )
         self.estado = EstadoFormulario.VALIDADO
 
+    def deshacer_aprobacion(self) -> None:
+        """VALIDADO → ENVIADO. Revierte una aprobación hecha por error."""
+        if self.estado != EstadoFormulario.VALIDADO:
+            raise FormularioNoEditableError(
+                f"Solo se puede revertir la aprobación de un formulario en estado 'validado' "
+                f"(actual: '{self.estado.value}')."
+            )
+        self.estado = EstadoFormulario.ENVIADO
+
     def rechazar(self) -> None:
         """ENVIADO | VALIDADO → RECHAZADO."""
         if self.estado not in (EstadoFormulario.ENVIADO, EstadoFormulario.VALIDADO):

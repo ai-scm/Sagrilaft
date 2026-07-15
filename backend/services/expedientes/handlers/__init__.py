@@ -3,6 +3,7 @@
 from services.expedientes.handlers.aprobacion_rechazo_handler import (
     AprobacionRechazoHandler,
     ComandoAprobacion,
+    ComandoDeshacerAprobacion,
     ComandoRechazo,
 )
 from services.expedientes.handlers.carga_documento_handler import (
@@ -18,6 +19,7 @@ from services.expedientes.handlers.devolucion_correccion_handler import (
 __all__ = [
     "AprobacionRechazoHandler",
     "ComandoAprobacion",
+    "ComandoDeshacerAprobacion",
     "ComandoRechazo",
     "CargaDocumentoHandler",
     "ComandoCargaDocumento",

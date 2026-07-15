@@ -280,6 +280,24 @@ def aprobar_expediente(
 
 
 @enrutador.post(
+    "/{formulario_id}/deshacer-aprobacion",
+    summary="Deshacer aprobación de formulario",
+    description="Devuelve un formulario validado al estado 'enviado' en caso de error al aprobar.",
+    responses={400: {"description": "El formulario no está en estado 'validado'"}},
+)
+def deshacer_aprobacion(
+    formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> dict:
+    return servicio.deshacer_aprobacion_expediente(
+        formulario_id,
+        _contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
+
+
+@enrutador.post(
     "/{formulario_id}/rechazar",
     response_model=ResumenRechazo,
     summary="Rechazar formulario",

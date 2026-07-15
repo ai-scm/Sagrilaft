@@ -126,6 +126,10 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}/aprobar`, { method: 'POST' });
   },
 
+  async deshacerAprobacionExpediente(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/deshacer-aprobacion`, { method: 'POST' });
+  },
+
   async rechazarExpediente(formularioId, solicitud) {
     return requestJson(`/expedientes/${formularioId}/rechazar`, {
       method: 'POST',

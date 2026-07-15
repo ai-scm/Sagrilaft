@@ -45,6 +45,14 @@ class ComandoAprobacion:
 
 
 @dataclass
+class ComandoDeshacerAprobacion:
+    """Comando para revertir una aprobación."""
+    formulario_id: str
+    actor_id: Optional[str] = None
+    contrapartes_permitidas: Optional[List[str]] = None
+
+
+@dataclass
 class ComandoRechazo:
     """Comando para rechazar un expediente — solo datos, sin dependencias."""
     formulario_id: str
@@ -99,6 +107,32 @@ class AprobacionRechazoHandler:
             self._repo_auditoria.registrar_evento(EventoAuditoria(
                 formulario_id=comando.formulario_id,
                 tipo_evento=TipoEvento.FORMULARIO_APROBADO,
+                estado_anterior=estado_anterior,
+                estado_nuevo=dominio.estado.value,
+                actor_id=comando.actor_id,
+                actor_tipo=ActorTipo.OPERADOR,
+            ))
+        
+        return {"estado": dominio.estado.value}
+
+    def ejecutar_deshacer_aprobacion(self, comando: ComandoDeshacerAprobacion) -> Dict[str, Any]:
+        """
+        Revierte la aprobación de un expediente y lo devuelve a estado enviado.
+        """
+        formulario = self._buscar_formulario(
+            comando.formulario_id,
+            comando.contrapartes_permitidas,
+        )
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.deshacer_aprobacion()
+        
+        self._repo.actualizar_estado(comando.formulario_id, dominio.estado.value)
+        
+        if self._repo_auditoria:
+            self._repo_auditoria.registrar_evento(EventoAuditoria(
+                formulario_id=comando.formulario_id,
+                tipo_evento=TipoEvento.FORMULARIO_APROBACION_REVERTIDA,
                 estado_anterior=estado_anterior,
                 estado_nuevo=dominio.estado.value,
                 actor_id=comando.actor_id,
