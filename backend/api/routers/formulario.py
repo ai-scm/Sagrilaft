@@ -31,6 +31,7 @@ from api.transformadores import construir_respuesta_documento
 from services.acceso_manual.acceso_manual_service import AccesoManualService
 from services.formulario.formulario_service import FormularioService
 from domain.excepciones import CorreoDestinatarioNoRegistradoError
+from domain.auditoria.entidades import ActorTipo
 
 enrutador = APIRouter(prefix="/api/formularios", tags=["formularios"])
 
@@ -209,6 +210,7 @@ async def subir_documento(
         contenido_bytes=contenido,
         nombre_archivo=archivo.filename,
         content_type=archivo.content_type,
+        subido_por=ActorTipo.CONTRAPARTE,
     )
     return construir_respuesta_documento(resultado)
 

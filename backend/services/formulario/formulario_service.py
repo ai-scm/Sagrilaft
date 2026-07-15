@@ -171,6 +171,7 @@ class FormularioService:
         contenido_bytes: bytes,
         nombre_archivo: str,
         content_type: str,
+        subido_por: Optional[str] = None,
     ) -> ResultadoGuardadoDocumento:
         formulario = self._buscar_formulario_o_error(formulario_id)
         self._verificar_estado_editable_o_error(
@@ -191,6 +192,7 @@ class FormularioService:
             content_type=content_type,
             tamano=len(contenido_bytes),
             hash_sha256=self._documentos.calcular_hash(contenido_bytes),
+            subido_por=subido_por,
         )
         return await self._analisis.analizar_nueva_carga(
             documento=documento,

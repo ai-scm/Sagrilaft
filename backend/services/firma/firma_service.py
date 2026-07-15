@@ -6,6 +6,7 @@ Flujo de estados:
                                                  → [webhook Declined]  → VALIDADO
 """
 
+import hashlib
 import hmac
 import logging
 import tempfile
@@ -97,14 +98,24 @@ class FirmaService:
         es solo un registro de auditoría.
         """
         existente = self._repo.obtener_certificado(formulario.id)
+        hash_calc = hashlib.sha256(ruta_certificado.read_bytes()).hexdigest()
+        tamano_calc = ruta_certificado.stat().st_size
         if existente:
-            self._repo.actualizar_ruta_certificado(existente.id, str(ruta_certificado))
+            self._repo.actualizar_certificado(
+                existente.id,
+                str(ruta_certificado),
+                tamano_calc,
+                hash_calc,
+            )
         else:
             self._repo.crear_documento({
                 "formulario_id":  formulario.id,
                 "tipo_documento": TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
                 "nombre_archivo": ruta_certificado.name,
                 "ruta_archivo":   str(ruta_certificado),
+                "tamano":         tamano_calc,
+                "subido_por":     ActorTipo.SISTEMA,
+                "hash_sha256":    hash_calc,
             })
 
     # ─── Enviar a firma ───────────────────────────────────────────────────────

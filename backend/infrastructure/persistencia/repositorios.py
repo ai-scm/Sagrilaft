@@ -832,6 +832,8 @@ class RepositorioExpedienteSQLAlchemy:
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
             orm.estado = estado
             orm.campos_a_corregir = campos_a_corregir
+            # tipo_solicitud se preserva (vinculacion/actualizacion) — no se muta.
+            # El tipo del ciclo actual queda en campos_a_corregir["tipo"] = ACTUALIZACION_REABIERTA.
             self._sesion.commit()
 
 
@@ -903,10 +905,12 @@ class RepositorioFirmaSQLAlchemy:
                 setattr(orm, campo, valor)
             self._sesion.commit()
 
-    def actualizar_ruta_certificado(self, doc_id: str, ruta_archivo: str) -> None:
+    def actualizar_certificado(self, doc_id: str, ruta_archivo: str, tamano: int, hash_sha256: str) -> None:
         orm = self._sesion.query(DocumentoAdjunto).filter(DocumentoAdjunto.id == doc_id).first()
         if orm:
             orm.ruta_archivo = ruta_archivo
+            orm.tamano = tamano
+            orm.hash_sha256 = hash_sha256
             self._sesion.commit()
 
 
