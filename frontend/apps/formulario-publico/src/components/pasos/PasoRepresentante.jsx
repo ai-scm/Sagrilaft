@@ -4,6 +4,7 @@ import LocationSelect from '../LocationSelect';
 import NacionalidadSelect from '../NacionalidadSelect';
 import AlertasInconsistencia from '../AlertasInconsistencia';
 import { useUbicacion, NA_OPTION } from '../../hooks/useUbicacion';
+import { getIdPropsByTipoDocumento } from '../../utils/inputValidation';
 
 const TIPOS_DOC = [
   { value: 'CC',  label: 'Cédula de Ciudadanía' },
@@ -67,7 +68,7 @@ export default function PasoRepresentante({ formData, onChange, onOpenHelp, erro
 
       <div className="form-row">
         <FormField label="Tipo de Documento" type="select" required options={TIPOS_DOC} {...fieldProps('tipo_doc_representante')} />
-        <FormField label="No. de Identificación" required {...fieldProps('numero_doc_representante')} />
+        <FormField label="No. de Identificación" required {...fieldProps('numero_doc_representante')} {...getIdPropsByTipoDocumento(formData.tipo_doc_representante)} />
       </div>
 
       <AlertasInconsistencia alertas={alertasNumeroDocRepresentante} tipoCampo="No. de Identificación del representante sin resolver" nombreCampo="No. de Identificación" />

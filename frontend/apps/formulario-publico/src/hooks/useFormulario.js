@@ -68,6 +68,38 @@ function _limpiarErroresDependientesMoneda(limpiarError) {
   CAMPOS_DEPENDIENTES_MONEDA_EXTRANJERA.forEach(limpiarError);
 }
 
+/**
+ * Mapa declarativo: campo "tipo de documento" → campo "número" que lo acompaña.
+ * Fuente única de verdad — agregar futuros pares aquí sin tocar handleChange.
+ *
+ *   Paso 2: tipo_identificacion     → numero_identificacion
+ *   Paso 3: tipo_doc_representante  → numero_doc_representante
+ */
+const CAMPO_NUMERO_POR_TIPO_DOC = {
+  tipo_identificacion:    'numero_identificacion',
+  tipo_doc_representante: 'numero_doc_representante',
+};
+
+/**
+ * Aplica el cambio de tipo-documento sobre el estado del formulario:
+ *   1. Guarda el nuevo tipo.
+ *   2. Limpia el campo número asociado para que el usuario reingrese el valor
+ *      en el formato correcto del nuevo tipo.
+ *
+ * @param {Object} estadoAnterior - formData previo.
+ * @param {string} campoTipo      - Nombre del campo selector (ej: 'tipo_identificacion').
+ * @param {string} nuevoValor     - Valor seleccionado.
+ * @param {string} campoNumero    - Nombre del campo número a limpiar.
+ * @returns {Object} Nuevo estado parcial listo para fusionar.
+ */
+function _aplicarCambioDeTipoDoc(estadoAnterior, campoTipo, nuevoValor, campoNumero) {
+  return {
+    ...estadoAnterior,
+    [campoTipo]:   nuevoValor,
+    [campoNumero]: '',
+  };
+}
+
 export function useFormulario() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({});
@@ -164,14 +196,24 @@ export function useFormulario() {
       : CAMPOS_BOOLEANOS_SI_NO.has(name)
         ? value === 'true'
         : value;
+    const campoNumero = CAMPO_NUMERO_POR_TIPO_DOC[name];
     setFormData(prev => {
-      const next = { ...prev, [name]: nuevoValor };
-      if (name === 'tipo_identificacion') {
-        next.digito_verificacion = calcularValorDv(nuevoValor, prev.digito_verificacion);
+      // Si el campo modificado es un selector de tipo-documento, limpia
+      // atómicamente su campo número asociado dentro del mismo setState.
+      if (campoNumero) {
+        const siguiente = _aplicarCambioDeTipoDoc(prev, name, nuevoValor, campoNumero);
+        // Solo Paso 2 tiene DV; si no aplica, calcularValorDv queda fuera del bloque.
+        if (name === 'tipo_identificacion') {
+          siguiente.digito_verificacion = calcularValorDv(nuevoValor, prev.digito_verificacion);
+        }
+        return siguiente;
       }
-      return next;
+      return { ...prev, [name]: nuevoValor };
     });
     limpiarError(name);
+    if (campoNumero) {
+      limpiarError(campoNumero);
+    }
     if (name === 'tipo_identificacion') {
       limpiarError('digito_verificacion');
     }

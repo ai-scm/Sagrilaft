@@ -3,7 +3,7 @@ import LocationSelect from '../LocationSelect';
 import AlertasInconsistencia from '../AlertasInconsistencia';
 import { HR } from '../TablaFormComponents';
 import { useUbicacion, NA_OPTION } from '../../hooks/useUbicacion';
-import { getDvProps } from '../../utils/inputValidation';
+import { getDvProps, getIdPropsByTipoDocumento } from '../../utils/inputValidation';
 
 const OPCIONES_TIPO_CONTRAPARTE = [
   { value: 'proveedor', label: 'Proveedor' },
@@ -144,6 +144,7 @@ export default function PasoInfoBasica(props) {
             label: 'Número de Identificación',
             name: 'numero_identificacion',
             required: true,
+            ...getIdPropsByTipoDocumento(formData.tipo_identificacion),
           },
           {
             name: 'digito_verificacion',

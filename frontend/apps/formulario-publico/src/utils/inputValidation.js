@@ -112,9 +112,9 @@ export const onPorcentajePaste = (e) => {
  *   formatoCorreo  → valida estructura usuario@dominio.ext
  */
 export const REGLAS_INPUT = {
-  numero_identificacion: { soloNumericos: true },
   digito_verificacion: { soloNumericos: true },
-  numero_doc_representante: { soloNumericos: true },
+  // numero_doc_representante usa getIdPropsByTipoDocumento() dinámicamente en PasoRepresentante
+  // (numérico para CC/CE/NIT, alfanumérico para Pasaporte/otros) — no va aquí.
   telefono: { soloNumericos: true },
   telefono_representante: { soloNumericos: true },
   codigo_ciiu: { soloNumericos: true, longitudMaxima: 4 },
