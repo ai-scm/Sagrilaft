@@ -32,6 +32,7 @@ from api.schemas import (
     SolicitudDevolucion,
     SolicitudReaperturaActualizacion,
     SolicitudRechazo,
+    SolicitudAuditoriaAlerta,
 )
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
@@ -345,6 +346,43 @@ def devolver_expediente(
         formulario_id=formulario_id,
         especificaciones=solicitud.especificaciones,
         campos_identificados=solicitud.campos_identificados,
+        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
+
+@enrutador.post(
+    "/{formulario_id}/deshacer-devolucion",
+    summary="Deshacer devolución de formulario",
+    description="Devuelve un formulario en corrección al estado 'enviado'.",
+    responses={400: {"description": "El formulario no está en estado 'en_correccion'"}},
+)
+def deshacer_devolucion(
+    formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> dict:
+    return servicio.deshacer_devolucion_expediente(
+        formulario_id,
+        _contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
+
+@enrutador.patch(
+    "/{formulario_id}/alertas/{alerta_id}/auditoria",
+    summary="Actualizar estado de auditoría de una alerta",
+    description="Permite al analista cambiar el estado de una alerta (ej: PENDIENTE a FALSO_POSITIVO_IA).",
+)
+def actualizar_estado_alerta(
+    formulario_id: str,
+    alerta_id: str,
+    solicitud: SolicitudAuditoriaAlerta,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> dict:
+    return servicio.actualizar_estado_alerta(
+        formulario_id=formulario_id,
+        alerta_id=alerta_id,
+        estado_auditoria=solicitud.estado_auditoria,
         contrapartes_permitidas=_contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )

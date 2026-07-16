@@ -179,6 +179,7 @@ class ExpedienteService:
                 }
                 for doc in documentos
             ],
+            "alertas_inconsistencia": formulario.alertas_inconsistencia,
         }
 
     def comparar_ultima_correccion(
@@ -395,6 +396,39 @@ class ExpedienteService:
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,
         ))
+
+    def deshacer_devolucion_expediente(
+        self,
+        formulario_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        from services.expedientes.handlers.devolucion_correccion_handler import ComandoDeshacerDevolucion
+        return self._devolucion.ejecutar_deshacer_devolucion(ComandoDeshacerDevolucion(
+            formulario_id=formulario_id,
+            actor_id=actor_id,
+            contrapartes_permitidas=contrapartes_permitidas,
+        ))
+
+    def actualizar_estado_alerta(
+        self,
+        formulario_id: str,
+        alerta_id: str,
+        estado_auditoria: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        self._repo.actualizar_estado_alerta(formulario_id, alerta_id, estado_auditoria, actor_id or "SISTEMA")
+        self._registrar_evento_ciclo_vida(
+            formulario_id=formulario_id,
+            tipo_evento="ESTADO_ALERTA_ACTUALIZADO",
+            estado_anterior="",
+            estado_nuevo=estado_auditoria,
+            actor_id=actor_id or "SISTEMA",
+            metadata={"alerta_id": alerta_id}
+        )
+        return {"mensaje": "Estado de alerta actualizado exitosamente."}
 
     # ─── Descarga ─────────────────────────────────────────────────────────────
 

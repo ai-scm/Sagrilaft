@@ -12,6 +12,13 @@ export const api = {
     });
   },
 
+  async reenviarAccesoManual(accesoId) {
+    return requestJson(`/accesos-manuales/${accesoId}/reenviar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
   async listarAccesosManuales() {
     return requestJson('/accesos-manuales/');
   },
@@ -60,6 +67,14 @@ export const api = {
 
   async obtenerExpediente(formularioId) {
     return requestJson(`/expedientes/${formularioId}`);
+  },
+
+  async actualizarEstadoAlerta(formularioId, alertaId, estadoAuditoria) {
+    return requestJson(`/expedientes/${formularioId}/alertas/${alertaId}/auditoria`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado_auditoria: estadoAuditoria }),
+    });
   },
 
   async compararVersionesFormulario(formularioId) {
@@ -144,6 +159,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(solicitud),
     });
+  },
+
+  async deshacerDevolucionExpediente(formularioId) {
+    return requestJson(`/expedientes/${formularioId}/deshacer-devolucion`, { method: 'POST' });
   },
 
   async enviarAFirma(formularioId) {

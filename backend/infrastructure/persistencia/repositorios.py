@@ -44,6 +44,7 @@ from infrastructure.persistencia.models import (
     ReferenciaComercialFormulario,
     ResultadoValidacion,
     TipoTransaccionFormulario,
+    AlertaInconsistencia,
 )
 
 # Campos que se almacenan como JSON string en la base de datos.
@@ -461,6 +462,21 @@ def _orm_formulario_a_datos(
         informacion_bancaria_pagos=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["informacion_bancaria_pagos"][1]) for f in orm.informacion_bancaria_pagos],
         documentos=documentos,
         validaciones=validaciones,
+        alertas_inconsistencia=[
+            {
+                "id": a.id,
+                "formulario_id": a.formulario_id,
+                "tipo_campo": a.tipo_campo,
+                "nombre_documento": a.nombre_documento,
+                "valor_formulario": a.valor_formulario,
+                "valor_documento": a.valor_documento,
+                "seccion_referencia": a.seccion_referencia,
+                "estado_auditoria": a.estado_auditoria,
+                "actualizado_por": a.actualizado_por,
+                "fecha_creacion": a.fecha_creacion,
+            }
+            for a in orm.alertas_inconsistencia
+        ] if cargar_relaciones else [],
     )
 
 
@@ -485,6 +501,7 @@ def _orm_acceso_manual_a_datos(
         consumed_at=orm.consumed_at,
         expires_at=orm.expires_at,
         created_at=orm.created_at,
+        ultimo_envio_correo=orm.ultimo_envio_correo,
         estado_formulario=estado_formulario,
         codigo_peticion=codigo_peticion,
     )
@@ -590,6 +607,22 @@ class RepositorioFormularioSQLAlchemy:
         self._sesion.refresh(orm)
         return _orm_formulario_a_datos(orm)
 
+    def guardar_alertas(self, formulario_id: str, alertas: List[Dict[str, Any]]) -> None:
+        """Guarda las alertas de inconsistencia ignoradas por el usuario al enviar."""
+        self._sesion.query(AlertaInconsistencia).filter(
+            AlertaInconsistencia.formulario_id == formulario_id
+        ).delete()
+        self._sesion.commit()
+
+        if not alertas:
+            return
+        
+        orms = [
+            AlertaInconsistencia(formulario_id=formulario_id, **alerta)
+            for alerta in alertas
+        ]
+        self._sesion.bulk_save_objects(orms)
+        self._sesion.commit()
 
 class RepositorioDocumentoSQLAlchemy:
     """Adaptador de persistencia para DocumentoAdjunto — usado por DocumentoService."""
@@ -641,6 +674,13 @@ class RepositorioDocumentoSQLAlchemy:
         self._sesion.query(DocumentoAdjunto).filter(
             DocumentoAdjunto.id == doc_id
         ).update({"deleted_at": datetime.now(timezone.utc)})
+        self._sesion.commit()
+
+    def actualizar_snapshot_datos(self, doc_id: str, snapshot_datos: str) -> None:
+        """Actualiza la columna snapshot_datos de un documento específico."""
+        self._sesion.query(DocumentoAdjunto).filter(
+            DocumentoAdjunto.id == doc_id
+        ).update({"snapshot_datos": snapshot_datos})
         self._sesion.commit()
 
     def obtener_ultimo_formulario_pdf(self, formulario_id: str) -> Optional[DocumentoDatos]:
@@ -738,7 +778,7 @@ class RepositorioExpedienteSQLAlchemy:
             )
             .first()
         )
-        return _orm_formulario_a_datos(orm) if orm else None
+        return _orm_formulario_a_datos(orm, cargar_relaciones=True) if orm else None
 
     def buscar_documento_descargable(
         self, formulario_id: str, doc_id: str, estados: List[Any]
@@ -815,6 +855,23 @@ class RepositorioExpedienteSQLAlchemy:
             orm.campos_a_corregir = campos_a_corregir
             self._sesion.commit()
 
+    def actualizar_para_deshacer_devolucion(
+        self,
+        formulario_id: str,
+        estado: str,
+        numero_correccion: int,
+    ) -> None:
+        """
+        Revierte los campos de una devolución para corrección y hace commit.
+        """
+        orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
+        if orm:
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
+            orm.estado = estado
+            orm.numero_correccion = numero_correccion
+            orm.campos_a_corregir = None
+            self._sesion.commit()
+
     def actualizar_para_reapertura_actualizacion(
         self,
         formulario_id: str,
@@ -835,6 +892,22 @@ class RepositorioExpedienteSQLAlchemy:
             # tipo_solicitud se preserva (vinculacion/actualizacion) — no se muta.
             # El tipo del ciclo actual queda en campos_a_corregir["tipo"] = ACTUALIZACION_REABIERTA.
             self._sesion.commit()
+
+    def actualizar_estado_alerta(
+        self,
+        formulario_id: str,
+        alerta_id: str,
+        estado_auditoria: str,
+        actor_id: str,
+    ) -> None:
+        self._sesion.query(AlertaInconsistencia).filter(
+            AlertaInconsistencia.id == alerta_id,
+            AlertaInconsistencia.formulario_id == formulario_id
+        ).update({
+            "estado_auditoria": estado_auditoria,
+            "actualizado_por": actor_id,
+        })
+        self._sesion.commit()
 
 
 class RepositorioFirmaSQLAlchemy:
@@ -1037,4 +1110,28 @@ class RepositorioAccesoManualSQLAlchemy:
         acceso = self._sesion.query(AccesoManual).filter(AccesoManual.token_diligenciamiento == token).first()
         if acceso:
             acceso.correo_destinatario = correo
+            self._sesion.commit()
+
+    def obtener_acceso_activo_por_correo(self, correo: str) -> Optional[AccesoManualDatos]:
+        """Obtiene el acceso más reciente que no esté consumido ni expirado para un correo."""
+        from datetime import datetime, timezone
+        ahora = datetime.now(timezone.utc)
+        orm = (
+            self._sesion.query(AccesoManual)
+            .options(joinedload(AccesoManual.formulario))
+            .filter(
+                AccesoManual.correo_destinatario == correo,
+                AccesoManual.consumed_at.is_(None),
+                AccesoManual.expires_at > ahora,
+            )
+            .order_by(AccesoManual.created_at.desc())
+            .first()
+        )
+        return _orm_acceso_manual_a_datos(orm, con_formulario=True) if orm else None
+
+    def reenviar_acceso(self, acceso_id: str, nuevo_pin_hash: str, timestamp: datetime) -> None:
+        orm = self._sesion.query(AccesoManual).filter(AccesoManual.id == acceso_id).first()
+        if orm:
+            orm.pin_hash = nuevo_pin_hash
+            orm.ultimo_envio_correo = timestamp
             self._sesion.commit()

@@ -25,6 +25,7 @@ import ModalConfirmacion from '../modals/ModalConfirmacion';
 import ModalCargaReporteFinal from '../modals/ModalCargaReporteFinal';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import HistorialExpediente from './HistorialExpediente';
+import PanelAlertasAuditoria from './PanelAlertasAuditoria';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
   ETIQUETA_CAUSAL_CIERRE,
@@ -159,6 +160,7 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
   const [verificando, setVerificando] = useState(false);
   const [errorFirma, setErrorFirma] = useState(null);
   const [deshaciendoAprobacion, setDeshaciendoAprobacion] = useState(false);
+  const [deshaciendoDevolucion, setDeshaciendoDevolucion] = useState(false);
   const [mostrarModalDevolucion, setMostrarModalDevolucion] = useState(false);
   const [mostrarModalRechazo, setMostrarModalRechazo] = useState(false);
   const [mostrarModalAprobacion, setMostrarModalAprobacion] = useState(false);
@@ -229,6 +231,22 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
       setErrorFirma(err.message || 'Error al deshacer aprobación.');
     } finally {
       setDeshaciendoAprobacion(false);
+    }
+  }
+
+  async function handleDeshacerDevolucion() {
+    if (!window.confirm('¿Está seguro de que desea deshacer la devolución de este formulario?')) {
+      return;
+    }
+    setDeshaciendoDevolucion(true);
+    setErrorFirma(null);
+    try {
+      await api.deshacerDevolucionExpediente(formularioId);
+      onFirmaEnviada();
+    } catch (err) {
+      setErrorFirma(err.message || 'Error al deshacer devolución.');
+    } finally {
+      setDeshaciendoDevolucion(false);
     }
   }
 
@@ -315,9 +333,18 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
         <div className="banner-firma-textos">
           <p className="banner-firma-titulo">Formulario devuelto — en corrección</p>
           <p className="banner-firma-subtitulo">
-            Se notificó al destinatario. El formulario estará disponible nuevamente
-            cuando el remitente reenvíe la versión corregida.
+            {errorFirma || 'Se notificó al destinatario. El formulario estará disponible nuevamente cuando el remitente reenvíe la versión corregida.'}
           </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+          <button
+            className="btn-outline"
+            onClick={handleDeshacerDevolucion}
+            disabled={deshaciendoDevolucion}
+            type="button"
+          >
+            {deshaciendoDevolucion ? 'Deshaciendo…' : 'Deshacer devolución'}
+          </button>
         </div>
       </div>
     );
@@ -636,6 +663,8 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                   onFirmaEnviada={recargarExpediente}
                 />
 
+
+
                 {/* Summary Cards */}
                 {(pdfFormulario || reporteFinal) && (
                   <section className="section-block">
@@ -730,6 +759,13 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 <section className="section-block">
                   <HistorialExpediente formularioId={formularioId} />
                 </section>
+
+                {/* Alertas de Inconsistencia Documental */}
+                <PanelAlertasAuditoria
+                  alertas={expediente.alertas_inconsistencia}
+                  formularioId={formularioId}
+                  onAlertaActualizada={recargarExpediente}
+                />
               </div>
             </div>
           </>

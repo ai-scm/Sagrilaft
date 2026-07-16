@@ -34,6 +34,7 @@ class RepositorioFormulario(Protocol):
     def obtener_por_codigo(self, codigo: str) -> Optional[FormularioDatos]: ...
     def crear(self, datos: Dict[str, Any]) -> FormularioDatos: ...
     def actualizar(self, formulario_id: str, campos: Dict[str, Any]) -> FormularioDatos: ...
+    def guardar_alertas(self, formulario_id: str, alertas: List[Dict[str, Any]]) -> None: ...
 
 
 @runtime_checkable
@@ -94,11 +95,26 @@ class RepositorioExpediente(Protocol):
         campos_a_corregir: str,
     ) -> None: ...
 
+    def actualizar_para_deshacer_devolucion(
+        self,
+        formulario_id: str,
+        estado: str,
+        numero_correccion: int,
+    ) -> None: ...
+
     def actualizar_para_reapertura_actualizacion(
         self,
         formulario_id: str,
         estado: str,
         campos_a_corregir: str,
+    ) -> None: ...
+
+    def actualizar_estado_alerta(
+        self,
+        formulario_id: str,
+        alerta_id: str,
+        estado_auditoria: str,
+        actor_id: str,
     ) -> None: ...
 
 
@@ -134,3 +150,5 @@ class RepositorioAccesoManual(Protocol):
     def reactivar_acceso(
         self, acceso_id: str, nuevo_token: str, nuevo_expires_at: datetime
     ) -> None: ...
+    def obtener_acceso_activo_por_correo(self, correo: str) -> Optional[AccesoManualDatos]: ...
+    def reenviar_acceso(self, acceso_id: str, nuevo_pin_hash: str, timestamp: datetime) -> None: ...

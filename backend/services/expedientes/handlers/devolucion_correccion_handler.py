@@ -48,6 +48,13 @@ class ComandoDevolucion:
     actor_id: Optional[str] = None
     contrapartes_permitidas: Optional[List[str]] = None
 
+@dataclass
+class ComandoDeshacerDevolucion:
+    """Comando para revertir una devolución para corrección."""
+    formulario_id: str
+    actor_id: Optional[str] = None
+    contrapartes_permitidas: Optional[List[str]] = None
+
 
 class DevolucionCorreccionHandler:
     """Maneja la transición de devolución para corrección."""
@@ -149,6 +156,40 @@ class DevolucionCorreccionHandler:
         }
 
     # ─── Privados ─────────────────────────────────────────────────────────────
+
+    def ejecutar_deshacer_devolucion(self, comando: ComandoDeshacerDevolucion) -> Dict[str, Any]:
+        """
+        Revierte la devolución de un expediente para corrección.
+        """
+        formulario = self._buscar_formulario(
+            comando.formulario_id,
+            comando.contrapartes_permitidas,
+        )
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.deshacer_devolucion()
+
+        # Actualizar repositorio
+        self._repo.actualizar_para_deshacer_devolucion(
+            comando.formulario_id,
+            dominio.estado.value,
+            dominio.numero_correccion,
+        )
+
+        # Registrar auditoría
+        if self._repo_auditoria:
+            self._repo_auditoria.registrar_evento(EventoAuditoria(
+                formulario_id=comando.formulario_id,
+                tipo_evento=TipoEvento.FORMULARIO_DEVOLUCION_REVERTIDA,
+                estado_anterior=estado_anterior,
+                estado_nuevo=dominio.estado.value,
+                actor_id=comando.actor_id,
+                actor_tipo=ActorTipo.OPERADOR,
+            ))
+
+        return {
+            "estado": dominio.estado.value,
+        }
 
     def _buscar_formulario(
         self,

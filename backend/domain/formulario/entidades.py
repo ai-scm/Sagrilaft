@@ -159,6 +159,7 @@ class FormularioDatos:
     # ── Relaciones (populadas solo en snapshot completo) ──────────────────────
     documentos: List[DocumentoDatos] = field(default_factory=list)
     validaciones: List[Dict[str, Any]] = field(default_factory=list)
+    alertas_inconsistencia: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -259,6 +260,17 @@ class FormularioDominio:
             )
         self.estado = EstadoFormulario.EN_CORRECCION
         self.numero_correccion += 1
+
+    def deshacer_devolucion(self) -> None:
+        """EN_CORRECCION → ENVIADO. Revierte una devolución para corrección hecha por error."""
+        if self.estado != EstadoFormulario.EN_CORRECCION:
+            raise FormularioNoEditableError(
+                f"Solo se puede revertir la devolución de un formulario en estado 'en_correccion' "
+                f"(actual: '{self.estado.value}')."
+            )
+        self.estado = EstadoFormulario.ENVIADO
+        if self.numero_correccion > 0:
+            self.numero_correccion -= 1
 
     def carga_manual(self) -> None:
         """CUALQUIER ESTADO → ENVIADO. El formulario vuelve al flujo de revisión."""
