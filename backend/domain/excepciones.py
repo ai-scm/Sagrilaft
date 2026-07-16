@@ -147,3 +147,13 @@ class CorreoDestinatarioNoRegistradoError(Exception):
             f"Destinatario sin correo registrado para formulario '{formulario_id}'. "
             "Debe completar el paso de captura de correo antes de enviar."
         )
+
+class AccesoActivoExistenteError(Exception):
+    def __init__(self, acceso_id: str) -> None:
+        self.acceso_id = acceso_id
+        super().__init__("Ya existe un acceso activo para este correo electrónico.")
+
+class FrecuenciaEnvioExcedidaError(Exception):
+    def __init__(self, segundos_restantes: int) -> None:
+        self.segundos_restantes = segundos_restantes
+        super().__init__(f"Debe esperar {segundos_restantes} segundos antes de solicitar otro correo.")

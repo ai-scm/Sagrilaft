@@ -54,6 +54,20 @@ def crear_acceso_manual_contraparte(
     )
     return servicio_acceso_manual.crear_acceso(solicitud_dominio)
 
+@enrutador.post(
+    "/{acceso_id}/reenviar",
+    response_model=AccesoManualCreado,
+    status_code=200,
+    summary="Reenviar acceso manual",
+    description="Regenera el PIN y reenvía el correo de acceso manual.",
+    dependencies=[Depends(portal_interno)],
+)
+def reenviar_acceso_manual_contraparte(
+    acceso_id: str,
+    servicio_acceso_manual: AccesoManualService = Depends(obtener_servicio_acceso),
+) -> AccesoManualCreado:
+    return servicio_acceso_manual.reenviar_acceso(acceso_id)
+
 
 # ─── 2. Listado ───────────────────────────────────────────────────────────────
 

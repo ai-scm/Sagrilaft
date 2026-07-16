@@ -27,6 +27,8 @@ from domain.excepciones import (
     FormularioYaEnviadoError,
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
+    AccesoActivoExistenteError,
+    FrecuenciaEnvioExcedidaError,
 )
 from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioAccesoManual
@@ -166,7 +168,7 @@ class AccesoManualService:
         Returns True si el correo se envió; False si no hay notificador
         configurado, no hay destinatario, o el envío falló.
         """
-        if not self._notificador or not acceso["correo_destinatario"]:
+        if not self._notificador or not acceso.get("correo_destinatario"):
             return False
 
         return self._notificador.enviar_notificacion_acceso_creado(
@@ -201,8 +203,22 @@ class AccesoManualService:
         Genera credenciales únicas, persiste el AccesoManual y el Formulario
         pre-inicializado, y devuelve el PIN en texto plano UNA SOLA VEZ.
 
-        El PIN nunca se vuelve a exponer tras esta llamada.
+        Verifica si ya existe un acceso activo para el mismo correo para
+        prevenir duplicados.
         """
+        if solicitud.correo_destinatario:
+            acceso_existente = self._repo.obtener_acceso_activo_por_correo(solicitud.correo_destinatario)
+            if acceso_existente and _calcular_estado_acceso(acceso_existente) == "activo":
+                # Revisar tiempo desde el último envío para prevenir spam
+                ahora = ahora_utc()
+                if acceso_existente.ultimo_envio_correo:
+                    tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso_existente.ultimo_envio_correo)).total_seconds()
+                    if tiempo_transcurrido < 120:  # 2 minutos
+                        raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
+                
+                # Existe un acceso activo y pasaron más de 2 minutos, pedir confirmación al front
+                raise AccesoActivoExistenteError(acceso_existente.id)
+
         pin = _generar_pin()
         pin_hash = _verificador_pin.hash(pin)
         token = secrets.token_urlsafe(32)
@@ -218,6 +234,46 @@ class AccesoManualService:
         )
 
         acceso_creado = self._serializar_acceso_creado(resultado, pin)
+        acceso_creado["correo_enviado"] = self._notificar_credenciales_acceso(acceso_creado)
+        return acceso_creado
+
+    def reenviar_acceso(self, acceso_id: str) -> Dict[str, Any]:
+        """
+        Reenvía las credenciales de un acceso existente (generando un nuevo PIN).
+        """
+        accesos = self._repo.listar_accesos()
+        acceso = next((a for a in accesos if a.id == acceso_id), None)
+        if not acceso:
+            raise TokenDiligenciamientoInvalidoError("Acceso no encontrado")
+
+        if _calcular_estado_acceso(acceso) != "activo":
+            raise FormularioYaEnviadoError("El acceso ya no está activo.")
+
+        ahora = ahora_utc()
+        if acceso.ultimo_envio_correo:
+            tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso.ultimo_envio_correo)).total_seconds()
+            if tiempo_transcurrido < 120:
+                raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
+
+        pin = _generar_pin()
+        pin_hash = _verificador_pin.hash(pin)
+        self._repo.reenviar_acceso(acceso_id, pin_hash, ahora)
+
+        acceso_creado = {
+            "formulario_id":            acceso.formulario_id,
+            "codigo_peticion":          acceso.codigo_peticion,
+            "pin":                      pin,
+            "token_diligenciamiento":   acceso.token_diligenciamiento,
+            "enlace_diligenciamiento":  self._construir_enlace_diligenciamiento(acceso.token_diligenciamiento),
+            "correo_destinatario":      acceso.correo_destinatario,
+            "razon_social":             acceso.razon_social,
+            "tipo_contraparte":         acceso.tipo_contraparte,
+            "area_responsable":         acceso.area_responsable,
+            "created_at":               acceso.created_at,
+            "expires_at":               acceso.expires_at,
+        }
+        
+        logger.info("Acceso manual reenviado — destinatario: %s, código: %s", acceso.correo_destinatario, acceso.codigo_peticion)
         acceso_creado["correo_enviado"] = self._notificar_credenciales_acceso(acceso_creado)
         return acceso_creado
 

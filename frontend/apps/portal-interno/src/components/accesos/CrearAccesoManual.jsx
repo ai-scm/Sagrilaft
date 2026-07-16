@@ -164,6 +164,8 @@ export default function CrearAccesoManual() {
   const [copiado, setCopiado] = useState(false);
   const [campoEnfocado, setCampoEnfocado] = useState(null);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [mostrarConfirmacionReenvio, setMostrarConfirmacionReenvio] = useState(false);
+  const [accesoIdReenvio, setAccesoIdReenvio] = useState(null);
 
   const temporizadorRef = useRef(null);
 
@@ -204,12 +206,42 @@ export default function CrearAccesoManual() {
       setResultado(acceso);
       setMostrarConfirmacion(false);
     } catch (errorCreacion) {
-      setErrorGlobal('Error al crear el acceso. Verifique los datos e intente nuevamente.');
       setMostrarConfirmacion(false);
+      if (errorCreacion.status === 409 && errorCreacion.data?.acceso_id) {
+        setAccesoIdReenvio(errorCreacion.data.acceso_id);
+        setMostrarConfirmacionReenvio(true);
+      } else if (errorCreacion.status === 429) {
+        const segundos = errorCreacion.data?.segundos_restantes || 120;
+        setErrorGlobal(`Demasiadas solicitudes. Debe esperar ${segundos} segundos antes de solicitar otro acceso para este correo.`);
+      } else {
+        setErrorGlobal(errorCreacion.message || 'Error al crear el acceso. Verifique los datos e intente nuevamente.');
+      }
     } finally {
       setCargando(false);
     }
   }, [cargando, formData]);
+
+  const handleReenviar = useCallback(async () => {
+    if (cargando || !accesoIdReenvio) return;
+    setCargando(true);
+    setErrorGlobal(null);
+    try {
+      const acceso = await api.reenviarAccesoManual(accesoIdReenvio);
+      guardarCredenciales(acceso);
+      setResultado(acceso);
+      setMostrarConfirmacionReenvio(false);
+    } catch (errorCreacion) {
+      setMostrarConfirmacionReenvio(false);
+      if (errorCreacion.status === 429) {
+        const segundos = errorCreacion.data?.segundos_restantes || 120;
+        setErrorGlobal(`Debe esperar ${segundos} segundos antes de solicitar otro correo.`);
+      } else {
+        setErrorGlobal(errorCreacion.message || 'Error al reenviar el acceso. Verifique los datos e intente nuevamente.');
+      }
+    } finally {
+      setCargando(false);
+    }
+  }, [cargando, accesoIdReenvio]);
 
   const handleCopiarEnlace = () => {
     if (!resultado) return;
@@ -226,6 +258,8 @@ export default function CrearAccesoManual() {
     setErroresCampo({});
     setErrorGlobal(null);
     setMostrarConfirmacion(false);
+    setMostrarConfirmacionReenvio(false);
+    setAccesoIdReenvio(null);
   };
 
   const estiloInput = (campo) => ({
@@ -346,6 +380,20 @@ export default function CrearAccesoManual() {
         ocupado={cargando}
       >
         <ResumenConfirmacionAcceso datos={formData} />
+      </ModalConfirmacion>
+      <ModalConfirmacion
+        visible={mostrarConfirmacionReenvio}
+        titulo="Acceso activo existente"
+        textoConfirmar="Sí, reenviar y generar nuevo PIN"
+        textoCancelar="Cancelar"
+        onConfirmar={handleReenviar}
+        onCancelar={() => setMostrarConfirmacionReenvio(false)}
+        ocupado={cargando}
+      >
+        <div style={ESTILOS.confirmacionTexto}>
+          <p>Ya existe un acceso activo para <strong>{formData.correo_destinatario}</strong>.</p>
+          <p>¿Desea reenviar las credenciales generando un nuevo PIN e invalidando el anterior?</p>
+        </div>
       </ModalConfirmacion>
     </>
   );
