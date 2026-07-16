@@ -17,6 +17,7 @@ from starlette.responses import Response
 from api.dependencies import (
     obtener_servicio_expediente,
     obtener_servicio_firma,
+    obtener_servicio_verificacion_sagrilaft,
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from domain.excepciones import SinPermisoError
@@ -33,9 +34,11 @@ from api.schemas import (
     SolicitudReaperturaActualizacion,
     SolicitudRechazo,
     SolicitudAuditoriaAlerta,
+    SagrilaftConsultaManual,
 )
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
+from services.formulario.verificacion_sagrilaft import ServicioVerificacionSagrilaft
 
 enrutador = APIRouter(
     prefix="/api/expedientes",
@@ -366,6 +369,43 @@ def deshacer_devolucion(
         _contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
+
+@enrutador.post(
+    "/{formulario_id}/verificar-sagrilaft",
+    summary="Verificar contraparte en SAGRILAFT",
+    description="Consulta la contraparte en las listas cautela y retorna el resultado (simulado, real o deshabilitado).",
+)
+def verificar_sagrilaft(
+    formulario_id: str,
+    datos: Optional[SagrilaftConsultaManual] = None,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ServicioVerificacionSagrilaft = Depends(obtener_servicio_verificacion_sagrilaft),
+) -> dict:
+    return servicio.verificar_contraparte(formulario_id, _contrapartes_permitidas(usuario), datos_manuales=datos)
+
+@enrutador.get(
+    "/{formulario_id}/sagrilaft/pdf",
+    summary="Descargar certificado SAGRILAFT",
+    description="Descarga el certificado PDF original desde el proveedor de listas cautela.",
+)
+def descargar_pdf_sagrilaft(
+    formulario_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ServicioVerificacionSagrilaft = Depends(obtener_servicio_verificacion_sagrilaft),
+):
+    from fastapi.responses import Response
+    from fastapi import HTTPException
+    try:
+        pdf_bytes = servicio.descargar_certificado_sagrilaft(formulario_id, _contrapartes_permitidas(usuario))
+        return Response(
+            content=pdf_bytes, 
+            media_type="application/pdf", 
+            headers={"Content-Disposition": f'attachment; filename="sagrilaft_{formulario_id}.pdf"'}
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error descargando PDF: {str(e)}")
 
 @enrutador.patch(
     "/{formulario_id}/alertas/{alerta_id}/auditoria",

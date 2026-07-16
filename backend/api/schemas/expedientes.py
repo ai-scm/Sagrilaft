@@ -71,6 +71,7 @@ class ExpedienteDetalle(BaseModel):
     numero_correccion: int = 0
     campos_a_corregir: Optional[str] = None
     causal_cierre: Optional[str] = None
+    sagrilaft_reporte_id: Optional[str] = None
     updated_at: datetime
     documentos: List[DocumentoResumen] = Field(default_factory=list)
     alertas_inconsistencia: List[AlertaInconsistenciaResponse] = Field(default_factory=list)
@@ -159,6 +160,13 @@ class SolicitudRechazo(BaseModel):
             "Si se omite, no se envía ninguna notificación."
         ),
     )
+
+class SagrilaftConsultaManual(BaseModel):
+    """Datos ingresados manualmente por el analista para consultar listas cautela."""
+    tipo_identificacion: str
+    numero_identificacion: str
+    nombre_completo: str
+    fecha_expedicion: Optional[str] = None
 
 
 class ResumenRechazo(BaseModel):

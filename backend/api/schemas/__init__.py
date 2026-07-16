@@ -45,6 +45,7 @@ from .expedientes import (
     SolicitudReaperturaActualizacion,
     SolicitudRechazo,
     SolicitudAuditoriaAlerta,
+    SagrilaftConsultaManual,
 )
 from .listas_cautela import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
 from .validaciones import ValidacionResponse
@@ -91,6 +92,7 @@ __all__ = [
     "SolicitudReaperturaActualizacion",
     "SolicitudRechazo",
     "SolicitudAuditoriaAlerta",
+    "SagrilaftConsultaManual",
     # Listas de cautela
     "BusquedaListaCautela",
     "RespuestaListaCautela",

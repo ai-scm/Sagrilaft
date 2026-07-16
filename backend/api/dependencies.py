@@ -57,6 +57,8 @@ from services.expedientes.reportes import RendereadorReporteService
 from services.firma.firma_service import FirmaService
 from services.formulario.documento_service import DocumentoService
 from services.formulario.formulario_service import FormularioService
+from services.formulario.verificacion_sagrilaft import ServicioVerificacionSagrilaft
+from infrastructure.servicios_externos.sagrilaft.fabrica import obtener_consultor_listas
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.validacion.validacion_service import ValidacionService
@@ -246,3 +248,10 @@ def obtener_servicio_validacion(
     servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
 ) -> ValidacionService:
     return ValidacionService(repo, orquestador, servicio_listas)
+
+
+def obtener_servicio_verificacion_sagrilaft(
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente)
+) -> ServicioVerificacionSagrilaft:
+    consultor = obtener_consultor_listas()
+    return ServicioVerificacionSagrilaft(consultor, repo)
