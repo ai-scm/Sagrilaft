@@ -95,6 +95,10 @@ class DocumentoService:
         """
         return self._repo.obtener_ultimo_formulario_pdf(formulario_id)
 
+    def actualizar_snapshot_datos(self, doc_id: str, snapshot_datos: str) -> None:
+        """Actualiza el campo snapshot_datos del documento en la BD."""
+        self._repo.actualizar_snapshot_datos(doc_id, snapshot_datos)
+
     # ─── Movimiento (borrador → contraparte) ───────────────────────────────────
 
     def mover_archivos_formulario_a_contraparte(
@@ -167,7 +171,11 @@ class DocumentoService:
     # ─── Eliminación ───────────────────────────────────────────────────────────
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
-        """Elimina el archivo del backend y lo marca como eliminado en BD."""
+        """
+        Soft-delete en BD. Solo elimina el archivo físico si está en la carpeta 'tmp/' (borrador).
+        Los documentos oficiales (enviados) se conservan en storage por auditoría.
+        """
         documento = self.buscar_documento(formulario_id, doc_id)
-        self._storage.eliminar(documento.ruta_archivo)
+        if documento.ruta_archivo.startswith("tmp/"):
+            self._storage.eliminar(documento.ruta_archivo)
         self._repo.marcar_eliminado(doc_id)

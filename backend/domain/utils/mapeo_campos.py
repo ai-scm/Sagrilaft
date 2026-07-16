@@ -174,8 +174,9 @@ class MapeadorCamposFormulario:
             "tipo_identificacion": _normalizar_tipo_identificacion,
         },
         "cedula_representante": {
-            "fecha_nacimiento":    _normalizar_fecha_colombia,
-            "fecha_expedicion":    _normalizar_fecha_colombia,
+            "tipo_doc_representante": _normalizar_tipo_identificacion,
+            "fecha_nacimiento":       _normalizar_fecha_colombia,
+            "fecha_expedicion":       _normalizar_fecha_colombia,
         },
     }
 

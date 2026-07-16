@@ -40,12 +40,12 @@ Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún
 - actividades_economicas: lista de códigos de actividad económica con su descripción (array de strings)
 - codigo_ica: código de la actividad principal a nivel local/municipal (si aplica). Devuelve solo el número, sin texto adicional.
 - tipo_persona: tipo de persona o contribuyente (ej. Jurídica, Natural). Normaliza el valor extraído a "Persona Jurídica" o "Persona Natural" según corresponda.
-- nombre_representante: nombre completo del representante legal. Busca en la sección de representación o apoderados y concatena los nombres y apellidos. Devuelve una sola cadena.
+- nombre_representante: nombre completo del representante legal. Busca en la sección de representación o apoderados y concatena los nombres y apellidos -> Primer Nombre, Segundo Nombre o Otros Nombres, Primer Apellido, Segundo Apellido. Devuelve una sola cadena.
 - fecha_documento: fecha de generación, inscripción o actualización del documento en formato YYYY-MM-DD
 - direccion: dirección registrada
 - correo: correo electrónico registrado
 - telefono: número de teléfono registrado (solo dígitos, sin espacios ni guiones)
-- cedula_representante: número de identificación del representante legal. Búscalo en la sección "REPRESENTACIÓN" → campo "101. Número de identificación". REGLAS ESTRICTAS: (1) El campo "100. Tipo de documento" contiene SOLO un código corto de 2 dígitos (13=CC, 22=CE, 31=NIT, 41=PAS) — ese código NUNCA forma parte del número de identificación. (2) Lee el número que aparece EXCLUSIVAMENTE después del label "101." — ignorando completamente la fila del "100.". (3) Si el valor que extrajiste empieza por 13, 22, 31 o 41 seguido de más dígitos, esos 2 primeros dígitos son el código del tipo de documento que se coló accidentalmente — descártalos y devuelve solo los dígitos restantes. (4) Devuelve únicamente dígitos, sin espacios ni guiones. Si no encuentras el campo 101, devuelve null.
+- cedula_representante: número de identificación del representante legal. Búscalo en la sección "Representación" → campo Número de identificación". REGLAS ESTRICTAS: (1) El campo "100. Tipo de documento" contiene SOLO un código corto de 2 dígitos (13=CC, 22=CE, 31=NIT, 41=PAS) — ese código NUNCA forma parte del número de identificación. (2) Lee el número que aparece EXCLUSIVAMENTE después del label "101." — ignorando completamente la fila del "100.". (3) Si el valor que extrajiste empieza por 13, 22, 31 o 41 seguido de más dígitos, esos 2 primeros dígitos son el código del tipo de documento que se coló accidentalmente — descártalos y devuelve solo los dígitos restantes. (4) Devuelve únicamente dígitos, sin espacios ni guiones. Si no encuentras el campo 101, devuelve null.
 - clasificacion_dv: dígito de verificación del NIT. Búscalo en la sección "IDENTIFICACIÓN" → campo "6. DV". Devuelve ÚNICAMENTE el dígito numérico (0-9), sin puntos, guiones ni texto adicional. Si no lo encuentras o no es un único dígito numérico, devuelve null.
 
 Responde SOLO con un JSON válido, sin texto adicional. Si no puedes leer algún campo, usa null.""",
@@ -127,9 +127,9 @@ class ExtractorBedrock:
 
     # Tiempo máximo de espera para que Bedrock complete la extracción de un PDF.
     # Claude Sonnet puede tardar entre 30 y 90 s en documentos complejos.
-    # El valor debe ser menor al idleTimeout del ALB (300 s) para que la
+    # El valor debe ser menor al idleTimeout del ALB (60s típicamente) para que la
     # respuesta de error de boto3 llegue antes de que el gateway corte la conexión.
-    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 280
+    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 45
 
     def __init__(self, region: str, modelo_id: str, max_tokens: int = 4096) -> None:
         import boto3
@@ -181,10 +181,18 @@ class ExtractorBedrock:
                 mensaje="boto3 no instalado. Ejecute: pip install boto3",
             )
         except Exception as error:
-            logger.error("Error extrayendo datos de %s: %s", ruta_archivo, str(error))
+            error_str = str(error)
+            logger.error("Error extrayendo datos de %s: %s", ruta_archivo, error_str)
+            
+            # Obfuscate AWS internal details for security
+            if "endpoint URL" in error_str or "arn:aws" in error_str or "Read timeout" in error_str:
+                mensaje_usuario = "El servidor de IA tardó demasiado en responder o está temporalmente indisponible. Por favor, valide e ingrese la información manualmente."
+            else:
+                mensaje_usuario = f"Error al procesar documento: El documento no pudo ser procesado por la IA. Por favor, valide e ingrese la información manualmente."
+
             return ResultadoExtraccion(
                 extraido=False,
-                mensaje=f"Error al procesar documento: {str(error)}",
+                mensaje=mensaje_usuario,
             )
 
     # ─── Métodos privados ─────────────────────────────────────────────────────

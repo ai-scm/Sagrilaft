@@ -107,7 +107,7 @@ class FormularioService:
         formulario_actualizado = self._repo.actualizar(formulario_id, datos)
         return formulario_a_dict(formulario_actualizado)
 
-    def enviar(self, formulario_id: str, actor_id: Optional[str] = None) -> ResultadoEnvioFormulario:
+    def enviar(self, formulario_id: str, actor_id: Optional[str] = None, alertas: Optional[List[Any]] = None) -> ResultadoEnvioFormulario:
         formulario = self._buscar_formulario_o_error(formulario_id)
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
@@ -116,6 +116,11 @@ class FormularioService:
         errores = self._validador_envio.validar(formulario)
         if errores:
             return ResultadoEnvioFormulario(valido=False, errores=errores)
+
+        if alertas:
+            # Convertimos las pydantic models a dicts, solo guardamos campos relevantes
+            alertas_dicts = [a.model_dump() if hasattr(a, "model_dump") else a for a in alertas]
+            self._repo.guardar_alertas(formulario.id, alertas_dicts)
 
         prefijo = resolver_key_contraparte(formulario.tipo_contraparte, formulario.razon_social)
         self._documentos.mover_archivos_formulario_a_contraparte(formulario.id, prefijo)
@@ -182,6 +187,15 @@ class FormularioService:
         key = self._documentos.key_borrador(formulario.codigo_peticion, nombre_archivo)
         self._documentos.guardar_archivo(key, contenido_bytes, content_type)
 
+        documentos_activos = self._documentos.listar_documentos(formulario_id)
+        version_numero = 1
+        version_anterior_id = None
+        for doc in documentos_activos:
+            if doc.tipo_documento == tipo_documento:
+                version_numero = doc.version_numero + 1
+                version_anterior_id = doc.id
+                self._documentos.eliminar_documento(formulario_id, doc.id)
+
         from services.formulario.documento_service import _sanitizar_nombre_archivo
         nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)
         documento = self._documentos.registrar_documento_en_bd(
@@ -193,11 +207,29 @@ class FormularioService:
             tamano=len(contenido_bytes),
             hash_sha256=self._documentos.calcular_hash(contenido_bytes),
             subido_por=subido_por,
+            version_numero=version_numero,
+            version_anterior_id=version_anterior_id,
         )
-        return await self._analisis.analizar_nueva_carga(
+        resultado = await self._analisis.analizar_nueva_carga(
             documento=documento,
             formulario=formulario,
         )
+        if resultado.extraccion_exitosa and resultado.datos_extraidos_ia:
+            import json
+            extraccion_mapeada = {
+                "razon_social_extraida": resultado.razon_social_extraida,
+                "nit_extraido": resultado.nit_extraido,
+                "nombre_representante_extraido": resultado.nombre_representante_extraido,
+                "numero_doc_representante_extraido": resultado.numero_doc_representante_extraido,
+                "direccion_extraida": resultado.direccion_extraida,
+                "extraccion_exitosa": True,
+            }
+            self._documentos.actualizar_snapshot_datos(
+                documento.id, json.dumps(extraccion_mapeada, ensure_ascii=False)
+            )
+            documento.snapshot_datos = extraccion_mapeada
+
+        return resultado
 
     def eliminar_documento(self, formulario_id: str, doc_id: str) -> None:
         formulario = self._buscar_formulario_o_error(formulario_id)

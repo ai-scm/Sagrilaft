@@ -24,43 +24,79 @@ import {
   calcularAlertasNombreRepresentante,
   calcularAlertasNumeroDocRepresentante,
   calcularAlertasDireccion,
+  DOCS_RAZON_SOCIAL,
+  DOCS_NIT,
+  DOCS_NOMBRE_REPRESENTANTE,
+  DOCS_NUMERO_DOC_REPRESENTANTE,
+  DOCS_DIRECCION,
 } from '../utils/calcularAlertasInconsistencia';
 
-export function useAlertasInconsistencia(documentos, formData) {
+export function useAlertasInconsistencia(documentos, formData, alertasServidor = []) {
+  // Restaurar datos extraídos desde las alertas del servidor si no están presentes en `documentos`.
+  // Esto permite que el motor de alertas siga funcionando cuando se devuelve un formulario,
+  // validando los valores extraídos antiguos contra los nuevos valores ingresados en el formulario.
+  const documentosConAlertas = useMemo(() => {
+    const docs = { ...documentos };
+    alertasServidor.forEach(alerta => {
+      // Intentar encontrar el tipo de documento por el nombre legible
+      const tipoDocEntry = Object.entries({
+        ...DOCS_RAZON_SOCIAL, ...DOCS_NIT, ...DOCS_NOMBRE_REPRESENTANTE, ...DOCS_NUMERO_DOC_REPRESENTANTE, ...DOCS_DIRECCION
+      }).find(([, config]) => config.nombreLegible === alerta.nombre_documento);
+      
+      if (tipoDocEntry) {
+        const [tipoDoc] = tipoDocEntry;
+        if (docs[tipoDoc]) {
+           docs[tipoDoc] = { ...docs[tipoDoc] }; // copy
+           if (alerta.tipo_campo === 'razon_social' && docs[tipoDoc].razon_social_extraida == null) docs[tipoDoc].razon_social_extraida = alerta.valor_documento;
+           if (alerta.tipo_campo === 'numero_identificacion' && docs[tipoDoc].nit_extraido == null) docs[tipoDoc].nit_extraido = alerta.valor_documento;
+           if (alerta.tipo_campo === 'nombre_representante' && docs[tipoDoc].nombre_representante_extraido == null) docs[tipoDoc].nombre_representante_extraido = alerta.valor_documento;
+           if (alerta.tipo_campo === 'numero_doc_representante' && docs[tipoDoc].numero_doc_representante_extraido == null) docs[tipoDoc].numero_doc_representante_extraido = alerta.valor_documento;
+           if (alerta.tipo_campo === 'direccion' && docs[tipoDoc].direccion_extraida == null) docs[tipoDoc].direccion_extraida = alerta.valor_documento;
+        }
+      }
+    });
+    return docs;
+  }, [documentos, alertasServidor]);
+
   const alertasRazonSocial = useMemo(
-    () => calcularAlertasRazonSocial(documentos, formData.razon_social),
-    [documentos, formData.razon_social],
+    () => calcularAlertasRazonSocial(documentosConAlertas, formData.razon_social),
+    [documentosConAlertas, formData.razon_social],
   );
 
   const alertasNit = useMemo(
-    () => calcularAlertasNit(documentos, formData.numero_identificacion, formData.tipo_identificacion),
-    [documentos, formData.numero_identificacion, formData.tipo_identificacion],
+    () => calcularAlertasNit(documentosConAlertas, formData.numero_identificacion, formData.tipo_identificacion),
+    [documentosConAlertas, formData.numero_identificacion, formData.tipo_identificacion],
   );
 
   const alertasNombreRepresentante = useMemo(
-    () => calcularAlertasNombreRepresentante(documentos, formData.nombre_representante),
-    [documentos, formData.nombre_representante],
+    () => calcularAlertasNombreRepresentante(documentosConAlertas, formData.nombre_representante),
+    [documentosConAlertas, formData.nombre_representante],
   );
 
   const alertasNumeroDocRepresentante = useMemo(
-    () => calcularAlertasNumeroDocRepresentante(documentos, formData.numero_doc_representante),
-    [documentos, formData.numero_doc_representante],
+    () => calcularAlertasNumeroDocRepresentante(documentosConAlertas, formData.numero_doc_representante),
+    [documentosConAlertas, formData.numero_doc_representante],
   );
 
   const alertasDireccion = useMemo(
-    () => calcularAlertasDireccion(documentos, formData.direccion),
-    [documentos, formData.direccion],
+    () => calcularAlertasDireccion(documentosConAlertas, formData.direccion),
+    [documentosConAlertas, formData.direccion],
+  );
+
+  const todasLasAlertasActivas = useMemo(
+    () => [
+      ...alertasRazonSocial,
+      ...alertasNit,
+      ...alertasNombreRepresentante,
+      ...alertasNumeroDocRepresentante,
+      ...alertasDireccion,
+    ],
+    [alertasRazonSocial, alertasNit, alertasNombreRepresentante, alertasNumeroDocRepresentante, alertasDireccion],
   );
 
   const hayAlertasActivas = useMemo(
-    () => [
-      alertasRazonSocial,
-      alertasNit,
-      alertasNombreRepresentante,
-      alertasNumeroDocRepresentante,
-      alertasDireccion,
-    ].some(alertas => alertas.length > 0),
-    [alertasRazonSocial, alertasNit, alertasNombreRepresentante, alertasNumeroDocRepresentante, alertasDireccion],
+    () => todasLasAlertasActivas.length > 0,
+    [todasLasAlertasActivas],
   );
 
   return {
@@ -70,5 +106,6 @@ export function useAlertasInconsistencia(documentos, formData) {
     alertasNumeroDocRepresentante,
     alertasDireccion,
     hayAlertasActivas,
+    todasLasAlertasActivas,
   };
 }

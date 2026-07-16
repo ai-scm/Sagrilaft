@@ -5,6 +5,7 @@ from sqlalchemy import (
     Date, ForeignKey, Index, UniqueConstraint, CheckConstraint,
 )
 from sqlalchemy.orm import relationship
+import enum
 from infrastructure.persistencia.database import Base
 from domain.utils.fechas import sumar_dias_habiles, DIAS_HABILES_VIGENCIA_ACCESO
 
@@ -24,6 +25,12 @@ from domain.formulario.tipos import (  # noqa: F401
     TipoPersona,
     TipoSolicitud,
 )
+
+class EstadoAlerta(str, enum.Enum):
+    PENDIENTE = "PENDIENTE"
+    FALSO_POSITIVO_IA = "FALSO_POSITIVO_IA"
+    CORREGIDO = "CORREGIDO"
+    RIESGO_ACEPTADO = "RIESGO_ACEPTADO"
 
 def generate_uuid():
     return str(uuid.uuid4())
@@ -167,6 +174,8 @@ class Formulario(Base):
                                               lazy="selectin")
     tipos_transaccion = relationship("TipoTransaccionFormulario", back_populates="formulario",
                                      cascade="all, delete-orphan", lazy="selectin")
+    alertas_inconsistencia = relationship("AlertaInconsistencia", back_populates="formulario",
+                                          cascade="all, delete-orphan", lazy="selectin")
 
     def _obtener_o_crear_datos_persona_natural(self):
         if self.datos_persona_natural is None:
@@ -594,6 +603,7 @@ class AccesoManual(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime(timezone=True), nullable=False, default=generate_expires_at)
     consumed_at = Column(DateTime(timezone=True), nullable=True)
+    ultimo_envio_correo = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", foreign_keys=[formulario_id])
 
@@ -620,3 +630,25 @@ class EventoFormulario(Base):
     actor_tipo = Column(String(20), nullable=False, default="SISTEMA")
     metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class AlertaInconsistencia(Base):
+    __tablename__ = "formulario_alertas_inconsistencia"
+    __table_args__ = (
+        Index("ix_formulario_alertas_inconsistencia_formulario_id", "formulario_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
+    
+    tipo_campo = Column(String, nullable=False)
+    nombre_documento = Column(String, nullable=False)
+    valor_formulario = Column(Text, nullable=True)
+    valor_documento = Column(Text, nullable=True)
+    seccion_referencia = Column(String, nullable=True)
+    
+    estado_auditoria = Column(String, default=EstadoAlerta.PENDIENTE.value)
+    actualizado_por = Column(String, nullable=True)
+    fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    formulario = relationship("Formulario", back_populates="alertas_inconsistencia")
+

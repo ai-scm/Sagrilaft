@@ -1,0 +1,38 @@
+.alertas-card {
+  margin-top: 24px;
+  border-left: 4px solid #f59e0b;
+}
+
+.alerta-item {
+  transition: background-color 0.2s ease;
+}
+
+.alerta-item.pendiente .lucide {
+  color: #f59e0b;
+}
+
+.alerta-item.falso_positivo_ia .lucide {
+  color: #6b7280;
+}
+
+.alerta-item.corregido .lucide {
+  color: #10b981;
+}
+
+.alerta-item.riesgo_aceptado .lucide {
+  color: #3b82f6;
+}
+
+.alerta-item.falso_positivo_ia {
+  opacity: 0.8;
+  background-color: #f9fafb;
+}
+
+.alerta-item.corregido {
+  opacity: 0.8;
+  background-color: #f0fdf4;
+}
+
+.alerta-item.riesgo_aceptado {
+  background-color: #eff6ff;
+}

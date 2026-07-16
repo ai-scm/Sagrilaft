@@ -47,12 +47,12 @@ export default function AlertasInconsistencia({ alertas, tipoCampo, nombreCampo 
       </p>
 
       {alertas.map((alerta) => (
-        <div key={alerta.tipoDoc} className="alerta-inconsistencia">
+        <div key={alerta.nombre_documento} className="alerta-inconsistencia">
 
           <div className="alerta-header">
             <span className="alerta-icono" aria-hidden="true">⚠️</span>
             <span className="alerta-titulo">
-              <strong>{alerta.nombreDocumento}</strong>
+              <strong>{alerta.nombre_documento}</strong>
             </span>
           </div>
 
@@ -60,19 +60,19 @@ export default function AlertasInconsistencia({ alertas, tipoCampo, nombreCampo 
             <div className="alerta-valor-fila">
               <span className="alerta-etiqueta">Formulario:</span>
               <span className="alerta-valor alerta-valor--formulario">
-                {alerta.valorFormulario}
+                {alerta.valor_formulario}
               </span>
             </div>
             <div className="alerta-valor-fila">
               <span className="alerta-etiqueta">Documento:</span>
               <span className="alerta-valor alerta-valor--documento">
-                {alerta.valorDocumento}
+                {alerta.valor_documento}
               </span>
             </div>
           </div>
 
           <p className="alerta-referencia">
-            Posible ubicación en el documento: <em>{alerta.seccionReferencia}</em>
+            Posible ubicación en el documento: <em>{alerta.seccion_referencia}</em>
           </p>
 
         </div>

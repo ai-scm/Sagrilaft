@@ -96,6 +96,9 @@ class ResultadoGuardadoDocumento:
     alerta_numero_doc_representante:   Optional[AlertaInconsistencia] = None
     direccion_extraida:                Optional[str]                  = None
     alerta_direccion:                  Optional[AlertaInconsistencia] = None
+    extraccion_exitosa:                bool                           = False
+    mensaje_extraccion:                str                            = ""
+    datos_extraidos_ia:                Dict[str, Any]                 = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -200,12 +203,17 @@ class AnalisisDocumentosService:
         del formulario usando los detectores.
         """
         extraccion = await self._extraer(documento)
-        resultado  = ResultadoGuardadoDocumento(documento=documento)
+        resultado  = ResultadoGuardadoDocumento(
+            documento=documento,
+            extraccion_exitosa=extraccion.extraido,
+            mensaje_extraccion=extraccion.mensaje,
+        )
 
         if not extraccion.extraido:
             return resultado
 
         resultado.campos_sugeridos = extraccion.campos_sugeridos
+        resultado.datos_extraidos_ia = extraccion.datos
 
         for config in self._config_analisis:
             # 1. Extraer valor para el frontend

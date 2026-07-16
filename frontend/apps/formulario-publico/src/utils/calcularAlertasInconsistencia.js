@@ -21,7 +21,7 @@ import {
 // ── Configuración de campos vigilados por tipo de documento ───────────────────
 // Lenguaje ubicuo: los nombres reflejan las secciones del documento físico.
 
-const DOCS_RAZON_SOCIAL = {
+export const DOCS_RAZON_SOCIAL = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
     seccionReferencia: 'Puede aparecer en la sección de “Nombre, identificación y domicilio” o en la sección de identificación del documento, donde aparece la razón social.',
@@ -40,7 +40,7 @@ const DOCS_RAZON_SOCIAL = {
   },
 };
 
-const DOCS_NIT = {
+export const DOCS_NIT = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
     seccionReferencia: 'puede aparecer en la sección “Nombre, identificación y domicilio” o en la sección de identificación (NIT)',
@@ -63,7 +63,7 @@ const DOCS_NIT = {
   },
 };
 
-const DOCS_NOMBRE_REPRESENTANTE = {
+export const DOCS_NOMBRE_REPRESENTANTE = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
     seccionReferencia: 'Sección de representantes legales (nombres y apellidos del representante)',
@@ -78,7 +78,7 @@ const DOCS_NOMBRE_REPRESENTANTE = {
   },
 };
 
-const DOCS_NUMERO_DOC_REPRESENTANTE = {
+export const DOCS_NUMERO_DOC_REPRESENTANTE = {
   cedula_representante: {
     nombreLegible:     'Cédula del Representante Legal',
     seccionReferencia: 'Número del documento de identidad del titular',
@@ -97,7 +97,7 @@ const DOCS_NUMERO_DOC_REPRESENTANTE = {
   },
 };
 
-const DOCS_DIRECCION = {
+export const DOCS_DIRECCION = {
   certificado_existencia: {
     nombreLegible:     'Certificado de Existencia y Representación Legal',
     seccionReferencia: 'Dirección del domicilio principal',
@@ -121,7 +121,7 @@ const DOCS_DIRECCION = {
  * @param {Object}   configPorTipoDoc  — nombre legible y sección de referencia por tipo de doc
  * @returns {Array<AlertaInconsistencia>}
  */
-function detectarInconsistencias(documentos, valorFormulario, extraerValorDoc, normalizar, configPorTipoDoc) {
+function detectarInconsistencias(documentos, valorFormulario, extraerValorDoc, normalizar, configPorTipoDoc, tipoCampo) {
   if (!valorFormulario) return [];
 
   const normForm = normalizar(valorFormulario);
@@ -137,11 +137,11 @@ function detectarInconsistencias(documentos, valorFormulario, extraerValorDoc, n
 
       const config = configPorTipoDoc[tipoDoc];
       return {
-        tipoDoc,
-        nombreDocumento:   config?.nombreLegible    ?? tipoDoc,
-        seccionReferencia: config?.seccionReferencia ?? '',
-        valorFormulario,
-        valorDocumento:    valorExtraido,
+        tipo_campo:        tipoCampo,
+        nombre_documento:   config?.nombreLegible    ?? tipoDoc,
+        seccion_referencia: config?.seccionReferencia ?? '',
+        valor_formulario:   valorFormulario,
+        valor_documento:    valorExtraido,
       };
     })
     .filter(Boolean);
@@ -165,6 +165,7 @@ export const calcularAlertasRazonSocial = (documentos, razonSocial) =>
     docRes => docRes.razon_social_extraida,
     normalizarNombre,
     DOCS_RAZON_SOCIAL,
+    'razon_social'
   );
 
 export const calcularAlertasNit = (documentos, numeroIdentificacion, tipoIdentificacion) => {
@@ -174,6 +175,7 @@ export const calcularAlertasNit = (documentos, numeroIdentificacion, tipoIdentif
     docRes => docRes.nit_extraido,
     normalizarNit,
     DOCS_NIT,
+    'numero_identificacion'
   );
 };
 
@@ -183,6 +185,7 @@ export const calcularAlertasNombreRepresentante = (documentos, nombreRepresentan
     docRes => docRes.nombre_representante_extraido,
     normalizarNombre,
     DOCS_NOMBRE_REPRESENTANTE,
+    'nombre_representante'
   );
 
 export const calcularAlertasNumeroDocRepresentante = (documentos, numeroDocRepresentante) =>
@@ -191,6 +194,7 @@ export const calcularAlertasNumeroDocRepresentante = (documentos, numeroDocRepre
     docRes => docRes.numero_doc_representante_extraido,
     normalizarNumeroDoc,
     DOCS_NUMERO_DOC_REPRESENTANTE,
+    'numero_doc_representante'
   );
 
 export const calcularAlertasDireccion = (documentos, direccion) =>
@@ -199,4 +203,5 @@ export const calcularAlertasDireccion = (documentos, direccion) =>
     docRes => docRes.direccion_extraida,
     normalizarDireccion,
     DOCS_DIRECCION,
+    'direccion'
   );
