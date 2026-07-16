@@ -137,6 +137,9 @@ class Formulario(Base):
     # --- ZohoSign ---
     zoho_request_id        = Column(String, nullable=True)
     ruta_documento_firmado = Column(String, nullable=True)
+    
+    # Integración con proveedor SAGRILAFT (Tusdatos)
+    sagrilaft_reporte_id   = Column(String, nullable=True)
 
     # Relaciones
     documentos = relationship("DocumentoAdjunto", back_populates="formulario",

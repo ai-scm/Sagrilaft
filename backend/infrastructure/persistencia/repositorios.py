@@ -454,6 +454,7 @@ def _orm_formulario_a_datos(
         campos_a_corregir=orm.campos_a_corregir,
         zoho_request_id=orm.zoho_request_id,
         ruta_documento_firmado=orm.ruta_documento_firmado,
+        sagrilaft_reporte_id=orm.sagrilaft_reporte_id,
         junta_directiva=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["junta_directiva"][1]) for f in orm.junta_directiva],
         accionistas=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["accionistas"][1]) for f in orm.accionistas],
         beneficiario_final=[_fila_orm_a_dict(f, _TABLAS_LISTA_FORMULARIO["beneficiario_final"][1]) for f in orm.beneficiario_final],
@@ -831,6 +832,15 @@ class RepositorioExpedienteSQLAlchemy:
             # Informa al trigger de auditoría que este cambio viene de la aplicación
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
             orm.estado = estado
+            self._sesion.commit()
+
+    def actualizar_sagrilaft_reporte_id(self, formulario_id: str, reporte_id: str) -> None:
+        """Persiste el ID del reporte de SAGRILAFT para descargas posteriores."""
+        orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
+        if orm and reporte_id:
+            # Informa al trigger de auditoría que este cambio viene de la aplicación
+            self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
+            orm.sagrilaft_reporte_id = reporte_id
             self._sesion.commit()
 
     def actualizar_para_correccion(

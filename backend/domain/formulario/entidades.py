@@ -147,6 +147,7 @@ class FormularioDatos:
     # ── ZohoSign ──────────────────────────────────────────────────────────────
     zoho_request_id: Optional[str] = None
     ruta_documento_firmado: Optional[str] = None
+    sagrilaft_reporte_id: Optional[str] = None
 
     # ── Campos dinámicos JSON (ya deserializados como listas Python) ──────────
     junta_directiva: Optional[Any] = None
