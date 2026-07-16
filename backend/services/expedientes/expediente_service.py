@@ -165,6 +165,7 @@ class ExpedienteService:
             "numero_correccion": formulario.numero_correccion or 0,
             "campos_a_corregir": formulario.campos_a_corregir,
             "causal_cierre":     causal_cierre,
+            "sagrilaft_reporte_id": formulario.sagrilaft_reporte_id,
             "updated_at":        formulario.updated_at,
             "documentos": [
                 {
