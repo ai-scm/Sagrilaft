@@ -9,7 +9,7 @@
  * sensible está contenida exclusivamente en el PDF oficial descargable.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Upload, ShieldCheck, FileText, FileBarChart } from 'lucide-react';
 import './DetalleExpediente.css';
 import '../modals/Modals.css';
@@ -428,6 +428,111 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
   return null;
 }
 
+function ModalSagrilaft({ visible, onConfirmar, onCancelar, ocupado, error, expediente }) {
+  const [datos, setDatos] = useState({
+    tipo_identificacion: expediente?.tipo_identificacion || '',
+    numero_identificacion: expediente?.numero_identificacion || '',
+    nombre_completo: expediente?.razon_social || '',
+    fecha_expedicion: '' // Siempre arranca vacío para que lo digiten
+  });
+
+  // Solo si cambia el expediente actualizamos los valores iniciales.
+  useEffect(() => {
+    if (visible && expediente) {
+      setDatos({
+        tipo_identificacion: expediente.tipo_identificacion || '',
+        numero_identificacion: expediente.numero_identificacion || '',
+        nombre_completo: expediente.razon_social || '',
+        fecha_expedicion: '' 
+      });
+    }
+  }, [visible, expediente]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true">
+      <div className="modal-container" style={{ maxWidth: '460px' }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Consultar SAGRILAFT</h3>
+          <p className="modal-desc">
+            Confirma o edita los datos que se enviarán a la central de riesgo.
+          </p>
+        </div>
+        
+        <div className="modal-body">
+          {error && <Alert mensaje={error} style={{ marginBottom: '16px' }} />}
+          
+          <div className="form-group" style={{ marginBottom: '12px' }}>
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>Tipo de Identificación</label>
+            <input 
+              className="input-base" 
+              type="text"
+              value={datos.tipo_identificacion} 
+              onChange={e => setDatos({...datos, tipo_identificacion: e.target.value})}
+              disabled={ocupado}
+              style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '12px' }}>
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>Número de Identificación</label>
+            <input 
+              className="input-base" 
+              type="text"
+              value={datos.numero_identificacion} 
+              onChange={e => setDatos({...datos, numero_identificacion: e.target.value})}
+              disabled={ocupado}
+              style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '12px' }}>
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>Nombre / Razón Social</label>
+            <input 
+              className="input-base" 
+              type="text"
+              value={datos.nombre_completo} 
+              onChange={e => setDatos({...datos, nombre_completo: e.target.value})}
+              disabled={ocupado}
+              style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="field-label" style={{ display: 'block', marginBottom: '4px' }}>
+              Fecha de Expedición <span style={{ color: '#6b7280', fontSize: '0.85em', fontWeight: 'normal' }}>(dd/mm/yyyy - Obligatorio para CE y PPT)</span>
+            </label>
+            <input 
+              className="input-base" 
+              type="text"
+              placeholder="Ej: 01/12/2017"
+              value={datos.fecha_expedicion} 
+              onChange={e => setDatos({...datos, fecha_expedicion: e.target.value})}
+              disabled={ocupado}
+              style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px' }}
+            />
+          </div>
+        </div>
+
+        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '16px', borderTop: '1px solid #f3f4f6' }}>
+          <button className="btn btn-secondary" onClick={onCancelar} disabled={ocupado} type="button">
+            Cancelar
+          </button>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => onConfirmar(datos)} 
+            disabled={ocupado || !datos.tipo_identificacion || !datos.numero_identificacion || !datos.nombre_completo}
+            type="button"
+          >
+            {ocupado ? 'Consultando...' : 'Verificar en Tusdatos'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalReaperturaActualizacion({ visible, onConfirmar, onCancelar, ocupado, error }) {
   const [justificacion, setJustificacion] = useState('');
   const justificacionValida = justificacion.trim().length >= 20;
@@ -522,6 +627,49 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const [mostrarModalReporteFinal, setMostrarModalReporteFinal] = useState(false);
   const [descargandoTodos, setDescargandoTodos] = useState(false);
 
+  const [verificandoSagrilaft, setVerificandoSagrilaft] = useState(false);
+  const [resultadoSagrilaft, setResultadoSagrilaft] = useState(null);
+  const [mostrarModalSagrilaft, setMostrarModalSagrilaft] = useState(false);
+  
+  const [descargandoCertificado, setDescargandoCertificado] = useState(false);
+  const [errorCertificado, setErrorCertificado] = useState(null);
+
+  async function handleVerificarSagrilaft(datosManuales) {
+    setVerificandoSagrilaft(true);
+    setResultadoSagrilaft(null);
+    try {
+      const res = await api.verificarSagrilaft(formularioId, datosManuales);
+      setResultadoSagrilaft(res);
+      setMostrarModalSagrilaft(false);
+      // Recargar para obtener el reporte_id recién guardado
+      recargarExpediente();
+    } catch (err) {
+      setResultadoSagrilaft({ error: err.message || 'Error de conexión' });
+    } finally {
+      setVerificandoSagrilaft(false);
+    }
+  }
+
+  async function handleDescargarCertificado() {
+    setDescargandoCertificado(true);
+    setErrorCertificado(null);
+    try {
+      const blob = await api.descargarCertificadoSagrilaft(formularioId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sagrilaft_${expediente.codigo_peticion || formularioId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setErrorCertificado(err.message || 'Error al descargar el certificado');
+    } finally {
+      setDescargandoCertificado(false);
+    }
+  }
+
   async function handleDescargarTodos() {
     if (documentosAdjuntos.length === 0 || descargandoTodos) return;
     setDescargandoTodos(true);
@@ -603,6 +751,26 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 )}
                 <button
                   className="btn btn-secondary"
+                  onClick={() => setMostrarModalSagrilaft(true)}
+                  disabled={verificandoSagrilaft}
+                  type="button"
+                >
+                  <ShieldCheck size={16} />
+                  Verificar SAGRILAFT
+                </button>
+                {expediente.sagrilaft_reporte_id && (
+                  <button
+                    className="btn btn-outline"
+                    onClick={handleDescargarCertificado}
+                    disabled={descargandoCertificado}
+                    type="button"
+                    title="Descargar Certificado SAGRILAFT"
+                  >
+                    📄 {descargandoCertificado ? 'Descargando...' : 'Descargar Certificado'}
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary"
                   onClick={() => { if (!estaCerrado) setMostrarModalCargaManual(true); }}
                   disabled={estaCerrado}
                   type="button"
@@ -626,6 +794,25 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               <Alert
                 mensaje={avisoReapertura}
                 style={{ marginBottom: '16px', background: '#fffbeb', borderColor: '#fbbf24', color: '#92400e' }}
+              />
+            )}
+            
+            {errorCertificado && (
+              <Alert
+                mensaje={errorCertificado}
+                style={{ marginBottom: '16px', background: '#fef2f2', borderColor: '#f87171', color: '#b91c1c' }}
+              />
+            )}
+
+            {resultadoSagrilaft && (
+              <Alert
+                mensaje={`SAGRILAFT: ${resultadoSagrilaft.estado || resultadoSagrilaft.error}. ${resultadoSagrilaft.riesgo ? `Riesgo: ${resultadoSagrilaft.riesgo}.` : ''} ${resultadoSagrilaft.detalles || ''}`}
+                style={{ 
+                  marginBottom: '16px', 
+                  background: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#ecfdf5' : '#fef2f2', 
+                  borderColor: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#10b981' : '#ef4444', 
+                  color: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#065f46' : '#991b1b' 
+                }}
               />
             )}
 
@@ -771,6 +958,18 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
           </>
         )}
       </div>
+
+      <ModalSagrilaft 
+        visible={mostrarModalSagrilaft}
+        ocupado={verificandoSagrilaft}
+        expediente={expediente}
+        error={resultadoSagrilaft?.error}
+        onConfirmar={handleVerificarSagrilaft}
+        onCancelar={() => {
+          setMostrarModalSagrilaft(false);
+          setResultadoSagrilaft(null);
+        }}
+      />
     </div>
   );
 }

@@ -165,6 +165,30 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}/deshacer-devolucion`, { method: 'POST' });
   },
 
+  async verificarSagrilaft(formularioId, datosManuales = null) {
+    const options = { method: 'POST' };
+    if (datosManuales) {
+      options.headers = { 'Content-Type': 'application/json' };
+      options.body = JSON.stringify(datosManuales);
+    }
+    return requestJson(`/expedientes/${formularioId}/verificar-sagrilaft`, options);
+  },
+
+  async descargarCertificadoSagrilaft(formularioId) {
+    const token = await getToken();
+    const response = await fetch(`${API_BASE}/expedientes/${formularioId}/sagrilaft/pdf`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error descargando certificado: ${response.status} - ${errorText}`);
+    }
+    return response.blob();
+  },
+
   async enviarAFirma(formularioId) {
     return requestJson(`/expedientes/${formularioId}/enviar-a-firma`, {
       method: 'POST',
