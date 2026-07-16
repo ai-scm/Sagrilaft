@@ -25,6 +25,7 @@ from api.schemas import (
     FormularioUpdate,
     FechaServidorResponse,
     ResultadoValidacionEnvio,
+    SolicitudEnvioFormulario,
 )
 from api.limitador import limitador
 from api.transformadores import construir_respuesta_documento
@@ -131,7 +132,7 @@ def actualizar_formulario(
 def enviar_formulario(
     request: Request,
     formulario_id: str,
-    credenciales: Optional[CredencialesEnvioFormulario] = Body(None),
+    solicitud: Optional[SolicitudEnvioFormulario] = Body(None),
     servicio_acceso: AccesoManualService = Depends(obtener_servicio_acceso),
     servicio: FormularioService = Depends(obtener_servicio_formulario),
 ) -> ResultadoValidacionEnvio:
@@ -143,6 +144,9 @@ def enviar_formulario(
     
     Requisito: el destinatario debe haber registrado su correo electrónico.
     """
+    credenciales = solicitud.credenciales if solicitud else None
+    alertas = solicitud.alertas_ignoradas if solicitud else []
+
     servicio_acceso.verificar_credenciales_si_aplica(
         formulario_id,
         token=credenciales.token_diligenciamiento if credenciales else None,
@@ -155,7 +159,7 @@ def enviar_formulario(
     if not actor_id or not actor_id.strip():
         raise CorreoDestinatarioNoRegistradoError(formulario_id)
     
-    resultado_dominio = servicio.enviar(formulario_id, actor_id=actor_id)
+    resultado_dominio = servicio.enviar(formulario_id, actor_id=actor_id, alertas=alertas)
     if resultado_dominio.valido and credenciales is not None:
         # Si el formulario tiene AccesoManual, dejar evidencia consistente de consumo
         # independientemente del tipo de credencial usada (token o código+PIN).

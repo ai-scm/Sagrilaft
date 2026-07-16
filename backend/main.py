@@ -30,6 +30,8 @@ from domain.excepciones import (
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
     WebhookTokenInvalidoError,
+    AccesoActivoExistenteError,
+    FrecuenciaEnvioExcedidaError,
 )
 from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
@@ -62,13 +64,15 @@ _VERSION_SERVICIO = "2.0.0"
 _ESTADO = 'activo'
 _MODO_IA = 'bedrock'
 
-def _respuesta_error(status_code: int, detalle: str, *, hint: str | None = None) -> JSONResponse:
+def _respuesta_error(status_code: int, detalle: str, *, hint: str | None = None, adiciones: dict = None) -> JSONResponse:
     contenido = {
         "detail": detalle,
         "referencia": request_id_context.get()
     }
     if hint is not None:
         contenido["hint"] = hint
+    if adiciones:
+        contenido.update(adiciones)
     return JSONResponse(status_code=status_code, content=contenido)
 
 
@@ -137,6 +141,16 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
 
         return _inner
 
+    def handler_acceso_existente():
+        def _inner(_: Request, exc: AccesoActivoExistenteError) -> JSONResponse:
+            return _respuesta_error(409, str(exc), adiciones={"acceso_id": exc.acceso_id})
+        return _inner
+
+    def handler_frecuencia_excedida():
+        def _inner(_: Request, exc: FrecuenciaEnvioExcedidaError) -> JSONResponse:
+            return _respuesta_error(429, str(exc), adiciones={"segundos_restantes": exc.segundos_restantes})
+        return _inner
+
     def _ip(req: Request) -> str:
         return req.client.host if req.client else "unknown"
 
@@ -169,6 +183,8 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
     app.add_exception_handler(AccesoExpiradoError,                handler_from_exception(410))
     app.add_exception_handler(CorreoDestinatarioNoRegistradoError, handler_from_exception(400))
     app.add_exception_handler(CorreoDestinatarioVacioError, handler_from_exception(400))
+    app.add_exception_handler(AccesoActivoExistenteError, handler_acceso_existente())
+    app.add_exception_handler(FrecuenciaEnvioExcedidaError, handler_frecuencia_excedida())
     app.add_exception_handler(
         DependenciaPdfNoInstaladaError,
         handler_from_exception_with_hint(

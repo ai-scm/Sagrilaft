@@ -179,6 +179,7 @@ class AccesoManualDatos:
     consumed_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
+    ultimo_envio_correo: Optional[datetime] = None
     estado_formulario: str = ""
     codigo_peticion: str = ""
 

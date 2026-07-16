@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona, TipoSolicitud
 from domain.catalogo_correcciones import validar_campos_corregibles
+from .formularios import AlertaInconsistenciaResponse
 
 from .comunes import a_iso_utc
 
@@ -72,6 +73,7 @@ class ExpedienteDetalle(BaseModel):
     causal_cierre: Optional[str] = None
     updated_at: datetime
     documentos: List[DocumentoResumen] = Field(default_factory=list)
+    alertas_inconsistencia: List[AlertaInconsistenciaResponse] = Field(default_factory=list)
 
     @field_serializer("updated_at", when_used="json")
     def _serializar_fecha(self, valor: datetime) -> str:
@@ -193,3 +195,8 @@ class ResumenReaperturaActualizacion(BaseModel):
     modo_trabajo: str
     correo_notificado: Optional[str] = None
     correo_enviado: bool = False
+
+class SolicitudAuditoriaAlerta(BaseModel):
+    estado_auditoria: str = Field(
+        description="Nuevo estado de la alerta: FALSO_POSITIVO_IA, CORREGIDO, RIESGO_ACEPTADO, PENDIENTE"
+    )

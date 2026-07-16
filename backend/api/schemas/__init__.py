@@ -31,6 +31,7 @@ from .formularios import (
     ReferenciaBancaria,
     ReferenciaComercial,
     ResultadoValidacionEnvio,
+    SolicitudEnvioFormulario,
 )
 from .expedientes import (
     ComparacionVersionFormulario,
@@ -43,6 +44,7 @@ from .expedientes import (
     SolicitudDevolucion,
     SolicitudReaperturaActualizacion,
     SolicitudRechazo,
+    SolicitudAuditoriaAlerta,
 )
 from .listas_cautela import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
 from .validaciones import ValidacionResponse
@@ -76,6 +78,7 @@ __all__ = [
     "ReferenciaBancaria",
     "ReferenciaComercial",
     "ResultadoValidacionEnvio",
+    "SolicitudEnvioFormulario",
     # Expedientes
     "ExpedienteDetalle",
     "ExpedienteResumen",
@@ -87,6 +90,7 @@ __all__ = [
     "SolicitudDevolucion",
     "SolicitudReaperturaActualizacion",
     "SolicitudRechazo",
+    "SolicitudAuditoriaAlerta",
     # Listas de cautela
     "BusquedaListaCautela",
     "RespuestaListaCautela",

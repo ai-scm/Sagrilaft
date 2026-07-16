@@ -274,7 +274,7 @@ class FormularioResponse(FormularioBase):
 class FormularioConDetalles(FormularioResponse):
     documentos: List[DocumentoResponse] = Field(default_factory=list)
     validaciones: List[ValidacionResponse] = Field(default_factory=list)
-
+    alertas_inconsistencia: List[AlertaInconsistenciaResponse] = Field(default_factory=list)
 
 class ResultadoValidacionEnvio(BaseModel):
     valido: bool
@@ -291,3 +291,31 @@ class CredencialesEnvioFormulario(BaseModel):
     token_diligenciamiento: Optional[str] = None
     codigo_peticion: Optional[str] = None
     pin: Optional[str] = None
+
+class AlertaInconsistenciaBase(BaseModel):
+    tipo_campo: str
+    nombre_documento: str
+    valor_formulario: Optional[str] = None
+    valor_documento: Optional[str] = None
+    seccion_referencia: Optional[str] = None
+
+class AlertaInconsistenciaCreate(AlertaInconsistenciaBase):
+    pass
+
+class AlertaInconsistenciaResponse(AlertaInconsistenciaBase):
+    id: str
+    formulario_id: str
+    estado_auditoria: str
+    actualizado_por: Optional[str] = None
+    fecha_creacion: datetime
+
+    class Config:
+        from_attributes = True
+
+    @field_serializer("fecha_creacion", when_used="json")
+    def _serializar_fechas(self, valor: datetime) -> str:
+        return a_iso_utc(valor) or ""
+
+class SolicitudEnvioFormulario(BaseModel):
+    credenciales: Optional[CredencialesEnvioFormulario] = None
+    alertas_ignoradas: List[AlertaInconsistenciaCreate] = Field(default_factory=list)

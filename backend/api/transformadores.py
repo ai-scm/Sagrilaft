@@ -58,4 +58,6 @@ def construir_respuesta_documento(
         alerta_numero_doc_representante=serializar_alerta(resultado.alerta_numero_doc_representante),
         direccion_extraida=resultado.direccion_extraida,
         alerta_direccion=serializar_alerta(resultado.alerta_direccion),
+        extraccion_exitosa=resultado.extraccion_exitosa,
+        mensaje_extraccion=resultado.mensaje_extraccion,
     )

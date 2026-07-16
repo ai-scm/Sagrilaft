@@ -119,6 +119,7 @@ function _adaptarRespuestaServidor(formulario, borradorLocal = null) {
     referenciasBancarias: formulario.referencias_bancarias ?? [],
     infoBancariaPagos: formulario.informacion_bancaria_pagos ?? [],
     documentos,
+    alertasInconsistencia: formulario.alertas_inconsistencia ?? [],
   };
 }
 
@@ -129,7 +130,7 @@ export function useRecuperacionSesion(setters) {
     setTablasOriginales,
     setJuntaDirectiva, setAccionistas, setBeneficiarios,
     setReferenciasComerciales, setReferenciasBancarias,
-    setInfoBancariaPagos, setDocumentos,
+    setInfoBancariaPagos, setDocumentos, setAlertasServidor,
   } = setters;
 
   const { snapshotInicial, credencialesRef, cerrarSesion } = useDiligenciamiento();
@@ -163,13 +164,14 @@ export function useRecuperacionSesion(setters) {
     setReferenciasBancarias(snapshot_recuperar_sesion.referenciasBancarias?.length > 0 ? snapshot_recuperar_sesion.referenciasBancarias : [{}, {}]);
     setInfoBancariaPagos(snapshot_recuperar_sesion.infoBancariaPagos?.length > 0 ? snapshot_recuperar_sesion.infoBancariaPagos : [{}, {}]);
     setDocumentos(snapshot_recuperar_sesion.documentos ?? {});
+    setAlertasServidor(snapshot_recuperar_sesion.alertasInconsistencia ?? []);
   }, [
     setFormData, setStep, setFormularioId, setCodigoPeticion,
     setEstadoFormulario, setCamposACorregir, setFormDataOriginal,
     setTablasOriginales,
     setJuntaDirectiva, setAccionistas, setBeneficiarios,
     setReferenciasComerciales, setReferenciasBancarias,
-    setInfoBancariaPagos, setDocumentos,
+    setInfoBancariaPagos, setDocumentos, setAlertasServidor,
   ]);
 
   const restaurarDesdeSnapshotRef = useRef(_restaurarDesdeSnapshot);

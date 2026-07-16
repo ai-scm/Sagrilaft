@@ -68,7 +68,11 @@ export async function requestJson(path, options = {}) {
     if (res.status === 401 && _onAuthError) {
       _onAuthError();
     }
-    const err = new Error(await leerDetalleError(res));
+    const err = new Error();
+    try {
+      err.data = await res.clone().json();
+    } catch (e) {}
+    err.message = await leerDetalleError(res);
     err.status = res.status;
     throw err;
   }

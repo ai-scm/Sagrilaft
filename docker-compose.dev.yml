@@ -6,7 +6,7 @@
 # recarga automática de código y servidor web ligero.
 #
 # Cómo levantarlo:
-#   docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
 # Lo que cambia respecto a producción:
 #   - La base de datos corre aquí (en producción usa RDS de AWS)
@@ -74,7 +74,7 @@ services:
       # Este segundo volumen evita que el montaje anterior borre la carpeta
       # uploads que el contenedor crea internamente. Sin esto, los archivos
       # subidos durante la sesión desaparecerían al reiniciar.
-      - ./uploads:/app/uploads
+      - ./backend/uploads:/app/uploads
 
     # En desarrollo reemplazamos el comando de arranque normal (que incluye
     # comprobaciones de producción) por uno más simple:
@@ -225,7 +225,7 @@ services:
   #   PORTAL_AUTH_DISABLED=true  → el backend no exige token
   #   VITE_KEYCLOAK_URL vacío    → el frontend no redirige al login
   #
-  # Para activarlo completamente, define en tu .env.dev:
+  # Para activarlo completamente, define en tu .env:
   #   KEYCLOAK_URL=http://keycloak:8080
   #   VITE_KEYCLOAK_URL=http://localhost:8080
   #   PORTAL_AUTH_DISABLED=false   (o elimina esa línea)

@@ -109,6 +109,7 @@ export function useFormulario() {
   const [estadoFormulario, setEstadoFormulario] = useState(null);
   const [camposACorregir, setCamposACorregir] = useState(null);
   const [documentos, setDocumentos] = useState({});
+  const [alertasServidor, setAlertasServidor] = useState([]);
   const [formDataOriginal, setFormDataOriginal] = useState(null);
   const [tablasOriginales, setTablasOriginales] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -126,7 +127,8 @@ export function useFormulario() {
     alertasNumeroDocRepresentante,
     alertasDireccion,
     hayAlertasActivas,
-  } = useAlertasInconsistencia(documentos, formData);
+    todasLasAlertasActivas,
+  } = useAlertasInconsistencia(documentos, formData, alertasServidor);
 
   const {
     juntaDirectiva, setJuntaDirectiva,
@@ -177,7 +179,7 @@ export function useFormulario() {
     setTablasOriginales,
     setJuntaDirectiva, setAccionistas, setBeneficiarios,
     setReferenciasComerciales, setReferenciasBancarias,
-    setInfoBancariaPagos, setDocumentos,
+    setInfoBancariaPagos, setDocumentos, setAlertasServidor,
   };
 
   const { lastSaved, limpiarBorrador, guardarBorradorLocal } = useFormPersistencia(
@@ -319,6 +321,9 @@ export function useFormulario() {
       setDocumentos(prev => ({ ...prev, [tipoDoc]: docRes }));
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
+      }
+      if (!docRes.extraccion_exitosa) {
+        alert(`El documento se subió correctamente, pero ocurrió un error al analizarlo con IA:\n${docRes.mensaje_extraccion || 'Timeout en el servidor'}\nPor favor, valide e ingrese la información manualmente.`);
       }
     } catch (err) {
       console.error(`Error subiendo ${tipoDoc}:`, err);
@@ -570,7 +575,7 @@ export function useFormulario() {
     try {
       const credenciales = recuperacion.credencialesRef?.current ?? null;
       const id = await _sincronizarConServidor();
-      await api.enviarFormulario(id, credenciales);
+      await api.enviarFormulario(id, credenciales, todasLasAlertasActivas);
       limpiarBorrador();
       setSubmitted(true);
     } catch (err) {
@@ -619,5 +624,6 @@ export function useFormulario() {
     alertasNumeroDocRepresentante,
     alertasDireccion,
     hayAlertasActivas,
+    todasLasAlertasActivas,
   };
 }

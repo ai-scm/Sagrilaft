@@ -33,12 +33,19 @@ export const api = {
     });
   },
 
-  async enviarFormulario(id, credenciales = null) {
-    const opciones = { method: 'POST' };
+  async enviarFormulario(id, credenciales = null, alertasIgnoradas = []) {
+    const payload = {
+      alertas_ignoradas: alertasIgnoradas,
+    };
     if (credenciales) {
-      opciones.headers = { 'Content-Type': 'application/json' };
-      opciones.body = JSON.stringify(credenciales);
+      payload.credenciales = credenciales;
     }
+    const opciones = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    };
+    
     const resultado = await requestJson(`/formularios/${id}/enviar`, opciones);
     if (!resultado.valido) {
       const detalle = resultado.errores?.map(e => e.mensaje).join('\n') ?? 'El formulario no pudo enviarse';
