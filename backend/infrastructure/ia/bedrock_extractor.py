@@ -7,10 +7,16 @@ con las llamadas síncronas de boto3.
 """
 
 import asyncio
+import io
 import json
 import logging
 import mimetypes
+import os
 from typing import Any, Dict, Tuple
+
+import boto3
+from botocore.config import Config
+from pypdf import PdfReader, PdfWriter
 
 from domain.contratos import ResultadoExtraccion
 from domain.utils.mapeo_campos import mapear_campos_para_formulario
@@ -129,16 +135,17 @@ class ExtractorBedrock:
     # Claude Sonnet puede tardar entre 30 y 90 s en documentos complejos.
     # El valor debe ser menor al idleTimeout del ALB (60s típicamente) para que la
     # respuesta de error de boto3 llegue antes de que el gateway corte la conexión.
-    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 45
+    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 90
 
     def __init__(self, region: str, modelo_id: str, max_tokens: int = 4096) -> None:
-        import boto3
-        from botocore.config import Config
 
         configuracion_cliente = Config(
             connect_timeout=10,
             read_timeout=self._TIMEOUT_LECTURA_BEDROCK_SEGUNDOS,
-            retries={"max_attempts": 0},  # sin reintentos automáticos — el caller decide
+            retries={
+                "max_attempts": 3,
+                "mode": "standard"  # Maneja cuotas (429) y fallas transitorias de IA con backoff
+            },
         )
         self._cliente = boto3.client(
             "bedrock-runtime",
@@ -282,22 +289,71 @@ class ExtractorBedrock:
             }
         }
 
-    @staticmethod
-    def _leer_archivo(ruta_archivo: str) -> Tuple[bytes, str]:
+    @classmethod
+    def _leer_archivo(cls, ruta_archivo: str) -> Tuple[bytes, str]:
         """
         Lee el contenido binario de un archivo y determina su tipo MIME.
-
-        Returns:
-            Tupla (contenido_bytes, tipo_mime).
+        Optimiza los documentos PDF reduciendo su tamaño.
         """
-        with open(ruta_archivo, "rb") as archivo:
-            contenido = archivo.read()
+        tipo_mime = cls._determinar_tipo_mime(ruta_archivo)
 
-        tipo_mime, _ = mimetypes.guess_type(ruta_archivo)
-        if tipo_mime is None:
-            tipo_mime = "application/pdf"
+        if tipo_mime == "application/pdf":
+            contenido = cls._obtener_pdf_optimizado(ruta_archivo)
+        else:
+            with open(ruta_archivo, "rb") as archivo:
+                contenido = archivo.read()
 
         return contenido, tipo_mime
+
+    @staticmethod
+    def _determinar_tipo_mime(ruta_archivo: str) -> str:
+        """Determina el tipo MIME basándose en la extensión del archivo."""
+        tipo_mime, _ = mimetypes.guess_type(ruta_archivo)
+        if tipo_mime is None:
+            return "application/pdf" if ruta_archivo.lower().endswith('.pdf') else "application/octet-stream"
+        return tipo_mime
+
+    @classmethod
+    def _obtener_pdf_optimizado(cls, ruta_archivo: str, max_paginas: int = 7) -> bytes:
+        """Devuelve el PDF recortado si excede el límite, o el original si hay error."""
+        try:
+            return cls._recortar_primeras_paginas_pdf(ruta_archivo, max_paginas)
+        except Exception as error:
+            logger.warning(
+                "No se pudo optimizar el PDF %s (%s). Se usará el original completo.",
+                os.path.basename(ruta_archivo),
+                str(error),
+            )
+            with open(ruta_archivo, "rb") as archivo:
+                return archivo.read()
+
+    @staticmethod
+    def _recortar_primeras_paginas_pdf(ruta_archivo: str, max_paginas: int) -> bytes:
+        """
+        Lee el PDF y recorta las primeras páginas.
+        Lanza excepción si pypdf no está disponible o el archivo es inválido.
+        """
+        reader = PdfReader(ruta_archivo)
+        total_paginas = len(reader.pages)
+
+        if total_paginas <= max_paginas:
+            with open(ruta_archivo, "rb") as archivo:
+                return archivo.read()
+
+        logger.info(
+            "Optimizando PDF %s: Recortando de %d a %d páginas para extracción IA.",
+            os.path.basename(ruta_archivo),
+            total_paginas,
+            max_paginas,
+        )
+        
+        writer = PdfWriter()
+        for i in range(max_paginas):
+            writer.add_page(reader.pages[i])
+
+        buffer_salida = io.BytesIO()
+        writer.write(buffer_salida)
+        return buffer_salida.getvalue()
 
     @staticmethod
     def _parsear_respuesta_json(texto: str) -> Dict[str, Any]:
