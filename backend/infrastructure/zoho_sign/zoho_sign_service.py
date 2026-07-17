@@ -37,6 +37,46 @@ class ZohoSignService:
         self._access_token: str | None = None
         self._token_expiry: datetime = datetime.min.replace(tzinfo=timezone.utc)
 
+    def _ejecutar_peticion_con_reintentos(self, metodo: str, url: str, **kwargs) -> httpx.Response:
+        """
+        Envuelve las llamadas HTTP a Zoho Sign aportando resiliencia.
+        Maneja errores de límite de tasa (429) y fallas transitorias (5xx) 
+        usando un esquema de Backoff Exponencial.
+        """
+        import time
+        max_intentos = 3
+        espera = 1.0
+        
+        for intento in range(1, max_intentos + 1):
+            try:
+                resp = httpx.request(metodo, url, **kwargs)
+                # Forzar excepción si la respuesta es de tipo falla transitoria para poder reintentar
+                if resp.status_code in (429, 502, 503, 504):
+                    resp.raise_for_status()
+                return resp
+            except httpx.HTTPStatusError as e:
+                if intento < max_intentos and e.response.status_code in (429, 502, 503, 504):
+                    logger.warning(
+                        "Resiliencia API: Falla transitoria (HTTP %d) en ZohoSign. Reintento %d/%d en %.1fs...",
+                        e.response.status_code, intento, max_intentos, espera
+                    )
+                    time.sleep(espera)
+                    espera *= 2
+                    continue
+                raise
+            except httpx.RequestError as e:
+                if intento < max_intentos:
+                    logger.warning(
+                        "Resiliencia API: Falla de red (%s) hacia ZohoSign. Reintento %d/%d en %.1fs...",
+                        type(e).__name__, intento, max_intentos, espera
+                    )
+                    time.sleep(espera)
+                    espera *= 2
+                    continue
+                raise
+        
+        raise RuntimeError("Inalcanzable")
+
     # ─── Token management ─────────────────────────────────────────────────────
 
     def _obtener_token(self) -> str:
@@ -45,7 +85,8 @@ class ZohoSignService:
             return self._access_token
 
         logger.info("Refrescando access token de ZohoSign")
-        resp = httpx.post(
+        resp = self._ejecutar_peticion_con_reintentos(
+            "POST",
             _TOKEN_URL,
             data={
                 "grant_type":    "refresh_token",
@@ -131,7 +172,8 @@ class ZohoSignService:
                 ("file", (p.name, stack.enter_context(open(p, "rb")), "application/pdf"))
                 for p in pdf_paths
             ]
-            resp_crear = httpx.post(
+            resp_crear = self._ejecutar_peticion_con_reintentos(
+                "POST",
                 f"{_API_BASE}/requests",
                 headers=self._headers(),
                 params=params,
@@ -172,7 +214,8 @@ class ZohoSignService:
 
         logger.info("Paso 2/2 ZohoSign — enviando paquete a firma: request_id=%s", request_id)
 
-        resp_enviar = httpx.post(
+        resp_enviar = self._ejecutar_peticion_con_reintentos(
+            "POST",
             f"{_API_BASE}/requests/{request_id}/submit",
             headers=self._headers(),
             params=params,
@@ -211,7 +254,8 @@ class ZohoSignService:
         if self._config.modo_prueba:
             logger.info("ZohoSign sandbox: cancelando solicitud real request_id=%s", request_id)
 
-        resp = httpx.post(
+        resp = self._ejecutar_peticion_con_reintentos(
+            "POST",
             f"{_API_BASE}/requests/{request_id}/recall",
             headers=self._headers(),
             timeout=15,
@@ -234,7 +278,8 @@ class ZohoSignService:
         if self._config.modo_prueba:
             logger.info("ZohoSign sandbox: consultando estado real request_id=%s", request_id)
 
-        resp = httpx.get(
+        resp = self._ejecutar_peticion_con_reintentos(
+            "GET",
             f"{_API_BASE}/requests/{request_id}",
             headers=self._headers(),
             timeout=15,
@@ -278,7 +323,8 @@ class ZohoSignService:
             )
 
         # Descargar el documento firmado (con certificado de completado)
-        resp_archivo = httpx.get(
+        resp_archivo = self._ejecutar_peticion_con_reintentos(
+            "GET",
             f"{_API_BASE}/requests/{request_id}/pdf",
             params={"merge": "true", "with_coc": "true"},
             headers=self._headers(),
