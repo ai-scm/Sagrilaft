@@ -79,8 +79,8 @@ class FirmaService:
 
     # ─── Helpers internos ─────────────────────────────────────────────────────
 
-    def _obtener_formulario(self, formulario_id: str) -> FormularioDatos:
-        formulario = self._repo.obtener_formulario(formulario_id)
+    def _obtener_formulario(self, formulario_id: str, bloquear: bool = False) -> FormularioDatos:
+        formulario = self._repo.obtener_formulario(formulario_id, bloquear=bloquear)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         return formulario
@@ -130,7 +130,7 @@ class FirmaService:
         4. Envía ambos PDFs a ZohoSign.
         5. Actualiza el estado a PENDIENTE_FIRMA.
         """
-        formulario = self._obtener_formulario(formulario_id)
+        formulario = self._obtener_formulario(formulario_id, bloquear=True)
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.iniciar_firma()  # VALIDADO → PENDIENTE_FIRMA; lanza FormularioNoEditableError si no aplica
 
@@ -216,7 +216,7 @@ class FirmaService:
             logger.warning("Webhook ZohoSign sin request_id — ignorado")
             return
 
-        formulario = self._repo.obtener_formulario_por_zoho_id(request_id)
+        formulario = self._repo.obtener_formulario_por_zoho_id(request_id, bloquear=True)
         if not formulario:
             logger.info("Webhook ZohoSign: request_id=%s no corresponde a ningún formulario", request_id)
             return
@@ -293,7 +293,7 @@ class FirmaService:
     # ─── Cancelación de firma ────────────────────────────────────────────────
 
     def cancelar_firma(self, formulario_id: str, actor_id: Optional[str] = None) -> dict:
-        formulario = self._obtener_formulario(formulario_id)
+        formulario = self._obtener_formulario(formulario_id, bloquear=True)
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.cancelar_firma()  # PENDIENTE_FIRMA → VALIDADO; lanza FormularioNoEditableError si no aplica
 
@@ -322,7 +322,7 @@ class FirmaService:
     # ─── Verificación manual de estado ───────────────────────────────────────
 
     def verificar_estado_firma(self, formulario_id: str) -> dict:
-        formulario = self._obtener_formulario(formulario_id)
+        formulario = self._obtener_formulario(formulario_id, bloquear=True)
 
         if formulario.estado != EstadoFormulario.PENDIENTE_FIRMA:
             raise FormularioNoEditableError(

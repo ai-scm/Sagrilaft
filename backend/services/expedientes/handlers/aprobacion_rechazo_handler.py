@@ -193,7 +193,7 @@ class AprobacionRechazoHandler:
         contrapartes_permitidas: Optional[List[str]],
     ) -> Any:
         """Busca un formulario en estado expediente validando contrapartes."""
-        formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE)
+        formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE, bloquear=True)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         if contrapartes_permitidas is not None and formulario.tipo_contraparte not in contrapartes_permitidas:

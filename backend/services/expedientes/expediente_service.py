@@ -96,8 +96,9 @@ class ExpedienteService:
         self,
         formulario_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
+        bloquear: bool = False,
     ):
-        formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE)
+        formulario = self._repo.obtener(formulario_id, _ESTADOS_EXPEDIENTE, bloquear=bloquear)
         if not formulario:
             raise FormularioNoEncontradoError(formulario_id)
         if contrapartes_permitidas is not None and formulario.tipo_contraparte not in contrapartes_permitidas:
@@ -267,7 +268,7 @@ class ExpedienteService:
         if causal_cierre != CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS:
             raise ValueError("El informe final en PDF es obligatorio para esta causal de cierre.")
 
-        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas, bloquear=True)
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.cerrar_con_reporte()
@@ -298,7 +299,7 @@ class ExpedienteService:
         actor_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas, bloquear=True)
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.reabrir_por_actualizacion()
@@ -419,7 +420,7 @@ class ExpedienteService:
         contrapartes_permitidas: Optional[List[str]] = None,
         actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas, bloquear=True)
         self._repo.actualizar_estado_alerta(formulario_id, alerta_id, estado_auditoria, actor_id or "SISTEMA")
         self._registrar_evento_ciclo_vida(
             formulario_id=formulario_id,

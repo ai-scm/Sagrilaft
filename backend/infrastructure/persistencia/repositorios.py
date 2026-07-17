@@ -770,15 +770,17 @@ class RepositorioExpedienteSQLAlchemy:
         orms = consulta.order_by(Formulario.updated_at.desc()).all()
         return [_orm_formulario_a_datos(orm) for orm in orms]
 
-    def obtener(self, formulario_id: str, estados: List[Any]) -> Optional[FormularioDatos]:
-        orm = (
+    def obtener(self, formulario_id: str, estados: List[Any], bloquear: bool = False) -> Optional[FormularioDatos]:
+        consulta = (
             self._sesion.query(Formulario)
             .filter(
                 Formulario.id == formulario_id,
                 Formulario.estado.in_(estados),
             )
-            .first()
         )
+        if bloquear:
+            consulta = consulta.with_for_update()
+        orm = consulta.first()
         return _orm_formulario_a_datos(orm, cargar_relaciones=True) if orm else None
 
     def buscar_documento_descargable(
@@ -926,20 +928,24 @@ class RepositorioFirmaSQLAlchemy:
     def __init__(self, sesion: Session) -> None:
         self._sesion = sesion
 
-    def obtener_formulario(self, formulario_id: str) -> Optional[FormularioDatos]:
-        orm = (
+    def obtener_formulario(self, formulario_id: str, bloquear: bool = False) -> Optional[FormularioDatos]:
+        consulta = (
             self._sesion.query(Formulario)
             .filter(Formulario.id == formulario_id)
-            .first()
         )
+        if bloquear:
+            consulta = consulta.with_for_update()
+        orm = consulta.first()
         return _orm_formulario_a_datos(orm) if orm else None
 
-    def obtener_formulario_por_zoho_id(self, request_id: str) -> Optional[FormularioDatos]:
-        orm = (
+    def obtener_formulario_por_zoho_id(self, request_id: str, bloquear: bool = False) -> Optional[FormularioDatos]:
+        consulta = (
             self._sesion.query(Formulario)
             .filter(Formulario.zoho_request_id == request_id)
-            .first()
         )
+        if bloquear:
+            consulta = consulta.with_for_update()
+        orm = consulta.first()
         return _orm_formulario_a_datos(orm) if orm else None
 
     def obtener_pdf(self, formulario_id: str) -> Optional[DocumentoDatos]:
