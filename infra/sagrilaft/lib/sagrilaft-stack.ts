@@ -14,6 +14,8 @@ import { LoadBalancer } from './constructs/load-balancer';
 import { Ecr } from './constructs/ecr';
 import { ConfigParameters } from './constructs/config-parameters';
 import { EcsFargate } from './constructs/ecs-fargate';
+import { CortafuegosWeb } from './constructs/cortafuegos-web';
+import { ObservabilidadAlarmas } from './constructs/observabilidad-alarmas';
 import { DEFAULT_BEDROCK_MODEL_ID } from './deployment-constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +65,7 @@ export class SagrilaftStack extends cdk.Stack {
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '1');
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
@@ -158,6 +160,17 @@ export class SagrilaftStack extends cdk.Stack {
       dominio,
       dominioPortal,
       dominioKeycloak,
+    });
+
+    const cortafuegos = new CortafuegosWeb(this, 'CortafuegosWeb', {
+      arnBalanceadorCarga: lb.alb.loadBalancerArn,
+    });
+
+    const alarmas = new ObservabilidadAlarmas(this, 'AlarmasCriticas', {
+      balanceadorCarga: lb.alb,
+      servicioBackend: ecsFargate.backend.service,
+      topicAlertas: notifications.alertasTopic,
+      ambiente,
     });
 
     if (hostedZone) {
