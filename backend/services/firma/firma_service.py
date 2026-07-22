@@ -174,10 +174,6 @@ class FirmaService:
                     ruta_certificado.unlink()
                     logger.debug("Certificado temporal eliminado: %s", ruta_certificado)
 
-        self._repo.actualizar_formulario(formulario_id, {
-            "zoho_request_id": resultado.request_id,
-            "estado":          dominio.estado.value,
-        })
         self._registrar(EventoAuditoria(
             formulario_id=formulario_id,
             tipo_evento=TipoEvento.FIRMA_INICIADA,
@@ -186,6 +182,10 @@ class FirmaService:
             actor_id=actor_id,
             actor_tipo=ActorTipo.OPERADOR,
         ))
+        self._repo.actualizar_formulario(formulario_id, {
+            "zoho_request_id": resultado.request_id,
+            "estado":          dominio.estado.value,
+        })
         self._alertar(TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA, formulario)
 
         logger.info(
@@ -252,10 +252,6 @@ class FirmaService:
             key_guardado = str(Path(key_destino).with_suffix(ruta_local.suffix))
             self._storage.guardar_desde_archivo_local(key_guardado, ruta_local)
 
-        self._repo.actualizar_formulario(formulario.id, {
-            "ruta_documento_firmado": key_guardado,
-            "estado":                 dominio.estado.value,
-        })
         self._registrar(EventoAuditoria(
             formulario_id=formulario.id,
             tipo_evento=TipoEvento.FIRMA_COMPLETADA,
@@ -264,6 +260,10 @@ class FirmaService:
             actor_id=request_id,
             actor_tipo=ActorTipo.SISTEMA,
         ))
+        self._repo.actualizar_formulario(formulario.id, {
+            "ruta_documento_firmado": key_guardado,
+            "estado":                 dominio.estado.value,
+        })
         self._alertar(TipoAlerta.FORMULARIO_FIRMADO, formulario)
 
         logger.info("Formulario %s → FIRMADO. Key: %s", formulario.id, key_guardado)
@@ -272,10 +272,6 @@ class FirmaService:
     def _procesar_firma_cancelada(self, formulario: FormularioDatos, request_id: str, status: str) -> str:
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.cancelar_firma()  # PENDIENTE_FIRMA → VALIDADO; lanza FormularioNoEditableError si no aplica
-        self._repo.actualizar_formulario(formulario.id, {
-            "estado":          dominio.estado.value,
-            "zoho_request_id": None,
-        })
         self._registrar(EventoAuditoria(
             formulario_id=formulario.id,
             tipo_evento=TipoEvento.FIRMA_CANCELADA,
@@ -284,6 +280,10 @@ class FirmaService:
             actor_id=request_id,
             actor_tipo=ActorTipo.SISTEMA,
         ))
+        self._repo.actualizar_formulario(formulario.id, {
+            "estado":          dominio.estado.value,
+            "zoho_request_id": None,
+        })
         logger.info(
             "Formulario %s devuelto a VALIDADO (ZohoSign status='%s', request_id=%s)",
             formulario.id, status, request_id,
@@ -303,10 +303,6 @@ class FirmaService:
             )
 
         self._zoho.cancelar_solicitud_firma(formulario.zoho_request_id)
-        self._repo.actualizar_formulario(formulario_id, {
-            "estado":          dominio.estado.value,
-            "zoho_request_id": None,
-        })
         self._registrar(EventoAuditoria(
             formulario_id=formulario_id,
             tipo_evento=TipoEvento.FIRMA_CANCELADA,
@@ -315,6 +311,10 @@ class FirmaService:
             actor_id=actor_id,
             actor_tipo=ActorTipo.OPERADOR,
         ))
+        self._repo.actualizar_formulario(formulario_id, {
+            "estado":          dominio.estado.value,
+            "zoho_request_id": None,
+        })
 
         logger.info("Firma cancelada para formulario %s → VALIDADO", formulario_id)
         return {"estado": dominio.estado.value}

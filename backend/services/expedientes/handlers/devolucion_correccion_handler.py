@@ -110,15 +110,7 @@ class DevolucionCorreccionHandler:
             comando.formulario_id
         )
 
-        # Actualizar repositorio
-        self._repo.actualizar_para_correccion(
-            comando.formulario_id,
-            dominio.estado.value,
-            dominio.numero_correccion,
-            campos_json,
-        )
-
-        # Registrar auditoría
+        # Registrar auditoría ANTES del commit
         if self._repo_auditoria:
             self._repo_auditoria.registrar_evento(EventoAuditoria(
                 formulario_id=comando.formulario_id,
@@ -133,6 +125,14 @@ class DevolucionCorreccionHandler:
                     "campos": comando.campos_identificados,
                 },
             ))
+
+        # Actualizar repositorio y confirmar estado + auditoría en una sola transacción
+        self._repo.actualizar_para_correccion(
+            comando.formulario_id,
+            dominio.estado.value,
+            dominio.numero_correccion,
+            campos_json,
+        )
 
         # Generar alerta con detalle de campos
         self._alertar_devolucion(formulario, dominio, comando)
@@ -176,14 +176,7 @@ class DevolucionCorreccionHandler:
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.deshacer_devolucion()
 
-        # Actualizar repositorio
-        self._repo.actualizar_para_deshacer_devolucion(
-            comando.formulario_id,
-            dominio.estado.value,
-            dominio.numero_correccion,
-        )
-
-        # Registrar auditoría
+        # Registrar auditoría ANTES del commit
         if self._repo_auditoria:
             self._repo_auditoria.registrar_evento(EventoAuditoria(
                 formulario_id=comando.formulario_id,
@@ -193,6 +186,13 @@ class DevolucionCorreccionHandler:
                 actor_id=comando.actor_id,
                 actor_tipo=ActorTipo.OPERADOR,
             ))
+
+        # Actualizar repositorio y confirmar estado + auditoría en una sola transacción
+        self._repo.actualizar_para_deshacer_devolucion(
+            comando.formulario_id,
+            dominio.estado.value,
+            dominio.numero_correccion,
+        )
 
         return {
             "estado": dominio.estado.value,
