@@ -58,11 +58,6 @@ _VALORES_AMIGABLES: Dict[str, str] = {
     "cliente": "Cliente",
     "vinculacion": "Vinculación",
     "actualizacion": "Actualización",
-    "c": "Comercializador",
-    "d": "Distribuidor",
-    "r": "Representante",
-    "f": "Fabricante",
-    "i": "Importador",
     "cuenta_corriente": "Cuenta corriente",
     "cuenta_ahorros": "Cuenta ahorros",
     "importacion": "Importación",
@@ -70,6 +65,14 @@ _VALORES_AMIGABLES: Dict[str, str] = {
     "inversiones": "Inversiones",
     "pago_servicios": "Pago de servicios",
     "otras": "Otras",
+}
+
+_CLASIFICACIONES_ACTIVIDAD: Dict[str, str] = {
+    "c": "Comercializador",
+    "d": "Distribuidor",
+    "r": "Representante",
+    "f": "Fabricante",
+    "i": "Importador",
 }
 
 
@@ -90,6 +93,13 @@ def _valor_a_texto(valor: Any) -> str:
         normalizado = valor.strip()
         return _VALORES_AMIGABLES.get(normalizado.lower(), normalizado)
     return str(valor).strip()
+
+
+def _valor_campo_a_texto(clave: str, valor: Any) -> str:
+    if clave == "clasificacion_actividad" and isinstance(valor, str):
+        normalizado = valor.strip().lower()
+        return _CLASIFICACIONES_ACTIVIDAD.get(normalizado, valor.strip())
+    return _valor_a_texto(valor)
 
 
 def _formatear_monto(valor: Any, moneda: str, moneda_otra: Any = None) -> str:
@@ -130,8 +140,8 @@ def _normalizar_referencias_comerciales(
 
 # ─── Renderizadores HTML ──────────────────────────────────────────────────────
 
-def _fila_etiqueta_valor(etiqueta: str, valor: Any) -> str:
-    texto = _valor_a_texto(valor)
+def _fila_etiqueta_valor(etiqueta: str, valor: Any, clave: Optional[str] = None) -> str:
+    texto = _valor_campo_a_texto(clave, valor) if clave else _valor_a_texto(valor)
     if not texto:
         return ""
     return (
@@ -161,13 +171,13 @@ def _render_tabla(
     filas: Sequence[Dict[str, Any]],
     columnas: Sequence[Tuple[str, str]],
 ) -> str:
-    filas_limpias = [f for f in filas if any(_valor_a_texto(f.get(clave)) for clave, _ in columnas)]
+    filas_limpias = [f for f in filas if any(_valor_campo_a_texto(clave, f.get(clave)) for clave, _ in columnas)]
     if not filas_limpias:
         return ""
     encabezados = "".join(f"<th>{escape(label)}</th>" for _, label in columnas)
     cuerpo = "".join(
         "<tr>"
-        + "".join(f"<td>{escape(_valor_a_texto(f.get(clave)))}</td>" for clave, _ in columnas)
+        + "".join(f"<td>{escape(_valor_campo_a_texto(clave, f.get(clave)))}</td>" for clave, _ in columnas)
         + "</tr>"
         for f in filas_limpias
     )
@@ -554,6 +564,11 @@ def _renderizar_seccion(seccion: _SeccionFormulario, datos: Dict[str, Any]) -> s
     if isinstance(seccion, _SeccionNarrativaFirma):
         return _render_narrativa_firma(seccion.titulo, datos)
     if isinstance(seccion, _SeccionCampos):
+        if (
+            seccion.titulo == "Clasificación de la Empresa y Régimen Tributario"
+            and datos.get("tipo_persona") != "juridica"
+        ):
+            return ""
         # La sección financiera tiene tratamiento especial: usa formateo por moneda.
         if seccion.titulo == "Información Financiera":
             return _renderizar_seccion_financiera(datos)
@@ -561,7 +576,10 @@ def _renderizar_seccion(seccion: _SeccionFormulario, datos: Dict[str, Any]) -> s
             return _renderizar_seccion_declaraciones(datos)
         return _render_seccion_campos(
             seccion.titulo,
-            [(etiqueta, datos.get(clave)) for etiqueta, clave in seccion.campos],
+            [
+                (etiqueta, _valor_campo_a_texto(clave, datos.get(clave)))
+                for etiqueta, clave in seccion.campos
+            ],
         )
     filas = datos.get(seccion.clave_dato) or []
     if seccion.transformar:

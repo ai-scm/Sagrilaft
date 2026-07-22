@@ -177,15 +177,21 @@ def _purgar_datos_no_aplicables_en_payload(datos: Dict[str, Any], orm: Optional[
     return purgar_campos_no_aplicables(datos, tipo_persona)
 
 
-def _purgar_relaciones_no_aplicables(orm: Formulario, datos: Dict[str, Any]) -> None:
+def _purgar_relaciones_no_aplicables(orm: Formulario, datos: Dict[str, Any]) -> List[Any]:
     tipo_persona = _tipo_persona_efectivo(orm, datos)
+    relaciones_eliminadas: List[Any] = []
     if tipo_persona == "natural":
+        if orm.clasificacion_tributaria is not None:
+            relaciones_eliminadas.append(orm.clasificacion_tributaria)
         orm.clasificacion_tributaria = None
         orm.junta_directiva = []
         orm.accionistas = []
         orm.beneficiario_final = []
     elif tipo_persona == "juridica":
+        if orm.datos_persona_natural is not None:
+            relaciones_eliminadas.append(orm.datos_persona_natural)
         orm.datos_persona_natural = None
+    return relaciones_eliminadas
 
 
 def _aplicar_actualizacion_contactos(orm: Formulario, campos: Dict[str, Any]) -> None:
