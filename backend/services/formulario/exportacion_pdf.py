@@ -294,7 +294,7 @@ def _render_narrativa_firma(titulo: str, datos: Dict[str, Any]) -> str:
         "Firma Representante Legal"
         "</div>"
         f"<div style='border-bottom:1.5px solid var(--gray-800); color:white;"
-        f"            font-size:24px; white-space:nowrap; min-height:70px;'>"
+        f"            font-size:24px; white-space:nowrap; min-height:40px; line-height: 40px;'>"
         f"{{{{S:R1*{_espacios}}}}}"
         f"</div>"
         "</div>"
