@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { Clock, Download, FileText, CheckCircle2, ChevronDown, User, ArrowUp } from 'lucide-react';
+import { usePaginacion } from '../../hooks/usePaginacion';
+import ControlsPaginacion from '../ui/ControlsPaginacion';
 
 export default function HistorialExpediente({ formularioId }) {
   const [descargandoReporte, setDescargandoReporte] = useState(false);
@@ -20,6 +22,8 @@ export default function HistorialExpediente({ formularioId }) {
 
   const [eventos, setEventos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  
+  const paginacionEventos = usePaginacion(eventos, 4);
 
   useEffect(() => {
     async function loadEventos() {
@@ -119,7 +123,7 @@ export default function HistorialExpediente({ formularioId }) {
           <div style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>Cargando historial...</div>
         ) : (
           <div className="timeline-list">
-            {eventos.map((evento) => {
+            {paginacionEventos.elementosPagina.map((evento) => {
               const { icon, cssClass } = getUIProps(evento);
               const actor = evento.actor_tipo === 'SISTEMA' ? 'SISTEMA' : evento.actor_id || 'Desconocido';
               const titulo = formatTipoEvento(evento.tipo_evento);
@@ -159,14 +163,10 @@ export default function HistorialExpediente({ formularioId }) {
             )}
           </div>
         )}
-        
-        {eventos.length > 5 && (
-          <div className="footer-actions">
-            <button className="btn-link">
-              Ver más eventos <ChevronDown size={14} />
-            </button>
-          </div>
-        )}
+
+        <div style={{ padding: '8px 24px 16px' }}>
+          <ControlsPaginacion {...paginacionEventos} />
+        </div>
       </div>
     </>
   );
