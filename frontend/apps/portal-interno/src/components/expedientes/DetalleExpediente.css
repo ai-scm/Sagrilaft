@@ -662,3 +662,9 @@
 .banner-firma-firmado .banner-firma-subtitulo { color: #8b5cf6; }
 .btn-firma-color-firmado { color: #6d28d9; border-color: #c4b5fd; }
 .btn-firma-color-firmado:hover:not(:disabled) { background: #ede9fe; }
+.btn-firma-color-reabrir { color: #c2410c; border-color: #fed7aa; }
+.btn-firma-color-reabrir:hover:not(:disabled) { background: #ffedd5; }
+
+.banner-firma-cerrado { background: #f8fafc; border: 1px solid #cbd5e1; }
+.banner-firma-cerrado .banner-firma-titulo { color: #334155; }
+.banner-firma-cerrado .banner-firma-subtitulo { color: #64748b; }

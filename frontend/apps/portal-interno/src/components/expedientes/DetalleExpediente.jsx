@@ -46,6 +46,7 @@ const ESTADO_EN_CORRECCION = 'en_correccion';
 const ESTADO_VALIDADO = 'validado';
 const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
 const ESTADO_FIRMADO = 'firmado';
+const ESTADO_CERRADO = 'cerrado';
 
 const TIPOS_EXCLUIDOS_DE_ADJUNTOS = [TIPO_DOCUMENTO_FORMULARIO_PDF, TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT, TIPO_DOCUMENTO_REPORTE_FINAL];
 
@@ -153,17 +154,21 @@ function BtnDescargaFirmado({ formularioId }) {
   );
 }
 
-function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEnviada }) {
+function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, documentoFirmadoDisponible, onFirmaEnviada }) {
   const [enviando, setEnviando] = useState(false); // enviar a ZohoSign (VALIDADO)
   const [aprobando, setAprobando] = useState(false); // aprobar expediente (ENVIADO)
   const [cancelando, setCancelando] = useState(false);
   const [verificando, setVerificando] = useState(false);
+  const [reabriendoRevision, setReabriendoRevision] = useState(false);
+  const [motivoReapertura, setMotivoReapertura] = useState('');
   const [errorFirma, setErrorFirma] = useState(null);
   const [deshaciendoAprobacion, setDeshaciendoAprobacion] = useState(false);
   const [deshaciendoDevolucion, setDeshaciendoDevolucion] = useState(false);
   const [mostrarModalDevolucion, setMostrarModalDevolucion] = useState(false);
   const [mostrarModalRechazo, setMostrarModalRechazo] = useState(false);
   const [mostrarModalAprobacion, setMostrarModalAprobacion] = useState(false);
+  const [mostrarModalReabrirRevision, setMostrarModalReabrirRevision] = useState(false);
+  const motivoReaperturaValido = motivoReapertura.trim().length >= 20;
 
   async function handleEnviarAFirma() {
     setEnviando(true);
@@ -250,6 +255,22 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
     }
   }
 
+  async function handleReabrirRevisionFirmado() {
+    if (!motivoReaperturaValido) return;
+    setReabriendoRevision(true);
+    setErrorFirma(null);
+    try {
+      await api.reabrirRevisionFirmado(formularioId, motivoReapertura.trim());
+      setMostrarModalReabrirRevision(false);
+      setMotivoReapertura('');
+      onFirmaEnviada();
+    } catch (err) {
+      setErrorFirma(err.message || 'Error al reabrir la revisión.');
+    } finally {
+      setReabriendoRevision(false);
+    }
+  }
+
   if (estado === ESTADO_ENVIADO) {
     const ocupado = aprobando;
     return (
@@ -286,6 +307,7 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
             >
               Devolver
             </button>
+            {documentoFirmadoDisponible && <BtnDescargaFirmado formularioId={formularioId} />}
           </div>
         </div>
         <ModalConfirmacion
@@ -415,10 +437,76 @@ function BannerFirma({ estado, modoTrabajo, formularioId, tipoPersona, onFirmaEn
 
   if (estado === ESTADO_FIRMADO) {
     return (
-      <div className="banner-firma banner-firma-firmado">
+      <>
+        <div className="banner-firma banner-firma-firmado">
+          <div className="banner-firma-textos">
+            <p className="banner-firma-titulo">Documentos firmados electrónicamente</p>
+            <p className="banner-firma-subtitulo">
+              {errorFirma || 'La contraparte firmó el formulario y Certificado vía ZohoSign.'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <BtnDescargaFirmado formularioId={formularioId} />
+            <button
+              className="btn-firma btn-firma-color-reabrir"
+              onClick={() => {
+                setErrorFirma(null);
+                setMostrarModalReabrirRevision(true);
+              }}
+              disabled={reabriendoRevision}
+              type="button"
+            >
+              Reabrir revisión
+            </button>
+          </div>
+        </div>
+        <ModalConfirmacion
+          visible={mostrarModalReabrirRevision}
+          titulo="Reabrir revisión"
+          textoConfirmar="Reabrir revisión"
+          colorConfirmar="#c2410c"
+          onConfirmar={handleReabrirRevisionFirmado}
+          onCancelar={() => setMostrarModalReabrirRevision(false)}
+          ocupado={reabriendoRevision}
+          confirmarDeshabilitado={!motivoReaperturaValido}
+        >
+          <div>
+            <p style={{ margin: '0 0 14px', color: '#475569', lineHeight: 1.5, fontSize: '0.9rem' }}>
+              El documento firmado se conservará y el expediente volverá a “Formulario recibido — pendiente de revisión”.
+            </p>
+            <label htmlFor="motivo-reapertura-firma" className="form-label">
+              Motivo de reapertura
+            </label>
+            <textarea
+              id="motivo-reapertura-firma"
+              className="form-input form-textarea"
+              value={motivoReapertura}
+              onChange={e => setMotivoReapertura(e.target.value)}
+              rows={4}
+              maxLength={1000}
+              disabled={reabriendoRevision}
+              placeholder="Ej. Se detectaron inconsistencias en los datos firmados..."
+            />
+            <div className="char-counter">
+              <span>{motivoReapertura.trim().length} / 1000</span>
+              <span style={{ color: motivoReaperturaValido ? '#166534' : '#DC2626' }}>
+                {motivoReaperturaValido ? 'Mínimo cumplido' : `Mínimo 20 caracteres (${motivoReapertura.trim().length}/20)`}
+              </span>
+            </div>
+          </div>
+        </ModalConfirmacion>
+      </>
+    );
+  }
+
+  if (estado === ESTADO_CERRADO && documentoFirmadoDisponible) {
+    return (
+      <div className="banner-firma banner-firma-cerrado">
         <div className="banner-firma-textos">
-          <p className="banner-firma-titulo">Documentos firmados electrónicamente</p>
-          <p className="banner-firma-subtitulo">La contraparte firmó el formulario y Certificado vía ZohoSign.</p>
+          <p className="banner-firma-titulo">Expediente cerrado</p>
+          <p className="banner-firma-subtitulo">
+            El expediente está cerrado. El documento firmado se conserva como evidencia.
+          </p>
         </div>
         <BtnDescargaFirmado formularioId={formularioId} />
       </div>
@@ -847,6 +935,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                   modoTrabajo={expediente.modo_trabajo}
                   formularioId={formularioId}
                   tipoPersona={expediente.tipo_persona}
+                  documentoFirmadoDisponible={expediente.documento_firmado_disponible}
                   onFirmaEnviada={recargarExpediente}
                 />
 

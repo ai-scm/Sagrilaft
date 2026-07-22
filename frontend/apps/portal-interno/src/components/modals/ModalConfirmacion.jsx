@@ -76,9 +76,12 @@ export default function ModalConfirmacion({
   onConfirmar,
   onCancelar,
   ocupado = false,
+  confirmarDeshabilitado = false,
   colorConfirmar = 'var(--primary-600, #2563eb)',
 }) {
   if (!visible) return null;
+
+  const deshabilitado = ocupado || confirmarDeshabilitado;
 
   return (
     <div style={s.fondo} role="dialog" aria-modal="true" aria-labelledby="titulo-modal-confirmacion">
@@ -98,10 +101,10 @@ export default function ModalConfirmacion({
             style={{
               ...s.btnConfirmar,
               background: colorConfirmar,
-              ...(ocupado ? s.btnDeshabilitado : {}),
+              ...(deshabilitado ? s.btnDeshabilitado : {}),
             }}
             onClick={onConfirmar}
-            disabled={ocupado}
+            disabled={deshabilitado}
             type="button"
           >
             {ocupado ? 'Procesando…' : textoConfirmar}

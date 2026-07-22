@@ -211,6 +211,14 @@ export const api = {
     });
   },
 
+  async reabrirRevisionFirmado(formularioId, motivo) {
+    return requestJson(`/expedientes/${formularioId}/reabrir-revision-firmado`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    });
+  },
+
   urlDocumentoFirmado(formularioId) {
     return `${API_BASE}/expedientes/${formularioId}/documento-firmado`;
   },
@@ -218,7 +226,10 @@ export const api = {
   async descargarDocumentoFirmado(formularioId) {
     const token = await getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documento-firmado`, { headers });
+    const res = await fetch(`${API_BASE}/expedientes/${formularioId}/documento-firmado`, {
+      headers,
+      cache: 'no-store',
+    });
     if (!res.ok) throw new Error(await leerDetalleError(res));
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
