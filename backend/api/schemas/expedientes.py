@@ -72,6 +72,7 @@ class ExpedienteDetalle(BaseModel):
     campos_a_corregir: Optional[str] = None
     causal_cierre: Optional[str] = None
     sagrilaft_reporte_id: Optional[str] = None
+    documento_firmado_disponible: bool = False
     updated_at: datetime
     documentos: List[DocumentoResumen] = Field(default_factory=list)
     alertas_inconsistencia: List[AlertaInconsistenciaResponse] = Field(default_factory=list)
@@ -203,6 +204,35 @@ class ResumenReaperturaActualizacion(BaseModel):
     modo_trabajo: str
     correo_notificado: Optional[str] = None
     correo_enviado: bool = False
+
+
+class SolicitudReaperturaRevisionFirmado(BaseModel):
+    """Datos requeridos para reabrir revisión de un documento ya firmado."""
+
+    motivo: str = Field(
+        min_length=20,
+        max_length=1000,
+        description=(
+            "Justificación interna de la reapertura. No invalida la firma electrónica "
+            "y queda registrada en auditoría."
+        ),
+    )
+
+    @field_validator("motivo")
+    @classmethod
+    def _validar_motivo(cls, valor: str) -> str:
+        motivo = valor.strip()
+        if len(motivo) < 20:
+            raise ValueError("El motivo debe tener al menos 20 caracteres.")
+        return motivo
+
+
+class ResumenReaperturaRevisionFirmado(BaseModel):
+    """Resultado de reabrir revisión de un documento firmado."""
+
+    estado: str
+    documento_firmado_conservado: bool = True
+
 
 class SolicitudAuditoriaAlerta(BaseModel):
     estado_auditoria: str = Field(

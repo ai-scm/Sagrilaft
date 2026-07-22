@@ -167,6 +167,7 @@ class ExpedienteService:
             "campos_a_corregir": formulario.campos_a_corregir,
             "causal_cierre":     causal_cierre,
             "sagrilaft_reporte_id": formulario.sagrilaft_reporte_id,
+            "documento_firmado_disponible": bool(formulario.ruta_documento_firmado),
             "updated_at":        formulario.updated_at,
             "documentos": [
                 {
@@ -427,6 +428,36 @@ class ExpedienteService:
             actor_id=actor_id,
             contrapartes_permitidas=contrapartes_permitidas,
         ))
+
+    def reabrir_revision_firmado(
+        self,
+        formulario_id: str,
+        motivo: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+        actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas, bloquear=True)
+        estado_anterior = formulario.estado
+        dominio = FormularioDominio.desde_snapshot(formulario)
+        dominio.reabrir_revision_firmado()
+
+        self._registrar_evento_ciclo_vida(
+            formulario_id=formulario_id,
+            tipo_evento=TipoEvento.FIRMA_REVISION_REABIERTA,
+            estado_anterior=estado_anterior,
+            estado_nuevo=dominio.estado.value,
+            actor_id=actor_id or "SISTEMA",
+            metadata={
+                "motivo": motivo.strip(),
+                "documento_firmado_conservado": bool(formulario.ruta_documento_firmado),
+            },
+        )
+        self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+        self._repo._sesion.commit()
+        return {
+            "estado": dominio.estado.value,
+            "documento_firmado_conservado": bool(formulario.ruta_documento_firmado),
+        }
 
     def actualizar_estado_alerta(
         self,

@@ -4,6 +4,7 @@ FirmaService — lógica de negocio para el flujo de firma electrónica vía Zoh
 Flujo de estados:
   VALIDADO → [enviar_a_firma] → PENDIENTE_FIRMA → [webhook Completed] → FIRMADO
                                                  → [webhook Declined]  → VALIDADO
+  FIRMADO → [reabrir revisión interna] → ENVIADO
 """
 
 import hashlib
@@ -33,7 +34,6 @@ from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioFirma
 from services.firma.almacenamiento_firma import (
-    archivar_en_storage,
     resolver_key_documento_firmado,
     resolver_ruta_certificado,
 )
@@ -239,10 +239,7 @@ class FirmaService:
             logger.info("Webhook duplicado ignorado: formulario %s ya está FIRMADO", formulario.id)
             return dominio.estado.value
 
-        if formulario.ruta_documento_firmado:
-            archivar_en_storage(self._storage, formulario.ruta_documento_firmado)
-
-        key_destino = resolver_key_documento_firmado(formulario)
+        key_destino = resolver_key_documento_firmado(formulario, request_id)
 
         # ZohoSign descarga a un archivo local temporal; luego lo subimos al backend.
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -352,7 +349,7 @@ class FirmaService:
         """Genera la info de descarga del PDF firmado. El caller decide el tipo de respuesta según InfoDescarga.es_url."""
         formulario = self._obtener_formulario(formulario_id)
 
-        if formulario.estado != EstadoFormulario.FIRMADO or not formulario.ruta_documento_firmado:
+        if not formulario.ruta_documento_firmado:
             raise FirmaNoDisponibleError(formulario_id)
 
         key = formulario.ruta_documento_firmado

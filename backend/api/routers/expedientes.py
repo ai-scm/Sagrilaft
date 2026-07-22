@@ -29,9 +29,11 @@ from api.schemas import (
     ResumenCierreExpediente,
     ResumenDevolucion,
     ResumenReaperturaActualizacion,
+    ResumenReaperturaRevisionFirmado,
     ResumenRechazo,
     SolicitudDevolucion,
     SolicitudReaperturaActualizacion,
+    SolicitudReaperturaRevisionFirmado,
     SolicitudRechazo,
     SolicitudAuditoriaAlerta,
     SagrilaftConsultaManual,
@@ -511,10 +513,34 @@ def cancelar_firma(
     return servicio.cancelar_firma(formulario_id, actor_id=usuario.email)
 
 
+@enrutador.post(
+    "/{formulario_id}/reabrir-revision-firmado",
+    response_model=ResumenReaperturaRevisionFirmado,
+    summary="Reabrir revisión de documento firmado",
+    description=(
+        "Devuelve un formulario firmado electrónicamente al estado 'enviado' para revisión interna. "
+        "El documento firmado se conserva y la firma no se invalida."
+    ),
+    responses={400: {"description": "El formulario no está en estado 'firmado'"}},
+)
+def reabrir_revision_firmado(
+    formulario_id: str,
+    solicitud: SolicitudReaperturaRevisionFirmado,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+) -> ResumenReaperturaRevisionFirmado:
+    return servicio.reabrir_revision_firmado(
+        formulario_id=formulario_id,
+        motivo=solicitud.motivo,
+        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        actor_id=usuario.email,
+    )
+
+
 @enrutador.get(
     "/{formulario_id}/documento-firmado",
     summary="Descargar documento firmado",
-    description="Descarga el PDF firmado electrónicamente. Solo disponible en estado 'firmado'.",
+    description="Descarga el PDF firmado electrónicamente si fue conservado en el expediente.",
     responses={
         404: {"description": "Documento firmado no disponible"},
     },
@@ -527,6 +553,12 @@ def descargar_documento_firmado(
 ) -> Response:
     servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
     info = servicio.resolver_documento_firmado(formulario_id)
+    headers = {"Cache-Control": "no-store"}
     if info.es_url:
-        return RedirectResponse(url=info.valor, status_code=307)
-    return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)
+        return RedirectResponse(url=info.valor, status_code=307, headers=headers)
+    return FileResponse(
+        path=info.valor,
+        filename=info.nombre_archivo,
+        media_type=info.content_type,
+        headers=headers,
+    )

@@ -32,6 +32,7 @@ class TipoEvento:
     FIRMA_INICIADA   = "FIRMA_INICIADA"
     FIRMA_COMPLETADA = "FIRMA_COMPLETADA"
     FIRMA_CANCELADA  = "FIRMA_CANCELADA"
+    FIRMA_REVISION_REABIERTA = "FIRMA_REVISION_REABIERTA"
 
     # ── Documentos ────────────────────────────────────────────────────────────
     DOCUMENTO_CARGADO   = "DOCUMENTO_CARGADO"

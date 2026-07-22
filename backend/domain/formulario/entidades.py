@@ -301,6 +301,15 @@ class FormularioDominio:
             )
         self.estado = EstadoFormulario.FIRMADO
 
+    def reabrir_revision_firmado(self) -> None:
+        """FIRMADO → ENVIADO. Reabre la revisión interna sin invalidar la firma."""
+        if self.estado != EstadoFormulario.FIRMADO:
+            raise FormularioNoEditableError(
+                f"Solo se puede reabrir revisión de un formulario en estado 'firmado' "
+                f"(actual: '{self.estado.value}')."
+            )
+        self.estado = EstadoFormulario.ENVIADO
+
     def cancelar_firma(self) -> None:
         """PENDIENTE_FIRMA → VALIDADO."""
         if self.estado != EstadoFormulario.PENDIENTE_FIRMA:

@@ -5,8 +5,10 @@ Funciones puras de keys y filesystem — sin dependencias de DB ni servicios.
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from domain.formulario.entidades import FormularioDatos
 from domain.puertos.almacenamiento import IAlmacenamiento
@@ -18,13 +20,20 @@ _NOMBRE_PDF_FIRMADO     = "formulario_firmado.pdf"
 _NOMBRE_PDF_CERTIFICADO = "certificado_sagrilaft.pdf"
 
 
-def resolver_key_documento_firmado(formulario: FormularioDatos) -> str:
+def resolver_key_documento_firmado(
+    formulario: FormularioDatos,
+    identificador: Optional[str] = None,
+) -> str:
     """Devuelve la key del backend donde se guarda el PDF firmado del formulario."""
     prefijo = resolver_key_contraparte(
         tipo_contraparte=formulario.tipo_contraparte or "",
         razon_social=formulario.razon_social or "",
     )
-    return f"{prefijo}/{_NOMBRE_PDF_FIRMADO}"
+    if not identificador:
+        return f"{prefijo}/{_NOMBRE_PDF_FIRMADO}"
+
+    identificador_seguro = re.sub(r"[^A-Za-z0-9_-]+", "_", identificador).strip("_")
+    return f"{prefijo}/formulario_firmado_{identificador_seguro}.pdf"
 
 
 def resolver_ruta_certificado(pdf_local: Path) -> Path:
