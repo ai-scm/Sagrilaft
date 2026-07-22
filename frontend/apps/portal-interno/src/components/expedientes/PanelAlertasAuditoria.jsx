@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, XCircle, ShieldAlert } from 'lucide-react';
 import { api } from '../../services/api';
 import { usePaginacion } from '../../hooks/usePaginacion';
 import ControlsPaginacion from '../ui/ControlsPaginacion';
@@ -16,7 +16,6 @@ const DICCIONARIO_CAMPOS = {
 const DICCIONARIO_ESTADOS = {
   PENDIENTE: { label: 'Pendiente', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50' },
   FALSO_POSITIVO_IA: { label: 'Falso Positivo IA', icon: XCircle, color: 'text-gray-500', bg: 'bg-gray-50' },
-  CORREGIDO: { label: 'Corregido', icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' },
   RIESGO_ACEPTADO: { label: 'Riesgo Aceptado', icon: ShieldAlert, color: 'text-blue-500', bg: 'bg-blue-50' },
 };
 
@@ -76,7 +75,6 @@ export default function PanelAlertasAuditoria({ alertas = [], formularioId, onAl
                     <option value="PENDIENTE">Pendiente</option>
                     <option value="FALSO_POSITIVO_IA">Marcar como Falso Positivo</option>
                     <option value="RIESGO_ACEPTADO">Aceptar Riesgo</option>
-                    <option value="CORREGIDO">Marcar como Corregido</option>
                   </select>
                   {alerta.actualizado_por && alerta.estado_auditoria !== 'PENDIENTE' && (
                     <div style={{ marginTop: '4px', fontSize: '11px', color: '#9ca3af' }}>

@@ -206,5 +206,5 @@ class ResumenReaperturaActualizacion(BaseModel):
 
 class SolicitudAuditoriaAlerta(BaseModel):
     estado_auditoria: str = Field(
-        description="Nuevo estado de la alerta: FALSO_POSITIVO_IA, CORREGIDO, RIESGO_ACEPTADO, PENDIENTE"
+        description="Nuevo estado de la alerta: FALSO_POSITIVO_IA, RIESGO_ACEPTADO, PENDIENTE"
     )

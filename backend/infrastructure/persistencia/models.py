@@ -29,7 +29,6 @@ from domain.formulario.tipos import (  # noqa: F401
 class EstadoAlerta(str, enum.Enum):
     PENDIENTE = "PENDIENTE"
     FALSO_POSITIVO_IA = "FALSO_POSITIVO_IA"
-    CORREGIDO = "CORREGIDO"
     RIESGO_ACEPTADO = "RIESGO_ACEPTADO"
 
 def generate_uuid():
