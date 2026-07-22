@@ -117,7 +117,7 @@ class FormularioService:
         if errores:
             return ResultadoEnvioFormulario(valido=False, errores=errores)
 
-        if alertas:
+        if alertas is not None:
             # Convertimos las pydantic models a dicts, solo guardamos campos relevantes
             alertas_dicts = [a.model_dump() if hasattr(a, "model_dump") else a for a in alertas]
             self._repo.guardar_alertas(formulario.id, alertas_dicts)

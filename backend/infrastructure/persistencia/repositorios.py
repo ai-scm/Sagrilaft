@@ -1145,9 +1145,10 @@ class RepositorioAccesoManualSQLAlchemy:
         )
         return _orm_acceso_manual_a_datos(orm, con_formulario=True) if orm else None
 
-    def reenviar_acceso(self, acceso_id: str, nuevo_pin_hash: str, timestamp: datetime) -> None:
+    def reenviar_acceso(self, acceso_id: str, nuevo_pin_hash: str, nuevo_token: str, timestamp: datetime) -> None:
         orm = self._sesion.query(AccesoManual).filter(AccesoManual.id == acceso_id).first()
         if orm:
             orm.pin_hash = nuevo_pin_hash
+            orm.token_diligenciamiento = nuevo_token
             orm.ultimo_envio_correo = timestamp
             self._sesion.commit()
