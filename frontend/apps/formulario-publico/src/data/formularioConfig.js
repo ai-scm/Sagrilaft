@@ -52,6 +52,28 @@ export const DOCUMENTOS_CONFIG = [
 export const CAMPOS_PERSONA_NATURAL = ['ciudad_residencia', 'direccion_residencia'];
 
 /**
+ * Campos de clasificación tributaria exclusivos de Persona Jurídica.
+ * Persona Natural conserva contacto e información bancaria, pero no diligencia
+ * la clasificación de empresa ni régimen tributario.
+ */
+export const CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA = [
+  'actividad_clasificacion',
+  'actividad_especifica',
+  'sector',
+  'superintendencia',
+  'responsabilidades_renta',
+  'autorretenedor',
+  'responsabilidades_iva',
+  'regimen_iva',
+  'gran_contribuyente',
+  'entidad_sin_animo_lucro',
+  'retencion_ica',
+  'impuesto_ica',
+  'entidad_oficial',
+  'exento_retencion_fuente',
+];
+
+/**
  * Mensajes de validación para los campos dependientes de moneda extranjera (Paso 6).
  * Fuente única de verdad — espeja los mensajes del backend (validacion_envio.py).
  */
@@ -104,12 +126,7 @@ export const CAMPOS_CONDICIONALES = {
   7: [
     {
       condicion: (fd) => fd.tipo_persona === 'juridica',
-      campos: [
-        'actividad_clasificacion', 'actividad_especifica', 'sector', 'superintendencia',
-        'responsabilidades_renta', 'autorretenedor', 'responsabilidades_iva', 'regimen_iva',
-        'gran_contribuyente', 'entidad_sin_animo_lucro', 'retencion_ica', 'impuesto_ica',
-        'entidad_oficial', 'exento_retencion_fuente',
-      ],
+      campos: CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA,
     },
   ],
 };

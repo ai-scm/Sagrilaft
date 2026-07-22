@@ -9,7 +9,13 @@
  */
 import { useState, useCallback, useMemo } from 'react';
 import { api } from '../services/api';
-import { TOTAL_STEPS, CAMPOS_REQUERIDOS, calcularPasosVisibles } from '../data/formularioConfig';
+import {
+  TOTAL_STEPS,
+  CAMPOS_REQUERIDOS,
+  CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA,
+  CAMPOS_PERSONA_NATURAL,
+  calcularPasosVisibles,
+} from '../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
 import { useFormPersistencia } from './useFormPersistencia';
@@ -100,6 +106,41 @@ function _aplicarCambioDeTipoDoc(estadoAnterior, campoTipo, nuevoValor, campoNum
   };
 }
 
+function _limpiarCampos(estado, campos) {
+  const siguiente = { ...estado };
+  for (const campo of campos) {
+    siguiente[campo] = '';
+  }
+  return siguiente;
+}
+
+function _aplicarReglasTipoPersona(estadoAnterior, tipoPersona) {
+  const siguiente = { ...estadoAnterior, tipo_persona: tipoPersona };
+  if (tipoPersona === 'natural') {
+    return _limpiarCampos(siguiente, CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA);
+  }
+  if (tipoPersona === 'juridica') {
+    return _limpiarCampos(siguiente, CAMPOS_PERSONA_NATURAL);
+  }
+  return siguiente;
+}
+
+function _purgarCamposNoAplicablesPorTipoPersona(datos) {
+  if (datos.tipo_persona === 'natural') {
+    return _limpiarCampos(datos, CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA);
+  }
+  if (datos.tipo_persona === 'juridica') {
+    return _limpiarCampos(datos, CAMPOS_PERSONA_NATURAL);
+  }
+  return datos;
+}
+
+function _limpiarErroresTipoPersona(limpiarError) {
+  CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA.forEach(limpiarError);
+  CAMPOS_PERSONA_NATURAL.forEach(limpiarError);
+  limpiarError('tipo_persona');
+}
+
 export function useFormulario() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({});
@@ -160,8 +201,9 @@ export function useFormulario() {
       : { juntaDirectiva: [], accionistas: [], beneficiarios: [] };
     const paso6 = purgarFilasVaciasPaso6({ referenciasComerciales, referenciasBancarias });
     const paso7 = purgarFilasVaciasPaso7({ infoBancariaPagos });
+    const datosAplicables = _purgarCamposNoAplicablesPorTipoPersona(formData);
     return sanitizarPayload({
-      ...formData,
+      ...datosAplicables,
       pagina_actual: step,
       junta_directiva:    paso4.juntaDirectiva,
       accionistas:        paso4.accionistas,
@@ -210,6 +252,9 @@ export function useFormulario() {
         }
         return siguiente;
       }
+      if (name === 'tipo_persona') {
+        return _aplicarReglasTipoPersona(prev, nuevoValor);
+      }
       return { ...prev, [name]: nuevoValor };
     });
     limpiarError(name);
@@ -220,18 +265,18 @@ export function useFormulario() {
       limpiarError('digito_verificacion');
     }
 
-    // Al cambiar a Persona Natural, reiniciar las tablas del Paso 4 a su
-    // estado vacío/inicial y limpiar sus errores. Evita que datos de una
-    // sesión previa como Jurídica queden activos y disparen validaciones.
-    if (name === 'tipo_persona' && nuevoValor === 'natural') {
-      setJuntaDirectiva(JUNTA_INICIAL);
-      setAccionistas([{}]);
-      setBeneficiarios([{}]);
-      aplicarErrores(prev => {
-        const sinTablasPaso4 = { ...prev };
-        for (const clave of CLAVES_ERROR_PASO4) delete sinTablasPaso4[clave];
-        return sinTablasPaso4;
-      });
+    if (name === 'tipo_persona') {
+      _limpiarErroresTipoPersona(limpiarError);
+      if (nuevoValor === 'natural') {
+        setJuntaDirectiva(JUNTA_INICIAL);
+        setAccionistas([{}]);
+        setBeneficiarios([{}]);
+        aplicarErrores(prev => {
+          const sinTablasPaso4 = { ...prev };
+          for (const clave of CLAVES_ERROR_PASO4) delete sinTablasPaso4[clave];
+          return sinTablasPaso4;
+        });
+      }
     }
   }, [limpiarError, aplicarErrores, setJuntaDirectiva, setAccionistas, setBeneficiarios]);
 
