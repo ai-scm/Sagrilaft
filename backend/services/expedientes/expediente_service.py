@@ -194,6 +194,20 @@ class ExpedienteService:
             contrapartes_permitidas,
         )
 
+    def comparar_versiones_especificas(
+        self,
+        formulario_id: str,
+        documento_base_id: str,
+        documento_comparar_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        return self._comparador.comparar_versiones_especificas(
+            formulario_id,
+            documento_base_id,
+            documento_comparar_id,
+            contrapartes_permitidas,
+        )
+
     def generar_reporte_comparacion_pdf(
         self,
         formulario_id: str,

@@ -89,6 +89,19 @@ export default function HistorialVersionesFormulario({ documentos, formularioId 
     }
   }
 
+  async function handleCompararVersionesEspecificas(baseId, compararId) {
+    setCargandoComparacion(true);
+    setErrorComparacion(null);
+    setErrorDescarga(null);
+    try {
+      setComparacion(await api.compararVersionesFormularioEspecificas(formularioId, baseId, compararId));
+    } catch (err) {
+      setErrorComparacion(err.message || 'No se pudo comparar las versiones seleccionadas.');
+    } finally {
+      setCargandoComparacion(false);
+    }
+  }
+
   async function handleDescargarEvidencia() {
     setDescargandoReporte(true);
     setErrorDescarga(null);
@@ -139,6 +152,8 @@ export default function HistorialVersionesFormulario({ documentos, formularioId 
         descargandoReporte={descargandoReporte}
         onDescargarReporte={handleDescargarEvidencia}
         onCerrar={handleCerrarComparacion}
+        versiones={versionesDelFormulario}
+        onCompararVersiones={handleCompararVersionesEspecificas}
       />
     </>
   );

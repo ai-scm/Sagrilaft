@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import Spinner from '@shared/components/ui/Spinner';
 import { esCampoMonetario, formatearMontoMoneda } from '../../../../../shared/utils/formatoMoneda';
 import ComparadorRegistros, { esCampoComparableComoRegistro } from '@shared/components/cambios/ComparadorRegistros';
@@ -127,13 +128,33 @@ export default function ModalComparacionVersiones({
   descargandoReporte,
   onDescargarReporte,
   onCerrar,
+  versiones,
+  onCompararVersiones,
 }) {
+  const [baseSeleccionada, setBaseSeleccionada] = useState('');
+  const [compararSeleccionada, setCompararSeleccionada] = useState('');
+
+  useEffect(() => {
+    if (comparacion) {
+      setBaseSeleccionada(comparacion.version_anterior?.toString() || '');
+      setCompararSeleccionada(comparacion.version_corregida?.toString() || '');
+    }
+  }, [comparacion]);
+
+  function handleCambioComparacion(nuevaBase, nuevaComparar) {
+    if (!versiones || !onCompararVersiones) return;
+    
+    const docBase = versiones.find(v => v.version_numero.toString() === nuevaBase);
+    const docComparar = versiones.find(v => v.version_numero.toString() === nuevaComparar);
+    
+    if (docBase && docComparar) {
+      onCompararVersiones(docBase.id, docComparar.id);
+    }
+  }
+
   if (!visible) return null;
 
   const camposComplejos = comparacion?.campos_complejos ?? {};
-  const subtitulo = comparacion
-    ? `v${comparacion.version_anterior || '-'} → v${comparacion.version_corregida}`
-    : 'Comparando versiones';
 
   function presentarCambio(cambio, moneda) {
     const valor = cambio.valor_anterior;
@@ -159,7 +180,37 @@ export default function ModalComparacionVersiones({
         <div style={s.encabezado}>
           <div>
             <h2 id="titulo-comparacion-versiones" style={s.titulo}>Cambios corregidos</h2>
-            <p style={s.subtitulo}>{subtitulo}</p>
+            {versiones && versiones.length > 0 ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--gray-500, #64748b)' }}>Comparando versión</span>
+                <select 
+                  value={compararSeleccionada}
+                  onChange={e => handleCambioComparacion(baseSeleccionada, e.target.value)}
+                  disabled={cargando}
+                  style={{ fontSize: '0.8rem', padding: '2px 4px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                >
+                  {versiones.map(v => (
+                    <option key={`c-${v.id}`} value={v.version_numero.toString()}>v{v.version_numero}</option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '0.82rem', color: 'var(--gray-500, #64748b)' }}>contra versión base</span>
+                <select
+                  value={baseSeleccionada}
+                  onChange={e => handleCambioComparacion(e.target.value, compararSeleccionada)}
+                  disabled={cargando}
+                  style={{ fontSize: '0.8rem', padding: '2px 4px', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                >
+                  <option value="">-</option>
+                  {versiones.map(v => (
+                    <option key={`b-${v.id}`} value={v.version_numero.toString()}>v{v.version_numero}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <p style={s.subtitulo}>
+                {comparacion ? `v${comparacion.version_anterior || '-'} → v${comparacion.version_corregida}` : 'Comparando versiones'}
+              </p>
+            )}
           </div>
           <div style={s.acciones}>
             {comparacion?.disponible && (

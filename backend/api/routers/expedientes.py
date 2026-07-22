@@ -8,7 +8,7 @@ SRP: parsea solicitudes HTTP y delega toda la lógica al ExpedienteService.
 DIP: depende de api.dependencies, no de infrastructure directamente.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, RedirectResponse
@@ -116,6 +116,26 @@ def comparar_ultima_correccion(
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ComparacionVersionFormulario:
     return servicio.comparar_ultima_correccion(formulario_id, _contrapartes_permitidas(usuario))
+
+
+@enrutador.get(
+    "/{formulario_id}/comparacion-versiones-especificas",
+    response_model=Dict[str, Any],
+    summary="Comparar versiones específicas",
+)
+def comparar_versiones_especificas(
+    formulario_id: str,
+    base_id: str,
+    comparar_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+):
+    return servicio.comparar_versiones_especificas(
+        formulario_id,
+        base_id,
+        comparar_id,
+        _contrapartes_permitidas(usuario)
+    )
 
 
 @enrutador.get(

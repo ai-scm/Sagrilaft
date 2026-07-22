@@ -80,6 +80,29 @@ class ComparadorService:
         respuesta["campos_complejos"] = self._configuracion.a_dict()
         return respuesta
 
+    def comparar_versiones_especificas(
+        self,
+        formulario_id: str,
+        documento_base_id: str,
+        documento_comparar_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Compara dos versiones específicas de un formulario por ID de documento."""
+        self._buscar_formulario(formulario_id, contrapartes_permitidas)
+        
+        doc_comparar = self._documentos.buscar_documento(formulario_id, documento_comparar_id)
+        if not doc_comparar:
+            raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
+            
+        doc_base = self._documentos.buscar_documento(formulario_id, documento_base_id)
+        if not doc_base:
+            raise DocumentoNoEncontradoError(formulario_id, TIPO_DOCUMENTO_FORMULARIO_PDF)
+
+        comparacion = comparar_versiones(doc_comparar, doc_base)
+        respuesta = comparacion_versiones_a_dict(comparacion)
+        respuesta["campos_complejos"] = self._configuracion.a_dict()
+        return respuesta
+
     def generar_reporte_comparacion_pdf(
         self,
         formulario_id: str,

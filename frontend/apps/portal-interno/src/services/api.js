@@ -81,6 +81,10 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}/comparacion-versiones`);
   },
 
+  async compararVersionesFormularioEspecificas(formularioId, baseId, compararId) {
+    return requestJson(`/expedientes/${formularioId}/comparacion-versiones-especificas?base_id=${baseId}&comparar_id=${compararId}`);
+  },
+
   async descargarReporteComparacion(formularioId) {
     const token = await getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
