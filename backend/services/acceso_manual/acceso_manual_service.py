@@ -257,14 +257,15 @@ class AccesoManualService:
 
         pin = _generar_pin()
         pin_hash = _verificador_pin.hash(pin)
-        self._repo.reenviar_acceso(acceso_id, pin_hash, ahora)
+        nuevo_token = secrets.token_urlsafe(32)
+        self._repo.reenviar_acceso(acceso_id, pin_hash, nuevo_token, ahora)
 
         acceso_creado = {
             "formulario_id":            acceso.formulario_id,
             "codigo_peticion":          acceso.codigo_peticion,
             "pin":                      pin,
-            "token_diligenciamiento":   acceso.token_diligenciamiento,
-            "enlace_diligenciamiento":  self._construir_enlace_diligenciamiento(acceso.token_diligenciamiento),
+            "token_diligenciamiento":   nuevo_token,
+            "enlace_diligenciamiento":  self._construir_enlace_diligenciamiento(nuevo_token),
             "correo_destinatario":      acceso.correo_destinatario,
             "razon_social":             acceso.razon_social,
             "tipo_contraparte":         acceso.tipo_contraparte,

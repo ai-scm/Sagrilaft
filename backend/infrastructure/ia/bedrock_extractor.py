@@ -20,6 +20,7 @@ from pypdf import PdfReader, PdfWriter
 
 from domain.contratos import ResultadoExtraccion
 from domain.utils.mapeo_campos import mapear_campos_para_formulario
+from infrastructure.emf_logger import emitir_metrica_emf
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,17 @@ class ExtractorBedrock:
 
         texto_extraido = respuesta["output"]["message"]["content"][0]["text"]
         datos = self._parsear_respuesta_json(texto_extraido)
+        
+        # Emitir EMF Metric de tokens consumidos
+        if "usage" in respuesta:
+            emitir_metrica_emf(
+                namespace="Sagrilaft/Negocio",
+                dimensiones={"Servicio": "Bedrock", "ModeloId": self._modelo_id, "TipoDocumento": tipo_documento},
+                metricas={
+                    "BedrockInputTokens": respuesta["usage"].get("inputTokens", 0),
+                    "BedrockOutputTokens": respuesta["usage"].get("outputTokens", 0)
+                }
+            )
 
         logger.info(
             "Extracción exitosa: tipo=%s, campos_extraidos=%s",

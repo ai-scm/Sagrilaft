@@ -20,6 +20,7 @@ from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioExpediente
+from infrastructure.emf_logger import emitir_metrica_emf
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService
@@ -113,6 +114,12 @@ class AprobacionRechazoHandler:
                 actor_tipo=ActorTipo.OPERADOR,
             ))
         
+        emitir_metrica_emf(
+            namespace="Sagrilaft/Negocio",
+            dimensiones={"Embudo": "Aprobado"},
+            metricas={"ExpedientesProcesados": 1}
+        )
+        
         return {"estado": dominio.estado.value}
 
     def ejecutar_deshacer_aprobacion(self, comando: ComandoDeshacerAprobacion) -> Dict[str, Any]:
@@ -178,6 +185,12 @@ class AprobacionRechazoHandler:
         
         self._alertar_rechazo(formulario, comando)
         notificacion_enviada = self._notificar_rechazo_si_aplica(comando)
+        
+        emitir_metrica_emf(
+            namespace="Sagrilaft/Negocio",
+            dimensiones={"Embudo": "Rechazado"},
+            metricas={"ExpedientesProcesados": 1}
+        )
         
         return {
             "estado": dominio.estado.value,

@@ -16,6 +16,8 @@ import { ConfigParameters } from './constructs/config-parameters';
 import { EcsFargate } from './constructs/ecs-fargate';
 import { CortafuegosWeb } from './constructs/cortafuegos-web';
 import { ObservabilidadAlarmas } from './constructs/observabilidad-alarmas';
+import { DashboardTecnico } from './constructs/dashboard-tecnico';
+import { DashboardNegocio } from './constructs/dashboard-negocio';
 import { DEFAULT_BEDROCK_MODEL_ID } from './deployment-constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -170,6 +172,18 @@ export class SagrilaftStack extends cdk.Stack {
       balanceadorCarga: lb.alb,
       servicioBackend: ecsFargate.backend.service,
       topicAlertas: notifications.alertasTopic,
+      ambiente,
+    });
+
+    const dashboardTecnico = new DashboardTecnico(this, 'DashboardTecnico', {
+      balanceadorCarga: lb.alb,
+      servicioBackend: ecsFargate.backend.service,
+      servicioPortal: ecsFargate.portal.service,
+      dbInstance: database.instance,
+      ambiente,
+    });
+
+    const dashboardNegocio = new DashboardNegocio(this, 'DashboardNegocio', {
       ambiente,
     });
 

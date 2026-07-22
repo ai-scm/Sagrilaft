@@ -16,9 +16,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
-
 from domain.contratos import SolicitudFirmaCreada
 from infrastructure.configuracion import ZohoSignConfig
+from infrastructure.emf_logger import emitir_metrica_emf
 
 logger = logging.getLogger(__name__)
 
@@ -46,36 +46,58 @@ class ZohoSignService:
         import time
         max_intentos = 3
         espera = 1.0
+        start_time = time.time()
+        exito = True
         
-        for intento in range(1, max_intentos + 1):
-            try:
-                resp = httpx.request(metodo, url, **kwargs)
-                # Forzar excepción si la respuesta es de tipo falla transitoria para poder reintentar
-                if resp.status_code in (429, 502, 503, 504):
-                    resp.raise_for_status()
-                return resp
-            except httpx.HTTPStatusError as e:
-                if intento < max_intentos and e.response.status_code in (429, 502, 503, 504):
-                    logger.warning(
-                        "Resiliencia API: Falla transitoria (HTTP %d) en ZohoSign. Reintento %d/%d en %.1fs...",
-                        e.response.status_code, intento, max_intentos, espera
-                    )
-                    time.sleep(espera)
-                    espera *= 2
-                    continue
-                raise
-            except httpx.RequestError as e:
-                if intento < max_intentos:
-                    logger.warning(
-                        "Resiliencia API: Falla de red (%s) hacia ZohoSign. Reintento %d/%d en %.1fs...",
-                        type(e).__name__, intento, max_intentos, espera
-                    )
-                    time.sleep(espera)
-                    espera *= 2
-                    continue
-                raise
-        
-        raise RuntimeError("Inalcanzable")
+        try:
+            for intento in range(1, max_intentos + 1):
+                try:
+                    resp = httpx.request(metodo, url, **kwargs)
+                    # Forzar excepción si la respuesta es de tipo falla transitoria para poder reintentar
+                    if resp.status_code in (429, 502, 503, 504):
+                        resp.raise_for_status()
+                    return resp
+                except httpx.HTTPStatusError as e:
+                    if intento < max_intentos and e.response.status_code in (429, 502, 503, 504):
+                        logger.warning(
+                            "Resiliencia API: Falla transitoria (HTTP %d) en ZohoSign. Reintento %d/%d en %.1fs...",
+                            e.response.status_code, intento, max_intentos, espera
+                        )
+                        time.sleep(espera)
+                        espera *= 2
+                        continue
+                    raise
+                except httpx.RequestError as e:
+                    if intento < max_intentos:
+                        logger.warning(
+                            "Resiliencia API: Falla de red (%s) hacia ZohoSign. Reintento %d/%d en %.1fs...",
+                            type(e).__name__, intento, max_intentos, espera
+                        )
+                        time.sleep(espera)
+                        espera *= 2
+                        continue
+                    raise
+            
+            raise RuntimeError("Inalcanzable")
+        except Exception:
+            exito = False
+            raise
+        finally:
+            latencia_ms = int((time.time() - start_time) * 1000)
+            # Parsear operación simplificada de la URL (ej. "token" o "requests")
+            operacion = "desconocida"
+            if "/token" in url: operacion = "token"
+            elif "/requests" in url: operacion = "requests"
+                
+            emitir_metrica_emf(
+                namespace="Sagrilaft/Negocio",
+                dimensiones={"Servicio": "ZohoSign", "Operacion": operacion},
+                metricas={
+                    "ZohoSignLatency": latencia_ms,
+                    "ZohoSignSuccess": 1 if exito else 0,
+                    "ZohoSignError": 0 if exito else 1
+                }
+            )
 
     # ─── Token management ─────────────────────────────────────────────────────
 

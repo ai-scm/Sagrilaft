@@ -323,7 +323,7 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
             ("Tipo de solicitud",         "tipo_solicitud"),
             ("Clasificación de actividad","clasificacion_actividad"),
         ]),
-        _SeccionCampos("Información Básica", [
+        _SeccionCampos("Información Básica De La Empresa", [
             ("Razón social",              "razon_social"),
             ("Tipo de identificación",    "tipo_identificacion"),
             ("Número de identificación",  "numero_identificacion"),
@@ -340,7 +340,7 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
         ]),
     ]),
     _PasoFormulario(3, "Representante Legal", [
-        _SeccionCampos("Representante Legal o Persona Natural", [
+        _SeccionCampos("Información de Representante Legal o Persona Natural", [
             ("Nombres y apellidos",       "nombre_representante"),
             ("Tipo de documento",         "tipo_doc_representante"),
             ("Número de documento",       "numero_doc_representante"),
@@ -361,7 +361,7 @@ _PASOS_FORMULARIO: List[_PasoFormulario] = [
         ]),
     ]),
     _PasoFormulario(4, "Junta Directiva y Accionistas", [
-        _SeccionTabla("Junta Directiva y Representantes", "junta_directiva", [
+        _SeccionTabla("NFORMACIÓN JUNTA DIRECTIVA, REPRESENTANTES LEGALES Y REVISORES FISCALES", "junta_directiva", [
             ("cargo",       "Cargo"),
             ("nombre",      "Nombre"),
             ("tipo_id",     "Tipo ID"),
@@ -530,7 +530,7 @@ def _renderizar_seccion_declaraciones(datos: Dict[str, Any]) -> str:
     bloques = [
         _fila_etiqueta_valor("Autorización tratamiento de datos", datos.get("autorizacion_datos")),
         _fila_etiqueta_valor("Declaración origen de fondos", datos.get("declaracion_origen_fondos")),
-        _fila_etiqueta_valor("Origen de fondos (detalle)", datos.get("origen_fondos")),
+        _fila_etiqueta_valor("Que los Recursos que manejo provienen de las siguientes actividades:", datos.get("origen_fondos")),
     ]
     bloques = [bloque for bloque in bloques if bloque]
     items_html = "".join(f"<li>{escape(item)}</li>" for item in declaracion_items)

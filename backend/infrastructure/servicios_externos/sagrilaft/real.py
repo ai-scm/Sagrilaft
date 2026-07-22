@@ -7,6 +7,7 @@ from domain.puertos.consultor_listas_cautela import (
     ResultadoConsultaListas,
     ErrorConsultaListas
 )
+from infrastructure.emf_logger import emitir_metrica_emf
 
 class ConsultorListasCautelaAPI(ConsultorListasCautela):
     def __init__(self, url_base: str, api_key: str):
@@ -21,22 +22,39 @@ class ConsultorListasCautelaAPI(ConsultorListasCautela):
         Paso 2: Polling (Job Status)
         Paso 3: Obtener Json (Hallazgos)
         """
-        # PASO 1: Iniciar la consulta
-        job_id = self._lanzar_consulta(criterio)
-        
-        # PASO 2: Esperar resultado (Polling)
-        reporte_id, riesgo_maximo = self._consultar_estado(job_id)
-        
-        if riesgo_maximo != "NINGUNO":
-            # PASO 3: Obtener Json (Hallazgos) y mapearlo al dominio
-            return self._obtener_reporte_json(reporte_id, riesgo_maximo)
+        start_time = time.time()
+        exito = True
+        try:
+            # PASO 1: Iniciar la consulta
+            job_id = self._lanzar_consulta(criterio)
             
-        return ResultadoConsultaListas(
-            encontrado=False,
-            nivel_riesgo="NINGUNO",
-            fecha_consulta=datetime.utcnow().isoformat(),
-            reporte_id=reporte_id
-        )
+            # PASO 2: Esperar resultado (Polling)
+            reporte_id, riesgo_maximo = self._consultar_estado(job_id)
+            
+            if riesgo_maximo != "NINGUNO":
+                # PASO 3: Obtener Json (Hallazgos) y mapearlo al dominio
+                return self._obtener_reporte_json(reporte_id, riesgo_maximo)
+                
+            return ResultadoConsultaListas(
+                encontrado=False,
+                nivel_riesgo="NINGUNO",
+                fecha_consulta=datetime.utcnow().isoformat(),
+                reporte_id=reporte_id
+            )
+        except Exception:
+            exito = False
+            raise
+        finally:
+            latencia_ms = int((time.time() - start_time) * 1000)
+            emitir_metrica_emf(
+                namespace="Sagrilaft/Negocio",
+                dimensiones={"Servicio": "TusDatos", "Operacion": "ConsultaCompleta"},
+                metricas={
+                    "TusDatosLatency": latencia_ms,
+                    "TusDatosSuccess": 1 if exito else 0,
+                    "TusDatosError": 0 if exito else 1
+                }
+            )
 
     def _lanzar_consulta(self, criterio: CriterioConsultaListas) -> str:
         """Realiza el POST a /api/launch y retorna el jobid."""
