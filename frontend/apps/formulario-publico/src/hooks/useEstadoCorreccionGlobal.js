@@ -82,7 +82,16 @@ export function useEstadoCorreccionGlobal({
     const pendientes = new Set();
 
     for (const campo of camposIdentificados) {
-      if (CAMPOS_TABLA.has(campo)) {
+      if (campo.startsWith('doc_')) {
+        const tipoDoc = campo.replace('doc_', '');
+        const docActual = tablasActuales?.documentos?.[tipoDoc];
+        const docOriginal = tablasOriginales?.documentos?.[tipoDoc];
+        if (_tablaFueModificada(docActual, docOriginal)) {
+          corregidos.add(campo);
+        } else {
+          pendientes.add(campo);
+        }
+      } else if (CAMPOS_TABLA.has(campo)) {
         const claveTabla  = CLAVE_TABLA_POR_CAMPO[campo];
         const actual      = tablasActuales?.[claveTabla];
         const original    = tablasOriginales?.[claveTabla];

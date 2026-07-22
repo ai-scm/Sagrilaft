@@ -13,6 +13,14 @@ from __future__ import annotations
 # Deben coincidir exactamente con los IDs usados en el catálogo del frontend
 # (frontend/src/data/catalogoCorrecciones.js).
 CAMPOS_CORREGIBLES: frozenset[str] = frozenset({
+    # Paso 1 — Documentos Adjuntos
+    "doc_cedula_representante",
+    "doc_certificado_existencia",
+    "doc_estados_financieros",
+    "doc_declaracion_renta",
+    "doc_rut",
+    "doc_referencias_bancarias",
+
     # Paso 2 — Información básica
     "tipo_contraparte",
     "tipo_persona",
@@ -101,6 +109,12 @@ CAMPOS_CORREGIBLES: frozenset[str] = frozenset({
 # Se usan en el correo de notificación para que la contraparte entienda
 # qué campos corregir sin necesidad de abrir el formulario.
 ETIQUETAS_CAMPOS_CORREGIBLES: dict[str, str] = {
+    "doc_cedula_representante": "Cédula del Representante Legal",
+    "doc_certificado_existencia": "Certificado de Existencia y Representación Legal",
+    "doc_estados_financieros": "Estados Financieros",
+    "doc_declaracion_renta": "Declaración de Renta",
+    "doc_rut": "RUT (Registro Único Tributario)",
+    "doc_referencias_bancarias": "Referencias Bancarias",
     "tipo_contraparte":        "Tipo de Contraparte",
     "tipo_persona":            "Tipo de Persona",
     "tipo_solicitud":          "Tipo de Solicitud",

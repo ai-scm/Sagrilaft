@@ -182,7 +182,7 @@ export default function FormularioSagrilaft() {
       camposACorregirRaw={camposACorregir}
       valoresOriginales={formDataOriginal ?? {}}
       formDataActual={formData}
-      tablasActuales={{ juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos }}
+      tablasActuales={{ juntaDirectiva, accionistas, beneficiarios, referenciasComerciales, referenciasBancarias, infoBancariaPagos, documentos }}
       tablasOriginales={tablasOriginales}
     >
       <AutoNavegacion onNavegar={irAPasoCorreccion} />

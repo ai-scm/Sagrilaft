@@ -13,6 +13,18 @@
 
 export const CATALOGO_CORRECCIONES = [
   {
+    paso: 1,
+    etiqueta: 'Documentos adjuntos',
+    campos: [
+      { id: 'doc_cedula_representante', etiqueta: 'Cédula del Representante Legal' },
+      { id: 'doc_certificado_existencia', etiqueta: 'Certificado de Existencia y Representación Legal' },
+      { id: 'doc_estados_financieros', etiqueta: 'Estados Financieros' },
+      { id: 'doc_declaracion_renta', etiqueta: 'Declaración de Renta' },
+      { id: 'doc_rut', etiqueta: 'RUT (Registro Único Tributario)' },
+      { id: 'doc_referencias_bancarias', etiqueta: 'Referencias Bancarias' },
+    ],
+  },
+  {
     paso: 2,
     etiqueta: 'Información básica',
     campos: [

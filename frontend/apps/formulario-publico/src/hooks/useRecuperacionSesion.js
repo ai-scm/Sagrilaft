@@ -151,6 +151,7 @@ export function useRecuperacionSesion(setters) {
         referenciasComerciales: snapshot_recuperar_sesion.referenciasComerciales ?? [],
         referenciasBancarias: snapshot_recuperar_sesion.referenciasBancarias ?? [],
         infoBancariaPagos: snapshot_recuperar_sesion.infoBancariaPagos ?? [],
+        documentos: snapshot_recuperar_sesion.documentos ?? {},
       });
     }
     setJuntaDirectiva(
