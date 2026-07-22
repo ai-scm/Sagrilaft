@@ -113,13 +113,16 @@ class AprobacionRechazoHandler:
                 actor_id=comando.actor_id,
                 actor_tipo=ActorTipo.OPERADOR,
             ))
-        
+
+        # Confirma el cambio de estado y el evento de auditoría en una única transacción.
+        self._repo._sesion.commit()
+
         emitir_metrica_emf(
             namespace="Sagrilaft/Negocio",
             dimensiones={"Embudo": "Aprobado"},
             metricas={"ExpedientesProcesados": 1}
         )
-        
+
         return {"estado": dominio.estado.value}
 
     def ejecutar_deshacer_aprobacion(self, comando: ComandoDeshacerAprobacion) -> Dict[str, Any]:
@@ -145,7 +148,9 @@ class AprobacionRechazoHandler:
                 actor_id=comando.actor_id,
                 actor_tipo=ActorTipo.OPERADOR,
             ))
-        
+
+        # Confirma el cambio de estado y el evento de auditoría en una única transacción.
+        self._repo._sesion.commit()
         return {"estado": dominio.estado.value}
 
     def ejecutar_rechazo(self, comando: ComandoRechazo) -> Dict[str, Any]:
@@ -182,7 +187,10 @@ class AprobacionRechazoHandler:
                 actor_tipo=ActorTipo.OPERADOR,
                 metadata={"motivo": comando.motivo},
             ))
-        
+
+        # Confirma el cambio de estado y el evento de auditoría en una única transacción.
+        self._repo._sesion.commit()
+
         self._alertar_rechazo(formulario, comando)
         notificacion_enviada = self._notificar_rechazo_si_aplica(comando)
         

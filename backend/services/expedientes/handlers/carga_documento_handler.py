@@ -162,6 +162,8 @@ class CargaDocumentoHandler:
             versionamiento["numero_version"],
         )
         self._repo.actualizar_estado(comando.formulario_id, estado_nuevo)
+        # Confirma en una sola transacción: documento registrado + estado + evento de auditoría.
+        self._repo._sesion.commit()
 
         # 7. Alertar al portal
         self._alertar_portal(comando, formulario)

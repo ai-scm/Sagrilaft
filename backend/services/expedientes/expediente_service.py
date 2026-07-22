@@ -300,6 +300,8 @@ class ExpedienteService:
             },
         )
         self._repo.actualizar_estado(formulario_id, dominio.estado.value)
+        # Confirma el cambio de estado y el evento de auditoría en una única transacción.
+        self._repo._sesion.commit()
         return {
             "estado": dominio.estado.value,
             "causal_cierre": causal_cierre,

@@ -828,13 +828,19 @@ class RepositorioExpedienteSQLAlchemy:
         return {fila.formulario_id: fila.total for fila in filas}
 
     def actualizar_estado(self, formulario_id: str, estado: str) -> None:
-        """Persiste el nuevo estado y hace commit inmediato."""
+        """Marca el nuevo estado en la sesión sin hacer commit.
+
+        El commit lo realiza el caller (handler) después de registrar
+        el evento de auditoría, garantizando que ambas operaciones sean
+        atómicas en la misma transacción.
+        """
         orm = self._sesion.query(Formulario).filter(Formulario.id == formulario_id).first()
         if orm:
-            # Informa al trigger de auditoría que este cambio viene de la aplicación
+            # Informa al trigger de auditoría que este cambio viene de la aplicación.
+            # SET LOCAL vive dentro de la transacción activa — no hace commit.
             self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
             orm.estado = estado
-            self._sesion.commit()
+            # Sin commit aquí — el handler es responsable de confirmar la transacción.
 
     def actualizar_sagrilaft_reporte_id(self, formulario_id: str, reporte_id: str) -> None:
         """Persiste el ID del reporte de SAGRILAFT para descargas posteriores."""
