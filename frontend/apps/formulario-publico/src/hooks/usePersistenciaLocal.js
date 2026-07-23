@@ -49,7 +49,7 @@ export function usePersistenciaLocal(snapshot, alGuardar) {
 
     const timer = setTimeout(() => {
       guardarBorradorEnStorage(snapshot);
-      alGuardar(new Date());
+      alGuardar({ fecha: new Date(), tipo: 'local' });
     }, DEMORA_GUARDADO_LOCAL_MS);
 
     return () => clearTimeout(timer);
@@ -59,7 +59,7 @@ export function usePersistenciaLocal(snapshot, alGuardar) {
   // Guardado inmediato para uso programático (ej: fallback en error de red)
   const guardarAhora = useCallback(() => {
     guardarBorradorEnStorage(snapshot);
-    alGuardar(new Date());
+    alGuardar({ fecha: new Date(), tipo: 'local' });
   }, [snapshot, alGuardar]);
 
   return { guardarAhora };

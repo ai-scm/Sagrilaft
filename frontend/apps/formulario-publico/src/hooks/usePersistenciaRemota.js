@@ -51,7 +51,7 @@ export function usePersistenciaRemota(snapshot, construirPayload, alGuardar) {
     const timer = setTimeout(async () => {
       try {
         await api.actualizarFormulario(formularioId, construirPayload());
-        if (!cancelado) alGuardar(new Date());
+        if (!cancelado) alGuardar({ fecha: new Date(), tipo: 'remoto' });
       } catch {
         // Fallo silencioso: localStorage ya tiene el snapshot reciente.
       }

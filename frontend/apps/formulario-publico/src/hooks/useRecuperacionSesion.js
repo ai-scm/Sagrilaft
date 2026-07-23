@@ -73,11 +73,39 @@ function _normalizarDocumentos(documentosArray) {
 }
 
 function _adaptarRespuestaServidor(formulario, borradorLocal = null) {
-  const formData = _normalizarBooleanosFormulario(Object.fromEntries(
+  let formData = _normalizarBooleanosFormulario(Object.fromEntries(
     Object.entries(formulario).filter(([k]) => !_CAMPOS_EXCLUIR_DE_FORMDATA.has(k)),
   ));
 
   const documentos = _normalizarDocumentos(formulario.documentos);
+  
+  let step = formulario.pagina_actual ?? 1;
+  let juntaDirectiva = formulario.junta_directiva ?? [];
+  let accionistas = formulario.accionistas ?? [];
+  let beneficiarios = formulario.beneficiario_final ?? [];
+  let referenciasComerciales = formulario.referencias_comerciales ?? [];
+  let referenciasBancarias = formulario.referencias_bancarias ?? [];
+  let infoBancariaPagos = formulario.informacion_bancaria_pagos ?? [];
+
+  // Inteligencia de recuperación: si el borrador local (capa 1) es más reciente
+  // que el del servidor (capa 3), sobrescribimos los datos ingresados por el usuario
+  // con la versión local para evitar pérdida de información en recargas rápidas.
+  const esLocalMasReciente = borradorLocal && 
+                             borradorLocal.formularioId === formulario.id &&
+                             borradorLocal.guardadoEn &&
+                             formulario.updated_at &&
+                             new Date(borradorLocal.guardadoEn) > new Date(formulario.updated_at);
+
+  if (esLocalMasReciente) {
+    formData = { ...formData, ...(borradorLocal.formData || {}) };
+    step = borradorLocal.step ?? step;
+    juntaDirectiva = borradorLocal.juntaDirectiva ?? juntaDirectiva;
+    accionistas = borradorLocal.accionistas ?? accionistas;
+    beneficiarios = borradorLocal.beneficiarios ?? beneficiarios;
+    referenciasComerciales = borradorLocal.referenciasComerciales ?? referenciasComerciales;
+    referenciasBancarias = borradorLocal.referenciasBancarias ?? referenciasBancarias;
+    infoBancariaPagos = borradorLocal.infoBancariaPagos ?? infoBancariaPagos;
+  }
 
   // Preservar datos extraídos por IA (que el backend no persiste en la BD)
   // cruzando el ID del documento para asegurar que es el mismo archivo.
@@ -107,17 +135,17 @@ function _adaptarRespuestaServidor(formulario, borradorLocal = null) {
 
   return {
     formData,
-    step: formulario.pagina_actual ?? 1,
+    step,
     formularioId: formulario.id,
     codigoPeticion: formulario.codigo_peticion,
     estadoFormulario: formulario.estado ?? null,
     camposACorregir: formulario.campos_a_corregir ?? null,
-    juntaDirectiva: formulario.junta_directiva ?? [],
-    accionistas: formulario.accionistas ?? [],
-    beneficiarios: formulario.beneficiario_final ?? [],
-    referenciasComerciales: formulario.referencias_comerciales ?? [],
-    referenciasBancarias: formulario.referencias_bancarias ?? [],
-    infoBancariaPagos: formulario.informacion_bancaria_pagos ?? [],
+    juntaDirectiva,
+    accionistas,
+    beneficiarios,
+    referenciasComerciales,
+    referenciasBancarias,
+    infoBancariaPagos,
     documentos,
     alertasInconsistencia: formulario.alertas_inconsistencia ?? [],
   };

@@ -19,9 +19,11 @@ export default function NavegacionFormulario({
 
   return (
     <div className="form-card">
-      {lastSaved && (
+      {lastSaved && lastSaved.fecha && (
         <div style={{ fontSize: '0.78rem', color: 'var(--gray-400)', textAlign: 'right', marginBottom: '8px' }}>
-          Guardado automáticamente: {lastSaved.toLocaleTimeString('es-CO')}
+          {lastSaved.tipo === 'local' 
+            ? `Guardado localmente: ${lastSaved.fecha.toLocaleTimeString('es-CO')}` 
+            : `Sincronizado en la nube: ${lastSaved.fecha.toLocaleTimeString('es-CO')}`}
         </div>
       )}
       <div className="form-actions">
