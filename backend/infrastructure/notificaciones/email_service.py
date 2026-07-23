@@ -133,6 +133,7 @@ class EmailService:
         correo_destinatario: str,
         observaciones: str,
         enlace_diligenciamiento: str | None = None,
+        campos_identificados: list[str] | None = None,
     ) -> bool:
         """
         Notifica al destinatario que su expediente quedó habilitado para una
@@ -153,10 +154,10 @@ class EmailService:
             destinatario=correo_destinatario,
             asunto="Formulario SAGRILAFT — Actualización habilitada",
             cuerpo_texto=_construir_cuerpo_texto_actualizacion_reabierta(
-                observaciones, enlace_diligenciamiento,
+                observaciones, enlace_diligenciamiento, campos_identificados,
             ),
             cuerpo_html=_construir_cuerpo_html_actualizacion_reabierta(
-                observaciones, enlace_diligenciamiento,
+                observaciones, enlace_diligenciamiento, campos_identificados,
             ),
         )
         return self._enviar(mensaje, correo_destinatario)
@@ -281,7 +282,14 @@ def _construir_cuerpo_texto_rechazo(mensaje_para_destinatario: str) -> str:
 def _construir_cuerpo_texto_actualizacion_reabierta(
     observaciones: str,
     enlace: str | None,
+    campos_identificados: list[str] | None = None,
 ) -> str:
+    seccion_campos = ""
+    if campos_identificados:
+        etiquetas = resolver_etiquetas_campos_corregibles(campos_identificados)
+        lineas = "\n".join(f"  - {e}" for e in etiquetas)
+        seccion_campos = f"\nCampos que requieren actualización:\n{lineas}\n"
+
     seccion_enlace = (
         f"\nAcceda aquí para actualizar la información:\n{enlace}\n"
         if enlace
@@ -293,6 +301,7 @@ def _construir_cuerpo_texto_actualizacion_reabierta(
         "Puede revisar y actualizar la información del cliente/proveedor, completar "
         "nuevos cuestionarios y cargar documentos adicionales.\n\n"
         f"Observaciones:\n{observaciones}\n"
+        f"{seccion_campos}"
         f"{seccion_enlace}\n"
         "Equipo SAGRILAFT"
     )
@@ -326,6 +335,7 @@ def _construir_cuerpo_html_rechazo(mensaje_para_destinatario: str) -> str:
 def _construir_cuerpo_html_actualizacion_reabierta(
     observaciones: str,
     enlace: str | None,
+    campos_identificados: list[str] | None = None,
 ) -> str:
     observaciones_escapadas = (
         observaciones
@@ -334,6 +344,16 @@ def _construir_cuerpo_html_actualizacion_reabierta(
         .replace(">", "&gt;")
         .replace("\n", "<br>")
     )
+
+    seccion_campos_html = ""
+    if campos_identificados:
+        etiquetas = resolver_etiquetas_campos_corregibles(campos_identificados)
+        items = "".join(f"<li>{e}</li>" for e in etiquetas)
+        seccion_campos_html = (
+            '<p style="font-weight:700; margin-bottom: 6px;">Campos que requieren actualización:</p>'
+            f'<ul style="margin: 0 0 16px; padding-left: 20px; color: #0f766e;">{items}</ul>'
+        )
+
     seccion_enlace_html = (
         f'<p style="text-align:center; margin: 24px 0;">'
         f'<a href="{enlace}" '
@@ -356,6 +376,7 @@ def _construir_cuerpo_html_actualizacion_reabierta(
   <div style="background: #ecfdf5; border-left: 4px solid #0f766e; padding: 16px; border-radius: 4px; margin: 16px 0; white-space: pre-wrap;">
     {observaciones_escapadas}
   </div>
+  {seccion_campos_html}
   {seccion_enlace_html}
   <p style="color: #64748b; font-size: 0.85em; margin-top: 32px;">Equipo SAGRILAFT</p>
 </body>

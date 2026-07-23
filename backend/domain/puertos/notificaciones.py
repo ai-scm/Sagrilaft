@@ -47,6 +47,7 @@ class INotificador(Protocol):
         correo_destinatario: str,
         observaciones: str,
         enlace_diligenciamiento: Optional[str] = None,
+        campos_identificados: Optional[List[str]] = None,
     ) -> bool:
         """
         Notifica al destinatario que el expediente fue habilitado para una

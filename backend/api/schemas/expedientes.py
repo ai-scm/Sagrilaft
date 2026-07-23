@@ -195,6 +195,18 @@ class SolicitudReaperturaActualizacion(BaseModel):
         max_length=1000,
         description="Justificación interna de la reapertura para auditoría.",
     )
+    campos_identificados: List[str] = Field(
+        default_factory=list,
+        description=(
+            "IDs de los campos específicos del formulario que requieren corrección. "
+            "Deben corresponder a identificadores del catálogo de campos del formulario."
+        ),
+    )
+
+    @field_validator("campos_identificados")
+    @classmethod
+    def _validar_campos(cls, v: List[str]) -> List[str]:
+        return validar_campos_corregibles(v)
 
 
 class ResumenReaperturaActualizacion(BaseModel):

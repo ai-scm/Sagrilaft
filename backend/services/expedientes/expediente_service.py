@@ -315,12 +315,13 @@ class ExpedienteService:
         justificacion: str,
         actor_id: str,
         contrapartes_permitidas: Optional[List[str]] = None,
+        campos_identificados: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas, bloquear=True)
         estado_anterior = formulario.estado
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.reabrir_por_actualizacion()
-        campos_reapertura = self._construir_campos_reapertura_actualizacion(justificacion)
+        campos_reapertura = self._construir_campos_reapertura_actualizacion(justificacion, campos_identificados)
         datos_acceso = (
             self._acceso_service.reactivar_acceso_para_trabajo_expediente(formulario_id)
             if self._acceso_service
@@ -349,6 +350,7 @@ class ExpedienteService:
                 correo_destinatario=correo_notificado,
                 observaciones=justificacion.strip(),
                 enlace_diligenciamiento=enlace_acceso,
+                campos_identificados=campos_identificados,
             )
 
         return {
@@ -535,11 +537,11 @@ class ExpedienteService:
         ))
 
     @staticmethod
-    def _construir_campos_reapertura_actualizacion(justificacion: str) -> str:
+    def _construir_campos_reapertura_actualizacion(justificacion: str, campos_identificados: Optional[List[str]] = None) -> str:
         return json.dumps({
             "tipo": MODO_TRABAJO_ACTUALIZACION_REABIERTA,
             "especificaciones": justificacion.strip(),
-            "campos": [],
+            "campos": campos_identificados or [],
         }, ensure_ascii=False)
 
     @staticmethod

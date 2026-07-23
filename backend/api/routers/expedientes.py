@@ -283,6 +283,7 @@ def reabrir_actualizacion(
         justificacion=solicitud.justificacion,
         actor_id=usuario.email,
         contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        campos_identificados=solicitud.campos_identificados,
     )
 
 
