@@ -290,7 +290,7 @@ class ValidadorEnvioFormulario:
         errores = self._validar_filas_tabla(
             filas, "Composición Accionaria", "accionistas",
             self._CAMPOS_ACCIONISTA,
-            [self._crear_regla_porcentaje("accionistas", UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA, "El accionista", "participación")],
+            [self._crear_regla_porcentaje("accionistas", UMBRAL_MINIMO_PARTICIPACION_ACCIONISTA, "El accionista", "participación", es_inclusivo=False)],
         )
         error_total = self._error_porcentaje_excedido(
             self._sumar_porcentajes(filas),
@@ -307,7 +307,7 @@ class ValidadorEnvioFormulario:
             filas, "Beneficiario Final", "beneficiario_final",
             self._CAMPOS_BENEFICIARIO,
             [
-                self._crear_regla_porcentaje("beneficiario_final", UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL, "El beneficiario", "control")
+                self._crear_regla_porcentaje("beneficiario_final", UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL, "El beneficiario", "control", es_inclusivo=True)
             ],
         )
         error_total = self._error_porcentaje_excedido(
@@ -355,6 +355,7 @@ class ValidadorEnvioFormulario:
         umbral_minimo: float,
         etiqueta_entidad: str,
         nombre_porcentaje: str,
+        es_inclusivo: bool = False,
     ) -> Callable[[int, dict], Optional[ErrorValidacion]]:
         """Fábrica de reglas de validación de porcentaje para tablas dinámicas."""
         def regla(i: int, fila: dict) -> Optional[ErrorValidacion]:
@@ -366,10 +367,14 @@ class ValidadorEnvioFormulario:
             except (ValueError, TypeError):
                 return None
             nombre = fila.get("nombre") or f"fila {i + 1}"
-            if valor <= umbral_minimo:
+            
+            es_invalido = valor < umbral_minimo if es_inclusivo else valor <= umbral_minimo
+            
+            if es_invalido:
+                palabra = "igual o mayor al" if es_inclusivo else "mayor al"
                 return ErrorValidacion(
                     campo=f"{campo_base}[{i}].porcentaje",
-                    mensaje=f"{etiqueta_entidad} '{nombre}' debe tener {nombre_porcentaje} mayor al {umbral_minimo:.0f}%",
+                    mensaje=f"{etiqueta_entidad} '{nombre}' debe tener {nombre_porcentaje} {palabra} {umbral_minimo:.0f}%",
                 )
             if valor > PORCENTAJE_MAXIMO_PERMITIDO:
                 return ErrorValidacion(

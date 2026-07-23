@@ -131,8 +131,8 @@ export const ESQUEMAS_TABLA = {
 	    reglasCondicionales: [
 	      reglaNumeroIdAlfanumerico,
 	      (fila) =>
-	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) <= UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL
-	          ? { campo: 'porcentaje', mensaje: `El % de control debe ser mayor al ${UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL}%` }
+	        !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) < UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL
+	          ? { campo: 'porcentaje', mensaje: `El % de control debe ser igual o mayor al ${UMBRAL_MINIMO_CONTROL_BENEFICIARIO_FINAL}%` }
 	          : null,
       (fila) =>
         !esCampoVacio(fila.porcentaje) && Number(fila.porcentaje) > PORCENTAJE_MAXIMO_PERMITIDO
