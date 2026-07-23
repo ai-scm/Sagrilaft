@@ -11,6 +11,8 @@
  * .jsx solo puede exportar componentes React; mezclar valores planos con
  * componentes produce la advertencia «export is incompatible with Fast Refresh».
  */
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getIdPropsByTipoDocumento, sanitizeIdValue } from '../utils/inputValidation';
 import { LONGITUD_MAXIMA_ID } from '@shared/utils/constantes';
 import { ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR } from './tablaFormStyles';
@@ -47,6 +49,147 @@ const OPCIONES_PEP = [
   { value: 'no', label: 'No' },
 ];
 
+export const EditorVinculoPepFlotante = ({
+  valor,
+  alGuardar,
+  textoAyuda = "Describa los vínculos...",
+  disabled,
+  errStyle
+}) => {
+  const [estaAbierto, setEstaAbierto] = useState(false);
+  const [valorTemporal, setValorTemporal] = useState(valor);
+
+  const abrirEditor = () => {
+    if (disabled) return;
+    setValorTemporal(valor);
+    setEstaAbierto(true);
+  };
+
+  const cerrarYGuardar = () => {
+    alGuardar(valorTemporal);
+    setEstaAbierto(false);
+  };
+
+  return (
+    <>
+      <div 
+        onClick={abrirEditor}
+        style={{
+          padding: '8px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minHeight: '36px',
+          border: '1px solid #d1d5db',
+          borderRadius: '4px',
+          backgroundColor: disabled ? '#f3f4f6' : '#ffffff',
+          boxSizing: 'border-box',
+          ...errStyle
+        }}
+        title={disabled ? "" : "Haz clic para editar"}
+      >
+        {valor || (!disabled && <span style={{ color: '#9ca3af' }}>{textoAyuda}</span>)}
+      </div>
+
+      {estaAbierto && createPortal(
+        <div 
+          onClick={cerrarYGuardar}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 99998,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', // Un poco más oscuro para modo modal centrado
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(2px)' // Efecto opcional para enfocar el modal
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '500px', // Un poco más ancho ya que está centrado
+              maxWidth: '90vw',
+              backgroundColor: '#fff',
+              boxShadow: '0 10px 35px rgba(0,0,0,0.2)',
+              borderRadius: '8px',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              border: '1px solid #e5e7eb'
+            }}
+          >
+            {/* Cabecera */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+                Editar vínculos PEP
+              </h4>
+              <button 
+                type="button"
+                onClick={cerrarYGuardar}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '20px', color: '#6b7280', padding: '0 4px',
+                  lineHeight: '1'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Área de texto */}
+            <textarea
+              autoFocus
+              value={valorTemporal}
+              onChange={(e) => setValorTemporal(e.target.value)}
+              placeholder={textoAyuda}
+              rows={6}
+              style={{
+                width: '100%',
+                resize: 'none',
+                padding: '12px',
+                border: '2px solid #2563eb', 
+                borderRadius: '6px',
+                outline: 'none',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                boxSizing: 'border-box',
+                color: '#374151'
+              }}
+            />
+
+            {/* Pie de página: Contador y botón Listo */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                {valorTemporal.length} caracteres
+              </span>
+              <button 
+                type="button"
+                onClick={cerrarYGuardar}
+                style={{
+                  backgroundColor: '#2563eb', 
+                  color: '#fff', 
+                  border: 'none',
+                  padding: '8px 24px', 
+                  borderRadius: '6px', 
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  fontSize: '14px'
+                }}
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+};
+
 export function CeldaPEP({ item, err, onChange }) {
   return (
     <>
@@ -61,11 +204,11 @@ export function CeldaPEP({ item, err, onChange }) {
         </select>
       </td>
       <td>
-        <input
-          value={item.vinculos_pep || ''} placeholder="Describa:"
-          onChange={(e) => onChange('vinculos_pep', e.target.value)}
+        <EditorVinculoPepFlotante 
+          valor={item.vinculos_pep || ''}
+          alGuardar={(val) => onChange('vinculos_pep', val)}
           disabled={item.es_pep === 'no'}
-          style={err.vinculos_pep ? ESTILO_CELDA_ERROR : undefined}
+          errStyle={err.vinculos_pep ? ESTILO_CELDA_ERROR : undefined}
         />
       </td>
     </>
