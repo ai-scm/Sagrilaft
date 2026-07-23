@@ -58,6 +58,7 @@ export default function HistorialExpediente({ formularioId }) {
       'FORMULARIO_APROBADO': 'Formulario aprobado',
       'FORMULARIO_RECHAZADO': 'Formulario rechazado',
       'FORMULARIO_DEVUELTO': 'Formulario devuelto',
+      'FORMULARIO_DEVOLUCION_REVERTIDA': 'Devolución revertida',
       'FORMULARIO_CARGADO_MANUALMENTE': 'Formulario cargado manual',
       'REPORTE_FINAL_CARGADO': 'Reporte final cargado',
       'REPORTE_FINAL_ELIMINADO': 'Reporte final eliminado',
@@ -142,6 +143,17 @@ export default function HistorialExpediente({ formularioId }) {
                     <div className="audit-info">
                       <h4 className="audit-title">{titulo}</h4>
                       <p className="audit-desc">{descripcion}</p>
+                      {evento.metadata?.causal_cierre && (
+                        <div style={{ marginTop: '4px', fontSize: '13px', color: '#4B5563', background: '#F3F4F6', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                          <strong>Causal:</strong> {
+                            {
+                              'informe_final': 'Cierre aprobado con informe final',
+                              'no_continuacion_dialogos': 'No continuación de diálogos',
+                              'rechazado_con_informe_final': 'Cierre rechazado con informe final'
+                            }[evento.metadata.causal_cierre] || evento.metadata.causal_cierre
+                          }
+                        </div>
+                      )}
                     </div>
                     <div className="audit-meta">
                       <span>{formatearFecha(evento.created_at)}</span>

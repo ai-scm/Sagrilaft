@@ -32,6 +32,7 @@ _ETIQUETAS_EVENTO = {
     "FORMULARIO_APROBACION_REVERTIDA": "Validación de formulario revertida",
     "FORMULARIO_RECHAZADO":     "Formulario rechazado (cierre definitivo)",
     "FORMULARIO_DEVUELTO":  "Devuelto para corrección",
+    "FORMULARIO_DEVOLUCION_REVERTIDA": "Devolución revertida",
     "FORMULARIO_CARGADO_MANUALMENTE": "Formulario cargado manualmente",
     "REPORTE_FINAL_CARGADO": "Informe final cargado",
     "REPORTE_FINAL_ELIMINADO": "Informe final eliminado",
@@ -73,6 +74,12 @@ _ETIQUETAS_DOCUMENTO = {
     "FORMULARIO_PDF":         "Formulario SAGRILAFT (Oficial)",
     "CERTIFICADO_SAGRILAFT":  "Certificado de Firma Electrónica",
     "REPORTE_FINAL":          "Informe Final de Evaluación",
+}
+
+_ETIQUETAS_CAUSAL_CIERRE = {
+    "informe_final": "Cierre aprobado con informe final",
+    "no_continuacion_dialogos": "No continuación de diálogos",
+    "rechazado_con_informe_final": "Cierre rechazado con informe final",
 }
 
 def _documento_label(tipo: Optional[str]) -> str:
@@ -175,12 +182,19 @@ def _html_linea_de_tiempo(eventos: List[EventoAuditoria]) -> str:
     filas = ""
     for i, ev in enumerate(eventos, 1):
         tipo_label = _ETIQUETAS_EVENTO.get(ev.tipo_evento, ev.tipo_evento)
+        
+        detalles_extra = ""
+        if ev.metadata and "causal_cierre" in ev.metadata:
+            causal_raw = ev.metadata["causal_cierre"]
+            causal_str = _ETIQUETAS_CAUSAL_CIERRE.get(causal_raw, causal_raw)
+            detalles_extra = f"<br><small style='color: #475569; font-size: 8.5pt;'><b>Causal:</b> {escape(causal_str)}</small>"
+
         css_clase = "alerta" if ev.tipo_evento == "CAMBIO_DIRECTO_BD" else ""
         filas += (
             f"<tr class='{css_clase}'>"
             f"<td>{i}</td>"
             f"<td>{_ts(ev.created_at)}</td>"
-            f"<td>{escape(tipo_label)}</td>"
+            f"<td>{escape(tipo_label)}{detalles_extra}</td>"
             f"<td>{escape(_estado_label(ev.estado_anterior))}</td>"
             f"<td>{escape(_estado_label(ev.estado_nuevo))}</td>"
             f"<td>{escape(_actor_label(ev.actor_tipo))}</td>"
