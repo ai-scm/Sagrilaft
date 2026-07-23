@@ -31,6 +31,21 @@ class RepositorioDocumentoSQLAlchemy:
         )
         return _orm_documento_a_datos(orm) if orm else None
 
+    def obtener_activo_por_tipo_con_bloqueo(
+        self, formulario_id: str, tipo_documento: str
+    ) -> Optional[DocumentoDatos]:
+        orm = (
+            self._sesion.query(DocumentoAdjunto)
+            .filter(
+                DocumentoAdjunto.formulario_id == formulario_id,
+                DocumentoAdjunto.tipo_documento == tipo_documento,
+                DocumentoAdjunto.deleted_at.is_(None),
+            )
+            .with_for_update()
+            .first()
+        )
+        return _orm_documento_a_datos(orm) if orm else None
+
     def listar_activos(self, formulario_id: str) -> List[DocumentoDatos]:
         orms = (
             self._sesion.query(DocumentoAdjunto)

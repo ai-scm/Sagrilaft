@@ -187,14 +187,9 @@ class FormularioService:
         key = self._documentos.key_borrador(formulario.codigo_peticion, nombre_archivo)
         self._documentos.guardar_archivo(key, contenido_bytes, content_type)
 
-        documentos_activos = self._documentos.listar_documentos(formulario_id)
-        version_numero = 1
-        version_anterior_id = None
-        for doc in documentos_activos:
-            if doc.tipo_documento == tipo_documento:
-                version_numero = doc.version_numero + 1
-                version_anterior_id = doc.id
-                self._documentos.eliminar_documento(formulario_id, doc.id)
+        version_numero, version_anterior_id = (
+            self._documentos.reemplazar_documento_anterior(formulario_id, tipo_documento)
+        )
 
         from services.formulario.documento_service import _sanitizar_nombre_archivo
         nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)

@@ -195,7 +195,9 @@ def descargar_pdf_oficial(
 # ─── Endpoints de documentos adjuntos ────────────────────────────────────────
 
 @enrutador.post("/{formulario_id}/documentos", response_model=DocumentoResponse)
+@limitador.limit("60/minute")
 async def subir_documento(
+    request: Request,
     formulario_id: str,
     tipo_documento: str = Form(...),
     archivo: UploadFile = File(...),

@@ -179,3 +179,24 @@ class DocumentoService:
         if documento.ruta_archivo.startswith("tmp/"):
             self._storage.eliminar(documento.ruta_archivo)
         self._repo.marcar_eliminado(doc_id)
+
+    def reemplazar_documento_anterior(
+        self, formulario_id: str, tipo_documento: str
+    ) -> tuple[int, str | None]:
+        """
+        Busca el documento activo del mismo tipo CON bloqueo, lo elimina
+        y retorna (version_numero, version_anterior_id) para el nuevo.
+
+        Atómico: el FOR UPDATE impide que dos requests concurrentes
+        lean la misma versión anterior.
+        """
+        doc_anterior = self._repo.obtener_activo_por_tipo_con_bloqueo(
+            formulario_id, tipo_documento
+        )
+        if not doc_anterior:
+            return 1, None
+
+        version_numero = doc_anterior.version_numero + 1
+        version_anterior_id = doc_anterior.id
+        self.eliminar_documento(formulario_id, doc_anterior.id)
+        return version_numero, version_anterior_id
