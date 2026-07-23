@@ -57,11 +57,12 @@ export const api = {
     });
   },
 
-  async reabrirActualizacion(formularioId, justificacion) {
+  async reabrirActualizacion(formularioId, payload) {
+    const body = typeof payload === 'string' ? { justificacion: payload } : payload;
     return requestJson(`/expedientes/${formularioId}/reabrir-actualizacion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ justificacion }),
+      body: JSON.stringify(body),
     });
   },
 

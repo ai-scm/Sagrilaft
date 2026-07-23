@@ -1,10 +1,8 @@
 /**
- * ModalDevolucion — panel para devolver un formulario SAGRILAFT al remitente.
+ * ModalReaperturaActualizacion — panel para reabrir una actualización de expediente.
  *
- * El usuario del portal especifica qué debe corregirse o completarse y puede
- * seleccionar los campos específicos del formulario que requieren atención.
- * Al confirmar, el sistema cambia el estado a EN_CORRECCION y notifica
- * al destinatario registrado por correo electrónico.
+ * Funciona de manera idéntica al modal de devolución, permitiendo especificar
+ * qué debe corregirse y seleccionar campos del formulario.
  */
 
 import { useState } from 'react';
@@ -14,7 +12,7 @@ import FormularioEspecificacionesCorreccion from '../formularios/FormularioEspec
 
 const LONGITUD_MINIMA_ESPECIFICACIONES = 20;
 
-// ── Estilos ───────────────────────────────────────────────────────────────────
+// ── Estilos (mismos que Devolucion) ──────────────────────────────────────────
 
 const s = {
   fondo: {
@@ -103,7 +101,7 @@ const s = {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export default function ModalDevolucion({ visible, formularioId, tipoPersona, onDevuelto, onCancelar }) {
+export default function ModalReaperturaActualizacion({ visible, formularioId, tipoPersona, onReabierto, onCancelar }) {
   const [especificaciones, setEspecificaciones]     = useState('');
   const [camposSeleccionados, setCamposSeleccionados] = useState(new Set());
   const [enviando, setEnviando]                     = useState(false);
@@ -143,15 +141,17 @@ export default function ModalDevolucion({ visible, formularioId, tipoPersona, on
     setError(null);
 
     try {
-      await api.devolverExpediente(formularioId, {
-        especificaciones:    especificaciones.trim(),
+      const payload = {
+        justificacion: especificaciones.trim(),
         campos_identificados: [...camposSeleccionados],
-      });
+      };
+      
+      const resultado = await api.reabrirActualizacion(formularioId, payload);
       setMostrarConfirmacion(false);
       resetearEstado();
-      onDevuelto();
-    } catch (errorDevolucion) {
-      setError(errorDevolucion.message || 'Error al procesar la devolución. Intente nuevamente.');
+      onReabierto(resultado); // Se envía el resultado al padre (DetalleExpediente)
+    } catch (err) {
+      setError(err.message || 'Error al procesar la reapertura. Intente nuevamente.');
       setMostrarConfirmacion(false);
     } finally {
       setEnviando(false);
@@ -162,20 +162,20 @@ export default function ModalDevolucion({ visible, formularioId, tipoPersona, on
 
   const longitudActual   = especificaciones.trim().length;
   const especificacionesValidas = longitudActual >= LONGITUD_MINIMA_ESPECIFICACIONES;
-  const textoBoton       = enviando ? 'Enviando devolución…' : 'Confirmar devolución';
+  const textoBoton       = enviando ? 'Reabriendo...' : 'Reabrir actualización';
 
   return (
-    <div style={s.fondo} role="dialog" aria-modal="true" aria-labelledby="titulo-modal-devolucion">
+    <div style={s.fondo} role="dialog" aria-modal="true" aria-labelledby="titulo-modal-reapertura">
       <div style={s.modal}>
 
         {/* Encabezado */}
         <div style={s.encabezado}>
-          <h2 style={s.titulo} id="titulo-modal-devolucion">
-            Devolver formulario para corrección
+          <h2 style={s.titulo} id="titulo-modal-reapertura">
+            Reabrir actualización
           </h2>
           <p style={s.descripcion}>
-            El destinatario recibirá un correo con las especificaciones indicadas
-            y podrá acceder al formulario para corregir o completar la información solicitada.
+            La carpeta volverá a estado En corrección para continuar el ciclo periódico. 
+            Los documentos y reportes finales existentes se conservarán. Se notificará al destinatario.
           </p>
         </div>
 
@@ -189,7 +189,7 @@ export default function ModalDevolucion({ visible, formularioId, tipoPersona, on
             setCamposSeleccionados={setCamposSeleccionados}
             tipoPersona={tipoPersona}
             deshabilitado={enviando}
-            introduccionVistaPrevia="Usted ha sido requerido para completar/modificar la siguiente información del formulario:"
+            introduccionVistaPrevia="Se ha reabierto la actualización de su expediente. Para continuar, por favor proporcione/modifique la siguiente información:"
           />
 
           {/* Banner de error */}
@@ -222,9 +222,9 @@ export default function ModalDevolucion({ visible, formularioId, tipoPersona, on
 
         <ModalConfirmacion
           visible={mostrarConfirmacion}
-          titulo="¿Confirmar devolución?"
-          mensaje="El formulario será devuelto y se notificará al remitente para su corrección. ¿Desea continuar?"
-          textoConfirmar="Sí, devolver"
+          titulo="¿Confirmar reapertura?"
+          mensaje="El expediente será reabierto para actualización y se notificará al remitente. ¿Desea continuar?"
+          textoConfirmar="Sí, reabrir"
           colorConfirmar="#c2410c"
           onConfirmar={handleConfirmar}
           onCancelar={() => setMostrarConfirmacion(false)}

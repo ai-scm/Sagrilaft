@@ -80,9 +80,24 @@ function BannerCorreccionPendiente({ onNavegar }) {
         <div className="banner-correccion-completada__icono" aria-hidden="true">✓</div>
         <div className="banner-correccion-contenido">
           <p className="banner-correccion-completada__titulo">Actualización habilitada</p>
-          <p className="banner-correccion-completada__texto">
-            Revise y actualice la información del expediente, complete los cuestionarios requeridos y cargue los documentos adicionales.
+          <p className="banner-correccion-completada__texto" style={{ marginBottom: camposIdentificados.size > 0 ? '6px' : '0' }}>
+            {especificaciones ? especificaciones : 'Revise y actualice la información del expediente, complete los cuestionarios requeridos y cargue los documentos adicionales.'}
           </p>
+          {camposIdentificados.size > 0 && (
+            <p className="banner-correccion-hint" style={{ color: 'var(--green-800)' }}>
+              {camposPendientes.size} {camposPendientes.size === 1 ? 'campo requiere' : 'campos requieren'} actualización.
+              {pasoInicialCorreccion !== null && (
+                <button
+                  type="button"
+                  className="banner-correccion-link"
+                  onClick={() => onNavegar(pasoInicialCorreccion)}
+                  style={{ color: 'var(--green-700)' }}
+                >
+                  Ir al primer campo →
+                </button>
+              )}
+            </p>
+          )}
         </div>
       </div>
     );

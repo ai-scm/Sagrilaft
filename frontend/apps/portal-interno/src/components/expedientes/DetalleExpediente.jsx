@@ -23,6 +23,7 @@ import ModalRechazo from '../modals/ModalRechazo';
 import ModalCargaManual from '../modals/ModalCargaManual';
 import ModalConfirmacion from '../modals/ModalConfirmacion';
 import ModalCargaReporteFinal from '../modals/ModalCargaReporteFinal';
+import ModalReaperturaActualizacion from '../modals/ModalReaperturaActualizacion';
 import HistorialVersionesFormulario from './HistorialVersionesFormulario';
 import HistorialExpediente from './HistorialExpediente';
 import PanelAlertasAuditoria from './PanelAlertasAuditoria';
@@ -621,71 +622,6 @@ function ModalSagrilaft({ visible, onConfirmar, onCancelar, ocupado, error, expe
   );
 }
 
-function ModalReaperturaActualizacion({ visible, onConfirmar, onCancelar, ocupado, error }) {
-  const [justificacion, setJustificacion] = useState('');
-  const justificacionValida = justificacion.trim().length >= 20;
-
-  if (!visible) return null;
-
-  return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-reapertura">
-      <div className="modal-container" style={{ maxWidth: '460px' }}>
-        <div className="modal-header">
-          <h3 className="modal-title" id="titulo-reapertura">
-            Reabrir actualización
-          </h3>
-          <p className="modal-desc">
-            La carpeta volverá a estado En corrección para continuar el ciclo periódico. Los documentos y reportes finales existentes se conservarán.
-          </p>
-        </div>
-        
-        <div className="modal-body">
-          <div className="form-group">
-            <label htmlFor="justificacion-reapertura" className="form-label">
-              Justificación de reapertura
-            </label>
-            <textarea
-              id="justificacion-reapertura"
-              className="form-input form-textarea"
-              value={justificacion}
-              onChange={e => setJustificacion(e.target.value)}
-              placeholder="Ej. Se requieren nuevos soportes financieros..."
-              rows={4}
-              maxLength={1000}
-              disabled={ocupado}
-            />
-            <div className="char-counter">
-              <span>{justificacion.trim().length} / 1000</span>
-              <span style={{ color: justificacionValida ? '#166534' : '#DC2626' }}>
-                {justificacionValida ? '✓ Mínimo cumplido' : `Mínimo 20 caracteres (${justificacion.trim().length}/20)`}
-              </span>
-            </div>
-          </div>
-          {error && <div className="alert-error">{error}</div>}
-        </div>
-
-        <div className="modal-footer">
-          <button 
-            type="button" 
-            onClick={onCancelar} 
-            disabled={ocupado} 
-            className="btn-modal btn-modal-secondary"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirmar(justificacion.trim())}
-            disabled={ocupado || !justificacionValida}
-            className="btn-modal btn-modal-primary"
-          >
-            {ocupado ? 'Reabriendo...' : 'Reabrir'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -693,8 +629,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const { expediente, cargando, error, recargarExpediente } = useExpedienteDetalle(formularioId);
   const [mostrarModalCargaManual, setMostrarModalCargaManual] = useState(false);
   const [mostrarModalReapertura, setMostrarModalReapertura] = useState(false);
-  const [reabriendo, setReabriendo] = useState(false);
-  const [errorReapertura, setErrorReapertura] = useState(null);
   const [avisoReapertura, setAvisoReapertura] = useState(null);
 
   const tipoLabel = expediente ? (ETIQUETA_TIPO_CONTRAPARTE[expediente.tipo_contraparte] ?? expediente.tipo_contraparte) : '';
@@ -773,26 +707,16 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
     }
   }
 
-  async function handleReabrirActualizacion(justificacion) {
-    setReabriendo(true);
-    setErrorReapertura(null);
-    setAvisoReapertura(null);
-    try {
-      const resultado = await api.reabrirActualizacion(formularioId, justificacion);
-      setMostrarModalReapertura(false);
-      if (!resultado?.correo_enviado) {
-        setAvisoReapertura(
-          resultado?.correo_notificado
-            ? `La actualización fue reabierta, pero no se pudo enviar el correo a ${resultado.correo_notificado}.`
-            : 'La actualización fue reabierta, pero no hay correo de destinatario registrado para notificar.',
-        );
-      }
-      recargarExpediente();
-    } catch (err) {
-      setErrorReapertura(err.message || 'Error al reabrir la actualización.');
-    } finally {
-      setReabriendo(false);
+  function handleReabierto(resultado) {
+    setMostrarModalReapertura(false);
+    if (resultado && !resultado.correo_enviado) {
+      setAvisoReapertura(
+        resultado.correo_notificado
+          ? `La actualización fue reabierta, pero no se pudo enviar el correo a ${resultado.correo_notificado}.`
+          : 'La actualización fue reabierta, pero no hay correo de destinatario registrado para notificar.',
+      );
     }
+    recargarExpediente();
   }
 
   return (
@@ -831,7 +755,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 {permiteReaperturaActualizacion && (
                   <button
                     className="btn btn-outline-green"
-                    onClick={() => { setErrorReapertura(null); setMostrarModalReapertura(true); }}
+                    onClick={() => { setAvisoReapertura(null); setMostrarModalReapertura(true); }}
                     type="button"
                   >
                     Reabrir Actualización
@@ -919,10 +843,10 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
             />
             <ModalReaperturaActualizacion
               visible={mostrarModalReapertura}
-              onConfirmar={handleReabrirActualizacion}
+              formularioId={formularioId}
+              tipoPersona={expediente?.tipo_persona}
+              onReabierto={handleReabierto}
               onCancelar={() => setMostrarModalReapertura(false)}
-              ocupado={reabriendo}
-              error={errorReapertura}
             />
 
             <div className="expediente-grid">
