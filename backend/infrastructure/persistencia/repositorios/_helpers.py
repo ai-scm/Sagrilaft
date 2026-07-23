@@ -14,16 +14,7 @@ from typing import Any, Dict, List
 # Deben serializarse al escribir y deserializarse al leer.
 _CAMPOS_JSON = ["snapshot_datos"]
 
-_CAMPOS_BOOLEANOS_SI_NO = {
-    "realiza_operaciones_moneda_extranjera",
-    "autorretenedor",
-    "gran_contribuyente",
-    "entidad_sin_animo_lucro",
-    "retencion_ica",
-    "impuesto_ica",
-    "entidad_oficial",
-    "exento_retencion_fuente",
-}
+
 
 
 def _fila_orm_a_dict(fila: Any, atributos: List[str]) -> Dict[str, Any]:
@@ -65,13 +56,7 @@ def _aplicar_serializacion(datos: Dict[str, Any]) -> Dict[str, Any]:
     return resultado
 
 
-def _normalizar_booleanos_no_nulos(datos: Dict[str, Any]) -> Dict[str, Any]:
-    """Evita NULL en columnas Boolean no nulas cuando un borrador envía campo vacío."""
-    resultado = dict(datos)
-    for campo in _CAMPOS_BOOLEANOS_SI_NO:
-        if campo in resultado and resultado[campo] is None:
-            resultado[campo] = False
-    return resultado
+
 
 
 def _normalizar_enum_str(valor: str | None) -> str:

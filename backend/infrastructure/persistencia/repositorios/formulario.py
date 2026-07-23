@@ -17,7 +17,6 @@ from ._formulario_helpers import (
     _purgar_datos_no_aplicables_en_payload,
     _purgar_relaciones_no_aplicables,
 )
-from ._helpers import _normalizar_booleanos_no_nulos
 from ._mappers import _orm_formulario_a_datos
 
 
@@ -52,7 +51,7 @@ class RepositorioFormularioSQLAlchemy(RepositorioBase):
         datos_orm = _extraer_relaciones_uno_a_uno_para_creacion(
             _extraer_contactos_para_creacion(
                 _construir_relaciones_dinamicas(
-                    _normalizar_booleanos_no_nulos(_purgar_datos_no_aplicables_en_payload(datos))
+                    _purgar_datos_no_aplicables_en_payload(datos)
                 )
             )
         )
@@ -71,7 +70,7 @@ class RepositorioFormularioSQLAlchemy(RepositorioBase):
         )
         if "estado" in campos:
             self._marcar_cambio_auditado()
-        campos = _normalizar_booleanos_no_nulos(_purgar_datos_no_aplicables_en_payload(campos, orm))
+        campos = _purgar_datos_no_aplicables_en_payload(campos, orm)
         relaciones_eliminadas = _purgar_relaciones_no_aplicables(orm, campos)
         for relacion in relaciones_eliminadas:
             self._sesion.delete(relacion)
