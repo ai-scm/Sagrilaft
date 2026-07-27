@@ -140,7 +140,8 @@ _CSS_REPORTE = """
 """
 
 
-def _html_portada(formulario: FormularioDatos, generado_en: datetime) -> str:
+def _html_portada(formulario: FormularioDatos, eventos: List[EventoAuditoria], generado_en: datetime) -> str:
+    actualizaciones = sum(1 for e in eventos if e.tipo_evento == "EXPEDIENTE_REABIERTO_ACTUALIZACION")
     return (
         "<div class='portada'>"
         "<h1>Reporte de Auditoría SAGRILAFT</h1>"
@@ -149,6 +150,7 @@ def _html_portada(formulario: FormularioDatos, generado_en: datetime) -> str:
         f"<p>NIT/ID: {escape(formulario.numero_identificacion or '—')}</p>"
         f"<p>Estado actual: {escape(_estado_label(formulario.estado))}</p>"
         f"<p>Correcciones realizadas: {formulario.numero_correccion or 0}</p>"
+        f"<p>Actualizaciones realizadas: {actualizaciones}</p>"
         f"<p style='margin-top:16px; font-size:9pt;'>Generado: {_ts(generado_en)}</p>"
         "</div>"
     )
@@ -161,6 +163,7 @@ def _html_info_general(formulario: FormularioDatos) -> str:
         ("País",                formulario.pais or "—"),
         ("Ciudad",              formulario.ciudad or "—"),
         ("Correo",              formulario.correo or "—"),
+        ("Teléfono",            formulario.telefono_representante or "—"),
         ("Fecha de creación",   _ts(formulario.created_at)),
         ("Última actualización", _ts(formulario.updated_at)),
     ]
@@ -343,7 +346,7 @@ class AuditoriaService:
         firma_hex = _firmar_reporte(cuerpo_firmable, self._secret_key)
 
         html_body = (
-            _html_portada(formulario, generado_en)
+            _html_portada(formulario, eventos, generado_en)
             + "<div class='cuerpo'>"
             + _html_info_general(formulario)
             + _html_linea_de_tiempo(eventos)
