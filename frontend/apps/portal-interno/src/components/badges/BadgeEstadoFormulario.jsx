@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ESTADO_FORM_ENVIADO,
   ESTADO_FORM_EN_CORRECCION,

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { AlertTriangle, XCircle, ShieldAlert } from 'lucide-react';
-import { api } from '../../services/api';
-import { usePaginacion } from '../../hooks/usePaginacion';
-import ControlsPaginacion from '../ui/ControlsPaginacion';
+import { api } from '../../../services/api';
+import { usePaginacion } from '../../../hooks/usePaginacion';
+import ControlsPaginacion from '../../ui/ControlsPaginacion';
 import './PanelAlertasAuditoria.css';
 
 const DICCIONARIO_CAMPOS = {

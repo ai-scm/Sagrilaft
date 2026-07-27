@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Download, GitCompare } from 'lucide-react';
-import { api } from '../../services/api';
+import { api } from '../../../services/api';
 import ModalComparacionVersiones from './ModalComparacionVersiones';
 import {
   TIPO_DOCUMENTO_FORMULARIO_PDF,
   formatearFechaHora,
   formatearBytes,
-} from '../../config/constantes';
+} from '../../../config/constantes';
 
 // ── Sub-componente ────────────────────────────────────────────────────────────
 function FilaVersion({ documento, esVersionActiva, formularioId }) {

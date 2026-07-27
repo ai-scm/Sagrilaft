@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import { Clock, Download, FileText, CheckCircle2, ChevronDown, User, ArrowUp } from 'lucide-react';
-import { usePaginacion } from '../../hooks/usePaginacion';
-import ControlsPaginacion from '../ui/ControlsPaginacion';
+import { api } from '../../../services/api';
+import { Clock, FileText, CheckCircle2, User, ArrowUp } from 'lucide-react';
+import { usePaginacion } from '../../../hooks/usePaginacion';
+import ControlsPaginacion from '../../ui/ControlsPaginacion';
 
 export default function HistorialExpediente({ formularioId }) {
   const [descargandoReporte, setDescargandoReporte] = useState(false);

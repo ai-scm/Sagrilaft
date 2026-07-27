@@ -8,22 +8,22 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import DetalleExpediente from './DetalleExpediente';
-import { estilosBandeja } from '../ui/listaStyles';
-import InputBusqueda from '../ui/InputBusqueda';
-import ControlsPaginacion from '../ui/ControlsPaginacion';
-import useExpedientes from '../../hooks/useExpedientes';
+import DetalleExpediente from '../DetalleExpediente';
+import { estilosBandeja } from '../../ui/listaStyles';
+import InputBusqueda from '../../ui/InputBusqueda';
+import ControlsPaginacion from '../../ui/ControlsPaginacion';
+import useExpedientes from '../../../hooks/useExpedientes';
 import Spinner from '@shared/components/ui/Spinner';
 import Alert from '@shared/components/ui/Alert';
-import BadgeEstadoFormulario, { OPCIONES_ESTADOS_FORMULARIO } from '../badges/BadgeEstadoFormulario';
+import BadgeEstadoFormulario, { OPCIONES_ESTADOS_FORMULARIO } from '../../badges/BadgeEstadoFormulario';
 import {
   TIPOS_CONTRAPARTE,
   ETIQUETA_TIPO_CONTRAPARTE,
   formatearFechaCorta,
   generarTextoConteo,
-} from '../../config/constantes';
-import { ELEMENTOS_POR_PAGINA } from '../../config/constantesPaginacion';
-import { usePaginacion } from '../../hooks/usePaginacion';
+} from '../../../config/constantes';
+import { ELEMENTOS_POR_PAGINA } from '../../../config/constantesPaginacion';
+import { usePaginacion } from '../../../hooks/usePaginacion';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 

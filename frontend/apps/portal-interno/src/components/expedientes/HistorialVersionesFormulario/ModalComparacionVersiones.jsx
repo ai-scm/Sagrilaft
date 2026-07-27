@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import Spinner from '@shared/components/ui/Spinner';
-import { esCampoMonetario, formatearMontoMoneda } from '../../../../../shared/utils/formatoMoneda';
+import { esCampoMonetario, formatearMontoMoneda } from '@shared/utils/formatoMoneda';
 import ComparadorRegistros, { esCampoComparableComoRegistro } from '@shared/components/cambios/ComparadorRegistros';
-import { formatClasificacionActividad } from '../../utils/formateadores';
+import { formatClasificacionActividad } from '../../../utils/formateadores';
 
 const s = {
   fondo: {
