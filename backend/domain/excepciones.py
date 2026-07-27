@@ -101,7 +101,7 @@ class AccesoExpiradoError(Exception):
 
     Se distingue de TokenDiligenciamientoInvalidoError (token nunca existió)
     y de CredencialesAccesoInvalidasError (PIN incorrecto): aquí las credenciales
-    existieron y eran correctas, pero el plazo de 5 días hábiles ya venció.
+    existieron y eran correctas, pero el plazo de 15 días hábiles ya venció.
     """
 
     def __init__(self) -> None:

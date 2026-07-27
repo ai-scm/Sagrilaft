@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 
-DIAS_HABILES_VIGENCIA_ACCESO = 5
+DIAS_HABILES_VIGENCIA_ACCESO = 15
 
 
 def sumar_dias_habiles(desde: datetime, n_dias: int) -> datetime:

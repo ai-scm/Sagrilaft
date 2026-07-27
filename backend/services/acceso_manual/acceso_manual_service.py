@@ -100,7 +100,7 @@ def _calcular_estado_acceso(acceso: AccesoManualDatos) -> Literal["activo", "con
 
     Retorna:
       "consumido" — el formulario fue enviado (el acceso ya no es usable).
-      "expirado"  — el plazo de 5 días hábiles venció sin que se enviara el formulario.
+      "expirado"  — el plazo de 15 días hábiles venció sin que se enviara el formulario.
       "activo"    — las credenciales son válidas y el formulario sigue abierto.
     """
     if acceso.consumed_at is not None:
