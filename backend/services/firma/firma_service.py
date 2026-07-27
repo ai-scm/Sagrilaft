@@ -289,7 +289,7 @@ class FirmaService:
 
     # ─── Cancelación de firma ────────────────────────────────────────────────
 
-    def cancelar_firma(self, formulario_id: str, actor_id: Optional[str] = None) -> dict:
+    def cancelar_firma(self, formulario_id: str, actor_id: Optional[str] = None, motivo: Optional[str] = None) -> dict:
         formulario = self._obtener_formulario(formulario_id, bloquear=True)
         dominio = FormularioDominio.desde_snapshot(formulario)
         dominio.cancelar_firma()  # PENDIENTE_FIRMA → VALIDADO; lanza FormularioNoEditableError si no aplica
@@ -299,7 +299,7 @@ class FirmaService:
                 "El formulario no tiene una solicitud de firma activa en ZohoSign."
             )
 
-        self._zoho.cancelar_solicitud_firma(formulario.zoho_request_id)
+        self._zoho.cancelar_solicitud_firma(formulario.zoho_request_id, motivo=motivo)
         self._registrar(EventoAuditoria(
             formulario_id=formulario_id,
             tipo_evento=TipoEvento.FIRMA_CANCELADA,
@@ -307,13 +307,14 @@ class FirmaService:
             estado_nuevo=dominio.estado.value,
             actor_id=actor_id,
             actor_tipo=ActorTipo.OPERADOR,
+            metadata={"motivo": motivo} if motivo else None,
         ))
         self._repo.actualizar_formulario(formulario_id, {
             "estado":          dominio.estado.value,
             "zoho_request_id": None,
         })
 
-        logger.info("Firma cancelada para formulario %s → VALIDADO", formulario_id)
+        logger.info("Firma cancelada para formulario %s → VALIDADO. Motivo: %s", formulario_id, motivo)
         return {"estado": dominio.estado.value}
 
     # ─── Verificación manual de estado ───────────────────────────────────────

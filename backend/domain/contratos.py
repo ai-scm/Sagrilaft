@@ -333,7 +333,7 @@ class IServicioFirmaExterna(Protocol):
         """Descarga el documento firmado a la ruta de destino y devuelve la ruta real."""
         ...
 
-    def cancelar_solicitud_firma(self, request_id: str) -> None:
+    def cancelar_solicitud_firma(self, request_id: str, motivo: Optional[str] = None) -> None:
         """Cancela una solicitud de firma activa."""
         ...
 

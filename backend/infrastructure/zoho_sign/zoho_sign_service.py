@@ -266,21 +266,26 @@ class ZohoSignService:
 
     # ─── Cancelación ──────────────────────────────────────────────────────────
 
-    def cancelar_solicitud_firma(self, request_id: str) -> None:
+    def cancelar_solicitud_firma(self, request_id: str, motivo: str | None = None) -> None:
         """
         Cancela una solicitud de firma pendiente vía recall.
 
         POST /api/v1/requests/{id}/recall
-        No requiere cuerpo. Después del recall los destinatarios ya no pueden firmar.
+        Después del recall los destinatarios ya no pueden firmar.
+        Si se incluye un motivo, se reflejará en la notificación.
         """
         if self._config.modo_prueba:
             logger.info("ZohoSign sandbox: cancelando solicitud real request_id=%s", request_id)
+
+        kwargs = {"timeout": 15}
+        if motivo:
+            kwargs["data"] = {"reason": motivo}
 
         resp = self._ejecutar_peticion_con_reintentos(
             "POST",
             f"{_API_BASE}/requests/{request_id}/recall",
             headers=self._headers(),
-            timeout=15,
+            **kwargs
         )
         resp.raise_for_status()
         datos = resp.json()
