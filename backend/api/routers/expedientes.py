@@ -37,6 +37,7 @@ from api.schemas import (
     SolicitudRechazo,
     SolicitudAuditoriaAlerta,
     SagrilaftConsultaManual,
+    SolicitudCancelarFirma,
 )
 from services.expedientes.expediente_service import ExpedienteService
 from services.firma.firma_service import FirmaService
@@ -506,12 +507,13 @@ def verificar_estado_firma(
 )
 def cancelar_firma(
     formulario_id: str,
+    solicitud: SolicitudCancelarFirma,
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: FirmaService = Depends(obtener_servicio_firma),
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
     servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
-    return servicio.cancelar_firma(formulario_id, actor_id=usuario.email)
+    return servicio.cancelar_firma(formulario_id, actor_id=usuario.email, motivo=solicitud.motivo)
 
 
 @enrutador.post(
