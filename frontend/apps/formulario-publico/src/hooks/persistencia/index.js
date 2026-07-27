@@ -1,0 +1,1 @@
+export { usePersistenciaAviso } from './usePersistenciaAviso';

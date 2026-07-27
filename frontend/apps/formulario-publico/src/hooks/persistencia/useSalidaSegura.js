@@ -19,7 +19,7 @@
  * SRP: única responsabilidad = persistir localmente ante cualquier salida.
  */
 import { useEffect, useRef } from 'react';
-import { guardarBorradorEnStorage } from '../utils/borradorStorage';
+import { guardarBorradorEnStorage } from '../../utils/borradorStorage';
 
 /**
  * @param {object} snapshot - Estado actual del formulario.

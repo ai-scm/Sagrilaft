@@ -16,7 +16,7 @@
  */
 
 import { useMemo } from 'react';
-import { normalizarValorComparable } from '../utils/comparacionCorreccion';
+import { normalizarValorComparable } from '../../utils/comparacionCorreccion';
 
 // IDs del catálogo que corresponden a tablas dinámicas (no viven en formData)
 const CAMPOS_TABLA = new Set([

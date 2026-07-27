@@ -18,7 +18,7 @@
  * SRP: única responsabilidad = persistencia remota con debounce.
  */
 import { useEffect } from 'react';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 
 const DEMORA_GUARDADO_REMOTO_MS = 10_000;
 

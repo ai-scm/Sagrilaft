@@ -4,7 +4,7 @@ import { buildSelectStyles } from '../../utils/selectStyles';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
 import { HR, SectionTitle, SubLabel, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, MensajeError, CeldaToggleProducto } from '../TablaFormComponents';
 import { useCorreccion } from '../../context/CorreccionContext';
-import { fueValorModificado, normalizarValorComparable } from '../../utils/comparacionCorreccion';
+import { fueValorModificado } from '../../utils/comparacionCorreccion';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import textosAyudaCampos from '../data/helpTexts';
 
 /**

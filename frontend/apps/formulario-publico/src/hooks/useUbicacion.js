@@ -11,6 +11,7 @@
  * SRP : única responsabilidad = gestionar la cascada de ubicación.
  * OCP : extensible sin modificar los componentes consumidores.
  * DIP : los componentes dependen de esta interfaz, no de country-state-city.
+ * en la raíz porque es un hook compartido/simple usado por pasos distintos, no pertenece claramente a un flujo de negocio único.
  */
 
 import { useMemo } from 'react';

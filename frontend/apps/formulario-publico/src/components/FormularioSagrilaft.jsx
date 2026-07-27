@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
 import HelpPanel from './HelpPanel';
 import ProgressBar from './ProgressBar';
 import ModalConfirmacion from '@shared/components/ui/ModalConfirmacion';
-import { useFormulario } from '../hooks/useFormulario';
+import { useFormulario } from '../hooks/formulario';
 import { TOTAL_STEPS } from '../data/formularioConfig';
 import { CorreccionProvider, useCorreccion } from '../context/CorreccionContext';
 
@@ -18,7 +18,7 @@ import SubmittedView from './SubmittedView';
 import NavegacionFormulario from './NavegacionFormulario';
 import DisclaimerCamposNoAplicables from './DisclaimerCamposNoAplicables';
 import DisclaimerRadicacion from './DisclaimerRadicacion';
-import { useDisclaimerRadicacion } from '../hooks/useDisclaimerRadicacion';
+import { useDisclaimerRadicacion } from '../hooks/radicacion';
 import PasoDocumentos from './pasos/PasoDocumentos';
 import PasoInfoBasica from './pasos/PasoInfoBasica';
 import PasoRepresentante from './pasos/PasoRepresentante';

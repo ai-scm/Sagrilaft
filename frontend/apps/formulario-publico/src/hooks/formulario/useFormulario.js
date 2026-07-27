@@ -8,27 +8,27 @@
  * DIP: los pasos dependen de esta interfaz, no de implementaciones concretas.
  */
 import { useState, useCallback, useMemo } from 'react';
-import { api } from '../services/api';
+import { api } from '../../services/api';
 import {
   TOTAL_STEPS,
   CAMPOS_REQUERIDOS,
   CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA,
   CAMPOS_PERSONA_NATURAL,
   calcularPasosVisibles,
-} from '../data/formularioConfig';
+} from '../../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
-import { useFormPersistencia } from './useFormPersistencia';
-import { useRecuperacionSesion } from './useRecuperacionSesion';
+import { useFormPersistencia } from '../persistencia/useFormPersistencia';
+import { useRecuperacionSesion } from '../persistencia/useRecuperacionSesion';
 import { useAlertasInconsistencia } from './useAlertasInconsistencia';
 import {
   validarTablasPaso4, CLAVES_ERROR_PASO4, purgarFilasVaciasPaso4,
   validarTablasPaso6, CLAVES_ERROR_PASO6, purgarFilasVaciasPaso6,
   validarTablasPaso7, CLAVES_ERROR_PASO7, purgarFilasVaciasPaso7,
-} from '../utils/validacionTablas';
+} from '../../utils/validacionTablas';
 import { sanitizarPayload } from '@shared/utils/normalizadores';
-import { obtenerCamposDeDocumento } from '../data/mapeoDocumentos';
-import { calcularValorDv } from '../utils/inputValidation';
+import { obtenerCamposDeDocumento } from '../../data/mapeoDocumentos';
+import { calcularValorDv } from '../../utils/inputValidation';
 
 const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 

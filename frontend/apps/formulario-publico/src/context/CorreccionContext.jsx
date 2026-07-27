@@ -28,8 +28,7 @@
  */
 
 import { createContext, useContext, useCallback } from 'react';
-import { useCorreccionPendiente } from '../hooks/useCorreccionPendiente';
-import { useEstadoCorreccionGlobal } from '../hooks/useEstadoCorreccionGlobal';
+import { useCorreccionPendiente, useEstadoCorreccionGlobal } from '../hooks/correccion';
 
 const CorreccionContext = createContext({
   activa:                         false,

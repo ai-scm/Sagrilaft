@@ -17,8 +17,8 @@
  * DIP: depende de borradorStorage y api, no de implementaciones de persistencia.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useDiligenciamiento } from '../context/DiligenciamientoContext';
+import { useEffect, useCallback, useRef } from 'react';
+import { useDiligenciamiento } from '../../context/DiligenciamientoContext';
 
 // Campos del servidor que NO deben copiarse en formData del cliente.
 // Son metadatos del formulario o tablas gestionadas como estado separado.

@@ -5,9 +5,9 @@
  * SRP: única responsabilidad = saber qué campos son válidos en cada paso.
  */
 import { useState, useCallback } from 'react';
-import textosAyudaCampos from '../data/helpTexts';
-import { CAMPOS_REQUERIDOS, CAMPOS_CONDICIONALES } from '../data/formularioConfig';
-import { validarReglasEspeciales } from '../utils/inputValidation';
+import textosAyudaCampos from '../../data/helpTexts';
+import { CAMPOS_REQUERIDOS, CAMPOS_CONDICIONALES } from '../../data/formularioConfig';
+import { validarReglasEspeciales } from '../../utils/inputValidation';
 
 /**
  * Determina si un valor de campo está vacío o sin seleccionar.

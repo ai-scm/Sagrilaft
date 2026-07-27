@@ -11,11 +11,11 @@
  * .jsx solo puede exportar componentes React; mezclar valores planos con
  * componentes produce la advertencia «export is incompatible with Fast Refresh».
  */
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getIdPropsByTipoDocumento, sanitizeIdValue } from '../utils/inputValidation';
 import { LONGITUD_MAXIMA_ID } from '@shared/utils/constantes';
-import { ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR } from './tablaFormStyles';
+import { ESTILO_CELDA_ERROR } from './tablaFormStyles';
 
 // Re-exportadas desde tablaFormStyles.js para que todos los importadores
 // existentes sigan funcionando sin cambios.

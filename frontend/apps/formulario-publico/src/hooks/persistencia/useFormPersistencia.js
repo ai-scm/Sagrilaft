@@ -26,7 +26,7 @@ import { useState } from 'react';
 import { usePersistenciaLocal } from './usePersistenciaLocal';
 import { usePersistenciaRemota } from './usePersistenciaRemota';
 import { useSalidaSegura } from './useSalidaSegura';
-import { eliminarBorradorDeStorage } from '../utils/borradorStorage';
+import { eliminarBorradorDeStorage } from '../../utils/borradorStorage';
 
 export function useFormPersistencia(snapshot, construirPayload) {
   const [lastSaved, setLastSaved] = useState(null);

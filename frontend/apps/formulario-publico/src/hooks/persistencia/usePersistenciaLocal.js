@@ -15,7 +15,7 @@
  * SRP: única responsabilidad = persistencia local con debounce.
  */
 import { useEffect, useCallback } from 'react';
-import { guardarBorradorEnStorage } from '../utils/borradorStorage';
+import { guardarBorradorEnStorage } from '../../utils/borradorStorage';
 
 const DEMORA_GUARDADO_LOCAL_MS = 3_000;
 

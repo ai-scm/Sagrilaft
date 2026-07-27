@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DISCLAIMER_RADICACION } from '../hooks/useDisclaimerRadicacion';
+import { DISCLAIMER_RADICACION } from '../hooks/radicacion';
 
 /**
  * Disclaimer obligatorio previo a la radicación del formulario.

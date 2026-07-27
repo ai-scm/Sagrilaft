@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { usePersistenciaAviso } from '../hooks/usePersistenciaAviso';
+import { usePersistenciaAviso } from '../hooks/persistencia';
 
 const CLAVE_SESION = 'sagrilaft_aviso_campos_na_colapsado';
 

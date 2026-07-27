@@ -29,7 +29,7 @@ import {
   DOCS_NOMBRE_REPRESENTANTE,
   DOCS_NUMERO_DOC_REPRESENTANTE,
   DOCS_DIRECCION,
-} from '../utils/calcularAlertasInconsistencia';
+} from '../../utils/calcularAlertasInconsistencia';
 
 export function useAlertasInconsistencia(documentos, formData, alertasServidor = []) {
   // Restaurar datos extraídos desde las alertas del servidor si no están presentes en `documentos`.
