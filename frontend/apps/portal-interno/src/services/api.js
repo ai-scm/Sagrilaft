@@ -206,9 +206,11 @@ export const api = {
     });
   },
 
-  async cancelarFirma(formularioId) {
+  async cancelarFirma(formularioId, motivo = null) {
     return requestJson(`/expedientes/${formularioId}/cancelar-firma`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
     });
   },
 

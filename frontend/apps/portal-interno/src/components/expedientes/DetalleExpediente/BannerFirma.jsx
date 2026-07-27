@@ -27,7 +27,10 @@ export default function BannerFirma({
   const [mostrarModalRechazo, setMostrarModalRechazo] = useState(false);
   const [mostrarModalAprobacion, setMostrarModalAprobacion] = useState(false);
   const [mostrarModalReabrirRevision, setMostrarModalReabrirRevision] = useState(false);
+  const [mostrarModalCancelacion, setMostrarModalCancelacion] = useState(false);
+  const [motivoCancelacion, setMotivoCancelacion] = useState('');
   const motivoReaperturaValido = motivoReapertura.trim().length >= 20;
+  const motivoCancelacionValido = motivoCancelacion.trim().length >= 20;
 
   async function handleAprobar() {
     await firma.aprobar({ onAprobado: () => setMostrarModalAprobacion(false) });
@@ -52,6 +55,14 @@ export default function BannerFirma({
         setMotivoReapertura('');
       },
     });
+  }
+
+  async function handleCancelarFirma() {
+    if (!motivoCancelacionValido) return;
+
+    await firma.cancelarFirma(motivoCancelacion.trim());
+    setMostrarModalCancelacion(false);
+    setMotivoCancelacion('');
   }
 
   if (estado === ESTADO_ENVIADO) {
@@ -195,6 +206,7 @@ export default function BannerFirma({
   if (estado === ESTADO_PENDIENTE_FIRMA) {
     const ocupado = firma.cancelando || firma.verificando;
     return (
+      <>
       <div className="banner-firma banner-firma-pendiente">
         <div className="banner-firma-textos">
           <p className="banner-firma-titulo">Firma electrónica pendiente</p>
@@ -213,14 +225,53 @@ export default function BannerFirma({
           </button>
           <button
             className="btn-firma btn-firma-color-pendiente"
-            onClick={firma.cancelarFirma}
+            onClick={() => {
+              firma.setErrorFirma(null);
+              setMostrarModalCancelacion(true);
+            }}
             disabled={ocupado}
             type="button"
           >
-            {firma.cancelando ? 'Cancelando\u2026' : 'Cancelar'}
+            {firma.cancelando ? 'Cancelando\u2026' : 'Cancelar firma'}
           </button>
         </div>
       </div>
+      <ModalConfirmacion
+        visible={mostrarModalCancelacion}
+        titulo="Cancelar firma electrónica"
+        textoConfirmar="Cancelar firma"
+        colorConfirmar="#DC2626"
+        onConfirmar={handleCancelarFirma}
+        onCancelar={() => setMostrarModalCancelacion(false)}
+        ocupado={firma.cancelando}
+        confirmarDeshabilitado={!motivoCancelacionValido}
+      >
+        <div>
+          <p style={{ margin: '0 0 14px', color: '#475569', lineHeight: 1.5, fontSize: '0.9rem' }}>
+            {'La solicitud de firma en ZohoSign será cancelada (recall) y se notificará a los destinatarios. El expediente volverá al estado Validado.'}
+          </p>
+          <label htmlFor="motivo-cancelacion-firma" className="form-label">
+            Motivo de la cancelación (Visible para la contraparte)
+          </label>
+          <textarea
+            id="motivo-cancelacion-firma"
+            className="form-input form-textarea"
+            value={motivoCancelacion}
+            onChange={e => setMotivoCancelacion(e.target.value)}
+            rows={4}
+            maxLength={1000}
+            disabled={firma.cancelando}
+            placeholder="Ej. El documento adjunto debe ser corregido antes de firmar..."
+          />
+          <div className="char-counter">
+            <span>{motivoCancelacion.trim().length} / 1000</span>
+            <span style={{ color: motivoCancelacionValido ? '#166534' : '#DC2626' }}>
+              {motivoCancelacionValido ? 'Mínimo cumplido' : `Mínimo 20 caracteres (${motivoCancelacion.trim().length}/20)`}
+            </span>
+          </div>
+        </div>
+      </ModalConfirmacion>
+      </>
     );
   }
 

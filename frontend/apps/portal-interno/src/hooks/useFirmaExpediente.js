@@ -33,10 +33,10 @@ export function useFirmaExpediente({ formularioId, onActualizado }) {
     );
   }
 
-  function cancelarFirma() {
+  function cancelarFirma(motivo) {
     return ejecutarAccion(
       setCancelando,
-      () => api.cancelarFirma(formularioId),
+      () => api.cancelarFirma(formularioId, motivo),
       'Error al cancelar la firma. Intente nuevamente.',
     );
   }
