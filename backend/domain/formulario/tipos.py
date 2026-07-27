@@ -48,11 +48,11 @@ class ClasificacionActividad(str, enum.Enum):
 
 class ActividadClasificacion(str, enum.Enum):
     """Actividad principal de la empresa (Sección 8)."""
-    INDUSTRIAL         = "industrial"
-    COMERCIAL          = "comercial"
-    FINANCIERA         = "financiera"
-    ECONOMIA_SOLIDARIA = "economia_solidaria"
-    OTRA               = "otra"
+    INDUSTRIAL         = "Industrial"
+    COMERCIAL          = "Comercial"
+    FINANCIERA         = "Financiera"
+    ECONOMIA_SOLIDARIA = "Economia solidaria"
+    OTRA               = "Otra"
 
 
 class SectorEmpresa(str, enum.Enum):
