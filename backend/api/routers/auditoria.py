@@ -25,7 +25,7 @@ enrutador = APIRouter(
     summary="Métricas operativas de expedientes",
     description=(
         "Devuelve conteo de expedientes por estado, formularios estancados (sin movimiento "
-        f"en más de 5 días) y tiempo promedio de permanencia por estado."
+        f"en más de 15 días) y tiempo promedio de permanencia por estado."
     ),
 )
 def dashboard_metricas(

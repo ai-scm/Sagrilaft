@@ -26,7 +26,7 @@ from infrastructure.persistencia.models import (
 logger = logging.getLogger(__name__)
 
 # Umbral para considerar un formulario "estancado" (días sin cambio de estado)
-_DIAS_ESTANCADO = 5
+_DIAS_ESTANCADO = 15
 
 
 def _orm_a_evento(orm: EventoFormulario) -> EventoAuditoria:
