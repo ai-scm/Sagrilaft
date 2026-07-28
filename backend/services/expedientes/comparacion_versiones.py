@@ -205,6 +205,8 @@ def _presentar(campo: str, valor: Any, snapshot: Dict[str, Any]) -> str:
     normalizado = _normalizar(valor)
     if not normalizado:
         return "Sin información"
+    if isinstance(valor, bool):
+        return "Sí" if valor else "No"
     if campo in _CAMPOS_MONETARIOS:
         return _formatear_monto(valor, snapshot.get("moneda_declaracion"), snapshot.get("moneda_declaracion_otra"))
     if isinstance(valor, (list, dict)):

@@ -230,27 +230,6 @@ class FormularioBase(BaseModel):
             raise ValueError("El dígito de verificación debe ser un único dígito numérico (0-9)")
         return limpio
 
-    @field_validator(
-        "actividad_clasificacion",
-        "sector",
-        "responsabilidades_renta",
-        "responsabilidades_iva",
-        "regimen_iva",
-        mode="before",
-    )
-    @classmethod
-    def normalizar_enums_capitalizados(cls, v: object) -> str | None:
-        """
-        Normaliza los valores enviados por el frontend en minúsculas
-        para que coincidan con los Enums del backend (Ej: "comercial" -> "Comercial").
-        """
-        if isinstance(v, str) and v.strip():
-            v = v.strip()
-            # capitalize() convierte la primera a mayúscula y el resto a minúscula,
-            # perfecto para "economia solidaria" o "comercial"
-            return v.capitalize()
-        return v
-
     @field_serializer(
         "ingresos_mensuales",
         "otros_ingresos",
