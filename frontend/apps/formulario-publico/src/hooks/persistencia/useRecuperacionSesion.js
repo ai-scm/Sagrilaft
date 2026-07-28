@@ -19,6 +19,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useDiligenciamiento } from '../../context/DiligenciamientoContext';
+import { ESTADO_FORM_EN_CORRECCION } from '@shared/utils/constantes';
 
 // Campos del servidor que NO deben copiarse en formData del cliente.
 // Son metadatos del formulario o tablas gestionadas como estado separado.
@@ -170,7 +171,7 @@ export function useRecuperacionSesion(setters) {
     setCodigoPeticion(snapshot_recuperar_sesion.codigoPeticion ?? null);
     setEstadoFormulario(snapshot_recuperar_sesion.estadoFormulario ?? null);
     setCamposACorregir(snapshot_recuperar_sesion.camposACorregir ?? null);
-    if (snapshot_recuperar_sesion.estadoFormulario === 'en_correccion') {
+    if (snapshot_recuperar_sesion.estadoFormulario === ESTADO_FORM_EN_CORRECCION) {
       setFormDataOriginal(_normalizarBooleanosFormulario(snapshot_recuperar_sesion.formData ?? {}));
       setTablasOriginales({
         juntaDirectiva: snapshot_recuperar_sesion.juntaDirectiva ?? [],

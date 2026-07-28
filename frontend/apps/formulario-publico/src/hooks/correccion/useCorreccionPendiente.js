@@ -12,9 +12,10 @@
 
 import { useMemo, useCallback } from 'react';
 import { CATALOGO_CORRECCIONES } from '@shared/data/catalogoCorrecciones';
-import { MODO_TRABAJO_ACTUALIZACION_REABIERTA } from '@shared/utils/constantes';
-
-const ESTADO_EN_CORRECCION = 'en_correccion';
+import {
+  MODO_TRABAJO_ACTUALIZACION_REABIERTA,
+  ESTADO_FORM_EN_CORRECCION as ESTADO_EN_CORRECCION,
+} from '@shared/utils/constantes';
 
 /**
  * @typedef {Object} CorreccionPendiente

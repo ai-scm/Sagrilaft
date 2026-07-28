@@ -3,15 +3,16 @@ import ModalConfirmacion from '../../modals/ModalConfirmacion';
 import ModalDevolucion from '../../modals/ModalDevolucion';
 import ModalRechazo from '../../modals/ModalRechazo';
 import { MODO_TRABAJO_ACTUALIZACION_REABIERTA } from '../../../config/constantes';
+import {
+  ESTADO_FORM_ENVIADO as ESTADO_ENVIADO,
+  ESTADO_FORM_EN_CORRECCION as ESTADO_EN_CORRECCION,
+  ESTADO_FORM_VALIDADO as ESTADO_VALIDADO,
+  ESTADO_FORM_PENDIENTE_FIRMA as ESTADO_PENDIENTE_FIRMA,
+  ESTADO_FORM_FIRMADO as ESTADO_FIRMADO,
+  ESTADO_FORM_CERRADO as ESTADO_CERRADO,
+} from '@shared/utils/constantes';
 import { useFirmaExpediente } from '../../../hooks/useFirmaExpediente';
 import BtnDescargaFirmado from './BtnDescargaFirmado';
-
-const ESTADO_ENVIADO = 'enviado';
-const ESTADO_EN_CORRECCION = 'en_correccion';
-const ESTADO_VALIDADO = 'validado';
-const ESTADO_PENDIENTE_FIRMA = 'pendiente_firma';
-const ESTADO_FIRMADO = 'firmado';
-const ESTADO_CERRADO = 'cerrado';
 
 export default function BannerFirma({
   estado,
