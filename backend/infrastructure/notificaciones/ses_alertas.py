@@ -19,22 +19,12 @@ from botocore.exceptions import ClientError
 from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from infrastructure.configuracion import AWSConfig, SesConfig
 from infrastructure.notificaciones.templates_correos import (
-    TipoAlertaTemplate,
     construir_html_notificacion,
     construir_texto_plano_notificacion,
+    obtener_asunto_correo,
 )
 
 logger = logging.getLogger(__name__)
-
-_ASUNTO_POR_TIPO: dict[TipoAlerta, str] = {
-    TipoAlerta.FORMULARIO_RECIBIDO: "[SAGRILAFT] Nuevo formulario recibido",
-    TipoAlerta.FORMULARIO_DEVUELTO: "[SAGRILAFT] Formulario devuelto para corrección",
-    TipoAlerta.FORMULARIO_CORREGIDO: "[SAGRILAFT] Formulario corregido y reenviado",
-    TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: "[SAGRILAFT] Formulario enviado a firma electrónica",
-    TipoAlerta.FORMULARIO_FIRMADO: "[SAGRILAFT] Formulario firmado electrónicamente",
-    TipoAlerta.FORMULARIO_RECHAZADO: "[SAGRILAFT] Formulario rechazado",
-    TipoAlerta.REPORTE_FINAL_CARGADO: "[SAGRILAFT] Reporte final cargado",
-}
 
 
 def _parsear_destinatarios(valor: str) -> list[str]:
@@ -114,9 +104,6 @@ class SesAlertasPortal:
             True si se envió exitosamente, False si falló.
         """
         try:
-            # Mapear TipoAlerta (dominio) a TipoAlertaTemplate (templates)
-            tipo_template = self._mapear_tipo_alerta(tipo)
-
             # Para alertas de devolución (acción 5 → trazabilidad interna del área),
             # omitir CTA (botón, enlace, acceso manual) ya que el área responsable
             # ya verificó y decidió devolver. El botón solo es necesario para
@@ -125,7 +112,7 @@ class SesAlertasPortal:
 
             # Construir versiones HTML y texto plano
             cuerpo_html = construir_html_notificacion(
-                tipo_alerta=tipo_template,
+                tipo_alerta=tipo,
                 formulario_id=formulario_id,
                 razon_social=razon_social,
                 tipo_contraparte=tipo_contraparte,
@@ -136,7 +123,7 @@ class SesAlertasPortal:
             )
 
             cuerpo_texto = construir_texto_plano_notificacion(
-                tipo_alerta=tipo_template,
+                tipo_alerta=tipo,
                 formulario_id=formulario_id,
                 razon_social=razon_social,
                 tipo_contraparte=tipo_contraparte,
@@ -158,7 +145,7 @@ class SesAlertasPortal:
                 Source=self._email_origen,
                 Destination={"ToAddresses": destinatarios},
                 Message={
-                    "Subject": {"Data": _ASUNTO_POR_TIPO[tipo]},
+                    "Subject": {"Data": obtener_asunto_correo(tipo)},
                     "Body": {
                         "Html": {"Data": cuerpo_html, "Charset": "UTF-8"},
                         "Text": {"Data": cuerpo_texto, "Charset": "UTF-8"},
@@ -186,19 +173,6 @@ class SesAlertasPortal:
             self._fallidas += 1
             logger.error(f"Error inesperado enviando email: {e}", exc_info=True)
             return False
-
-    def _mapear_tipo_alerta(self, tipo: TipoAlerta) -> TipoAlertaTemplate:
-        """Convierte TipoAlerta (dominio) a TipoAlertaTemplate (templates)."""
-        mapeo = {
-            TipoAlerta.FORMULARIO_RECIBIDO: TipoAlertaTemplate.FORMULARIO_RECIBIDO,
-            TipoAlerta.FORMULARIO_DEVUELTO: TipoAlertaTemplate.FORMULARIO_DEVUELTO,
-            TipoAlerta.FORMULARIO_CORREGIDO: TipoAlertaTemplate.FORMULARIO_CORREGIDO,
-            TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: TipoAlertaTemplate.FORMULARIO_ENVIADO_A_FIRMA,
-            TipoAlerta.FORMULARIO_FIRMADO: TipoAlertaTemplate.FORMULARIO_FIRMADO,
-            TipoAlerta.FORMULARIO_RECHAZADO: TipoAlertaTemplate.FORMULARIO_RECHAZADO,
-            TipoAlerta.REPORTE_FINAL_CARGADO: TipoAlertaTemplate.REPORTE_FINAL_CARGADO,
-        }
-        return mapeo[tipo]
 
     @property
     def estadisticas(self) -> dict:

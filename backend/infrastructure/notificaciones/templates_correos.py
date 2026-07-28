@@ -11,81 +11,92 @@ Ventajas:
 """
 
 from typing import Dict, Optional
-from enum import Enum
 from datetime import datetime, timezone
 
-
-class TipoAlertaTemplate(str, Enum):
-    """Tipos de alertas y sus atributos visuales."""
-    FORMULARIO_RECIBIDO = "FORMULARIO_RECIBIDO"
-    FORMULARIO_DEVUELTO = "FORMULARIO_DEVUELTO"
-    FORMULARIO_CORREGIDO = "FORMULARIO_CORREGIDO"
-    FORMULARIO_ENVIADO_A_FIRMA = "FORMULARIO_ENVIADO_A_FIRMA"
-    FORMULARIO_FIRMADO = "FORMULARIO_FIRMADO"
-    FORMULARIO_RECHAZADO = "FORMULARIO_RECHAZADO"
-    REPORTE_FINAL_CARGADO = "REPORTE_FINAL_CARGADO"
+from domain.puertos.alertas_portal import TipoAlerta
 
 
 # ── Configuración por tipo de alerta ─────────────────────────────────────────
+#
+# Única fuente de verdad para todo lo que varía según TipoAlerta (dominio):
+# atributos visuales del template HTML y el asunto del correo. Antes, el
+# asunto vivía duplicado en sns_alertas.py y ses_alertas.py — ahora ambos
+# adaptadores lo leen de aquí mediante obtener_asunto_correo().
 
-CONFIGURACION_ALERTA: Dict[TipoAlertaTemplate, Dict[str, str]] = {
-    TipoAlertaTemplate.FORMULARIO_RECIBIDO: {
+CONFIGURACION_ALERTA: Dict[TipoAlerta, Dict[str, str]] = {
+    TipoAlerta.FORMULARIO_RECIBIDO: {
         "titulo": "Nuevo Formulario Recibido",
         "icono": "&#x1F4CB;",  # 📋 (clipboard) - usar entity HTML para evitar markdown conversion
         "color": "#1d4ed8",  # Azul
         "color_oscuro": "#1e40af",
         "mensaje": "Se ha recibido un nuevo formulario que requiere revisión y gestión en el portal SAGRILAFT.",
         "etiqueta_boton": "Revisar Formulario en el Portal",
+        "asunto": "[SAGRILAFT] Nuevo formulario recibido",
     },
-    TipoAlertaTemplate.FORMULARIO_DEVUELTO: {
+    TipoAlerta.FORMULARIO_DEVUELTO: {
         "titulo": "Formulario Devuelto para Corrección",
         "icono": "&#x26A0;",  # ⚠️ (warning) - usar entity HTML para evitar markdown conversion
         "color": "#f59e0b",  # Ámbar
         "color_oscuro": "#d97706",
         "mensaje": "El formulario ha sido devuelto para realizar correcciones. Por favor, revise los detalles.",
         "etiqueta_boton": "Ver Correcciones Requeridas",
+        "asunto": "[SAGRILAFT] Formulario devuelto para corrección",
     },
-    TipoAlertaTemplate.FORMULARIO_CORREGIDO: {
+    TipoAlerta.FORMULARIO_CORREGIDO: {
         "titulo": "Formulario Corregido Recibido",
         "icono": "&#x2705;",  # ✅ (checkmark) - usar entity HTML para evitar markdown conversion
         "color": "#10b981",  # Verde
         "color_oscuro": "#059669",
         "mensaje": "El formulario corregido ha sido recibido exitosamente. Revise los cambios en el portal.",
         "etiqueta_boton": "Ver Formulario Corregido",
+        "asunto": "[SAGRILAFT] Formulario corregido y reenviado",
     },
-    TipoAlertaTemplate.FORMULARIO_ENVIADO_A_FIRMA: {
+    TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: {
         "titulo": "Formulario Enviado a Firma Electrónica",
         "icono": "&#x270D;",  # ✍️ (writing hand) - usar entity HTML para evitar markdown conversion
         "color": "#8b5cf6",  # Púrpura
         "color_oscuro": "#7c3aed",
         "mensaje": "El formulario ha sido enviado a firma electrónica. Revise el estado en el portal.",
         "etiqueta_boton": "Ver Estado de Firma",
+        "asunto": "[SAGRILAFT] Formulario enviado a firma electrónica",
     },
-    TipoAlertaTemplate.FORMULARIO_FIRMADO: {
+    TipoAlerta.FORMULARIO_FIRMADO: {
         "titulo": "Formulario Firmado Electrónicamente",
         "icono": "&#x1F50F;",  # 🔏 (padlock) - usar entity HTML para evitar markdown conversion
         "color": "#06b6d4",  # Cyan
         "color_oscuro": "#0891b2",
         "mensaje": "El formulario ha sido firmado electrónicamente. Descargue la copia firmada en el portal.",
         "etiqueta_boton": "Descargar Formulario Firmado",
+        "asunto": "[SAGRILAFT] Formulario firmado electrónicamente",
     },
-    TipoAlertaTemplate.FORMULARIO_RECHAZADO: {
+    TipoAlerta.FORMULARIO_RECHAZADO: {
         "titulo": "Formulario Rechazado",
         "icono": "&#x274C;",  # ❌ (cross mark) - usar entity HTML para evitar markdown conversion
         "color": "#dc2626",  # Rojo
         "color_oscuro": "#b91c1c",
         "mensaje": "El expediente fue rechazado de forma definitiva. Revise el motivo interno y la trazabilidad en el portal.",
         "etiqueta_boton": "Ver Expediente Rechazado",
+        "asunto": "[SAGRILAFT] Formulario rechazado",
     },
-    TipoAlertaTemplate.REPORTE_FINAL_CARGADO: {
+    TipoAlerta.REPORTE_FINAL_CARGADO: {
         "titulo": "Reporte Final Cargado",
         "icono": "&#x1F4C4;",  # 📄 (documento) - usar entity HTML para evitar markdown conversion
         "color": "#0f766e",  # Teal
         "color_oscuro": "#115e59",
         "mensaje": "Se ha cargado el reporte final del expediente. La carpeta quedó cerrada para gestión interna.",
         "etiqueta_boton": "Ver Reporte Final en el Portal",
+        "asunto": "[SAGRILAFT] Reporte final cargado",
     },
 }
+
+
+def obtener_asunto_correo(tipo_alerta: TipoAlerta) -> str:
+    """Asunto del correo para el tipo de alerta dado.
+
+    Punto único de acceso al asunto — los adaptadores de notificaciones
+    (SNS, SES) no deben leer CONFIGURACION_ALERTA directamente.
+    """
+    return CONFIGURACION_ALERTA[tipo_alerta]["asunto"]
 
 
 def _escapar_html(texto: str | None) -> str:
@@ -304,7 +315,7 @@ def _generar_seccion_cta_html(
 
 
 def construir_html_notificacion(
-    tipo_alerta: TipoAlertaTemplate,
+    tipo_alerta: TipoAlerta,
     formulario_id: str,
     razon_social: str,
     tipo_contraparte: str,
@@ -435,7 +446,7 @@ def construir_html_notificacion(
 
 
 def construir_texto_plano_notificacion(
-    tipo_alerta: TipoAlertaTemplate,
+    tipo_alerta: TipoAlerta,
     formulario_id: str,
     razon_social: str,
     tipo_contraparte: str,

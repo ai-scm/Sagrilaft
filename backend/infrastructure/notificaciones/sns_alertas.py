@@ -18,25 +18,15 @@ from botocore.exceptions import ClientError
 from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from infrastructure.configuracion import AWSConfig, SnsConfig
 from infrastructure.notificaciones.templates_correos import (
-    TipoAlertaTemplate,
     construir_html_notificacion,
     construir_texto_plano_notificacion,
+    obtener_asunto_correo,
 )
 
 logger = logging.getLogger(__name__)
 
 # Ventana de throttling: no enviar la misma alerta si ya se envió en los últimos N minutos
 THROTTLE_MINUTOS = 5
-
-_ASUNTO_POR_TIPO: dict[TipoAlerta, str] = {
-    TipoAlerta.FORMULARIO_RECIBIDO:  "[SAGRILAFT] Nuevo formulario recibido",
-    TipoAlerta.FORMULARIO_DEVUELTO:  "[SAGRILAFT] Formulario devuelto para corrección",
-    TipoAlerta.FORMULARIO_CORREGIDO: "[SAGRILAFT] Formulario corregido y reenviado",
-    TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: "[SAGRILAFT] Formulario enviado a firma electrónica",
-    TipoAlerta.FORMULARIO_FIRMADO:   "[SAGRILAFT] Formulario firmado electrónicamente",
-    TipoAlerta.FORMULARIO_RECHAZADO: "[SAGRILAFT] Formulario rechazado",
-    TipoAlerta.REPORTE_FINAL_CARGADO: "[SAGRILAFT] Reporte final cargado",
-}
 
 
 class SnsAlertasPortal:
@@ -109,12 +99,9 @@ class SnsAlertasPortal:
             return True  # Silencio intencional — no es un error
 
         try:
-            # Mapear TipoAlerta (dominio) a TipoAlertaTemplate (templates)
-            tipo_template = self._mapear_tipo_alerta(tipo)
-            
             # Construir versiones HTML y texto plano
             cuerpo_html = construir_html_notificacion(
-                tipo_alerta=tipo_template,
+                tipo_alerta=tipo,
                 formulario_id=formulario_id,
                 razon_social=razon_social,
                 tipo_contraparte=tipo_contraparte,
@@ -124,7 +111,7 @@ class SnsAlertasPortal:
             )
             
             cuerpo_texto = construir_texto_plano_notificacion(
-                tipo_alerta=tipo_template,
+                tipo_alerta=tipo,
                 formulario_id=formulario_id,
                 razon_social=razon_social,
                 tipo_contraparte=tipo_contraparte,
@@ -141,7 +128,7 @@ class SnsAlertasPortal:
             
             respuesta = self._cliente.publish(
                 TopicArn=self._topic_arn,
-                Subject=_ASUNTO_POR_TIPO[tipo],
+                Subject=obtener_asunto_correo(tipo),
                 Message=mensaje_json,
                 MessageStructure="json",
                 MessageAttributes={
@@ -226,16 +213,3 @@ class SnsAlertasPortal:
         expiradas = [k for k, v in self._ultimo_envio.items() if v < limite]
         for clave in expiradas:
             del self._ultimo_envio[clave]
-
-    def _mapear_tipo_alerta(self, tipo: TipoAlerta) -> TipoAlertaTemplate:
-        """Convierte TipoAlerta (dominio) a TipoAlertaTemplate (templates)."""
-        mapeo = {
-            TipoAlerta.FORMULARIO_RECIBIDO: TipoAlertaTemplate.FORMULARIO_RECIBIDO,
-            TipoAlerta.FORMULARIO_DEVUELTO: TipoAlertaTemplate.FORMULARIO_DEVUELTO,
-            TipoAlerta.FORMULARIO_CORREGIDO: TipoAlertaTemplate.FORMULARIO_CORREGIDO,
-            TipoAlerta.FORMULARIO_ENVIADO_A_FIRMA: TipoAlertaTemplate.FORMULARIO_ENVIADO_A_FIRMA,
-            TipoAlerta.FORMULARIO_FIRMADO: TipoAlertaTemplate.FORMULARIO_FIRMADO,
-            TipoAlerta.FORMULARIO_RECHAZADO: TipoAlertaTemplate.FORMULARIO_RECHAZADO,
-            TipoAlerta.REPORTE_FINAL_CARGADO: TipoAlertaTemplate.REPORTE_FINAL_CARGADO,
-        }
-        return mapeo[tipo]
