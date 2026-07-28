@@ -46,16 +46,16 @@ class SesAlertasPortal:
         self,
         ses_config: SesConfig,
         aws_config: AWSConfig,
-        url_portal_interno: Optional[str] = None,
+        url_portal_interno: str,
     ) -> None:
         import boto3
         from botocore.config import Config
 
         self._email_origen = ses_config.email_origen
-        self._url_portal = url_portal_interno or os.getenv(
-            "PORTAL_INTERNO_URL",
-            "https://portal.sagrilaft.com"
-        )
+        # Obligatorio: AppConfig.portal_interno_url es la única fuente de
+        # verdad (ver infrastructure/configuracion.py) — este adaptador ya
+        # no define su propio default.
+        self._url_portal = url_portal_interno
 
         config_boto = Config(
             connect_timeout=5,

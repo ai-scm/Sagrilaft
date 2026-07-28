@@ -157,6 +157,23 @@ def _require_db_url() -> str:
     return url
 
 
+def _require_portal_interno_url() -> str:
+    """URL base del portal interno — obligatoria, sin default hardcodeado.
+
+    Antes tenía como default "https://portal.sagrilaft.com", un dominio que
+    ni siquiera coincide con el real de producción y que además estaba
+    repetido en sns_alertas.py y ses_alertas.py. AppConfig es la única fuente
+    de verdad; los adaptadores de alertas la reciben inyectada (ensamblaje.py).
+    """
+    url = os.getenv("PORTAL_INTERNO_URL")
+    if not url:
+        raise RuntimeError(
+            "La variable de entorno PORTAL_INTERNO_URL no está definida. "
+            "Ejemplo: https://portal.miempresa.com"
+        )
+    return url
+
+
 @dataclass(frozen=True)
 class SnsConfig:
     """Configuración de Amazon SNS para alertas al portal interno."""
@@ -227,9 +244,7 @@ class AppConfig:
     ses: SesConfig = field(default_factory=SesConfig)
     listas_cautela: SagrilaftListasConfig = field(default_factory=SagrilaftListasConfig)
     # URL base del portal interno — usada en enlaces de notificaciones por correo
-    portal_interno_url: str = field(
-        default_factory=lambda: os.getenv("PORTAL_INTERNO_URL", "https://portal.sagrilaft.com")
-    )
+    portal_interno_url: str = field(default_factory=_require_portal_interno_url)
     # "local" usa el volumen del servidor; "s3" usa Amazon S3
     storage_backend: str = field(default_factory=lambda: os.getenv("STORAGE_BACKEND", "local"))
     # Clave para firmar reportes de auditoría con HMAC-SHA256

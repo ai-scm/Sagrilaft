@@ -9,7 +9,6 @@ Prevención de duplicados: throttling temporal de 5 minutos por formulario+tipo.
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -40,17 +39,16 @@ class SnsAlertasPortal:
         self,
         sns_config: SnsConfig,
         aws_config: AWSConfig,
-        url_portal_interno: Optional[str] = None,
+        url_portal_interno: str,
     ) -> None:
         import boto3
         from botocore.config import Config
 
         self._topic_arn = sns_config.topic_arn
-        # Usar parámetro, variable de entorno o valor por defecto para desarrollo
-        self._url_portal = url_portal_interno or os.getenv(
-            "PORTAL_INTERNO_URL",
-            "https://portal.sagrilaft.com"
-        )
+        # Obligatorio: AppConfig.portal_interno_url es la única fuente de
+        # verdad (ver infrastructure/configuracion.py) — este adaptador ya
+        # no define su propio default.
+        self._url_portal = url_portal_interno
 
         # Cache en memoria: clave = (formulario_id, tipo), valor = datetime del último envío.
         # Previene duplicados si el mismo evento se dispara varias veces en poco tiempo.
