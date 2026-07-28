@@ -10,6 +10,8 @@ permissions:
   id-token: write
 
 env:
+  # Debe coincidir con DEFAULT_REGION en infra/sagrilaft/lib/deployment-constants.ts.
+  # YAML no puede importar esa constante; si cambia la región, actualizar aquí también.
   AWS_REGION: us-east-1
   ECR_REPOSITORY_BACKEND: sagrilaft-prod-backend
   ECR_REPOSITORY_FORMULARIO: sagrilaft-prod-formulario-publico

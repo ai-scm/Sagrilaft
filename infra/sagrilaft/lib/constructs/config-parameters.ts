@@ -1,6 +1,8 @@
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 
+import { DEFAULT_REGION } from '../deployment-constants';
+
 export interface ConfigParametersProps {
   readonly ambiente: string;
   readonly dominio: string;
@@ -24,7 +26,7 @@ export class ConfigParameters extends Construct {
     const prefix = `/sagrilaft/${props.ambiente}`;
     const values: Record<string, string> = {
       APP_ENV: props.ambiente === 'prod' ? 'production' : props.ambiente,
-      AWS_REGION: 'us-east-1',
+      AWS_REGION: DEFAULT_REGION,
       FRONTEND_URL: `https://${props.dominio},https://${props.dominioPortal}`,
       PORTAL_INTERNO_URL: `https://${props.dominioPortal}`,
       STORAGE_BACKEND: 's3',

@@ -31,6 +31,15 @@ def entorno_actual() -> str:
     return valor.lower()
 
 
+def _region_aws_por_defecto() -> str:
+    """Región AWS: única fuente de verdad para el default 'us-east-1'.
+
+    Reutilizada por AWSConfig y S3Config — antes cada una repetía el
+    mismo `os.getenv("AWS_REGION", "us-east-1")` por su cuenta.
+    """
+    return os.getenv("AWS_REGION", "us-east-1")
+
+
 @dataclass(frozen=True)
 class ZohoSignConfig:
     """Configuración de ZohoSign para firma electrónica."""
@@ -77,7 +86,7 @@ class ZohoSignConfig:
 @dataclass(frozen=True)
 class AWSConfig:
     """Configuración de AWS Bedrock."""
-    region: str = field(default_factory=lambda: os.getenv("AWS_REGION", "us-east-1"))
+    region: str = field(default_factory=_region_aws_por_defecto)
     access_key_id: str = field(default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID", ""))
     secret_access_key: str = field(default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY", ""))
     model_id: str = field(default_factory=lambda: os.getenv("BEDROCK_MODEL_ID", ""))
@@ -131,7 +140,7 @@ class S3Config:
     """Configuración para almacenamiento de archivos en Amazon S3."""
     bucket: str = field(default_factory=lambda: os.getenv("S3_BUCKET", ""))
     # Reutiliza AWS_REGION de AWSConfig para no duplicar variables
-    region: str = field(default_factory=lambda: os.getenv("AWS_REGION", "us-east-1"))
+    region: str = field(default_factory=_region_aws_por_defecto)
 
     @property
     def configurado(self) -> bool:
