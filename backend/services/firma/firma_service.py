@@ -322,6 +322,23 @@ class FirmaService:
     def verificar_estado_firma(self, formulario_id: str) -> dict:
         formulario = self._obtener_formulario(formulario_id, bloquear=True)
 
+        # Idempotencia ante la carrera webhook vs. verificación manual: el
+        # webhook de ZohoSign puede transicionar PENDIENTE_FIRMA → FIRMADO
+        # (bajo el mismo lock de fila `bloquear=True`) justo antes de que
+        # esta llamada adquiera el lock. No hay corrupción de datos posible
+        # — ambas rutas serializan sobre la misma fila — pero el resultado
+        # que este endpoint buscaba (reflejar que ZohoSign completó la firma)
+        # ya se cumplió. FIRMADO solo se alcanza desde PENDIENTE_FIRMA (ver
+        # docstring del módulo), así que reportarlo aquí como éxito nunca
+        # esconde un estado inválido.
+        if formulario.estado == EstadoFormulario.FIRMADO:
+            logger.info(
+                "Verificación manual formulario %s: ya estaba en FIRMADO "
+                "(el webhook ganó la carrera) — se reporta como éxito.",
+                formulario_id,
+            )
+            return {"estado_zoho": "completed", "estado": formulario.estado}
+
         if formulario.estado != EstadoFormulario.PENDIENTE_FIRMA:
             raise FormularioNoEditableError(
                 f"Solo se puede verificar en estado 'pendiente_firma' (actual: '{formulario.estado}')."
