@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Dict, List, Optional
 
+from domain.formulario.tipos import TipoPersona
 from domain.utils.fechas import parsear_fecha_colombia
 
 
@@ -54,9 +55,9 @@ def _normalizar_tipo_persona(valor: Any) -> Optional[str]:
     texto = re.sub(r'\s+', ' ', str(valor)).strip().upper()
 
     if 'JURIDICA' in texto or 'JURÍDICA' in texto:
-        return 'juridica'
+        return TipoPersona.JURIDICA.value
     if 'NATURAL' in texto:
-        return 'natural'
+        return TipoPersona.NATURAL.value
 
     return None
 

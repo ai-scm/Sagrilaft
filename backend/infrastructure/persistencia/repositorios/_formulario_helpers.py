@@ -10,6 +10,7 @@ from domain.formulario.reglas_tipo_persona import (
     _CAMPOS_PERSONA_NATURAL,
     purgar_campos_no_aplicables,
 )
+from domain.formulario.tipos import TipoPersona
 from infrastructure.persistencia.models import (
     AccionistaFormulario,
     BeneficiarioFinalFormulario,
@@ -180,14 +181,14 @@ def _purgar_datos_no_aplicables_en_payload(datos: Dict[str, Any], orm: Optional[
 def _purgar_relaciones_no_aplicables(orm: Formulario, datos: Dict[str, Any]) -> List[Any]:
     tipo_persona = _tipo_persona_efectivo(orm, datos)
     relaciones_eliminadas: List[Any] = []
-    if tipo_persona == "natural":
+    if tipo_persona == TipoPersona.NATURAL.value:
         if orm.clasificacion_tributaria is not None:
             relaciones_eliminadas.append(orm.clasificacion_tributaria)
         orm.clasificacion_tributaria = None
         orm.junta_directiva = []
         orm.accionistas = []
         orm.beneficiario_final = []
-    elif tipo_persona == "juridica":
+    elif tipo_persona == TipoPersona.JURIDICA.value:
         if orm.datos_persona_natural is not None:
             relaciones_eliminadas.append(orm.datos_persona_natural)
         orm.datos_persona_natural = None

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from domain.formulario.entidades import FormularioDatos
+from domain.formulario.tipos import TipoContraparte, TipoPersona
 from domain.utils.fechas import NOMBRES_MESES_ES, formatear_fecha_larga_es
 from services.formulario.formato_moneda import formatear_monto_monetario
 from services.formulario.serializacion import formulario_a_dict as deserializar_campos_json
@@ -52,10 +53,10 @@ class ArchivoPdfGenerado:
 _VALORES_AMIGABLES: Dict[str, str] = {
     "si": "Sí",
     "no": "No",
-    "juridica": "Jurídica",
-    "natural": "Natural",
-    "proveedor": "Proveedor",
-    "cliente": "Cliente",
+    TipoPersona.JURIDICA.value: "Jurídica",
+    TipoPersona.NATURAL.value: "Natural",
+    TipoContraparte.PROVEEDOR.value: "Proveedor",
+    TipoContraparte.CLIENTE.value: "Cliente",
     "vinculacion": "Vinculación",
     "actualizacion": "Actualización",
     "cuenta_corriente": "Cuenta corriente",
@@ -566,7 +567,7 @@ def _renderizar_seccion(seccion: _SeccionFormulario, datos: Dict[str, Any]) -> s
     if isinstance(seccion, _SeccionCampos):
         if (
             seccion.titulo == "Clasificación de la Empresa y Régimen Tributario"
-            and datos.get("tipo_persona") != "juridica"
+            and datos.get("tipo_persona") != TipoPersona.JURIDICA.value
         ):
             return ""
         # La sección financiera tiene tratamiento especial: usa formateo por moneda.

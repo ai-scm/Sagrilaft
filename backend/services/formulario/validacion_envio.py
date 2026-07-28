@@ -9,6 +9,7 @@ from typing import Any, Callable, List, Optional, Tuple
 from domain.constantes import PORCENTAJE_MAXIMO_PERMITIDO
 from domain.contratos import ErrorCampoFormulario
 from domain.formulario.entidades import FormularioDatos
+from domain.formulario.tipos import TipoPersona
 
 _REGEX_TELEFONO = re.compile(r'^\d+$')
 _REGEX_CORREO   = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
@@ -414,7 +415,7 @@ class ValidadorEnvioFormulario:
         Centralizar esta guarda evita repetir la comparación de string
         y hace explícita la regla de negocio en el dominio.
         """
-        return (formulario.tipo_persona or "").lower() == "juridica"
+        return (formulario.tipo_persona or "").lower() == TipoPersona.JURIDICA.value
 
     @staticmethod
     def _realiza_operaciones_en_moneda_extranjera(formulario: FormularioDatos) -> bool:

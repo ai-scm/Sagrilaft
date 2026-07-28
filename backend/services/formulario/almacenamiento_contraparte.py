@@ -5,11 +5,12 @@ Resolución y creación de rutas de almacenamiento por tipo de contraparte.
 import re
 
 from domain.excepciones import ContraparteInvalidaError
+from domain.formulario.tipos import TipoContraparte
 
 
 _CARPETA_POR_TIPO: dict[str, str] = {
-    "cliente": "CLIENTES",
-    "proveedor": "PROVEEDORES",
+    TipoContraparte.CLIENTE.value: "CLIENTES",
+    TipoContraparte.PROVEEDOR.value: "PROVEEDORES",
 }
 
 

@@ -2,6 +2,8 @@
 
 from typing import Any, Dict
 
+from domain.formulario.tipos import TipoPersona
+
 _CAMPOS_PERSONA_NATURAL = [
     "direccion_residencia",
     "ciudad_residencia",
@@ -36,12 +38,12 @@ def purgar_campos_no_aplicables(datos: Dict[str, Any], tipo_persona: str) -> Dic
     resultado = dict(datos)
     tipo = tipo_persona.lower() if tipo_persona else ""
 
-    if tipo == "natural":
+    if tipo == TipoPersona.NATURAL.value:
         for campo in _CAMPOS_CLASIFICACION_TRIBUTARIA:
             resultado.pop(campo, None)
         for lista in _LISTAS_SOLO_JURIDICA:
             resultado[lista] = []
-    elif tipo == "juridica":
+    elif tipo == TipoPersona.JURIDICA.value:
         for campo in _CAMPOS_PERSONA_NATURAL:
             resultado.pop(campo, None)
 
