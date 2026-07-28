@@ -12,6 +12,8 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 
+import { SAGRILAFT_DB_NAME } from '../deployment-constants';
+
 export interface EcsFargateProps {
   readonly ambiente: string;
   readonly imageTag: string;
@@ -30,6 +32,7 @@ export interface EcsFargateProps {
   readonly zohoSecret: secretsmanager.Secret;
   readonly keycloakAdminSecret: secretsmanager.Secret;
   readonly smtpSecret: secretsmanager.Secret;
+  readonly sagrilaftSecret: secretsmanager.Secret;
   readonly configParameterNames: string[];
   readonly configParameterNameByKey: Record<string, string>;
   readonly configParameterByKey: Record<string, ssm.IStringParameter>;
@@ -178,7 +181,7 @@ export class EcsFargate extends Construct {
       command: ['start', '--import-realm'],
       environment: {
         KC_DB: 'postgres',
-        KC_DB_URL: `jdbc:postgresql://${props.db.dbInstanceEndpointAddress}:5432/sagrilaft`,
+        KC_DB_URL: `jdbc:postgresql://${props.db.dbInstanceEndpointAddress}:5432/${SAGRILAFT_DB_NAME}`,
         KC_PROXY_HEADERS: 'xforwarded',
         KC_HTTP_ENABLED: 'true',
         KC_HOSTNAME_STRICT: 'false',
@@ -302,8 +305,8 @@ export class EcsFargate extends Construct {
     return {
       UPLOAD_DIR: '/app/uploads',
       DATABASE_HOST: dbEndpoint,
-      DATABASE_NAME: 'sagrilaft',
-      KEYCLOAK_DB_URL: `jdbc:postgresql://${dbEndpoint}:5432/sagrilaft`,
+      DATABASE_NAME: SAGRILAFT_DB_NAME,
+      KEYCLOAK_DB_URL: `jdbc:postgresql://${dbEndpoint}:5432/${SAGRILAFT_DB_NAME}`,
       SNS_TOPIC_ARN: props.alertasTopic.topicArn,
       CW_LOG_GROUP_BACKEND: logGroup.logGroupName,
       ...extra,
@@ -321,6 +324,8 @@ export class EcsFargate extends Construct {
       BEDROCK_MODEL_ID: this.ssmSecret('BEDROCK_MODEL_ID', props, idPrefix),
       UVICORN_WORKERS: this.ssmSecret('UVICORN_WORKERS', props, idPrefix),
       TRUSTED_PROXY_IPS: this.ssmSecret('TRUSTED_PROXY_IPS', props, idPrefix),
+      PROVEEDOR_LISTAS_CAUTELA: this.ssmSecret('PROVEEDOR_LISTAS_CAUTELA', props, idPrefix),
+      SAGRILAFT_API_URL: this.ssmSecret('SAGRILAFT_API_URL', props, idPrefix),
       KEYCLOAK_URL: this.ssmSecret('KEYCLOAK_URL', props, idPrefix),
       KEYCLOAK_REALM: this.ssmSecret('KEYCLOAK_REALM', props, idPrefix),
       KEYCLOAK_CLIENT_ID: this.ssmSecret('KEYCLOAK_CLIENT_ID', props, idPrefix),
@@ -346,6 +351,7 @@ export class EcsFargate extends Construct {
       ZOHO_WEBHOOK_SECRET: ecs.Secret.fromSecretsManager(props.zohoSecret, 'webhook_secret'),
       SMTP_USER: ecs.Secret.fromSecretsManager(props.smtpSecret, 'username'),
       SMTP_PASSWORD: ecs.Secret.fromSecretsManager(props.smtpSecret, 'password'),
+      SAGRILAFT_API_KEY: ecs.Secret.fromSecretsManager(props.sagrilaftSecret, 'api_key'),
     };
   }
 

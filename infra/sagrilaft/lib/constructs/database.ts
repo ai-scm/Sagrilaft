@@ -4,6 +4,8 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
+import { SAGRILAFT_DB_NAME } from '../deployment-constants';
+
 export interface DatabaseProps {
   readonly vpc: ec2.Vpc;
   readonly securityGroup: ec2.SecurityGroup;
@@ -36,7 +38,7 @@ export class Database extends Construct {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
       securityGroups: [props.securityGroup],
-      databaseName: 'sagrilaft',
+      databaseName: SAGRILAFT_DB_NAME,
       credentials: rds.Credentials.fromSecret(props.credentialsSecret),
       multiAz: false, // Free Tier no soporta Multi-AZ sin costos
       storageEncrypted: true,

@@ -18,7 +18,7 @@ import { CortafuegosWeb } from './constructs/cortafuegos-web';
 import { ObservabilidadAlarmas } from './constructs/observabilidad-alarmas';
 import { DashboardTecnico } from './constructs/dashboard-tecnico';
 import { DashboardNegocio } from './constructs/dashboard-negocio';
-import { DEFAULT_BEDROCK_MODEL_ID } from './deployment-constants';
+import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-constants';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dominios productivos actuales.
@@ -67,6 +67,7 @@ export class SagrilaftStack extends cdk.Stack {
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
+    const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
 
@@ -75,6 +76,12 @@ export class SagrilaftStack extends cdk.Stack {
     }
     if (['staging', 'prod'].includes(ambiente) && !bedrockModelId) {
       throw new Error(`El ambiente ${ambiente} requiere -c bedrockModelId=<model-id-o-inference-profile>. No usar credenciales AWS personales.`);
+    }
+    if (['staging', 'prod'].includes(ambiente) && !sagrilaftApiUrl) {
+      throw new Error(
+        `El ambiente ${ambiente} requiere -c sagrilaftApiUrl=<url-api-tusdatos>. ` +
+        'La verificacion de listas de cautela no puede quedar sin URL real en produccion/staging.',
+      );
     }
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
       throw new Error(`desiredCount invalido: ${desiredCountRaw}. Use 0 para bootstrap o 1+ para activar servicios.`);
@@ -107,6 +114,7 @@ export class SagrilaftStack extends cdk.Stack {
       sesEmailOrigen,
       alertasEmailDestino: snsAlertasSub,
       bedrockModelId,
+      sagrilaftApiUrl,
     });
 
     const database = new Database(this, 'Database', {
@@ -134,6 +142,7 @@ export class SagrilaftStack extends cdk.Stack {
       zohoSecret: secrets.zohoSecret,
       keycloakAdminSecret: secrets.keycloakAdminSecret,
       smtpSecret: secrets.smtpSecret,
+      sagrilaftSecret: secrets.sagrilaftSecret,
       configParameterNames: configParams.parameterNames,
       configParameterNameByKey: configParams.parameterNameByKey,
       configParameterByKey: configParams.parameterByKey,
@@ -215,11 +224,12 @@ export class SagrilaftStack extends cdk.Stack {
     new CfnOutput(this, 'DominiosEsperados', { value: `${dominio}, ${dominioPortal}, ${dominioKeycloak}`, description: 'Hostnames que deben apuntar al ALB' });
     new CfnOutput(this, 'S3Bucket', { value: storage.bucket.bucketName, description: 'Nombre del bucket S3 para uploads' });
     new CfnOutput(this, 'RdsEndpoint', { value: database.instance.dbInstanceEndpointAddress, description: 'Host RDS PostgreSQL' });
-    new CfnOutput(this, 'KeycloakDbName', { value: 'sagrilaft', description: 'Base de datos RDS usada por Keycloak en ECS' });
+    new CfnOutput(this, 'KeycloakDbName', { value: SAGRILAFT_DB_NAME, description: 'Base de datos RDS usada por Keycloak en ECS' });
     new CfnOutput(this, 'DbSecretArn', { value: secrets.dbSecret.secretArn, description: 'ARN del secreto con la contrasena de la BD' });
     new CfnOutput(this, 'AppSecretArn', { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });
     new CfnOutput(this, 'ZohoSecretArn', { value: secrets.zohoSecret.secretArn, description: 'ARN del secreto de credenciales Zoho' });
     new CfnOutput(this, 'SmtpSecretArn', { value: secrets.smtpSecret.secretArn, description: 'ARN del secreto de credenciales SMTP/SES' });
+    new CfnOutput(this, 'SagrilaftSecretArn', { value: secrets.sagrilaftSecret.secretArn, description: 'ARN del secreto de credenciales de la API de listas de cautela (tusdatos.co)' });
     new CfnOutput(this, 'KeycloakAdminSecretArn', { value: secrets.keycloakAdminSecret.secretArn, description: 'ARN del secreto admin de Keycloak' });
     new CfnOutput(this, 'RuntimeConfigPrefix', { value: `/sagrilaft/${ambiente}/config/`, description: 'Prefijo SSM Parameter Store para runtime config no sensible' });
     new CfnOutput(this, 'BedrockModelId', { value: bedrockModelId, description: 'Modelo o inference profile Bedrock inyectado al backend desde SSM' });

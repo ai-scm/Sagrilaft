@@ -13,6 +13,24 @@ _log = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def entorno_actual() -> str:
+    """Única fuente de verdad para APP_ENV: "development" | "staging" | "production".
+
+    Es obligatorio y no tiene valor por defecto: un entorno mal configurado
+    debe fallar de inmediato en el arranque, nunca asumir "production" en
+    silencio (eso fue exactamente el bug que motivó esta función: antes
+    `api/middleware/autenticacion.py` leía la misma variable por su cuenta
+    con un default distinto al de `AppConfig`).
+    """
+    valor = os.getenv("APP_ENV")
+    if not valor:
+        raise RuntimeError(
+            "La variable de entorno APP_ENV no está definida. "
+            "Valores válidos: development, staging, production."
+        )
+    return valor.lower()
+
+
 @dataclass(frozen=True)
 class ZohoSignConfig:
     """Configuración de ZohoSign para firma electrónica."""
@@ -161,6 +179,23 @@ class SesConfig:
 
 
 @dataclass(frozen=True)
+class SagrilaftListasConfig:
+    """Configuración del proveedor de listas de cautela (verificación PLAFT).
+
+    "dummy" simula resultados y NUNCA debe usarse en producción/staging;
+    "sagrilaft" consulta la API real (tusdatos.co); "deshabilitado" omite
+    la consulta. Ver validación de arranque en `load_config()`.
+    """
+    proveedor: str = field(default_factory=lambda: os.getenv("PROVEEDOR_LISTAS_CAUTELA", "dummy").lower())
+    api_url: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_URL", ""))
+    api_key: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_KEY", ""))
+
+    @property
+    def configurado(self) -> bool:
+        return bool(self.api_url and self.api_key)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Configuración general de la aplicación."""
     db_url: str = field(default_factory=_require_db_url)
@@ -181,6 +216,7 @@ class AppConfig:
     s3: S3Config = field(default_factory=S3Config)
     sns: SnsConfig = field(default_factory=SnsConfig)
     ses: SesConfig = field(default_factory=SesConfig)
+    listas_cautela: SagrilaftListasConfig = field(default_factory=SagrilaftListasConfig)
     # URL base del portal interno — usada en enlaces de notificaciones por correo
     portal_interno_url: str = field(
         default_factory=lambda: os.getenv("PORTAL_INTERNO_URL", "https://portal.sagrilaft.com")
@@ -192,11 +228,8 @@ class AppConfig:
     default_factory=lambda:
         os.environ["SECRET_KEY"]
 )
-    # "development" | "production" — controla comportamiento del health check y logs
-    entorno: str = field(
-    default_factory=lambda:
-        os.environ["APP_ENV"].lower()
-)
+    # "development" | "staging" | "production" — controla comportamiento del health check y logs
+    entorno: str = field(default_factory=entorno_actual)
 
 def load_config() -> AppConfig:
     """Carga la configuración desde variables de entorno."""
@@ -219,6 +252,17 @@ def load_config() -> AppConfig:
         if not cfg.s3.bucket:
             raise RuntimeError(
                 f"S3_BUCKET es obligatorio en APP_ENV={cfg.entorno} con STORAGE_BACKEND=s3."
+            )
+        if cfg.listas_cautela.proveedor == "dummy":
+            raise RuntimeError(
+                f"PROVEEDOR_LISTAS_CAUTELA=dummy no está permitido en APP_ENV={cfg.entorno}. "
+                "Configure PROVEEDOR_LISTAS_CAUTELA=sagrilaft (con SAGRILAFT_API_URL y "
+                "SAGRILAFT_API_KEY) o =deshabilitado si la verificación se omite a propósito."
+            )
+        if cfg.listas_cautela.proveedor == "sagrilaft" and not cfg.listas_cautela.configurado:
+            raise RuntimeError(
+                f"PROVEEDOR_LISTAS_CAUTELA=sagrilaft requiere SAGRILAFT_API_URL y "
+                f"SAGRILAFT_API_KEY en APP_ENV={cfg.entorno}."
             )
 
     if not cfg.aws.model_id:

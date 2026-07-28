@@ -26,7 +26,7 @@ from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
-from infrastructure.configuracion import KeycloakConfig
+from infrastructure.configuracion import KeycloakConfig, entorno_actual
 from domain.utils.seguridad import sanitizar_log
 
 _portador = HTTPBearer(auto_error=False)
@@ -34,9 +34,13 @@ _log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # A07:2025 - Fix 1 (CWE-287): bloquear bypass de autenticacion en produccion.
+# entorno_actual() es la unica fuente de verdad para APP_ENV (ver
+# infrastructure/configuracion.py) - antes este modulo leia la variable por
+# su cuenta con un default distinto ("production") al de AppConfig, lo que
+# permitia que ambas lecturas divergieran.
 # ---------------------------------------------------------------------------
 _AUTH_DESHABILITADA = os.getenv("PORTAL_AUTH_DISABLED", "").lower() == "true"
-_APP_ENV = os.getenv("APP_ENV", "production").lower()
+_APP_ENV = entorno_actual()
 
 if _AUTH_DESHABILITADA and _APP_ENV not in ("development", "local", "test"):
     _log.critical(

@@ -1,27 +1,25 @@
-import os
 from domain.puertos.consultor_listas_cautela import ConsultorListasCautela
+from infrastructure.configuracion import SagrilaftListasConfig
 from infrastructure.servicios_externos.sagrilaft.dummy import ConsultorListasCautelaDummy
 from infrastructure.servicios_externos.sagrilaft.real import ConsultorListasCautelaAPI
 from infrastructure.servicios_externos.sagrilaft.deshabilitado import ConsultorListasCautelaDeshabilitado
 
-class ConfigIntegracionSagrilaft:
-    @property
-    def proveedor(self) -> str:
-        # Feature flag estratégico: 'dummy' | 'sagrilaft' | 'deshabilitado'
-        return os.getenv("PROVEEDOR_LISTAS_CAUTELA", "dummy").lower()
 
-def obtener_consultor_listas() -> ConsultorListasCautela:
-    """Factory method para inyección de dependencias (Strategy)."""
-    config = ConfigIntegracionSagrilaft()
-    proveedor = config.proveedor
-    
-    if proveedor == "deshabilitado":
+def obtener_consultor_listas(config: SagrilaftListasConfig) -> ConsultorListasCautela:
+    """Factory method para inyección de dependencias (Strategy).
+
+    Recibe la configuración ya validada por `load_config()` — no lee
+    variables de entorno directamente, para que `PROVEEDOR_LISTAS_CAUTELA`
+    tenga una única fuente de verdad (AppConfig) en vez de quedar fuera de
+    la validación de arranque de la aplicación.
+    """
+    if config.proveedor == "deshabilitado":
         return ConsultorListasCautelaDeshabilitado()
-    elif proveedor == "sagrilaft":
+    elif config.proveedor == "sagrilaft":
         return ConsultorListasCautelaAPI(
-            url_base=os.getenv("SAGRILAFT_API_URL", ""),
-            api_key=os.getenv("SAGRILAFT_API_KEY", "")
+            url_base=config.api_url,
+            api_key=config.api_key,
         )
-    
+
     # Por defecto 'dummy' para desarrollo local o si el valor no es reconocido
     return ConsultorListasCautelaDummy()

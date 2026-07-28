@@ -19,6 +19,7 @@
     public readonly zohoSecret: secretsmanager.Secret;
     public readonly keycloakAdminSecret: secretsmanager.Secret;
     public readonly smtpSecret: secretsmanager.Secret;
+    public readonly sagrilaftSecret: secretsmanager.Secret;
 
     constructor(scope: Construct, id: string, props: SecretsProps) {
       super(scope, id);
@@ -72,6 +73,16 @@
           password: '',
         })),
       });
+
+      // Credencial de la API de listas de cautela (tusdatos.co). Nace vacia
+      // como zohoSecret/smtpSecret: debe rellenarse en Secrets Manager antes
+      // de desplegar con PROVEEDOR_LISTAS_CAUTELA=sagrilaft.
+      this.sagrilaftSecret = new secretsmanager.Secret(this, 'SagrilaftCredentialsSecret', {
+        secretName: `sagrilaft/${ambiente}/sagrilaft_listas_cautela_credentials`,
+        secretStringValue: cdk.SecretValue.unsafePlainText(JSON.stringify({
+          api_key: '',
+        })),
+      });
     }
 
     /** Otorga permisos de lectura de todos los secretos a un rol IAM. */
@@ -81,5 +92,6 @@
       this.zohoSecret.grantRead(grantee);
       this.keycloakAdminSecret.grantRead(grantee);
       this.smtpSecret.grantRead(grantee);
+      this.sagrilaftSecret.grantRead(grantee);
     }
   }

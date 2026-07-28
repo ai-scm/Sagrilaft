@@ -251,7 +251,8 @@ def obtener_servicio_validacion(
 
 
 def obtener_servicio_verificacion_sagrilaft(
-    repo: RepositorioExpediente = Depends(obtener_repo_expediente)
+    repo: RepositorioExpediente = Depends(obtener_repo_expediente),
+    config: AppConfig = Depends(obtener_config),
 ) -> ServicioVerificacionSagrilaft:
-    consultor = obtener_consultor_listas()
+    consultor = obtener_consultor_listas(config.listas_cautela)
     return ServicioVerificacionSagrilaft(consultor, repo)
