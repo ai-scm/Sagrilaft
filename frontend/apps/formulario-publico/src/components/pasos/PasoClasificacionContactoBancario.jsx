@@ -57,11 +57,11 @@ const REGIMENES_IVA = [
  * Mapeado con el Enum ActividadClasificacion del backend.
  */
 const OPCIONES_ACTIVIDAD = [
-  { value: 'industrial',         label: 'Industrial'         },
-  { value: 'comercial',          label: 'Comercial'          },
-  { value: 'financiera',         label: 'Financiera'         },
-  { value: 'economia_solidaria', label: 'Economía solidaria' },
-  { value: 'otra',               label: 'Otra'               },
+  { value: 'Industrial',         label: 'Industrial'         },
+  { value: 'Comercial',          label: 'Comercial'          },
+  { value: 'Financiera',         label: 'Financiera'         },
+  { value: 'Economia solidaria', label: 'Economía solidaria' },
+  { value: 'Otra',               label: 'Otra'               },
 ];
 
 const TIPOS_CUENTA = [
