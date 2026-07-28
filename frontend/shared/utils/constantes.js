@@ -39,6 +39,18 @@ export const SECTORES_EMPRESA = [
   { value: 'Mixto',   label: 'Mixto'   },
 ];
 
+/** Espeja ActividadClasificacion en backend/domain/formulario/tipos.py */
+export const OPCIONES_ACTIVIDAD_CLASIFICACION = [
+  { value: 'Industrial',         label: 'Industrial'         },
+  { value: 'Comercial',          label: 'Comercial'          },
+  { value: 'Financiera',         label: 'Financiera'         },
+  { value: 'Economia solidaria', label: 'Economía solidaria' },
+  { value: 'Otra',               label: 'Otra'               },
+];
+
+/** Valor que habilita edición libre de 'actividad_especifica'; usado en PasoClasificacionContactoBancario.jsx y useFormulario.js */
+export const VALOR_ACTIVIDAD_OTRA = 'Otra';
+
 // ─── Tipos de Documentos del Sistema ──────────────────────────────────────────
 export const TIPO_DOCUMENTO_FORMULARIO_PDF        = 'FORMULARIO_PDF';
 export const TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT = 'CERTIFICADO_SAGRILAFT';

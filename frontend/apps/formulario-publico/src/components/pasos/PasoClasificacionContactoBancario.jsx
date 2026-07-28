@@ -14,7 +14,7 @@ import FormField from '../FormField';
 import ContactGroup from '../ContactGroup';
 import { HR, SectionTitle, ESTILO_CELDA_ERROR, ESTILO_BTN_ELIMINAR, MensajeError } from '../TablaFormComponents';
 import { onlyNumericKeyDown, onlyNumericPaste } from '../../utils/inputValidation';
-import { SECTORES_EMPRESA } from '@shared/utils/constantes';
+import { SECTORES_EMPRESA, OPCIONES_ACTIVIDAD_CLASIFICACION, VALOR_ACTIVIDAD_OTRA } from '@shared/utils/constantes';
 import { useCorreccion } from '../../context/CorreccionContext';
 
 
@@ -50,18 +50,6 @@ const REGIMENES_IVA = [
   { value: 'Régimen común', label: 'Régimen común' },
   { value: 'Régimen simplificado', label: 'Régimen simplificado' },
   { value: 'Ningún régimen', label: 'Ningún régimen' },
-];
-
-/**
- * Actividad principal de la empresa.
- * Mapeado con el Enum ActividadClasificacion del backend.
- */
-const OPCIONES_ACTIVIDAD = [
-  { value: 'Industrial',         label: 'Industrial'         },
-  { value: 'Comercial',          label: 'Comercial'          },
-  { value: 'Financiera',         label: 'Financiera'         },
-  { value: 'Economia solidaria', label: 'Economía solidaria' },
-  { value: 'Otra',               label: 'Otra'               },
 ];
 
 const TIPOS_CUENTA = [
@@ -136,7 +124,7 @@ function CeldaEliminar({ mostrar, onClick, title }) {
  */
 function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpenHelp, errors }) {
   const actividad = formData.actividad_clasificacion;
-  const esOtraActividad = actividad === 'otra';
+  const esOtraActividad = actividad === VALOR_ACTIVIDAD_OTRA;
   const fieldProps = (name) => ({ name, value: formData[name], onChange, onOpenHelp, error: errors[name] });
 
   return (
@@ -144,7 +132,7 @@ function ClasificacionTributaria({ formData, onChange, onActividadChange, onOpen
       <SectionTitle>8. CLASIFICACIÓN DE LA EMPRESA Y RÉGIMEN TRIBUTARIO</SectionTitle>
 
       <div className="form-row">
-        <FormField label="Actividad" type="select" required options={OPCIONES_ACTIVIDAD}
+        <FormField label="Actividad" type="select" required options={OPCIONES_ACTIVIDAD_CLASIFICACION}
           {...fieldProps('actividad_clasificacion')} onChange={onActividadChange} />
         <FormField label="¿Cuál? Especifique" required disabled={!esOtraActividad}
           {...fieldProps('actividad_especifica')} />

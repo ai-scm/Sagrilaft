@@ -27,6 +27,7 @@ import {
   validarTablasPaso7, CLAVES_ERROR_PASO7, purgarFilasVaciasPaso7,
 } from '../../utils/validacionTablas';
 import { sanitizarPayload } from '@shared/utils/normalizadores';
+import { VALOR_ACTIVIDAD_OTRA } from '@shared/utils/constantes';
 import { obtenerCamposDeDocumento } from '../../data/mapeoDocumentos';
 import { calcularValorDv } from '../../utils/inputValidation';
 
@@ -294,13 +295,13 @@ export function useFormulario() {
 
   /**
    * Cambia la actividad principal y gestiona la dependencia con 'actividad_especifica'.
-   * Si no es 'otra', se fuerza el valor 'NA' para cumplir con la integridad del backend.
+   * Si no es VALOR_ACTIVIDAD_OTRA, se fuerza el valor 'NA' para cumplir con la integridad del backend.
    */
   const handleActividadChange = useCallback((e) => {
     const { value } = e.target;
     setFormData(prev => {
       const siguiente = { ...prev, actividad_clasificacion: value };
-      if (value === 'otra') {
+      if (value === VALOR_ACTIVIDAD_OTRA) {
         siguiente.actividad_especifica = '';
       } else if (value !== '') {
         siguiente.actividad_especifica = 'NA';
@@ -308,7 +309,7 @@ export function useFormulario() {
       return siguiente;
     });
     limpiarError('actividad_clasificacion');
-    if (value !== 'otra') {
+    if (value !== VALOR_ACTIVIDAD_OTRA) {
       limpiarError('actividad_especifica');
     }
   }, [limpiarError]);
