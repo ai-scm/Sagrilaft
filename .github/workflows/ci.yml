@@ -27,6 +27,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Validar plantillas .env (validate_envs.py)
+        run: python3 scripts/validate_envs.py
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
