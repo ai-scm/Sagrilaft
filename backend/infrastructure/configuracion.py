@@ -254,6 +254,8 @@ class AppConfig:
 )
     # "development" | "staging" | "production" — controla comportamiento del health check y logs
     entorno: str = field(default_factory=entorno_actual)
+    # Límite de tamaño para archivos subidos (documentos, cargas manuales, reportes finales)
+    max_upload_mb: int = field(default_factory=lambda: int(os.getenv("MAX_UPLOAD_SIZE_MB", "15")))
 
 def load_config() -> AppConfig:
     """Carga la configuración desde variables de entorno."""

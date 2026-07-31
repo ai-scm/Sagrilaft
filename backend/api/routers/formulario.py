@@ -10,11 +10,16 @@ from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Body, Depends, File, Form, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
-from api.dependencies import obtener_servicio_acceso, obtener_servicio_formulario
+from api.dependencies import (
+    obtener_max_upload_mb,
+    obtener_servicio_acceso,
+    obtener_servicio_formulario,
+)
+from domain.utils.archivos import ArchivoDemasiadoGrandeError, leer_archivo_limitado
 from api.schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
@@ -202,6 +207,7 @@ async def subir_documento(
     tipo_documento: str = Form(...),
     archivo: UploadFile = File(...),
     servicio: FormularioService = Depends(obtener_servicio_formulario),
+    max_upload_mb: int = Depends(obtener_max_upload_mb),
 ) -> DocumentoResponse:
     """
     Sube un documento y extrae sus datos con IA de forma inmediata.
@@ -209,7 +215,10 @@ async def subir_documento(
     Flujo event-driven: cada carga dispara UNA sola llamada a Bedrock
     para el tipo_documento recibido, sin iterar sobre otros documentos.
     """
-    contenido = await archivo.read()
+    try:
+        contenido = await leer_archivo_limitado(archivo, max_upload_mb)
+    except ArchivoDemasiadoGrandeError as e:
+        raise HTTPException(status_code=413, detail=str(e))
     resultado = await servicio.guardar_documento(
         formulario_id=formulario_id,
         tipo_documento=tipo_documento,

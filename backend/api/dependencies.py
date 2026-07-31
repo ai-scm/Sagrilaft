@@ -76,6 +76,11 @@ def obtener_servicio_lista_cautela(solicitud: Request) -> ListaCautelaService:
     return solicitud.app.state.servicio_listas_cautela
 
 
+def obtener_max_upload_mb(config: AppConfig = Depends(obtener_config)) -> int:
+    """Límite de tamaño (en MB) para archivos subidos por los routers de documentos."""
+    return config.max_upload_mb
+
+
 # ── Servicios de aplicación ──────────────────────────────────────────────────
 
 def obtener_servicio_email(

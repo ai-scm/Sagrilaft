@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
 from api.dependencies import (
+    obtener_max_upload_mb,
     obtener_servicio_expediente,
     obtener_servicio_firma,
     obtener_servicio_verificacion_sagrilaft,
@@ -22,6 +23,7 @@ from api.dependencies import (
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from domain.excepciones import SinPermisoError
 from domain.constantes import CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS
+from domain.utils.archivos import ArchivoDemasiadoGrandeError, leer_archivo_limitado
 from api.schemas import (
     ComparacionVersionFormulario,
     ExpedienteDetalle,
@@ -193,13 +195,17 @@ async def carga_manual_expediente(
     archivo: UploadFile = File(...),
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+    max_upload_mb: int = Depends(obtener_max_upload_mb),
 ) -> dict:
     if archivo.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Solo se permite subir archivos PDF.")
     if len(justificacion.strip()) < 20:
         raise HTTPException(status_code=400, detail="La justificación debe tener al menos 20 caracteres.")
-        
-    contenido = await archivo.read()
+
+    try:
+        contenido = await leer_archivo_limitado(archivo, max_upload_mb)
+    except ArchivoDemasiadoGrandeError as e:
+        raise HTTPException(status_code=413, detail=str(e))
     try:
         return servicio.cargar_formulario_manual(
             formulario_id=formulario_id,
@@ -230,6 +236,7 @@ async def carga_reporte_final(
     archivo: Optional[UploadFile] = File(None),
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
+    max_upload_mb: int = Depends(obtener_max_upload_mb),
 ) -> ResumenCierreExpediente:
     if archivo is None:
         if causal_cierre != CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS:
@@ -247,8 +254,11 @@ async def carga_reporte_final(
 
     if archivo.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Solo se permite subir archivos PDF para el reporte final.")
-        
-    contenido = await archivo.read()
+
+    try:
+        contenido = await leer_archivo_limitado(archivo, max_upload_mb)
+    except ArchivoDemasiadoGrandeError as e:
+        raise HTTPException(status_code=413, detail=str(e))
     try:
         return servicio.cargar_reporte_final(
             formulario_id=formulario_id,
