@@ -65,6 +65,32 @@ export class CortafuegosWeb extends Construct {
             sampledRequestsEnabled: true,
           },
         },
+        // Regla 3: Límite de tasa global por IP.
+        // Necesaria porque slowapi (rate limiting a nivel de aplicación) mantiene su
+        // contador en memoria de cada task de ECS: con 2+ tasks detrás del mismo ALB,
+        // un cliente que reparte peticiones entre tasks puede multiplicar su límite real.
+        // El WAF ve el tráfico agregado antes de repartirlo, así que aquí el límite es
+        // efectivamente global sin importar cuántas tasks estén corriendo.
+        {
+          name: 'LimiteTasaGlobalPorIp',
+          priority: 3,
+          action: { block: {} },
+          statement: {
+            rateBasedStatement: {
+              // 2000 peticiones / 5 min por IP (~6.7 req/s sostenido). Generoso para
+              // uso normal (formulario público + portal + polling), pero corta fuerza
+              // bruta y abuso volumétrico antes de llegar a los contenedores.
+              limit: 2000,
+              aggregateKeyType: 'IP',
+              evaluationWindowSec: 300,
+            },
+          },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'LimiteTasaGlobalPorIpMetrica',
+            sampledRequestsEnabled: true,
+          },
+        },
       ],
     });
 
