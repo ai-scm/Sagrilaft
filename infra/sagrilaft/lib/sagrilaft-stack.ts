@@ -70,6 +70,8 @@ export class SagrilaftStack extends cdk.Stack {
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
+    const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
+    const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
@@ -85,6 +87,11 @@ export class SagrilaftStack extends cdk.Stack {
     }
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
       throw new Error(`desiredCount invalido: ${desiredCountRaw}. Use 0 para bootstrap o 1+ para activar servicios.`);
+    }
+    if (!Number.isInteger(backendMaxCapacity) || backendMaxCapacity < desiredCount) {
+      throw new Error(
+        `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe ser un entero >= desiredCount (${desiredCount}).`,
+      );
     }
     cdk.Tags.of(this).add('Project', 'sagrilaft');
     cdk.Tags.of(this).add('Environment', ambiente);
@@ -128,6 +135,7 @@ export class SagrilaftStack extends cdk.Stack {
       ambiente,
       imageTag: imageTag || 'dev',
       desiredCount,
+      backendMaxCapacity,
       vpc: networking.vpc,
       securityGroup: networking.sgEcs,
       bucket: storage.bucket,

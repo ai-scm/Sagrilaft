@@ -18,6 +18,7 @@ export interface EcsFargateProps {
   readonly ambiente: string;
   readonly imageTag: string;
   readonly desiredCount: number;
+  readonly backendMaxCapacity: number;
   readonly vpc: ec2.Vpc;
   readonly securityGroup: ec2.SecurityGroup;
   readonly bucket: s3.Bucket;
@@ -132,8 +133,41 @@ export class EcsFargate extends Construct {
     const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, 'backend');
     service.attachToApplicationTargetGroup(targetGroup);
     service.node.addDependency(props.db);
+    this.configureBackendAutoScaling(service, props);
 
     return { taskDefinition, service, targetGroup, logGroup };
+  }
+
+  /**
+   * Auto Scaling solo para el backend: es el único servicio con carga variable real
+   * (extracción con Bedrock, generación de PDF). Frontend/Portal son estáticos y
+   * Keycloak no escala aquí por la complejidad de clustering entre nodos dinámicos.
+   *
+   * Se omite durante el bootstrap (desiredCount=0) para no interferir con el primer
+   * despliegue sin tráfico, y si backendMaxCapacity no deja rango por encima de
+   * desiredCount (autoscaling deshabilitado a propósito, ej. entornos de prueba).
+   */
+  private configureBackendAutoScaling(service: ecs.FargateService, props: EcsFargateProps): void {
+    if (props.desiredCount === 0 || props.backendMaxCapacity <= props.desiredCount) {
+      return;
+    }
+
+    const scaling = service.autoScaleTaskCount({
+      minCapacity: props.desiredCount,
+      maxCapacity: props.backendMaxCapacity,
+    });
+
+    scaling.scaleOnCpuUtilization('CpuScaling', {
+      targetUtilizationPercent: 60,
+      scaleInCooldown: Duration.seconds(300),
+      scaleOutCooldown: Duration.seconds(60),
+    });
+
+    scaling.scaleOnMemoryUtilization('MemoryScaling', {
+      targetUtilizationPercent: 70,
+      scaleInCooldown: Duration.seconds(300),
+      scaleOutCooldown: Duration.seconds(60),
+    });
   }
 
   private buildMigrationTaskDefinition(props: EcsFargateProps): { taskDefinition: ecs.FargateTaskDefinition; logGroup: logs.LogGroup } {
@@ -309,6 +343,8 @@ export class EcsFargate extends Construct {
       KEYCLOAK_DB_URL: `jdbc:postgresql://${dbEndpoint}:5432/${SAGRILAFT_DB_NAME}`,
       SNS_TOPIC_ARN: props.alertasTopic.topicArn,
       CW_LOG_GROUP_BACKEND: logGroup.logGroupName,
+      MAX_UPLOAD_SIZE_MB: '15',
+      GIT_SHA: props.imageTag,
       ...extra,
     };
   }
