@@ -290,6 +290,12 @@ def load_config() -> AppConfig:
                 f"PROVEEDOR_LISTAS_CAUTELA=sagrilaft requiere SAGRILAFT_API_URL y "
                 f"SAGRILAFT_API_KEY en APP_ENV={cfg.entorno}."
             )
+        if not os.getenv("FRONTEND_URL"):
+            raise RuntimeError(
+                f"FRONTEND_URL es obligatorio en APP_ENV={cfg.entorno}. "
+                "Sin esta variable, CORS cae al valor de desarrollo "
+                "(http://localhost:5173) y bloqueará al frontend real."
+            )
 
     if not cfg.aws.model_id:
         _log.warning(
