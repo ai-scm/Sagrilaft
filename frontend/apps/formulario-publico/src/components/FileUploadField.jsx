@@ -7,7 +7,7 @@ import textosAyudaCampos from '../data/helpTexts';
  */
 export default function FileUploadField({
   label, tipoDoc, documentos, onFileChange, onRemove,
-  onOpenHelp, accepted, hint, uploading, eliminando,
+  onOpenHelp, accepted, hint, uploading, eliminando, error,
 }) {
   const doc = documentos[tipoDoc];
   const helpKey = `doc_${tipoDoc}`;
@@ -93,6 +93,8 @@ export default function FileUploadField({
           </div>
         </div>
       )}
+
+      {error && <div className="field-error">{error}</div>}
     </div>
   );
 }

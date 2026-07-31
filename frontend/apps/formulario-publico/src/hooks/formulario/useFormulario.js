@@ -354,6 +354,7 @@ export function useFormulario() {
 
   const handleFileChange = useCallback(async (tipoDoc, file) => {
     if (!file) return;
+    limpiarError(tipoDoc);
     setUploadingDoc(prev => ({ ...prev, [tipoDoc]: true }));
     try {
       let currentId = formularioId;
@@ -373,11 +374,14 @@ export function useFormulario() {
       }
     } catch (err) {
       console.error(`Error subiendo ${tipoDoc}:`, err);
-      alert('Error al subir el documento. Intente nuevamente.');
+      const mensaje = err?.message && err.message !== 'Failed to fetch'
+        ? err.message
+        : 'No se pudo subir el documento. Intente nuevamente.';
+      aplicarErrores(prev => ({ ...prev, [tipoDoc]: mensaje }));
     } finally {
       setUploadingDoc(prev => ({ ...prev, [tipoDoc]: false }));
     }
-  }, [formularioId]);
+  }, [formularioId, aplicarErrores, limpiarError]);
 
   const handleRemoveFile = useCallback((tipoDoc) => {
     setEstadoConfirmacion({ visible: true, tipoDoc });
@@ -402,6 +406,7 @@ export function useFormulario() {
       return;
     }
 
+    limpiarError(tipoDoc);
     setEliminandoDoc(prev => ({ ...prev, [tipoDoc]: true }));
     try {
       if (formularioId && docToDelete.id) {
@@ -422,11 +427,14 @@ export function useFormulario() {
       _quitarDocumento(tipoDoc);
     } catch (err) {
       console.error(`Error eliminando ${tipoDoc}:`, err);
-      alert('Error al intentar eliminar el documento. Intente nuevamente.');
+      const mensaje = err?.message && err.message !== 'Failed to fetch'
+        ? err.message
+        : 'No se pudo eliminar el documento. Intente nuevamente.';
+      aplicarErrores(prev => ({ ...prev, [tipoDoc]: mensaje }));
     } finally {
       setEliminandoDoc(prev => ({ ...prev, [tipoDoc]: false }));
     }
-  }, [estadoConfirmacion, documentos, formularioId]);
+  }, [estadoConfirmacion, documentos, formularioId, aplicarErrores, limpiarError]);
 
   /**
    * Upsert remoto: crea el formulario si aún no existe en el servidor,
