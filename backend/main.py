@@ -6,6 +6,7 @@ y registra todos los validadores de documentos.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -63,6 +64,11 @@ _NOMBRE_SERVICIO = "SAGRILAFT API"
 _VERSION_SERVICIO = "2.0.0"
 _ESTADO = 'activo'
 _MODO_IA = 'bedrock'
+# Commit exacto de la imagen corriendo (= el tag pusheado a ECR, ver
+# scripts/build_and_push_ecr_images.py y GIT_SHA en ecs-fargate.ts). En un
+# incidente, /health responde con esto — no hace falta adivinar qué versión
+# está desplegada ni depender de que alguien haya recordado subir un tag.
+_GIT_SHA = os.getenv("GIT_SHA", "dev")
 
 def _respuesta_error(status_code: int, detalle: str, *, hint: str | None = None, adiciones: dict = None) -> JSONResponse:
     contenido = {
@@ -244,6 +250,7 @@ def _crear_app() -> FastAPI:
         return {
             "servicio": _NOMBRE_SERVICIO,
             "version": _VERSION_SERVICIO,
+            "commit": _GIT_SHA,
             "estado": _ESTADO,
             "modo_ia": _MODO_IA,
         }
@@ -258,6 +265,7 @@ def _crear_app() -> FastAPI:
         return {
             "status": "healthy",
             "version": _VERSION_SERVICIO,
+            "commit": _GIT_SHA,
             "dependencies": {
                 "database": "ok",
                 "sns_alertas": sns_info,
