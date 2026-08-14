@@ -208,9 +208,10 @@ class SesConfig:
 class SagrilaftListasConfig:
     """Configuración del proveedor de listas de cautela (verificación PLAFT).
 
-    "dummy" simula resultados y NUNCA debe usarse en producción/staging;
-    "sagrilaft" consulta la API real (tusdatos.co); "deshabilitado" omite
-    la consulta. Ver validación de arranque en `load_config()`.
+    "dummy" simula resultados y puede usarse en desarrollo/staging mientras la
+    API real no esté disponible; "sagrilaft" consulta la API real (tusdatos.co);
+    "deshabilitado" omite la consulta. Ver validación de arranque en
+    `load_config()`.
     """
     proveedor: str = field(default_factory=lambda: os.getenv("PROVEEDOR_LISTAS_CAUTELA", "dummy").lower())
     api_url: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_URL", ""))
@@ -279,7 +280,7 @@ def load_config() -> AppConfig:
             raise RuntimeError(
                 f"S3_BUCKET es obligatorio en APP_ENV={cfg.entorno} con STORAGE_BACKEND=s3."
             )
-        if cfg.listas_cautela.proveedor == "dummy":
+        if cfg.entorno == "production" and cfg.listas_cautela.proveedor == "dummy":
             raise RuntimeError(
                 f"PROVEEDOR_LISTAS_CAUTELA=dummy no está permitido en APP_ENV={cfg.entorno}. "
                 "Configure PROVEEDOR_LISTAS_CAUTELA=sagrilaft (con SAGRILAFT_API_URL y "

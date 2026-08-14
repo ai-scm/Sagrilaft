@@ -12,6 +12,7 @@ export interface ConfigParametersProps {
   readonly sesEmailOrigen: string;
   readonly alertasEmailDestino: string;
   readonly bedrockModelId: string;
+  readonly proveedorListasCautela: string;
   readonly sagrilaftApiUrl: string;
 }
 
@@ -24,6 +25,7 @@ export class ConfigParameters extends Construct {
     super(scope, id);
 
     const prefix = `/sagrilaft/${props.ambiente}`;
+    const sagrilaftApiUrl = props.sagrilaftApiUrl || 'dummy://listas-cautela';
     const values: Record<string, string> = {
       APP_ENV: props.ambiente === 'prod' ? 'production' : props.ambiente,
       AWS_REGION: DEFAULT_REGION,
@@ -53,11 +55,10 @@ export class ConfigParameters extends Construct {
       ZOHO_SIGN_TESTING: ['staging', 'prod'].includes(props.ambiente) ? 'false' : 'true',
       UVICORN_WORKERS: '4',
       TRUSTED_PROXY_IPS: '172.0.0.0/8',
-      // Produccion y staging deben verificar contra la API real de listas de
-      // cautela (tusdatos.co) - nunca el proveedor simulado. Ver validacion
-      // de arranque en backend/infrastructure/configuracion.py::load_config().
-      PROVEEDOR_LISTAS_CAUTELA: 'sagrilaft',
-      SAGRILAFT_API_URL: props.sagrilaftApiUrl,
+      // Staging puede usar dummy mientras la API real no este disponible.
+      // Produccion debe usar sagrilaft o deshabilitado de forma explicita.
+      PROVEEDOR_LISTAS_CAUTELA: props.proveedorListasCautela,
+      SAGRILAFT_API_URL: sagrilaftApiUrl,
     };
 
     this.parameterNameByKey = {};

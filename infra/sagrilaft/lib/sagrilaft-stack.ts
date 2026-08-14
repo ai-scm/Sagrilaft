@@ -67,6 +67,9 @@ export class SagrilaftStack extends cdk.Stack {
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
+    const proveedorListasCautela = String(
+      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
+    ).toLowerCase();
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
@@ -79,10 +82,13 @@ export class SagrilaftStack extends cdk.Stack {
     if (['staging', 'prod'].includes(ambiente) && !bedrockModelId) {
       throw new Error(`El ambiente ${ambiente} requiere -c bedrockModelId=<model-id-o-inference-profile>. No usar credenciales AWS personales.`);
     }
-    if (['staging', 'prod'].includes(ambiente) && !sagrilaftApiUrl) {
+    if (ambiente === 'prod' && proveedorListasCautela === 'dummy') {
+      throw new Error('El ambiente prod no permite -c proveedorListasCautela=dummy.');
+    }
+    if (['staging', 'prod'].includes(ambiente) && proveedorListasCautela === 'sagrilaft' && !sagrilaftApiUrl) {
       throw new Error(
-        `El ambiente ${ambiente} requiere -c sagrilaftApiUrl=<url-api-tusdatos>. ` +
-        'La verificacion de listas de cautela no puede quedar sin URL real en produccion/staging.',
+        `El ambiente ${ambiente} con proveedorListasCautela=sagrilaft requiere ` +
+        '-c sagrilaftApiUrl=<url-api-tusdatos>.',
       );
     }
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
@@ -121,6 +127,7 @@ export class SagrilaftStack extends cdk.Stack {
       sesEmailOrigen,
       alertasEmailDestino: snsAlertasSub,
       bedrockModelId,
+      proveedorListasCautela,
       sagrilaftApiUrl,
     });
 
