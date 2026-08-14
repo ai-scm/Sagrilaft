@@ -21,6 +21,33 @@ export class CortafuegosWeb extends Construct {
   constructor(scope: Construct, id: string, props: CortafuegosWebProps) {
     super(scope, id);
 
+    const noEsUploadDocumento = {
+      notStatement: {
+        statement: {
+          andStatement: {
+            statements: [
+              {
+                byteMatchStatement: {
+                  fieldToMatch: { method: {} },
+                  positionalConstraint: 'EXACTLY',
+                  searchString: 'POST',
+                  textTransformations: [{ priority: 0, type: 'NONE' }],
+                },
+              },
+              {
+                byteMatchStatement: {
+                  fieldToMatch: { uriPath: {} },
+                  positionalConstraint: 'ENDS_WITH',
+                  searchString: '/documentos',
+                  textTransformations: [{ priority: 0, type: 'NONE' }],
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+
     // 1. Definición del WebACL con la acción por defecto de Permitir (Allow)
     const aclSagrilaft = new wafv2.CfnWebACL(this, 'AclSagrilaft', {
       defaultAction: { allow: {} },
@@ -40,6 +67,16 @@ export class CortafuegosWeb extends Construct {
             managedRuleGroupStatement: {
               name: 'AWSManagedRulesCommonRuleSet',
               vendorName: 'AWS',
+              scopeDownStatement: noEsUploadDocumento,
+              ruleActionOverrides: [
+                {
+                  // Los uploads multipart de documentos superan el umbral de
+                  // inspeccion de body del CommonRuleSet y WAF responde 403 antes
+                  // de llegar al backend. El limite real queda en FastAPI/nginx.
+                  name: 'SizeRestrictions_BODY',
+                  actionToUse: { count: {} },
+                },
+              ],
             },
           },
           visibilityConfig: {
@@ -57,6 +94,7 @@ export class CortafuegosWeb extends Construct {
             managedRuleGroupStatement: {
               name: 'AWSManagedRulesKnownBadInputsRuleSet',
               vendorName: 'AWS',
+              scopeDownStatement: noEsUploadDocumento,
             },
           },
           visibilityConfig: {
