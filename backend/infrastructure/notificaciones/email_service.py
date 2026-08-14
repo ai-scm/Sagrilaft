@@ -425,7 +425,7 @@ def _construir_cuerpo_html_acceso_creado(
   <p style="color: #64748b; margin-top: 0; font-size: 0.9em;">Credenciales de acceso</p>
   <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;">
   <p>Estimado usuario,</p>
-  <p>Se ha generado un acceso al formulario SAGRILAFT para <strong>{razon_social_esc}</strong>. Utilice las siguientes credenciales para diligenciarlo:</p>
+  <p>Se ha generado un acceso al formulario SAGRILAFT para <strong>{razon_social_esc}</strong>. Utilice las siguientes credenciales para diligenciarlo o retomar sesión:</p>
   <div style="background: #f1f5f9; border-left: 4px solid #1d4ed8; padding: 16px; border-radius: 4px; margin: 16px 0;">
     <p style="margin: 0 0 8px;"><strong>Código de petición:</strong> {codigo_peticion}</p>
     <p style="margin: 0 0 8px;"><strong>PIN de acceso:</strong> {pin}</p>
