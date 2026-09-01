@@ -49,7 +49,7 @@ def crear_acceso_manual_contraparte(
     solicitud_dominio = SolicitudCreacionAcceso(
         tipo_contraparte=solicitud_acceso_manual.tipo_contraparte.value,
         razon_social=solicitud_acceso_manual.razon_social,
-        correo_destinatario=str(solicitud_acceso_manual.correo_destinatario) if solicitud_acceso_manual.correo_destinatario else None,
+        correo_destinatario=str(solicitud_acceso_manual.correo_destinatario),
         area_responsable=solicitud_acceso_manual.area_responsable.value,
     )
     return servicio_acceso_manual.crear_acceso(solicitud_dominio)
@@ -91,9 +91,9 @@ def obtener_accesos_manuales_creados(
     response_model=EstadoCorreoAcceso,
     summary="Verificar si el acceso tiene correo registrado",
     description=(
-        "Endpoint liviano para comprobar si el destinatario ya registró su correo. "
-        "No devuelve datos del formulario. Usado por el frontend al cargar la página "
-        "para decidir si debe mostrar el modal de captura de correo."
+        "Endpoint liviano de compatibilidad para comprobar si un acceso historico "
+        "tiene correo registrado. En el flujo principal actual el correo es "
+        "obligatorio al crear el acceso manual. No devuelve datos del formulario."
     ),
     responses={
         404: {"description": "Token inválido o no encontrado"},
@@ -115,7 +115,10 @@ def consultar_estado_correo_acceso(
     "/token/{token}/correo",
     status_code=204,
     summary="Registrar correo del destinatario",
-    description="Permite al destinatario externo registrar su correo electrónico antes de iniciar el diligenciamiento.",
+    description=(
+        "Endpoint de compatibilidad para registrar correo en accesos historicos. "
+        "En el flujo principal actual el correo es obligatorio al crear el acceso."
+    ),
     responses={
         404: {"description": "Token inválido, no encontrado o ya consumido"},
         410: {"description": "El acceso ha expirado"},

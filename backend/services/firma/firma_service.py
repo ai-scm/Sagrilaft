@@ -159,8 +159,8 @@ class FirmaService:
 
                 if not acceso.correo_destinatario:
                     raise FormularioNoEditableError(
-                        "El destinatario aún no ha confirmado su correo electrónico. "
-                        "No es posible iniciar la firma hasta que complete ese paso."
+                        "El acceso manual no tiene correo destinatario asociado. "
+                        "No es posible iniciar la firma."
                     )
 
                 resultado = self._zoho.crear_solicitud_firma_multiple(

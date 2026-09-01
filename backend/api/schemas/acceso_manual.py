@@ -16,7 +16,7 @@ class SolicitudAccesoManual(BaseModel):
     tipo_contraparte: TipoContraparte
     razon_social: str = Field(min_length=1, strip_whitespace=True)
     area_responsable: AreaResponsable
-    correo_destinatario: Optional[EmailStr] = None
+    correo_destinatario: EmailStr
 
 
 class AccesoManualCreado(BaseModel):
@@ -36,7 +36,7 @@ class AccesoManualCreado(BaseModel):
     area_responsable: AreaResponsable
     created_at: datetime
     expires_at: datetime
-    correo_destinatario: Optional[str] = None
+    correo_destinatario: str
     correo_enviado: bool = False
 
     @field_serializer("created_at", "expires_at", when_used="json")
@@ -57,7 +57,7 @@ class AccesoManualResumen(BaseModel):
     created_at: datetime
     expires_at: datetime
     consumed_at: Optional[datetime] = None
-    correo_destinatario: Optional[str] = None
+    correo_destinatario: str
 
     @field_serializer("created_at", "expires_at", "consumed_at", when_used="json")
     def _serializar_fechas(self, valor: Optional[datetime]) -> Optional[str]:
@@ -81,8 +81,9 @@ class EstadoCorreoAcceso(BaseModel):
     """
     Respuesta liviana para verificar si el destinatario ya registró su correo.
 
-    Se usa exclusivamente por el frontend al cargar la página para decidir si
-    debe mostrar el modal de captura de correo. No expone datos del formulario.
+    Se conserva como compatibilidad operativa para enlaces historicos. En el
+    flujo principal actual el correo es obligatorio al crear el acceso manual.
+    No expone datos del formulario.
     """
 
     correo_registrado: bool

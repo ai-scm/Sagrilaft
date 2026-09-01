@@ -133,9 +133,10 @@ class CorreoDestinatarioNoRegistradoError(Exception):
     Excepcion de dominio: el destinatario no ha registrado su correo electrónico.
 
     Ocurre cuando se intenta realizar operaciones que REQUIEREN un correo válido
-    (envío del formulario, firma electrónica, notificaciones) pero el destinatario
-    aún no ha completado el paso de captura de correo. Esta es una validación
-    crítica de negocio que debe bloquearse en todos los puntos de entrada.
+    (envío del formulario, firma electrónica, notificaciones) pero el acceso
+    manual no tiene correo asociado. En el flujo principal actual esto solo
+    deberia ocurrir con datos historicos o inconsistentes, porque el correo es
+    obligatorio al crear el acceso.
 
     Es diferente de FormularioNoEditableError: aquí el problema es específicamente
     la falta de correo, no el estado general del formulario.
@@ -145,7 +146,7 @@ class CorreoDestinatarioNoRegistradoError(Exception):
         self.formulario_id = formulario_id
         super().__init__(
             f"Destinatario sin correo registrado para formulario '{formulario_id}'. "
-            "Debe completar el paso de captura de correo antes de enviar."
+            "El acceso manual debe tener un correo destinatario antes de enviar."
         )
 
 class AccesoActivoExistenteError(Exception):

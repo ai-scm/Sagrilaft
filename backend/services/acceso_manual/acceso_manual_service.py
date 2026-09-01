@@ -162,11 +162,8 @@ class AccesoManualService:
         """
         Envía por correo las credenciales del acceso recién creado.
 
-        No hay destinatario que notificar cuando el correo se captura después
-        desde el enlace de diligenciamiento (flujo de acceso sin correo previo).
-
         Returns True si el correo se envió; False si no hay notificador
-        configurado, no hay destinatario, o el envío falló.
+        configurado o el envío falló.
         """
         if not self._notificador or not acceso.get("correo_destinatario"):
             return False
@@ -206,18 +203,17 @@ class AccesoManualService:
         Verifica si ya existe un acceso activo para el mismo correo para
         prevenir duplicados.
         """
-        if solicitud.correo_destinatario:
-            acceso_existente = self._repo.obtener_acceso_activo_por_correo(solicitud.correo_destinatario)
-            if acceso_existente and _calcular_estado_acceso(acceso_existente) == "activo":
-                # Revisar tiempo desde el último envío para prevenir spam
-                ahora = ahora_utc()
-                if acceso_existente.ultimo_envio_correo:
-                    tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso_existente.ultimo_envio_correo)).total_seconds()
-                    if tiempo_transcurrido < 120:  # 2 minutos
-                        raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
-                
-                # Existe un acceso activo y pasaron más de 2 minutos, pedir confirmación al front
-                raise AccesoActivoExistenteError(acceso_existente.id)
+        acceso_existente = self._repo.obtener_acceso_activo_por_correo(solicitud.correo_destinatario)
+        if acceso_existente and _calcular_estado_acceso(acceso_existente) == "activo":
+            # Revisar tiempo desde el último envío para prevenir spam
+            ahora = ahora_utc()
+            if acceso_existente.ultimo_envio_correo:
+                tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso_existente.ultimo_envio_correo)).total_seconds()
+                if tiempo_transcurrido < 120:  # 2 minutos
+                    raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
+
+            # Existe un acceso activo y pasaron más de 2 minutos, pedir confirmación al front
+            raise AccesoActivoExistenteError(acceso_existente.id)
 
         pin = _generar_pin()
         pin_hash = _verificador_pin.hash(pin)
@@ -310,8 +306,10 @@ class AccesoManualService:
 
     def registrar_correo_desde_token(self, token: str, correo: str) -> None:
         """
-        Registra el correo del destinatario en el acceso (y formulario) asociado al token.
-        Valida que el token sea correcto y vigente.
+        Registra el correo del destinatario en un acceso historico asociado al token.
+
+        En el flujo principal actual el correo es obligatorio al crear el acceso
+        manual. Este metodo queda para compatibilidad con enlaces antiguos.
         """
         acceso = self._repo.obtener_acceso_por_token(token)
         if not acceso:
@@ -324,8 +322,9 @@ class AccesoManualService:
         """
         Verifica si el acceso asociado al token tiene correo registrado.
 
-        Endpoint liviano: no carga el snapshot completo del formulario.
-        Retorna True si correo_destinatario está presente, False en caso contrario.
+        Endpoint liviano de compatibilidad: no carga el snapshot completo del
+        formulario. Para accesos nuevos debe retornar True porque el correo es
+        obligatorio desde la creacion.
 
         Raises:
             TokenDiligenciamientoInvalidoError: si el token no existe.

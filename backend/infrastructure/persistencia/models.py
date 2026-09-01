@@ -597,7 +597,7 @@ class AccesoManual(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     pin_hash = Column(String, nullable=False)
     token_diligenciamiento = Column(String, unique=True, nullable=False)
-    correo_destinatario = Column(String, nullable=True)
+    correo_destinatario = Column(String, nullable=False)
     razon_social = Column(String, nullable=False)
     tipo_contraparte = Column(String, nullable=False)
     area_responsable = Column(String, nullable=False)
@@ -653,4 +653,3 @@ class AlertaInconsistencia(Base):
     fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="alertas_inconsistencia")
-

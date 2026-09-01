@@ -115,6 +115,8 @@ export const api = {
     }
   },
 
+  // Compatibilidad historica: el flujo principal actual recibe el correo desde
+  // la creacion del acceso manual en el portal interno.
   async actualizarCorreoPorToken(token, correo) {
     try {
       return await requestJson(`/accesos-manuales/token/${token}/correo`, {
@@ -130,7 +132,7 @@ export const api = {
   },
 
   /**
-   * Comprueba si el destinatario ya registró su correo para el token dado.
+   * Compatibilidad historica para accesos anteriores al correo obligatorio.
    * Endpoint liviano: solo devuelve { correo_registrado: bool }.
    * No carga el snapshot del formulario.
    */
