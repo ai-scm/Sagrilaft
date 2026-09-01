@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List
 
+from domain.constantes import TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
 from domain.contratos import DocumentoDatos
 from domain.excepciones import DocumentoNoEncontradoError
 from domain.puertos.repositorios import RepositorioDocumento
@@ -123,11 +124,18 @@ class DocumentoService:
 
         rutas_nuevas: dict[str, str] = {}
         for doc in documentos:
+            if doc.tipo_documento == TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT:
+                logger.info("[MOVER] Se omite certificado SAGRILAFT de auditoria: %s", doc.ruta_archivo)
+                continue
+
             key_actual = doc.ruta_archivo
             nombre = Path(key_actual).name
             key_nuevo = f"{prefijo_destino}/{nombre}"
             logger.info(f"[MOVER] {key_actual} -> {key_nuevo}")
             if key_actual != key_nuevo:
+                if not self._storage.existe(key_actual):
+                    logger.warning("[MOVER] Se omite archivo inexistente en storage: %s", key_actual)
+                    continue
                 self._storage.mover(key_actual, key_nuevo)
                 rutas_nuevas[doc.id] = key_nuevo
             else:
