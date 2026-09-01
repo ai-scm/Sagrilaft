@@ -25,8 +25,22 @@ logger = logging.getLogger(__name__)
 _TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
 _API_BASE  = "https://sign.zoho.com/api/v1"
 
-# Margen de 5 minutos antes de que el token expire para forzar refresco anticipado
-_MARGEN_REFRESCO_SEGUNDOS = 300
+_HTTP_STATUS_REINTENTABLES = (429, 502, 503, 504)
+_MILISEGUNDOS_POR_SEGUNDO = 1000
+
+_ORDEN_FIRMA_UNICO_FIRMANTE = 0
+_CODIGO_RESPUESTA_EXITOSA_ZOHO = 0
+_INDICE_PRIMERA_ACCION = 0
+
+_MAX_CARACTERES_RESPUESTA_ERROR_CREACION = 500
+_MAX_CARACTERES_RESPUESTA_ERROR_ENVIO = 500
+_MAX_CARACTERES_RESPUESTA_CONTENT_TYPE = 300
+
+_TIPOS_CONTENIDO_DOCUMENTO_FIRMADO = (
+    "application/pdf",
+    "application/zip",
+    "application/octet-stream",
+)
 
 
 class ZohoSignService:
@@ -44,8 +58,8 @@ class ZohoSignService:
         usando un esquema de Backoff Exponencial.
         """
         import time
-        max_intentos = 3
-        espera = 1.0
+        max_intentos = self._config.max_intentos_http
+        espera = self._config.espera_inicial_reintento_segundos
         start_time = time.time()
         exito = True
         
@@ -54,17 +68,17 @@ class ZohoSignService:
                 try:
                     resp = httpx.request(metodo, url, **kwargs)
                     # Forzar excepción si la respuesta es de tipo falla transitoria para poder reintentar
-                    if resp.status_code in (429, 502, 503, 504):
+                    if resp.status_code in _HTTP_STATUS_REINTENTABLES:
                         resp.raise_for_status()
                     return resp
                 except httpx.HTTPStatusError as e:
-                    if intento < max_intentos and e.response.status_code in (429, 502, 503, 504):
+                    if intento < max_intentos and e.response.status_code in _HTTP_STATUS_REINTENTABLES:
                         logger.warning(
                             "Resiliencia API: Falla transitoria (HTTP %d) en ZohoSign. Reintento %d/%d en %.1fs...",
                             e.response.status_code, intento, max_intentos, espera
                         )
                         time.sleep(espera)
-                        espera *= 2
+                        espera *= self._config.factor_backoff_exponencial
                         continue
                     raise
                 except httpx.RequestError as e:
@@ -74,7 +88,7 @@ class ZohoSignService:
                             type(e).__name__, intento, max_intentos, espera
                         )
                         time.sleep(espera)
-                        espera *= 2
+                        espera *= self._config.factor_backoff_exponencial
                         continue
                     raise
             
@@ -83,7 +97,7 @@ class ZohoSignService:
             exito = False
             raise
         finally:
-            latencia_ms = int((time.time() - start_time) * 1000)
+            latencia_ms = int((time.time() - start_time) * _MILISEGUNDOS_POR_SEGUNDO)
             # Parsear operación simplificada de la URL (ej. "token" o "requests")
             operacion = "desconocida"
             if "/token" in url: operacion = "token"
@@ -117,7 +131,7 @@ class ZohoSignService:
                 "refresh_token": self._config.refresh_token,
                 "redirect_uri":  self._config.redirect_uri,
             },
-            timeout=15,
+            timeout=self._config.timeout_token_segundos,
         )
         resp.raise_for_status()
         datos = resp.json()
@@ -126,8 +140,10 @@ class ZohoSignService:
             raise RuntimeError(f"ZohoSign no devolvió access_token: {datos}")
 
         self._access_token = datos["access_token"]
-        expires_in = int(datos.get("expires_in", 3600))
-        self._token_expiry = datetime.now(timezone.utc) + timedelta(seconds=expires_in - _MARGEN_REFRESCO_SEGUNDOS)
+        expires_in = int(datos.get("expires_in", self._config.segundos_expiracion_token_default))
+        self._token_expiry = datetime.now(timezone.utc) + timedelta(
+            seconds=expires_in - self._config.margen_refresco_segundos
+        )
         return self._access_token
 
     def _headers(self) -> dict:
@@ -170,14 +186,14 @@ class ZohoSignService:
         data_crear = {
             "requests": {
                 "request_name":    nombre_documento,
-                "expiration_days": 15,
+                "expiration_days": self._config.dias_expiracion_solicitud_firma,
                 "is_sequential":   True,
                 "actions": [
                     {
                         "action_type":     "SIGN",
                         "recipient_email": correo_firmante,
                         "recipient_name":  nombre_firmante,
-                        "signing_order":   0,
+                        "signing_order":   _ORDEN_FIRMA_UNICO_FIRMANTE,
                     }
                 ],
             }
@@ -201,17 +217,17 @@ class ZohoSignService:
                 params=params,
                 data={"data": json.dumps(data_crear)},
                 files=archivos,
-                timeout=30,
+                timeout=self._config.timeout_crear_solicitud_segundos,
             )
 
         if not resp_crear.is_success:
             raise RuntimeError(
                 f"ZohoSign rechazó la creación del paquete (HTTP {resp_crear.status_code}): "
-                f"{resp_crear.text[:500]}"
+                f"{resp_crear.text[:_MAX_CARACTERES_RESPUESTA_ERROR_CREACION]}"
             )
         datos_crear = resp_crear.json()
 
-        if datos_crear.get("code") != 0:
+        if datos_crear.get("code") != _CODIGO_RESPUESTA_EXITOSA_ZOHO:
             raise RuntimeError(
                 f"ZohoSign rechazó el paquete (code={datos_crear.get('code')}): "
                 f"{datos_crear.get('message', 'sin detalle')}"
@@ -219,7 +235,7 @@ class ZohoSignService:
 
         solicitud  = datos_crear["requests"]
         request_id = solicitud["request_id"]
-        action_id  = solicitud["actions"][0]["action_id"]
+        action_id  = solicitud["actions"][_INDICE_PRIMERA_ACCION]["action_id"]
         n_docs     = len(solicitud.get("document_ids", []))
 
         logger.info(
@@ -242,17 +258,17 @@ class ZohoSignService:
             headers=self._headers(),
             params=params,
             data={"data": json.dumps(data_enviar)},
-            timeout=30,
+            timeout=self._config.timeout_enviar_solicitud_segundos,
         )
 
         if not resp_enviar.is_success:
             raise RuntimeError(
                 f"ZohoSign rechazó el submit del paquete (HTTP {resp_enviar.status_code}): "
-                f"{resp_enviar.text[:500]}"
+                f"{resp_enviar.text[:_MAX_CARACTERES_RESPUESTA_ERROR_ENVIO]}"
             )
         datos_enviar = resp_enviar.json()
 
-        if datos_enviar.get("code", 0) != 0:
+        if datos_enviar.get("code", _CODIGO_RESPUESTA_EXITOSA_ZOHO) != _CODIGO_RESPUESTA_EXITOSA_ZOHO:
             raise RuntimeError(
                 f"ZohoSign rechazó el envío del paquete (code={datos_enviar.get('code')}): "
                 f"{datos_enviar.get('message', 'sin detalle')}"
@@ -277,7 +293,7 @@ class ZohoSignService:
         if self._config.modo_prueba:
             logger.info("ZohoSign sandbox: cancelando solicitud real request_id=%s", request_id)
 
-        kwargs = {"timeout": 15}
+        kwargs = {"timeout": self._config.timeout_cancelacion_segundos}
         if motivo:
             kwargs["data"] = {"reason": motivo}
 
@@ -290,7 +306,7 @@ class ZohoSignService:
         resp.raise_for_status()
         datos = resp.json()
 
-        if datos.get("code") != 0:
+        if datos.get("code") != _CODIGO_RESPUESTA_EXITOSA_ZOHO:
             raise RuntimeError(
                 f"ZohoSign rechazó el recall (code={datos.get('code')}): "
                 f"{datos.get('message', 'sin detalle')}"
@@ -309,12 +325,12 @@ class ZohoSignService:
             "GET",
             f"{_API_BASE}/requests/{request_id}",
             headers=self._headers(),
-            timeout=15,
+            timeout=self._config.timeout_consulta_segundos,
         )
         resp.raise_for_status()
         datos = resp.json()
 
-        if datos.get("code") != 0:
+        if datos.get("code") != _CODIGO_RESPUESTA_EXITOSA_ZOHO:
             raise RuntimeError(
                 f"ZohoSign error al consultar solicitud (code={datos.get('code')}): "
                 f"{datos.get('message', 'sin detalle')}"
@@ -355,18 +371,17 @@ class ZohoSignService:
             f"{_API_BASE}/requests/{request_id}/pdf",
             params={"merge": "true", "with_coc": "true"},
             headers=self._headers(),
-            timeout=60,
+            timeout=self._config.timeout_descarga_segundos,
             follow_redirects=True,
         )
         resp_archivo.raise_for_status()
 
         # Validar content-type: PDF (un doc) o ZIP (múltiples docs)
         content_type = resp_archivo.headers.get("content-type", "")
-        _TIPOS_VALIDOS = ("application/pdf", "application/zip", "application/octet-stream")
-        if not any(t in content_type for t in _TIPOS_VALIDOS):
+        if not any(t in content_type for t in _TIPOS_CONTENIDO_DOCUMENTO_FIRMADO):
             raise RuntimeError(
                 f"ZohoSign devolvió content-type inesperado: '{content_type}'. "
-                f"Respuesta: {resp_archivo.text[:300]}"
+                f"Respuesta: {resp_archivo.text[:_MAX_CARACTERES_RESPUESTA_CONTENT_TYPE]}"
             )
 
         # Ajustar extensión si ZohoSign devuelve ZIP (múltiples documentos)

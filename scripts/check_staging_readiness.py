@@ -238,25 +238,25 @@ def check_phase0_env_contract() -> Check:
     return Check("phase0-env-contract", ok, detail)
 
 
-def check_zoho_real_staging_contract() -> Check:
+def check_zoho_sign_environment_contract() -> Check:
     _, staging_env = read_first_existing([".env.staging.example", ".env.staging"])
     _, prod_env = read_first_existing([".env.prod.example", ".env.prod"])
     config_params = read("infra/sagrilaft/lib/constructs/config-parameters.ts")
 
     required = {
-        "staging usa Zoho real": "ZOHO_SIGN_TESTING=false" in staging_env,
+        "staging usa Zoho sandbox": "ZOHO_SIGN_TESTING=true" in staging_env,
         "prod usa Zoho real": "ZOHO_SIGN_TESTING=false" in prod_env,
         "staging tiene redirect uri": "ZOHO_REDIRECT_URI=https://staging-sagrilaft.ia.blend360.com/oauth/zoho/callback" in staging_env,
         "prod tiene redirect uri": "ZOHO_REDIRECT_URI=https://sagrilaft.ia.blend360.com/oauth/zoho/callback" in prod_env,
-        "CDK configura staging/prod con Zoho real": "['staging', 'prod'].includes(props.ambiente) ? 'false' : 'true'" in config_params,
+        "CDK configura solo prod con Zoho real": "props.ambiente === 'prod' ? 'false' : 'true'" in config_params,
         "CDK publica redirect uri": "ZOHO_REDIRECT_URI" in config_params and "/oauth/zoho/callback" in config_params,
         "CDK publica header HMAC": "ZOHO_WEBHOOK_SIGNATURE_HEADER" in config_params and "X-ZS-WEBHOOK-SIGNATURE" in config_params,
     }
     failed = [name for name, ok in required.items() if not ok]
     return Check(
-        "zoho-real-staging-contract",
+        "zoho-sign-environment-contract",
         not failed,
-        "staging/prod use real Zoho signing mode" if not failed else f"failed={failed}",
+        "staging uses sandbox and prod uses real Zoho signing mode" if not failed else f"failed={failed}",
     )
 
 
@@ -380,7 +380,7 @@ def main() -> int:
         check_keycloak_build_args(),
         check_cdk_context(),
         check_phase0_env_contract(),
-        check_zoho_real_staging_contract(),
+        check_zoho_sign_environment_contract(),
         check_phase0_domain_contract(),
         check_bedrock_target_account(),
         check_zoho_webhook_hmac_contract(),

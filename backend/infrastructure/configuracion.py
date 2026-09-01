@@ -40,6 +40,14 @@ def _region_aws_por_defecto() -> str:
     return os.getenv("AWS_REGION", "us-east-1")
 
 
+def _int_env(nombre: str, default: int) -> int:
+    return int(os.getenv(nombre, str(default)))
+
+
+def _float_env(nombre: str, default: float) -> float:
+    return float(os.getenv(nombre, str(default)))
+
+
 @dataclass(frozen=True)
 class ZohoSignConfig:
     """Configuración de ZohoSign para firma electrónica."""
@@ -53,6 +61,42 @@ class ZohoSignConfig:
     )
     modo_prueba:    bool = field(
         default_factory=lambda: os.getenv("ZOHO_SIGN_TESTING", "false").lower() == "true"
+    )
+    margen_refresco_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_REFRESH_MARGIN_SECONDS", 300)
+    )
+    segundos_expiracion_token_default: int = field(
+        default_factory=lambda: _int_env("ZOHO_TOKEN_EXPIRATION_DEFAULT_SECONDS", 3600)
+    )
+    max_intentos_http: int = field(
+        default_factory=lambda: _int_env("ZOHO_HTTP_MAX_ATTEMPTS", 3)
+    )
+    espera_inicial_reintento_segundos: float = field(
+        default_factory=lambda: _float_env("ZOHO_HTTP_INITIAL_RETRY_WAIT_SECONDS", 1.0)
+    )
+    factor_backoff_exponencial: int = field(
+        default_factory=lambda: _int_env("ZOHO_HTTP_BACKOFF_FACTOR", 2)
+    )
+    timeout_token_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_TOKEN_TIMEOUT_SECONDS", 15)
+    )
+    timeout_consulta_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_STATUS_TIMEOUT_SECONDS", 15)
+    )
+    timeout_cancelacion_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_CANCEL_TIMEOUT_SECONDS", 15)
+    )
+    timeout_crear_solicitud_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_CREATE_REQUEST_TIMEOUT_SECONDS", 30)
+    )
+    timeout_enviar_solicitud_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_SUBMIT_REQUEST_TIMEOUT_SECONDS", 30)
+    )
+    timeout_descarga_segundos: int = field(
+        default_factory=lambda: _int_env("ZOHO_DOWNLOAD_TIMEOUT_SECONDS", 60)
+    )
+    dias_expiracion_solicitud_firma: int = field(
+        default_factory=lambda: _int_env("ZOHO_SIGN_REQUEST_EXPIRATION_DAYS", 15)
     )
 
     def validar(self) -> None:
