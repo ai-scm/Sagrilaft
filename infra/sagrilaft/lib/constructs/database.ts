@@ -11,6 +11,7 @@ export interface DatabaseProps {
   readonly securityGroup: ec2.SecurityGroup;
   readonly credentialsSecret: secretsmanager.Secret;
   readonly ambiente: string;
+  readonly subnetType: ec2.SubnetType;
 }
 
 /**
@@ -35,7 +36,7 @@ export class Database extends Construct {
       instanceType: rdsComputeClass,
       vpc: props.vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        subnetType: props.subnetType,
       },
       securityGroups: [props.securityGroup],
       databaseName: SAGRILAFT_DB_NAME,

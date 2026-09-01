@@ -20,6 +20,7 @@ export interface EcsFargateProps {
   readonly desiredCount: number;
   readonly backendMaxCapacity: number;
   readonly vpc: ec2.Vpc;
+  readonly serviceSubnetType: ec2.SubnetType;
   readonly securityGroup: ec2.SecurityGroup;
   readonly bucket: s3.Bucket;
   readonly db: rds.DatabaseInstance;
@@ -318,7 +319,7 @@ export class EcsFargate extends Construct {
       desiredCount,
       assignPublicIp: false,
       securityGroups: [props.securityGroup],
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      vpcSubnets: { subnetType: props.serviceSubnetType },
       healthCheckGracePeriod: options.healthCheckGracePeriod,
       minHealthyPercent: 100,
       maxHealthyPercent: 200,

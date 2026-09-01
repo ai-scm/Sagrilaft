@@ -2,6 +2,11 @@ import { Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
 
+export interface NetworkingProps {
+  readonly ambiente: string;
+  readonly habilitarNatEgress: boolean;
+}
+
 /**
  * Networking: VPC con subnets públicas/privadas y Security Groups.
  * El modulo CDK de red se usa aqui solo para VPC, subnets, endpoints y SG.
@@ -16,13 +21,19 @@ export class Networking extends Construct {
   public readonly sgAlb: ec2.SecurityGroup;
   public readonly sgEcs: ec2.SecurityGroup;
   public readonly sgRds: ec2.SecurityGroup;
+  public readonly ecsSubnetType: ec2.SubnetType;
 
-  constructor(scope: Construct, id: string) {
+  constructor(scope: Construct, id: string, props: NetworkingProps) {
     super(scope, id);
+
+    const usaEgressExterno = props.habilitarNatEgress;
+    this.ecsSubnetType = usaEgressExterno
+      ? ec2.SubnetType.PRIVATE_WITH_EGRESS
+      : ec2.SubnetType.PRIVATE_ISOLATED;
 
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       availabilityZones: [`${Stack.of(this).region}a`, `${Stack.of(this).region}b`],
-      natGateways: 0,
+      natGateways: usaEgressExterno ? 1 : 0,
       subnetConfiguration: [
         {
           name: 'public',
@@ -31,7 +42,7 @@ export class Networking extends Construct {
         },
         {
           name: 'private',
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+          subnetType: usaEgressExterno ? ec2.SubnetType.PRIVATE_WITH_EGRESS : ec2.SubnetType.PRIVATE_ISOLATED,
           cidrMask: 24,
         },
       ],
@@ -69,7 +80,7 @@ export class Networking extends Construct {
 
     this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
+      subnets: [{ subnetType: this.ecsSubnetType }],
     });
 
     [
@@ -89,7 +100,7 @@ export class Networking extends Construct {
         privateDnsEnabled: true,
         open: false,
         securityGroups: [sgVpcEndpoints],
-        subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+        subnets: { subnetType: this.ecsSubnetType },
       });
     });
   }

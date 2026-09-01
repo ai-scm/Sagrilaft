@@ -75,6 +75,7 @@ export class SagrilaftStack extends cdk.Stack {
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
     const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
+    const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
@@ -110,7 +111,7 @@ export class SagrilaftStack extends cdk.Stack {
       : undefined;
 
     // ── Constructs ─────────────────────────────────────────────────────────
-    const networking = new Networking(this, 'Networking');
+    const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress });
     const storage = new Storage(this, 'Storage', { 
       ambiente,
       dominioPortal,
@@ -136,6 +137,7 @@ export class SagrilaftStack extends cdk.Stack {
       securityGroup: networking.sgRds,
       credentialsSecret: secrets.dbSecret,
       ambiente,
+      subnetType: networking.ecsSubnetType,
     });
 
     const ecsFargate = new EcsFargate(this, 'EcsFargate', {
@@ -144,6 +146,7 @@ export class SagrilaftStack extends cdk.Stack {
       desiredCount,
       backendMaxCapacity,
       vpc: networking.vpc,
+      serviceSubnetType: networking.ecsSubnetType,
       securityGroup: networking.sgEcs,
       bucket: storage.bucket,
       db: database.instance,
