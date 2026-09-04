@@ -69,6 +69,14 @@ services:
       # Si se deja vacío, el análisis automático de documentos queda desactivado.
       # Ej: arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-...
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID}
+      BEDROCK_MAX_TOKENS: ${BEDROCK_MAX_TOKENS:-4096}
+      BEDROCK_TEMPERATURE: ${BEDROCK_TEMPERATURE:-0.0}
+      BEDROCK_CONNECT_TIMEOUT_SECONDS: ${BEDROCK_CONNECT_TIMEOUT_SECONDS:-10}
+      BEDROCK_READ_TIMEOUT_SECONDS: ${BEDROCK_READ_TIMEOUT_SECONDS:-90}
+      BEDROCK_MAX_ATTEMPTS: ${BEDROCK_MAX_ATTEMPTS:-3}
+      BEDROCK_PDF_MAX_PAGES: ${BEDROCK_PDF_MAX_PAGES:-7}
+      BEDROCK_DEFAULT_CONFIDENCE: ${BEDROCK_DEFAULT_CONFIDENCE:-0.90}
+      BEDROCK_RESPONSE_LOG_CHARS: ${BEDROCK_RESPONSE_LOG_CHARS:-800}
 
       # "local" solo debe usarse en dev. Produccion/staging deben usar S3.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}

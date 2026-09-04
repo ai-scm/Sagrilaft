@@ -27,6 +27,18 @@ logger = logging.getLogger(__name__)
 
 from .prompts_extraccion import PROMPTS_EXTRACCION
 
+_TIMEOUT_CONEXION_DEFAULT_SEGUNDOS = 10
+_TIMEOUT_LECTURA_DEFAULT_SEGUNDOS = 90
+_MAX_INTENTOS_DEFAULT = 3
+_MAX_TOKENS_DEFAULT = 4096
+_TEMPERATURA_DEFAULT = 0.0
+_MAX_PAGINAS_PDF_DEFAULT = 7
+_CONFIANZA_EXTRACCION_DEFAULT = 0.90
+_MAX_CARACTERES_LOG_RESPUESTA_DEFAULT = 800
+
+_INDICE_PRIMER_BLOQUE_CONTENIDO = 0
+_METRICA_SIN_USO_REPORTADO = 0
+
 
 # ═══════════════════════════════════════════════════════════════
 # Extractor
@@ -46,19 +58,25 @@ class ExtractorBedrock:
           no de esta clase directamente.
     """
 
-    # Tiempo máximo de espera para que Bedrock complete la extracción de un PDF.
-    # Claude Sonnet puede tardar entre 30 y 90 s en documentos complejos.
-    # El valor debe ser menor al idleTimeout del ALB (60s típicamente) para que la
-    # respuesta de error de boto3 llegue antes de que el gateway corte la conexión.
-    _TIMEOUT_LECTURA_BEDROCK_SEGUNDOS: int = 90
-
-    def __init__(self, region: str, modelo_id: str, max_tokens: int = 4096) -> None:
+    def __init__(
+        self,
+        region: str,
+        modelo_id: str,
+        max_tokens: int = _MAX_TOKENS_DEFAULT,
+        temperature: float = _TEMPERATURA_DEFAULT,
+        connect_timeout_segundos: int = _TIMEOUT_CONEXION_DEFAULT_SEGUNDOS,
+        read_timeout_segundos: int = _TIMEOUT_LECTURA_DEFAULT_SEGUNDOS,
+        max_intentos: int = _MAX_INTENTOS_DEFAULT,
+        max_paginas_pdf: int = _MAX_PAGINAS_PDF_DEFAULT,
+        confianza_default: float = _CONFIANZA_EXTRACCION_DEFAULT,
+        max_caracteres_log_respuesta: int = _MAX_CARACTERES_LOG_RESPUESTA_DEFAULT,
+    ) -> None:
 
         configuracion_cliente = Config(
-            connect_timeout=10,
-            read_timeout=self._TIMEOUT_LECTURA_BEDROCK_SEGUNDOS,
+            connect_timeout=connect_timeout_segundos,
+            read_timeout=read_timeout_segundos,
             retries={
-                "max_attempts": 3,
+                "max_attempts": max_intentos,
                 "mode": "standard"  # Maneja cuotas (429) y fallas transitorias de IA con backoff
             },
         )
@@ -69,6 +87,10 @@ class ExtractorBedrock:
         )
         self._modelo_id = modelo_id
         self._max_tokens = max_tokens
+        self._temperature = temperature
+        self._max_paginas_pdf = max_paginas_pdf
+        self._confianza_default = confianza_default
+        self._max_caracteres_log_respuesta = max_caracteres_log_respuesta
 
     async def extraer(
         self,
@@ -151,11 +173,11 @@ class ExtractorBedrock:
             ],
             inferenceConfig={
                 "maxTokens": self._max_tokens,
-                "temperature": 0.0,
+                "temperature": self._temperature,
             },
         )
 
-        texto_extraido = respuesta["output"]["message"]["content"][0]["text"]
+        texto_extraido = respuesta["output"]["message"]["content"][_INDICE_PRIMER_BLOQUE_CONTENIDO]["text"]
         datos = self._parsear_respuesta_json(texto_extraido)
         
         # Emitir EMF Metric de tokens consumidos
@@ -164,8 +186,8 @@ class ExtractorBedrock:
                 namespace="Sagrilaft/Negocio",
                 dimensiones={"Servicio": "Bedrock", "ModeloId": self._modelo_id, "TipoDocumento": tipo_documento},
                 metricas={
-                    "BedrockInputTokens": respuesta["usage"].get("inputTokens", 0),
-                    "BedrockOutputTokens": respuesta["usage"].get("outputTokens", 0)
+                    "BedrockInputTokens": respuesta["usage"].get("inputTokens", _METRICA_SIN_USO_REPORTADO),
+                    "BedrockOutputTokens": respuesta["usage"].get("outputTokens", _METRICA_SIN_USO_REPORTADO)
                 }
             )
 
@@ -178,7 +200,7 @@ class ExtractorBedrock:
             extraido=True,
             datos=datos,
             mensaje=f"Datos extraídos exitosamente de {tipo_documento}",
-            confianza=0.90,
+            confianza=self._confianza_default,
         )
 
     @staticmethod
@@ -215,16 +237,15 @@ class ExtractorBedrock:
             }
         }
 
-    @classmethod
-    def _leer_archivo(cls, ruta_archivo: str) -> Tuple[bytes, str]:
+    def _leer_archivo(self, ruta_archivo: str) -> Tuple[bytes, str]:
         """
         Lee el contenido binario de un archivo y determina su tipo MIME.
         Optimiza los documentos PDF reduciendo su tamaño.
         """
-        tipo_mime = cls._determinar_tipo_mime(ruta_archivo)
+        tipo_mime = self._determinar_tipo_mime(ruta_archivo)
 
         if tipo_mime == "application/pdf":
-            contenido = cls._obtener_pdf_optimizado(ruta_archivo)
+            contenido = self._obtener_pdf_optimizado(ruta_archivo, self._max_paginas_pdf)
         else:
             with open(ruta_archivo, "rb") as archivo:
                 contenido = archivo.read()
@@ -240,7 +261,11 @@ class ExtractorBedrock:
         return tipo_mime
 
     @classmethod
-    def _obtener_pdf_optimizado(cls, ruta_archivo: str, max_paginas: int = 7) -> bytes:
+    def _obtener_pdf_optimizado(
+        cls,
+        ruta_archivo: str,
+        max_paginas: int = _MAX_PAGINAS_PDF_DEFAULT,
+    ) -> bytes:
         """Devuelve el PDF recortado si excede el límite, o el original si hay error."""
         try:
             return cls._recortar_primeras_paginas_pdf(ruta_archivo, max_paginas)
@@ -281,8 +306,7 @@ class ExtractorBedrock:
         writer.write(buffer_salida)
         return buffer_salida.getvalue()
 
-    @staticmethod
-    def _parsear_respuesta_json(texto: str) -> Dict[str, Any]:
+    def _parsear_respuesta_json(self, texto: str) -> Dict[str, Any]:
         """
         Parsea la respuesta JSON de Claude con tolerancia a variaciones de formato.
 
@@ -295,7 +319,7 @@ class ExtractorBedrock:
         donde termina, ignorando cualquier contenido posterior.
         """
         limpio = texto.strip()
-        logger.debug("Respuesta cruda de Claude:\n%s", limpio[:800])
+        logger.debug("Respuesta cruda de Claude:\n%s", limpio[:self._max_caracteres_log_respuesta])
         if limpio.startswith("```"):
             lineas = limpio.split("\n")
             lineas = [l for l in lineas if not l.strip().startswith("```")]

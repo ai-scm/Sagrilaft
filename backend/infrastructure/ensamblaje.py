@@ -39,6 +39,13 @@ def crear_extractor_ia(config: AppConfig) -> ExtractorBedrock:
         region=config.aws.region,
         modelo_id=config.aws.model_id,
         max_tokens=config.aws.max_tokens,
+        temperature=config.aws.temperature,
+        connect_timeout_segundos=config.aws.connect_timeout_segundos,
+        read_timeout_segundos=config.aws.read_timeout_segundos,
+        max_intentos=config.aws.max_intentos,
+        max_paginas_pdf=config.aws.max_paginas_pdf,
+        confianza_default=config.aws.confianza_default,
+        max_caracteres_log_respuesta=config.aws.max_caracteres_log_respuesta,
     )
 
 

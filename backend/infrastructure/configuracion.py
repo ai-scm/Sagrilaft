@@ -134,8 +134,22 @@ class AWSConfig:
     access_key_id: str = field(default_factory=lambda: os.getenv("AWS_ACCESS_KEY_ID", ""))
     secret_access_key: str = field(default_factory=lambda: os.getenv("AWS_SECRET_ACCESS_KEY", ""))
     model_id: str = field(default_factory=lambda: os.getenv("BEDROCK_MODEL_ID", ""))
-    max_tokens: int = 4096
-    temperature: float = 0.0  # Determinístico para extracción de datos
+    max_tokens: int = field(default_factory=lambda: _int_env("BEDROCK_MAX_TOKENS", 4096))
+    temperature: float = field(default_factory=lambda: _float_env("BEDROCK_TEMPERATURE", 0.0))
+    connect_timeout_segundos: int = field(
+        default_factory=lambda: _int_env("BEDROCK_CONNECT_TIMEOUT_SECONDS", 10)
+    )
+    read_timeout_segundos: int = field(
+        default_factory=lambda: _int_env("BEDROCK_READ_TIMEOUT_SECONDS", 90)
+    )
+    max_intentos: int = field(default_factory=lambda: _int_env("BEDROCK_MAX_ATTEMPTS", 3))
+    max_paginas_pdf: int = field(default_factory=lambda: _int_env("BEDROCK_PDF_MAX_PAGES", 7))
+    confianza_default: float = field(
+        default_factory=lambda: _float_env("BEDROCK_DEFAULT_CONFIDENCE", 0.90)
+    )
+    max_caracteres_log_respuesta: int = field(
+        default_factory=lambda: _int_env("BEDROCK_RESPONSE_LOG_CHARS", 800)
+    )
 
 
 @dataclass(frozen=True)

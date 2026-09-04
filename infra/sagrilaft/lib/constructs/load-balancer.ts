@@ -40,7 +40,8 @@ export class LoadBalancer extends Construct {
       vpc: props.vpc,
       internetFacing: true,
       securityGroup: props.securityGroup,
-      // 300 s > read_timeout de boto3 (280 s) > tiempo máximo de Bedrock (~90 s).
+      // 300 s > read_timeout de boto3 (90 s por defecto) para que el backend
+      // pueda responder el error si Bedrock no completa la extraccion a tiempo.
       // Sin este ajuste el ALB corta la conexión a los 60 s por defecto
       // mientras Bedrock aún procesa el PDF → HTTP 504 en el frontend.
       idleTimeout: Duration.seconds(300),

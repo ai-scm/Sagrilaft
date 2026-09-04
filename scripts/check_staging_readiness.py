@@ -21,6 +21,16 @@ BEDROCK_MODEL_ID = (
     "arn:aws:bedrock:us-east-1:874641912777:"
     "inference-profile/us.anthropic.claude-sonnet-4-6"
 )
+BEDROCK_RUNTIME_CONFIG_KEYS = [
+    "BEDROCK_MAX_TOKENS",
+    "BEDROCK_TEMPERATURE",
+    "BEDROCK_CONNECT_TIMEOUT_SECONDS",
+    "BEDROCK_READ_TIMEOUT_SECONDS",
+    "BEDROCK_MAX_ATTEMPTS",
+    "BEDROCK_PDF_MAX_PAGES",
+    "BEDROCK_DEFAULT_CONFIDENCE",
+    "BEDROCK_RESPONSE_LOG_CHARS",
+]
 HOSTED_ZONE_ID = "Z10446292T6I6L9P7R8AQ"
 EXPECTED_DOMAINS = {
     "forms-sagrilaft.ia.blend360.com",
@@ -299,6 +309,26 @@ def check_bedrock_target_account() -> Check:
     return Check("bedrock-target-account", ok, detail)
 
 
+def check_bedrock_runtime_config_contract() -> Check:
+    files = {
+        read_first_existing([".env.staging.example", ".env.staging"])[0]: read_first_existing([".env.staging.example", ".env.staging"])[1],
+        read_first_existing([".env.prod.example", ".env.prod"])[0]: read_first_existing([".env.prod.example", ".env.prod"])[1],
+        "infra/sagrilaft/lib/constructs/config-parameters.ts": read("infra/sagrilaft/lib/constructs/config-parameters.ts"),
+        "infra/sagrilaft/lib/constructs/ecs-fargate.ts": read("infra/sagrilaft/lib/constructs/ecs-fargate.ts"),
+    }
+    missing = [
+        f"{path}:{key}"
+        for path, content in files.items()
+        for key in BEDROCK_RUNTIME_CONFIG_KEYS
+        if key not in content
+    ]
+    return Check(
+        "bedrock-runtime-config-contract",
+        not missing,
+        "Bedrock operational config is declared in env, SSM and ECS" if not missing else f"missing={missing}",
+    )
+
+
 def check_frontend_api_contract() -> Check:
     shared_client = read("frontend/shared/services/apiClient.js")
     public_app = read("frontend/apps/formulario-publico/src/App.jsx")
@@ -383,6 +413,7 @@ def main() -> int:
         check_zoho_sign_environment_contract(),
         check_phase0_domain_contract(),
         check_bedrock_target_account(),
+        check_bedrock_runtime_config_contract(),
         check_zoho_webhook_hmac_contract(),
         check_frontend_api_contract(),
         check_frontend_legal_build_args(),
