@@ -166,7 +166,8 @@ def _aplicar_actualizacion_relaciones_uno_a_uno(orm: Formulario, campos: Dict[st
 
 
 def _tipo_persona_efectivo(orm: Optional[Formulario], datos: Dict[str, Any]) -> str:
-    return str(datos.get("tipo_persona") or getattr(orm, "tipo_persona", "") or "").lower()
+    tipo_persona = datos.get("tipo_persona") or getattr(orm, "tipo_persona", "") or ""
+    return str(getattr(tipo_persona, "value", tipo_persona)).lower()
 
 
 def _purgar_datos_no_aplicables_en_payload(datos: Dict[str, Any], orm: Optional[Formulario] = None) -> Dict[str, Any]:

@@ -19,6 +19,8 @@ class RepositorioBase:
 
     def _marcar_cambio_auditado(self) -> None:
         """Informa al trigger de auditoría que el cambio viene de la aplicación."""
+        if self._sesion.bind and self._sesion.bind.dialect.name != "postgresql":
+            return
         self._sesion.execute(text("SET LOCAL sagrilaft.from_app = '1'"))
 
     def _obtener_formulario_orm(self, formulario_id: str, *, bloquear: bool = False) -> Any:

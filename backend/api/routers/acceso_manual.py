@@ -9,7 +9,7 @@ SRP: parsea solicitudes HTTP y delega toda la lógica al AccesoManualService.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 
 from api.dependencies import obtener_servicio_acceso
 from api.limitador import limitador
@@ -27,13 +27,17 @@ from services.acceso_manual.acceso_manual_service import AccesoManualService
 
 enrutador = APIRouter(prefix="/api/accesos-manuales", tags=["accesos-manuales"])
 
+_RATE_LIMIT_CONSULTA_CORREO = "60/minute"
+_RATE_LIMIT_REGISTRO_CORREO = "10/minute"
+_RATE_LIMIT_RESOLUCION_TOKEN = "30/minute"
+
 
 # ─── 1. Creación ──────────────────────────────────────────────────────────────
 
 @enrutador.post(
     "/",
     response_model=AccesoManualCreado,
-    status_code=201,
+    status_code=status.HTTP_201_CREATED,
     summary="Crear acceso manual",
     description=(
         "Genera credenciales únicas (código de petición + PIN) para que un cliente "
@@ -57,7 +61,7 @@ def crear_acceso_manual_contraparte(
 @enrutador.post(
     "/{acceso_id}/reenviar",
     response_model=AccesoManualCreado,
-    status_code=200,
+    status_code=status.HTTP_200_OK,
     summary="Reenviar acceso manual",
     description="Regenera el PIN y reenvía el correo de acceso manual.",
     dependencies=[Depends(portal_interno)],
@@ -96,12 +100,12 @@ def obtener_accesos_manuales_creados(
         "obligatorio al crear el acceso manual. No devuelve datos del formulario."
     ),
     responses={
-        404: {"description": "Token inválido o no encontrado"},
-        410: {"description": "El acceso ha expirado"},
-        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
+        status.HTTP_404_NOT_FOUND: {"description": "Token inválido o no encontrado"},
+        status.HTTP_410_GONE: {"description": "El acceso ha expirado"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
     },
 )
-@limitador.limit("60/minute")
+@limitador.limit(_RATE_LIMIT_CONSULTA_CORREO)
 def consultar_estado_correo_acceso(
     request: Request,
     token: str,
@@ -113,19 +117,19 @@ def consultar_estado_correo_acceso(
 
 @enrutador.patch(
     "/token/{token}/correo",
-    status_code=204,
+    status_code=status.HTTP_204_NO_CONTENT,
     summary="Registrar correo del destinatario",
     description=(
         "Endpoint de compatibilidad para registrar correo en accesos historicos. "
         "En el flujo principal actual el correo es obligatorio al crear el acceso."
     ),
     responses={
-        404: {"description": "Token inválido, no encontrado o ya consumido"},
-        410: {"description": "El acceso ha expirado"},
-        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
+        status.HTTP_404_NOT_FOUND: {"description": "Token inválido, no encontrado o ya consumido"},
+        status.HTTP_410_GONE: {"description": "El acceso ha expirado"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
     },
 )
-@limitador.limit("10/minute")
+@limitador.limit(_RATE_LIMIT_REGISTRO_CORREO)
 def capturar_correo_desde_acceso_manual(
     request: Request,
     token: str,
@@ -147,12 +151,12 @@ def capturar_correo_desde_acceso_manual(
         "endpoint al hacer clic en el enlace recibido por correo."
     ),
     responses={
-        404: {"description": "Token inválido, no encontrado o ya consumido"},
-        410: {"description": "El acceso ha expirado"},
-        429: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
+        status.HTTP_404_NOT_FOUND: {"description": "Token inválido, no encontrado o ya consumido"},
+        status.HTTP_410_GONE: {"description": "El acceso ha expirado"},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"description": "Demasiadas solicitudes. Espere un momento antes de reintentar"},
     },
 )
-@limitador.limit("30/minute")
+@limitador.limit(_RATE_LIMIT_RESOLUCION_TOKEN)
 def obtener_formulario_por_codigo_acceso(
     request: Request,
     token: str,

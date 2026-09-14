@@ -15,6 +15,7 @@ solo reglas de acceso (vigencia, consumo y autorización del envío).
 
 import logging
 import secrets
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from argon2 import PasswordHasher
@@ -47,24 +48,54 @@ logger = logging.getLogger(__name__)
 # Alphabet sin caracteres ambiguos (0/O, 1/I/l) para mayor legibilidad
 _ALFABETO_PIN = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 _LONGITUD_PIN = 8
+_BYTES_ENTROPIA_TOKEN = 32
+_COOLDOWN_REENVIO_SEGUNDOS = 120
+
+_ARGON2_TIME_COST = 2
+_ARGON2_MEMORY_COST_KIB = 32768
+_ARGON2_PARALLELISM = 2
+_ARGON2_HASH_LEN = 32
+_ARGON2_SALT_LEN = 16
 
 _verificador_pin = PasswordHasher(
-    time_cost=2,
-    memory_cost=32768,  # 64 MB
-    parallelism=2,
-    hash_len=32,
-    salt_len=16,
+    time_cost=_ARGON2_TIME_COST,
+    memory_cost=_ARGON2_MEMORY_COST_KIB,
+    parallelism=_ARGON2_PARALLELISM,
+    hash_len=_ARGON2_HASH_LEN,
+    salt_len=_ARGON2_SALT_LEN,
 )
 
 # Hash de un valor aleatorio generado al importar el módulo.
 # Se usa cuando el código de petición no existe en la BD para que la verificación
 # Argon2 siempre se ejecute y el tiempo de respuesta sea indistinguible del caso
 # donde el código sí existe (prevención de enumeración por análisis de timing).
-_HASH_DUMMY = _verificador_pin.hash(secrets.token_urlsafe(32))
+_HASH_DUMMY = _verificador_pin.hash(secrets.token_urlsafe(_BYTES_ENTROPIA_TOKEN))
 
 
 def _generar_pin() -> str:
     return "".join(secrets.choice(_ALFABETO_PIN) for _ in range(_LONGITUD_PIN))
+
+
+def _generar_token_diligenciamiento() -> str:
+    return secrets.token_urlsafe(_BYTES_ENTROPIA_TOKEN)
+
+
+def _segundos_restantes_cooldown(
+    ultimo_envio: Optional[datetime],
+    ahora: datetime,
+) -> Optional[int]:
+    if not ultimo_envio:
+        return None
+    tiempo_transcurrido = (ahora - normalizar_datetime_utc(ultimo_envio)).total_seconds()
+    if tiempo_transcurrido < _COOLDOWN_REENVIO_SEGUNDOS:
+        return int(_COOLDOWN_REENVIO_SEGUNDOS - tiempo_transcurrido)
+    return None
+
+
+def _verificar_cooldown_reenvio(ultimo_envio: Optional[datetime], ahora: datetime) -> None:
+    segundos_restantes = _segundos_restantes_cooldown(ultimo_envio, ahora)
+    if segundos_restantes is not None:
+        raise FrecuenciaEnvioExcedidaError(segundos_restantes)
 
 
 def _verificar_pin(pin_hash: str, pin: str) -> None:
@@ -207,17 +238,14 @@ class AccesoManualService:
         if acceso_existente and _calcular_estado_acceso(acceso_existente) == "activo":
             # Revisar tiempo desde el último envío para prevenir spam
             ahora = ahora_utc()
-            if acceso_existente.ultimo_envio_correo:
-                tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso_existente.ultimo_envio_correo)).total_seconds()
-                if tiempo_transcurrido < 120:  # 2 minutos
-                    raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
+            _verificar_cooldown_reenvio(acceso_existente.ultimo_envio_correo, ahora)
 
-            # Existe un acceso activo y pasaron más de 2 minutos, pedir confirmación al front
+            # Existe un acceso activo y ya superó el cooldown, pedir confirmación al front
             raise AccesoActivoExistenteError(acceso_existente.id)
 
         pin = _generar_pin()
         pin_hash = _verificador_pin.hash(pin)
-        token = secrets.token_urlsafe(32)
+        token = _generar_token_diligenciamiento()
 
         resultado = self._repo.crear_formulario_y_acceso(solicitud, pin_hash, token)
 
@@ -246,14 +274,11 @@ class AccesoManualService:
             raise FormularioYaEnviadoError("El acceso ya no está activo.")
 
         ahora = ahora_utc()
-        if acceso.ultimo_envio_correo:
-            tiempo_transcurrido = (ahora - normalizar_datetime_utc(acceso.ultimo_envio_correo)).total_seconds()
-            if tiempo_transcurrido < 120:
-                raise FrecuenciaEnvioExcedidaError(int(120 - tiempo_transcurrido))
+        _verificar_cooldown_reenvio(acceso.ultimo_envio_correo, ahora)
 
         pin = _generar_pin()
         pin_hash = _verificador_pin.hash(pin)
-        nuevo_token = secrets.token_urlsafe(32)
+        nuevo_token = _generar_token_diligenciamiento()
         self._repo.reenviar_acceso(acceso_id, pin_hash, nuevo_token, ahora)
 
         acceso_creado = {
@@ -460,7 +485,7 @@ class AccesoManualService:
         if not acceso:
             return None
 
-        nuevo_token = secrets.token_urlsafe(32)
+        nuevo_token = _generar_token_diligenciamiento()
         nuevo_expires_at = sumar_dias_habiles(ahora_utc(), DIAS_HABILES_VIGENCIA_ACCESO)
         self._repo.reactivar_acceso(acceso.id, nuevo_token, nuevo_expires_at)
 

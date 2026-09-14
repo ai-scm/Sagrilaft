@@ -623,7 +623,11 @@ class EventoFormulario(Base):
         Index("ix_eventos_formulario_form_created", "formulario_id", "created_at"),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     formulario_id = Column(String, ForeignKey("formularios.id", ondelete="CASCADE"), nullable=False)
     tipo_evento = Column(String(60), nullable=False)
     estado_anterior = Column(String(50), nullable=True)
