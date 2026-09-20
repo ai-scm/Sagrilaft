@@ -1,13 +1,3 @@
-import os
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
-
-os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://user:pass@localhost:5432/db")
-os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("APP_ENV", "development")
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
