@@ -12,6 +12,7 @@ export default function DetalleExpedienteHeader({
   tipoSolicitudLabel,
   estaCerrado,
   permiteReaperturaActualizacion,
+  sagrilaftHabilitado,
   verificandoSagrilaft,
   descargandoCertificado,
   onReabrirActualizacion,
@@ -53,16 +54,18 @@ export default function DetalleExpedienteHeader({
             Reabrir Actualización
           </button>
         )}
-        <button
-          className="btn btn-secondary"
-          onClick={onVerificarSagrilaft}
-          disabled={verificandoSagrilaft}
-          type="button"
-        >
-          <ShieldCheck size={16} />
-          Verificar SAGRILAFT
-        </button>
-        {expediente.sagrilaft_reporte_id && (
+        {sagrilaftHabilitado && (
+          <button
+            className="btn btn-secondary"
+            onClick={onVerificarSagrilaft}
+            disabled={verificandoSagrilaft}
+            type="button"
+          >
+            <ShieldCheck size={16} />
+            {verificandoSagrilaft ? 'Consultando...' : 'Verificar SAGRILAFT'}
+          </button>
+        )}
+        {sagrilaftHabilitado && expediente.sagrilaft_reporte_id && (
           <button
             className="btn btn-outline"
             onClick={onDescargarCertificado}

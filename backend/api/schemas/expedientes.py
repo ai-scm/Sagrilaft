@@ -170,6 +170,16 @@ class SagrilaftConsultaManual(BaseModel):
     fecha_expedicion: Optional[str] = None
 
 
+class DisponibilidadSagrilaft(BaseModel):
+    """Estado del feature flag de verificación SAGRILAFT (PROVEEDOR_LISTAS_CAUTELA).
+
+    Permite al frontend ocultar las acciones de verificación cuando el
+    proveedor está configurado como 'deshabilitado', evitando que el analista
+    dispare una consulta que en realidad no verifica nada (Null Object).
+    """
+    habilitado: bool
+
+
 class ResumenRechazo(BaseModel):
     """Resultado de una operación de rechazo de formulario."""
 

@@ -10,7 +10,7 @@ Diseño:
   - Los routers dependen solo de api.dependencies, api.schemas y domain.* (tipos).
 """
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from typing import Optional
 
 from domain.contratos import ExtractorIAImp
@@ -26,8 +26,8 @@ from domain.puertos.repositorios import (
     RepositorioFormulario,
     RepositorioValidacion,
 )
-from infrastructure.configuracion import AppConfig
-from infrastructure.dependencies import (
+from infrastructure.config.configuracion import AppConfig
+from infrastructure.composicion.dependencies import (
     obtener_config,
     obtener_extractor,
     obtener_repo_acceso,
@@ -58,7 +58,10 @@ from services.firma.firma_service import FirmaService
 from services.formulario.documento_service import DocumentoService
 from services.formulario.formulario_service import FormularioService
 from services.formulario.verificacion_sagrilaft import ServicioVerificacionSagrilaft
-from infrastructure.servicios_externos.sagrilaft.fabrica import obtener_consultor_listas
+from infrastructure.servicios_externos.sagrilaft.fabrica import (
+    PROVEEDOR_DESHABILITADO,
+    obtener_consultor_listas,
+)
 from services.listas.servicio_listas_cautela import ListaCautelaService
 from services.validacion.orquestador import OrquestadorValidacionDocumentos
 from services.validacion.validacion_service import ValidacionService
@@ -261,3 +264,25 @@ def obtener_servicio_verificacion_sagrilaft(
 ) -> ServicioVerificacionSagrilaft:
     consultor = obtener_consultor_listas(config.listas_cautela)
     return ServicioVerificacionSagrilaft(consultor, repo)
+
+
+def sagrilaft_habilitado(config: AppConfig = Depends(obtener_config)) -> bool:
+    """Estado del feature flag PROVEEDOR_LISTAS_CAUTELA (única fuente: AppConfig)."""
+    return config.listas_cautela.proveedor != PROVEEDOR_DESHABILITADO
+
+
+def exigir_sagrilaft_habilitado(habilitado: bool = Depends(sagrilaft_habilitado)) -> None:
+    """Corta la petición HTTP antes de llegar al servicio si el flag está apagado.
+
+    El adaptador Deshabilitado (Null Object) sigue existiendo para quien lo
+    inyecte directamente, pero los endpoints HTTP de verificación/descarga no
+    deben ejecutar una consulta que en realidad no verifica nada.
+    """
+    if not habilitado:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La verificación SAGRILAFT está deshabilitada por configuración "
+                "(PROVEEDOR_LISTAS_CAUTELA=deshabilitado)."
+            ),
+        )

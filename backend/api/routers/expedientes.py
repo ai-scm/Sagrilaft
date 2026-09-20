@@ -15,10 +15,12 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
 from api.dependencies import (
+    exigir_sagrilaft_habilitado,
     obtener_max_upload_mb,
     obtener_servicio_expediente,
     obtener_servicio_firma,
     obtener_servicio_verificacion_sagrilaft,
+    sagrilaft_habilitado,
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
 from api.rbac import contrapartes_permitidas
@@ -26,6 +28,7 @@ from domain.constantes import CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS
 from domain.utils.archivos import ArchivoDemasiadoGrandeError, leer_archivo_limitado
 from api.schemas import (
     ComparacionVersionFormulario,
+    DisponibilidadSagrilaft,
     ExpedienteDetalle,
     ExpedienteResumen,
     ResumenCierreExpediente,
@@ -385,10 +388,28 @@ def deshacer_devolucion(
         actor_id=usuario.email,
     )
 
+@enrutador.get(
+    "/sagrilaft/disponibilidad",
+    response_model=DisponibilidadSagrilaft,
+    summary="Estado del feature flag de verificación SAGRILAFT",
+    description=(
+        "Indica si la verificación en listas cautela está habilitada según "
+        "PROVEEDOR_LISTAS_CAUTELA. El frontend usa este valor para mostrar u "
+        "ocultar las acciones de verificación y descarga de certificado."
+    ),
+)
+def disponibilidad_sagrilaft(
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
+    habilitado: bool = Depends(sagrilaft_habilitado),
+) -> DisponibilidadSagrilaft:
+    return DisponibilidadSagrilaft(habilitado=habilitado)
+
 @enrutador.post(
     "/{formulario_id}/verificar-sagrilaft",
     summary="Verificar contraparte en SAGRILAFT",
-    description="Consulta la contraparte en las listas cautela y retorna el resultado (simulado, real o deshabilitado).",
+    description="Consulta la contraparte en las listas cautela y retorna el resultado (simulado o real).",
+    responses={409: {"description": "La verificación SAGRILAFT está deshabilitada por configuración"}},
+    dependencies=[Depends(exigir_sagrilaft_habilitado)],
 )
 def verificar_sagrilaft(
     formulario_id: str,
@@ -402,6 +423,8 @@ def verificar_sagrilaft(
     "/{formulario_id}/sagrilaft/pdf",
     summary="Descargar certificado SAGRILAFT",
     description="Descarga el certificado PDF original desde el proveedor de listas cautela.",
+    responses={409: {"description": "La verificación SAGRILAFT está deshabilitada por configuración"}},
+    dependencies=[Depends(exigir_sagrilaft_habilitado)],
 )
 def descargar_pdf_sagrilaft(
     formulario_id: str,

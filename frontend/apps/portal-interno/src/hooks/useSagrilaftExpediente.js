@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 
 export function useSagrilaftExpediente({ formularioId, expediente, onActualizado }) {
@@ -6,6 +6,24 @@ export function useSagrilaftExpediente({ formularioId, expediente, onActualizado
   const [resultadoSagrilaft, setResultadoSagrilaft] = useState(null);
   const [descargandoCertificado, setDescargandoCertificado] = useState(false);
   const [errorCertificado, setErrorCertificado] = useState(null);
+  // null mientras se consulta el feature flag: evita parpadeo del botón.
+  const [sagrilaftHabilitado, setSagrilaftHabilitado] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+    api.obtenerDisponibilidadSagrilaft()
+      .then(({ habilitado }) => {
+        if (vigente) setSagrilaftHabilitado(habilitado);
+      })
+      .catch(() => {
+        // Ante un error de red asumimos deshabilitado: es más seguro ocultar
+        // la acción que ofrecer una verificación que podría fallar.
+        if (vigente) setSagrilaftHabilitado(false);
+      });
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   async function verificarSagrilaft(datosManuales) {
     setVerificandoSagrilaft(true);
@@ -45,6 +63,7 @@ export function useSagrilaftExpediente({ formularioId, expediente, onActualizado
   }
 
   return {
+    sagrilaftHabilitado,
     verificandoSagrilaft,
     resultadoSagrilaft,
     setResultadoSagrilaft,

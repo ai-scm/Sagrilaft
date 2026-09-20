@@ -35,6 +35,7 @@ from .formularios import (
 )
 from .expedientes import (
     ComparacionVersionFormulario,
+    DisponibilidadSagrilaft,
     ExpedienteDetalle,
     ExpedienteResumen,
     ResumenCierreExpediente,
@@ -84,6 +85,7 @@ __all__ = [
     "ResultadoValidacionEnvio",
     "SolicitudEnvioFormulario",
     # Expedientes
+    "DisponibilidadSagrilaft",
     "ExpedienteDetalle",
     "ExpedienteResumen",
     "ComparacionVersionFormulario",

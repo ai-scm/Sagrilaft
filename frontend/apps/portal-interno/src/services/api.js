@@ -170,6 +170,10 @@ export const api = {
     return requestJson(`/expedientes/${formularioId}/deshacer-devolucion`, { method: 'POST' });
   },
 
+  async obtenerDisponibilidadSagrilaft() {
+    return requestJson('/expedientes/sagrilaft/disponibilidad');
+  },
+
   async verificarSagrilaft(formularioId, datosManuales = null) {
     const options = { method: 'POST' };
     if (datosManuales) {

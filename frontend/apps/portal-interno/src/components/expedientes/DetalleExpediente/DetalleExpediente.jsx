@@ -84,6 +84,7 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               tipoSolicitudLabel={tipoSolicitudLabel}
               estaCerrado={estaCerrado}
               permiteReaperturaActualizacion={permiteReaperturaActualizacion}
+              sagrilaftHabilitado={sagrilaft.sagrilaftHabilitado}
               verificandoSagrilaft={sagrilaft.verificandoSagrilaft}
               descargandoCertificado={sagrilaft.descargandoCertificado}
               onReabrirActualizacion={() => {
