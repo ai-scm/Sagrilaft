@@ -21,7 +21,7 @@ from api.dependencies import (
     obtener_servicio_verificacion_sagrilaft,
 )
 from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
-from domain.excepciones import SinPermisoError
+from api.rbac import contrapartes_permitidas
 from domain.constantes import CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS
 from domain.utils.archivos import ArchivoDemasiadoGrandeError, leer_archivo_limitado
 from api.schemas import (
@@ -50,25 +50,6 @@ enrutador = APIRouter(
     tags=["expedientes"],
 )
 
-_ROLES_A_CONTRAPARTES = {
-    "acceso_clientes": "cliente",
-    "acceso_proveedores": "proveedor",
-}
-
-def _contrapartes_permitidas(usuario: UsuarioPortalInterno) -> list[str]:
-    """Deriva las carpetas visibles según los roles del operador autenticado."""
-
-    permitidas = [
-        tipo
-        for rol, tipo in _ROLES_A_CONTRAPARTES.items()
-        if usuario.tiene_rol(rol)
-    ]
-
-    if not permitidas:
-        raise SinPermisoError("sin_roles")
-
-    return permitidas
-
 # ─── 1. Listado y consulta ─────────────────────────────────────────────────────
 
 @enrutador.get(
@@ -90,7 +71,7 @@ def listar_expedientes(
     return servicio.listar_expedientes(
         tipo_contraparte=tipo_contraparte,
         busqueda=busqueda,
-        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        contrapartes_permitidas=contrapartes_permitidas(usuario),
     )
 
 
@@ -106,7 +87,7 @@ def obtener_expediente(
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ExpedienteDetalle:
-    return servicio.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    return servicio.obtener_expediente(formulario_id, contrapartes_permitidas(usuario))
 
 
 @enrutador.get(
@@ -120,7 +101,7 @@ def comparar_ultima_correccion(
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> ComparacionVersionFormulario:
-    return servicio.comparar_ultima_correccion(formulario_id, _contrapartes_permitidas(usuario))
+    return servicio.comparar_ultima_correccion(formulario_id, contrapartes_permitidas(usuario))
 
 
 @enrutador.get(
@@ -139,7 +120,7 @@ def comparar_versiones_especificas(
         formulario_id,
         base_id,
         comparar_id,
-        _contrapartes_permitidas(usuario)
+        contrapartes_permitidas(usuario)
     )
 
 
@@ -156,7 +137,7 @@ def descargar_reporte_comparacion(
 ) -> Response:
     pdf_bytes = servicio.generar_reporte_comparacion_pdf(
         formulario_id,
-        _contrapartes_permitidas(usuario),
+        contrapartes_permitidas(usuario),
     )
     headers = {
         "Content-Disposition": f'attachment; filename="comparacion_{formulario_id[:8]}.pdf"'
@@ -176,7 +157,7 @@ def descargar_documento(
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> Response:
-    info = servicio.resolver_documento_para_descarga(formulario_id, doc_id, _contrapartes_permitidas(usuario))
+    info = servicio.resolver_documento_para_descarga(formulario_id, doc_id, contrapartes_permitidas(usuario))
     if info.es_url:
         return RedirectResponse(url=info.valor, status_code=307)
     return FileResponse(path=info.valor, filename=info.nombre_archivo, media_type=info.content_type)
@@ -214,7 +195,7 @@ async def carga_manual_expediente(
             content_type=archivo.content_type,
             justificacion=justificacion,
             actor_id=usuario.email,
-            contrapartes_permitidas=_contrapartes_permitidas(usuario),
+            contrapartes_permitidas=contrapartes_permitidas(usuario),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -247,7 +228,7 @@ async def carga_reporte_final(
                 justificacion=justificacion or "",
                 actor_id=usuario.email,
                 causal_cierre=causal_cierre,
-                contrapartes_permitidas=_contrapartes_permitidas(usuario),
+                contrapartes_permitidas=contrapartes_permitidas(usuario),
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -268,7 +249,7 @@ async def carga_reporte_final(
             justificacion=justificacion,
             actor_id=usuario.email,
             causal_cierre=causal_cierre,
-            contrapartes_permitidas=_contrapartes_permitidas(usuario),
+            contrapartes_permitidas=contrapartes_permitidas(usuario),
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -293,7 +274,7 @@ def reabrir_actualizacion(
         formulario_id=formulario_id,
         justificacion=solicitud.justificacion,
         actor_id=usuario.email,
-        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        contrapartes_permitidas=contrapartes_permitidas(usuario),
         campos_identificados=solicitud.campos_identificados,
     )
 
@@ -312,7 +293,7 @@ def aprobar_expediente(
 ) -> dict:
     return servicio.aprobar_expediente(
         formulario_id,
-        _contrapartes_permitidas(usuario),
+        contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -330,7 +311,7 @@ def deshacer_aprobacion(
 ) -> dict:
     return servicio.deshacer_aprobacion_expediente(
         formulario_id,
-        _contrapartes_permitidas(usuario),
+        contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -355,7 +336,7 @@ def rechazar_expediente(
 ) -> ResumenRechazo:
     return servicio.rechazar_expediente(
         formulario_id,
-        _contrapartes_permitidas(usuario),
+        contrapartes_permitidas(usuario),
         actor_id=usuario.email,
         motivo=solicitud.motivo,
         mensaje_para_destinatario=solicitud.mensaje_para_destinatario,
@@ -383,7 +364,7 @@ def devolver_expediente(
         formulario_id=formulario_id,
         especificaciones=solicitud.especificaciones,
         campos_identificados=solicitud.campos_identificados,
-        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        contrapartes_permitidas=contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -400,7 +381,7 @@ def deshacer_devolucion(
 ) -> dict:
     return servicio.deshacer_devolucion_expediente(
         formulario_id,
-        _contrapartes_permitidas(usuario),
+        contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -415,7 +396,7 @@ def verificar_sagrilaft(
     usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: ServicioVerificacionSagrilaft = Depends(obtener_servicio_verificacion_sagrilaft),
 ) -> dict:
-    return servicio.verificar_contraparte(formulario_id, _contrapartes_permitidas(usuario), datos_manuales=datos)
+    return servicio.verificar_contraparte(formulario_id, contrapartes_permitidas(usuario), datos_manuales=datos)
 
 @enrutador.get(
     "/{formulario_id}/sagrilaft/pdf",
@@ -430,7 +411,7 @@ def descargar_pdf_sagrilaft(
     from fastapi.responses import Response
     from fastapi import HTTPException
     try:
-        pdf_bytes = servicio.descargar_certificado_sagrilaft(formulario_id, _contrapartes_permitidas(usuario))
+        pdf_bytes = servicio.descargar_certificado_sagrilaft(formulario_id, contrapartes_permitidas(usuario))
         return Response(
             content=pdf_bytes, 
             media_type="application/pdf", 
@@ -457,7 +438,7 @@ def actualizar_estado_alerta(
         formulario_id=formulario_id,
         alerta_id=alerta_id,
         estado_auditoria=solicitud.estado_auditoria,
-        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        contrapartes_permitidas=contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -483,7 +464,7 @@ def enviar_a_firma(
     servicio: FirmaService = Depends(obtener_servicio_firma),
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
-    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    servicio_exp.obtener_expediente(formulario_id, contrapartes_permitidas(usuario))
     return servicio.enviar_a_firma(formulario_id, actor_id=usuario.email)
 
 
@@ -499,7 +480,7 @@ def verificar_estado_firma(
     servicio: FirmaService = Depends(obtener_servicio_firma),
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
-    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    servicio_exp.obtener_expediente(formulario_id, contrapartes_permitidas(usuario))
     return servicio.verificar_estado_firma(formulario_id)
 
 
@@ -522,7 +503,7 @@ def cancelar_firma(
     servicio: FirmaService = Depends(obtener_servicio_firma),
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> dict:
-    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    servicio_exp.obtener_expediente(formulario_id, contrapartes_permitidas(usuario))
     return servicio.cancelar_firma(formulario_id, actor_id=usuario.email, motivo=solicitud.motivo)
 
 
@@ -545,7 +526,7 @@ def reabrir_revision_firmado(
     return servicio.reabrir_revision_firmado(
         formulario_id=formulario_id,
         motivo=solicitud.motivo,
-        contrapartes_permitidas=_contrapartes_permitidas(usuario),
+        contrapartes_permitidas=contrapartes_permitidas(usuario),
         actor_id=usuario.email,
     )
 
@@ -564,7 +545,7 @@ def descargar_documento_firmado(
     servicio: FirmaService = Depends(obtener_servicio_firma),
     servicio_exp: ExpedienteService = Depends(obtener_servicio_expediente),
 ) -> Response:
-    servicio_exp.obtener_expediente(formulario_id, _contrapartes_permitidas(usuario))
+    servicio_exp.obtener_expediente(formulario_id, contrapartes_permitidas(usuario))
     info = servicio.resolver_documento_firmado(formulario_id)
     headers = {"Cache-Control": "no-store"}
     if info.es_url:

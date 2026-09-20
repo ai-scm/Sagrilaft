@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, Request, status
 
 from api.dependencies import obtener_servicio_acceso
 from api.limitador import limitador
-from api.middleware.autenticacion import portal_interno
+from api.middleware.autenticacion import UsuarioPortalInterno, portal_interno
+from api.rbac import contrapartes_permitidas
 from api.schemas import (
     AccesoManualCreado,
     AccesoManualResumen,
@@ -44,10 +45,10 @@ _RATE_LIMIT_RESOLUCION_TOKEN = "30/minute"
         "o proveedor acceda al formulario SAGRILAFT. El PIN se devuelve UNA SOLA VEZ "
         "y nunca se vuelve a exponer desde el backend."
     ),
-    dependencies=[Depends(portal_interno)],
 )
 def crear_acceso_manual_contraparte(
     solicitud_acceso_manual: SolicitudAccesoManual,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio_acceso_manual: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> AccesoManualCreado:
     solicitud_dominio = SolicitudCreacionAcceso(
@@ -56,7 +57,10 @@ def crear_acceso_manual_contraparte(
         correo_destinatario=str(solicitud_acceso_manual.correo_destinatario),
         area_responsable=solicitud_acceso_manual.area_responsable.value,
     )
-    return servicio_acceso_manual.crear_acceso(solicitud_dominio)
+    return servicio_acceso_manual.crear_acceso(
+        solicitud_dominio,
+        contrapartes_permitidas(usuario),
+    )
 
 @enrutador.post(
     "/{acceso_id}/reenviar",
@@ -64,13 +68,16 @@ def crear_acceso_manual_contraparte(
     status_code=status.HTTP_200_OK,
     summary="Reenviar acceso manual",
     description="Regenera el PIN y reenvía el correo de acceso manual.",
-    dependencies=[Depends(portal_interno)],
 )
 def reenviar_acceso_manual_contraparte(
     acceso_id: str,
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio_acceso_manual: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> AccesoManualCreado:
-    return servicio_acceso_manual.reenviar_acceso(acceso_id)
+    return servicio_acceso_manual.reenviar_acceso(
+        acceso_id,
+        contrapartes_permitidas(usuario),
+    )
 
 
 # ─── 2. Listado ───────────────────────────────────────────────────────────────
@@ -80,12 +87,12 @@ def reenviar_acceso_manual_contraparte(
     response_model=List[AccesoManualResumen],
     summary="Listar accesos manuales",
     description="Devuelve todos los accesos creados ordenados del más reciente al más antiguo, con su estado calculado (activo, consumido o expirado).",
-    dependencies=[Depends(portal_interno)],
 )
 def obtener_accesos_manuales_creados(
+    usuario: UsuarioPortalInterno = Depends(portal_interno),
     servicio: AccesoManualService = Depends(obtener_servicio_acceso),
 ) -> List[AccesoManualResumen]:
-    return servicio.listar_accesos()
+    return servicio.listar_accesos(contrapartes_permitidas(usuario))
 
 
 # ─── 3. Gestión de correo del destinatario ────────────────────────────────────

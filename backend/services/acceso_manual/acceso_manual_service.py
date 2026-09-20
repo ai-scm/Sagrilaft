@@ -26,6 +26,7 @@ from domain.excepciones import (
     AccesoExpiradoError,
     CredencialesAccesoInvalidasError,
     FormularioYaEnviadoError,
+    SinPermisoError,
     TokenConsumidoError,
     TokenDiligenciamientoInvalidoError,
     AccesoActivoExistenteError,
@@ -149,6 +150,17 @@ def _calcular_estado_acceso(acceso: AccesoManualDatos) -> Literal["activo", "con
     return "activo"
 
 
+def _exigir_contraparte_permitida(
+    tipo_contraparte: Optional[str],
+    contrapartes_permitidas: Optional[List[str]],
+) -> None:
+    if (
+        contrapartes_permitidas is not None
+        and tipo_contraparte not in contrapartes_permitidas
+    ):
+        raise SinPermisoError(tipo_contraparte or "desconocida")
+
+
 class AccesoManualService:
     """
     Servicio de negocio para la creación y resolución de accesos manuales.
@@ -226,7 +238,11 @@ class AccesoManualService:
 
     # ─── Creación ────────────────────────────────────────────────────────────
 
-    def crear_acceso(self, solicitud: SolicitudCreacionAcceso) -> Dict[str, Any]:
+    def crear_acceso(
+        self,
+        solicitud: SolicitudCreacionAcceso,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
         Genera credenciales únicas, persiste el AccesoManual y el Formulario
         pre-inicializado, y devuelve el PIN en texto plano UNA SOLA VEZ.
@@ -234,6 +250,11 @@ class AccesoManualService:
         Verifica si ya existe un acceso activo para el mismo correo para
         prevenir duplicados.
         """
+        _exigir_contraparte_permitida(
+            solicitud.tipo_contraparte,
+            contrapartes_permitidas,
+        )
+
         acceso_existente = self._repo.obtener_acceso_activo_por_correo(solicitud.correo_destinatario)
         if acceso_existente and _calcular_estado_acceso(acceso_existente) == "activo":
             # Revisar tiempo desde el último envío para prevenir spam
@@ -261,7 +282,11 @@ class AccesoManualService:
         acceso_creado["correo_enviado"] = self._notificar_credenciales_acceso(acceso_creado)
         return acceso_creado
 
-    def reenviar_acceso(self, acceso_id: str) -> Dict[str, Any]:
+    def reenviar_acceso(
+        self,
+        acceso_id: str,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
         """
         Reenvía las credenciales de un acceso existente (generando un nuevo PIN).
         """
@@ -269,6 +294,11 @@ class AccesoManualService:
         acceso = next((a for a in accesos if a.id == acceso_id), None)
         if not acceso:
             raise TokenDiligenciamientoInvalidoError("Acceso no encontrado")
+
+        _exigir_contraparte_permitida(
+            acceso.tipo_contraparte,
+            contrapartes_permitidas,
+        )
 
         if _calcular_estado_acceso(acceso) != "activo":
             raise FormularioYaEnviadoError("El acceso ya no está activo.")
@@ -301,9 +331,18 @@ class AccesoManualService:
 
     # ─── Listado ─────────────────────────────────────────────────────────────
 
-    def listar_accesos(self) -> List[Dict[str, Any]]:
+    def listar_accesos(
+        self,
+        contrapartes_permitidas: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """Devuelve todos los accesos creados, ordenados del más reciente al más antiguo."""
         accesos = self._repo.listar_accesos()
+        if contrapartes_permitidas is not None:
+            accesos = [
+                acceso
+                for acceso in accesos
+                if acceso.tipo_contraparte in contrapartes_permitidas
+            ]
         return [self._serializar_acceso_listado(acceso) for acceso in accesos]
 
     # ─── Resolución de token ──────────────────────────────────────────────────
