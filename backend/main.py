@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from infrastructure.configuracion import load_config
+from infrastructure.config.configuracion import load_config
 from infrastructure.storage.backend import crear_storage
 from api.limitador import limitador
 from domain.excepciones import (
@@ -34,7 +34,7 @@ from domain.excepciones import (
     AccesoActivoExistenteError,
     FrecuenciaEnvioExcedidaError,
 )
-from infrastructure.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
+from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.notificaciones.email_service import CorreoDestinatarioVacioError

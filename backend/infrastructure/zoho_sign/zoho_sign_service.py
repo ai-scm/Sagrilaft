@@ -17,8 +17,8 @@ from pathlib import Path
 
 import httpx
 from domain.contratos import SolicitudFirmaCreada
-from infrastructure.configuracion import ZohoSignConfig
-from infrastructure.emf_logger import emitir_metrica_emf
+from infrastructure.config.configuracion import ZohoSignConfig
+from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
 logger = logging.getLogger(__name__)
 

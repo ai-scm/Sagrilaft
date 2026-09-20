@@ -7,7 +7,7 @@ from domain.puertos.consultor_listas_cautela import (
     ResultadoConsultaListas,
     ErrorConsultaListas
 )
-from infrastructure.emf_logger import emitir_metrica_emf
+from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
 class ConsultorListasCautelaAPI(ConsultorListasCautela):
     def __init__(self, url_base: str, api_key: str):

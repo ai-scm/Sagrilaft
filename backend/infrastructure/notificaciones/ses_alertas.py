@@ -17,7 +17,7 @@ from typing import Optional
 from botocore.exceptions import ClientError
 
 from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
-from infrastructure.configuracion import AWSConfig, SesConfig
+from infrastructure.config.configuracion import AWSConfig, SesConfig
 from infrastructure.notificaciones.templates_correos import (
     construir_html_notificacion,
     construir_texto_plano_notificacion,

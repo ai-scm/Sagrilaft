@@ -26,7 +26,7 @@ from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
-from infrastructure.configuracion import KeycloakConfig, entorno_actual
+from infrastructure.config.configuracion import KeycloakConfig, entorno_actual
 from domain.utils.seguridad import sanitizar_log
 
 _portador = HTTPBearer(auto_error=False)

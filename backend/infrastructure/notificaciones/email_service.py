@@ -10,7 +10,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from infrastructure.configuracion import SmtpConfig
+from infrastructure.config.configuracion import SmtpConfig
 from domain.catalogo_correcciones import resolver_etiquetas_campos_corregibles
 
 logger = logging.getLogger(__name__)

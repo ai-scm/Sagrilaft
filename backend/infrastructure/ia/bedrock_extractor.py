@@ -20,7 +20,7 @@ from pypdf import PdfReader, PdfWriter
 
 from domain.contratos import ResultadoExtraccion
 from domain.utils.mapeo_campos import mapear_campos_para_formulario
-from infrastructure.emf_logger import emitir_metrica_emf
+from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
 logger = logging.getLogger(__name__)
 

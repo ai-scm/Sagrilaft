@@ -14,7 +14,7 @@ from typing import Optional
 from botocore.exceptions import BotoCoreError, ClientError
 from botocore.config import Config
 
-from infrastructure.configuracion import AWSConfig, SnsConfig
+from infrastructure.config.configuracion import AWSConfig, SnsConfig
 
 logger = logging.getLogger(__name__)
 
