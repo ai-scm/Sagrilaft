@@ -23,7 +23,7 @@ from domain.puertos.alertas_portal import IAlertasPortal, TipoAlerta
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.notificaciones import INotificador
 from domain.puertos.repositorios import RepositorioExpediente
-from infrastructure.emf_logger import emitir_metrica_emf
+from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
 if TYPE_CHECKING:
     from services.acceso_manual.acceso_manual_service import AccesoManualService
@@ -233,10 +233,10 @@ class DevolucionCorreccionHandler:
             detalle_alerta += "\n".join(f"• {etiqueta}" for etiqueta in etiquetas_campos)
 
         self._alertas.alertar(
-            TipoAlerta.FORMULARIO_DEVUELTO,
-            formulario.id,
-            formulario.razon_social or "",
-            formulario.tipo_contraparte or "",
-            formulario.codigo_peticion,
+            tipo=TipoAlerta.FORMULARIO_DEVUELTO,
+            formulario_id=formulario.id,
+            razon_social=formulario.razon_social or "",
+            tipo_contraparte=formulario.tipo_contraparte or "",
+            codigo_peticion=formulario.codigo_peticion,
             detalle=detalle_alerta.strip(),
         )

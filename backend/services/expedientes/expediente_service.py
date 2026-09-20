@@ -506,7 +506,10 @@ class ExpedienteService:
         if not eventos:
             return None
         for evento in reversed(eventos):
-            if evento.tipo_evento == TipoEvento.EXPEDIENTE_CERRADO:
+            if evento.tipo_evento in (
+                TipoEvento.EXPEDIENTE_CERRADO,
+                TipoEvento.REPORTE_FINAL_CARGADO,
+            ):
                 metadata = evento.metadata or {}
                 return metadata.get("causal_cierre")
         return None
