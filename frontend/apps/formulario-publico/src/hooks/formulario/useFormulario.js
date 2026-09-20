@@ -15,6 +15,7 @@ import {
   CAMPOS_CLASIFICACION_TRIBUTARIA_EMPRESA,
   CAMPOS_PERSONA_NATURAL,
   calcularPasosVisibles,
+  validarDocumentosRequeridos,
 } from '../../data/formularioConfig';
 import { useFormValidacion } from './useFormValidacion';
 import { useTablasDinamicas, JUNTA_INICIAL } from './useTablasDinamicas';
@@ -366,6 +367,7 @@ export function useFormulario() {
       }
       const docRes = await api.subirDocumento(currentId, tipoDoc, file);
       setDocumentos(prev => ({ ...prev, [tipoDoc]: docRes }));
+      limpiarError(tipoDoc);
       if (docRes.campos_sugeridos && Object.keys(docRes.campos_sugeridos).length > 0) {
         setFormData(prev => ({ ...prev, ...docRes.campos_sugeridos }));
       }
@@ -508,6 +510,9 @@ export function useFormulario() {
   const handleNext = () => {
     const newErrors = validarPaso(step);
 
+    if (step === 1) {
+      Object.assign(newErrors, validarDocumentosRequeridos(documentos));
+    }
     if (step === 4) {
       Object.assign(newErrors, validarTablasPaso4({
         juntaDirectiva, accionistas, beneficiarios,
@@ -575,7 +580,7 @@ export function useFormulario() {
    * Función pura: solo consulta estado, sin efectos secundarios.
    */
   const _recopilarErroresEnvio = () => {
-    const errores = {};
+    const errores = validarDocumentosRequeridos(documentos);
     for (let s = 2; s <= TOTAL_STEPS; s++) {
       Object.assign(errores, validarPaso(s));
     }
@@ -600,10 +605,13 @@ export function useFormulario() {
    * interna de qué claves corresponden a cada paso.
    */
   const _navegarAlPrimerPasoConError = (errores) => {
+    const tieneErroresPaso1 = Object.keys(validarDocumentosRequeridos(documentos))
+      .some(k => errores[k]);
     const tieneErroresPaso4 = CLAVES_ERROR_PASO4.some(k => errores[k]);
     const tieneErroresPaso6 = CLAVES_ERROR_PASO6.some(k => errores[k]);
     const tieneErroresPaso7 = CLAVES_ERROR_PASO7.some(k => errores[k]);
-    const primerPaso = [2, 3, 4, 5, 6, 7, 8].find(s => {
+    const primerPaso = [1, 2, 3, 4, 5, 6, 7, 8].find(s => {
+      if (s === 1) return tieneErroresPaso1;
       if (s === 4) return tieneErroresPaso4;
       if (s === 6) return tieneErroresPaso6 || (CAMPOS_REQUERIDOS[6] || []).some(f => errores[f]);
       if (s === 7) return tieneErroresPaso7;

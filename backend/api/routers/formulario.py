@@ -19,7 +19,13 @@ from api.dependencies import (
     obtener_servicio_acceso,
     obtener_servicio_formulario,
 )
-from domain.utils.archivos import ArchivoDemasiadoGrandeError, leer_archivo_limitado
+from domain.utils.archivos import (
+    ArchivoDemasiadoGrandeError,
+    ArchivoDocumentoInvalidoError,
+    TipoDocumentoNoPermitidoError,
+    leer_archivo_limitado,
+    validar_archivo_diligenciamiento,
+)
 from api.schemas import (
     CredencialesAccesoManual,
     CredencialesEnvioFormulario,
@@ -215,6 +221,17 @@ async def subir_documento(
     Flujo event-driven: cada carga dispara UNA sola llamada a Bedrock
     para el tipo_documento recibido, sin iterar sobre otros documentos.
     """
+    try:
+        validar_archivo_diligenciamiento(
+            tipo_documento=tipo_documento,
+            nombre_archivo=archivo.filename or "",
+            content_type=archivo.content_type,
+        )
+    except TipoDocumentoNoPermitidoError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ArchivoDocumentoInvalidoError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+
     try:
         contenido = await leer_archivo_limitado(archivo, max_upload_mb)
     except ArchivoDemasiadoGrandeError as e:

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
 from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
-from domain.contratos import ExtractorIAImp, ResultadoEnvioFormulario
+from domain.contratos import ErrorCampoFormulario, ExtractorIAImp, ResultadoEnvioFormulario
 from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,
@@ -25,6 +25,10 @@ from domain.puertos.almacenamiento import IAlmacenamiento, InfoDescarga
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import RepositorioDocumento, RepositorioFormulario
 from domain.utils.estado_formulario import es_estado_editable
+from domain.utils.archivos import (
+    documentos_diligenciamiento_requeridos,
+    nombre_documento_diligenciamiento,
+)
 from services.formulario.almacenamiento_contraparte import resolver_key_contraparte
 from services.formulario.analisis_service import (
     AnalisisDocumentosService,
@@ -116,6 +120,10 @@ class FormularioService:
         errores = self._validador_envio.validar(formulario)
         if errores:
             return ResultadoEnvioFormulario(valido=False, errores=errores)
+
+        errores_documentos = self._validar_documentos_obligatorios(formulario.id)
+        if errores_documentos:
+            return ResultadoEnvioFormulario(valido=False, errores=errores_documentos)
 
         if alertas is not None:
             # Convertimos las pydantic models a dicts, solo guardamos campos relevantes
@@ -237,6 +245,22 @@ class FormularioService:
     def listar_documentos(self, formulario_id: str) -> List[Any]:
         self._buscar_formulario_o_error(formulario_id)
         return self._documentos.listar_documentos(formulario_id)
+
+    def _validar_documentos_obligatorios(self, formulario_id: str) -> List[ErrorCampoFormulario]:
+        documentos_activos = self._documentos.listar_documentos(formulario_id)
+        tipos_presentes = {documento.tipo_documento for documento in documentos_activos}
+
+        return [
+            ErrorCampoFormulario(
+                campo=f"documentos.{tipo_documento}",
+                mensaje=(
+                    "Debe cargar el documento obligatorio: "
+                    f"{nombre_documento_diligenciamiento(tipo_documento)}."
+                ),
+            )
+            for tipo_documento in documentos_diligenciamiento_requeridos()
+            if tipo_documento not in tipos_presentes
+        ]
 
     def descargar_pdf_oficial(self, codigo_o_id: str) -> InfoDescarga:
         formulario = self._repo.obtener_por_codigo(codigo_o_id) or self._repo.obtener_por_id(codigo_o_id)

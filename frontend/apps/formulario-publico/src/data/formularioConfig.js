@@ -45,6 +45,15 @@ export const DOCUMENTOS_CONFIG = [
   { label: 'Referencias Bancarias',                            tipoDoc: 'referencias_bancarias',  accepted: '.pdf' },
 ];
 
+export function validarDocumentosRequeridos(documentos = {}) {
+  return DOCUMENTOS_CONFIG.reduce((errores, documento) => {
+    if (!documentos[documento.tipoDoc]) {
+      errores[documento.tipoDoc] = `${documento.label} es obligatorio`;
+    }
+    return errores;
+  }, {});
+}
+
 /**
  * Campos exclusivos de Persona Natural.
  * Fuente única de verdad — espeja _CAMPOS_PERSONA_NATURAL del backend.
