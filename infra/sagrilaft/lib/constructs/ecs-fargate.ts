@@ -306,9 +306,13 @@ export class EcsFargate extends Construct {
     });
     container.addPortMappings({ containerPort: 8080 });
 
+    // 180s no fue suficiente en la práctica: se observó una tarea sana con 3/5
+    // chequeos ELB exitosos (~131s de vida) terminada por el Circuit Breaker antes
+    // de completar los 5 consecutivos (~150s) que exige el target group. Se sube a
+    // 300s (mismo valor ya probado exitosamente en Keycloak) para dar margen real.
     const targetGroup = this.buildTargetGroup(`${idPrefix}TargetGroup`, props, serviceName, 8080, '/');
     const service = this.buildService(`${idPrefix}Service`, props, taskDefinition, props.desiredCount, serviceName, {
-      healthCheckGracePeriod: Duration.seconds(180),
+      healthCheckGracePeriod: Duration.seconds(300),
     });
     service.attachToApplicationTargetGroup(targetGroup);
 
