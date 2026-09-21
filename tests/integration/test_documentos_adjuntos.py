@@ -1,4 +1,6 @@
 import hashlib
+import re
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -59,6 +61,19 @@ def _documentos_en_bd(sesion_bd, formulario_id: str) -> list[DocumentoAdjunto]:
     )
 
 
+def _assert_ruta_temporal(ruta: str, codigo_peticion: str, nombre_archivo: str) -> None:
+    """La key incluye un identificador único por carga (ver fix del bug de
+    concurrencia en docs/RUNBOOK_OPERATIVO.md sección 3): ya no es
+    `tmp/{codigo}/{nombre}` exacto, sino `tmp/{codigo}/{uuid}_{nombre}`."""
+    patron = rf"^tmp/{re.escape(codigo_peticion)}/[0-9a-f]{{12}}_{re.escape(nombre_archivo)}$"
+    assert re.match(patron, ruta), f"ruta temporal inesperada: {ruta}"
+
+
+def _assert_ruta_definitiva(ruta: str, prefijo_destino: str, nombre_archivo: str) -> None:
+    patron = rf"^{re.escape(prefijo_destino)}/[0-9a-f]{{12}}_{re.escape(nombre_archivo)}$"
+    assert re.match(patron, ruta), f"ruta definitiva inesperada: {ruta}"
+
+
 def _documento_activo_en_bd(
     sesion_bd,
     formulario_id: str,
@@ -103,7 +118,7 @@ def test_carga_documento_registra_evidencia_en_bd_storage_e_ia(
         TIPO_DOCUMENTO_RUT,
     )
     assert documento_bd.nombre_archivo == "rut_inicial.pdf"
-    assert documento_bd.ruta_archivo == f"tmp/{acceso['codigo_peticion']}/rut_inicial.pdf"
+    _assert_ruta_temporal(documento_bd.ruta_archivo, acceso["codigo_peticion"], "rut_inicial.pdf")
     assert documento_bd.version_numero == 1
     assert documento_bd.version_anterior_id is None
     assert documento_bd.hash_sha256 == hashlib.sha256(contenido).hexdigest()
@@ -169,8 +184,9 @@ def test_reemplazo_y_radicacion_mueven_documento_a_carpeta_definitiva(
     assert documento_vigente.version_anterior_id == documento_anterior.id
     assert documento_vigente.deleted_at is None
     assert documento_vigente.hash_sha256 == hashlib.sha256(segundo_contenido).hexdigest()
-    assert documento_vigente.ruta_archivo == f"tmp/{acceso['codigo_peticion']}/rut_vigente.pdf"
+    _assert_ruta_temporal(documento_vigente.ruta_archivo, acceso["codigo_peticion"], "rut_vigente.pdf")
     assert storage.existe(documento_vigente.ruta_archivo)
+    ruta_temporal_vigente = documento_vigente.ruta_archivo
 
     respuesta_listado = cliente_api.get(
         f"/api/formularios/{acceso['formulario_id']}/documentos"
@@ -203,8 +219,10 @@ def test_reemplazo_y_radicacion_mueven_documento_a_carpeta_definitiva(
     )
 
     assert documento_radicado.id == documento_vigente.id
-    assert documento_radicado.ruta_archivo == "PROVEEDORES/Proveedor Integracion SAS/rut_vigente.pdf"
-    assert storage.existe(f"tmp/{acceso['codigo_peticion']}/rut_vigente.pdf") is False
+    _assert_ruta_definitiva(
+        documento_radicado.ruta_archivo, "PROVEEDORES/Proveedor Integracion SAS", "rut_vigente.pdf"
+    )
+    assert storage.existe(ruta_temporal_vigente) is False
     assert storage.existe(documento_radicado.ruta_archivo)
     assert pdf_oficial.ruta_archivo.startswith("PROVEEDORES/Proveedor Integracion SAS/")
     assert storage.existe(pdf_oficial.ruta_archivo)
@@ -243,6 +261,7 @@ def test_ciclo_documental_con_los_seis_documentos_requeridos(
         tipo_documento for tipo_documento, _, _ in DOCUMENTOS_REQUERIDOS
     }
 
+    rutas_temporales: dict[str, str] = {}
     for tipo_documento, nombre_archivo, content_type in DOCUMENTOS_REQUERIDOS:
         documento = documentos_activos[tipo_documento]
         contenido = contenido_documento(tipo_documento)
@@ -254,8 +273,11 @@ def test_ciclo_documental_con_los_seis_documentos_requeridos(
         assert documento.subido_por == "CONTRAPARTE"
         assert documento.version_numero == 1
         assert documento.version_anterior_id is None
-        assert documento.ruta_archivo == f"tmp/{acceso['codigo_peticion']}/{nombre_archivo}"
+        _assert_ruta_temporal(documento.ruta_archivo, acceso["codigo_peticion"], nombre_archivo)
         assert storage.existe(documento.ruta_archivo)
+        # Se captura como str: el objeto ORM se refresca tras el movimiento (más
+        # abajo) y su atributo .ruta_archivo pasaría a apuntar a la ruta definitiva.
+        rutas_temporales[tipo_documento] = str(documento.ruta_archivo)
 
     respuesta_listado = cliente_api.get(
         f"/api/formularios/{acceso['formulario_id']}/documentos"
@@ -283,12 +305,13 @@ def test_ciclo_documental_con_los_seis_documentos_requeridos(
 
     for tipo_documento, nombre_archivo, _ in DOCUMENTOS_REQUERIDOS:
         documento = documentos_radicados[tipo_documento]
-        ruta_temporal = f"tmp/{acceso['codigo_peticion']}/{nombre_archivo}"
-        ruta_definitiva = f"PROVEEDORES/Proveedor Integracion SAS/{nombre_archivo}"
+        ruta_temporal_previa = rutas_temporales[tipo_documento]
         assert documento.formulario_id == acceso["formulario_id"]
-        assert documento.ruta_archivo == ruta_definitiva
-        assert storage.existe(ruta_temporal) is False
-        assert storage.existe(ruta_definitiva)
+        _assert_ruta_definitiva(
+            documento.ruta_archivo, "PROVEEDORES/Proveedor Integracion SAS", nombre_archivo
+        )
+        assert storage.existe(ruta_temporal_previa) is False
+        assert storage.existe(documento.ruta_archivo)
 
     assert _documento_activo_en_bd(
         sesion_bd,
@@ -511,3 +534,49 @@ def test_rechaza_archivo_demasiado_grande_sin_guardar_evidencia(
     assert respuesta.json()["detail"] == "El archivo supera el límite permitido de 0 MB."
     assert _documentos_en_bd(sesion_bd, acceso["formulario_id"]) == []
     assert dependencias_dobles["extractor_ia"].solicitudes == []
+
+
+def test_subidas_concurrentes_con_mismo_nombre_archivo_no_generan_500(
+    cliente_api,
+    sesion_bd,
+    dependencias_dobles,
+):
+    """
+    Regresión del bug de concurrencia encontrado en el load test del
+    2026-09-21 (docs/RUNBOOK_OPERATIVO.md sección 3): varias subidas casi
+    simultáneas al mismo formulario y tipo_documento, con el mismo nombre de
+    archivo, generaban `500 NoSuchKey` porque `key_borrador` producía la
+    misma key de S3 para todas — el reemplazo de una carga podía borrar el
+    archivo que otra carga concurrente todavía estaba leyendo para Bedrock.
+
+    Con el fix (key única por carga), todas deben resolver sin 500, y al
+    final debe quedar exactamente un documento activo de ese tipo, íntegro.
+    """
+    acceso = crear_acceso_manual(cliente_api)
+    contenido = b"%PDF-1.4\nrut concurrente\n"
+    intentos = 8
+
+    def _subir(_indice: int):
+        return intentar_subir_documento(
+            cliente_api,
+            acceso["formulario_id"],
+            tipo_documento=TIPO_DOCUMENTO_RUT,
+            nombre_archivo="rut.pdf",
+            contenido=contenido,
+        )
+
+    with ThreadPoolExecutor(max_workers=intentos) as executor:
+        respuestas = list(executor.map(_subir, range(intentos)))
+
+    codigos = [r.status_code for r in respuestas]
+    assert 500 not in codigos, f"códigos inesperados: {codigos}"
+    assert all(codigo == 200 for codigo in codigos), f"códigos inesperados: {codigos}"
+
+    documentos_activos = [
+        doc for doc in _documentos_en_bd(sesion_bd, acceso["formulario_id"])
+        if doc.deleted_at is None and doc.tipo_documento == TIPO_DOCUMENTO_RUT
+    ]
+    assert len(documentos_activos) == 1
+    documento_final = documentos_activos[0]
+    assert dependencias_dobles["storage"].existe(documento_final.ruta_archivo)
+    assert documento_final.version_numero == intentos

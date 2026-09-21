@@ -8,6 +8,7 @@ La key es agnóstica al backend de almacenamiento concreto.
 import hashlib
 import logging
 import re
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -40,8 +41,19 @@ class DocumentoService:
     # ─── Keys ─────────────────────────────────────────────────────────────────
 
     def key_borrador(self, codigo_peticion: str, nombre_archivo: str) -> str:
-        """Key temporal (espacio efímero). Al estar en tmp/, S3 lo borra automáticamente en 7 días si es abandonado."""
-        return f"tmp/{codigo_peticion}/{_sanitizar_nombre_archivo(nombre_archivo)}"
+        """
+        Key temporal (espacio efímero). Al estar en tmp/, S3 lo borra automáticamente en 7 días si es abandonado.
+
+        Incluye un identificador único por carga: si la key dependiera solo de
+        codigo_peticion + nombre_archivo, dos subidas casi simultáneas con el mismo
+        nombre de archivo (reintento de red, doble pestaña) comparten la misma key
+        física. `reemplazar_documento_anterior` puede entonces borrar en S3 el
+        archivo que otra petición concurrente todavía está leyendo para Bedrock,
+        provocando un 500 NoSuchKey (ver docs/RUNBOOK_OPERATIVO.md sección 3).
+        """
+        identificador_unico = uuid.uuid4().hex[:12]
+        nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)
+        return f"tmp/{codigo_peticion}/{identificador_unico}_{nombre_seguro}"
 
     # ─── Escritura ─────────────────────────────────────────────────────────────
 
