@@ -130,8 +130,16 @@ export class EcsFargate extends Construct {
     });
     container.addPortMappings({ containerPort: 8000 });
 
+    // El target group necesita 5 chequeos consecutivos exitosos cada 30s (~150s)
+    // para marcar la tarea como "Healthy" (ver buildTargetGroup). Sin grace period,
+    // ECS evalúa la salud desde el segundo 1 y el Circuit Breaker puede matar una
+    // tarea sana antes de que el target group llegue a confirmarlo (encontrado
+    // 2026-09-21 al redesplegar staging: el contenedor respondía 200 OK y de
+    // todos modos fue terminado por el rollback).
     const targetGroup = this.buildTargetGroup('BackendTargetGroup', props, 'backend', 8000, '/health');
-    const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, 'backend');
+    const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, 'backend', {
+      healthCheckGracePeriod: Duration.seconds(180),
+    });
     service.attachToApplicationTargetGroup(targetGroup);
     service.node.addDependency(props.db);
     this.configureBackendAutoScaling(service, props);
@@ -299,7 +307,9 @@ export class EcsFargate extends Construct {
     container.addPortMappings({ containerPort: 8080 });
 
     const targetGroup = this.buildTargetGroup(`${idPrefix}TargetGroup`, props, serviceName, 8080, '/');
-    const service = this.buildService(`${idPrefix}Service`, props, taskDefinition, props.desiredCount, serviceName);
+    const service = this.buildService(`${idPrefix}Service`, props, taskDefinition, props.desiredCount, serviceName, {
+      healthCheckGracePeriod: Duration.seconds(180),
+    });
     service.attachToApplicationTargetGroup(targetGroup);
 
     return { taskDefinition, service, targetGroup, logGroup };
