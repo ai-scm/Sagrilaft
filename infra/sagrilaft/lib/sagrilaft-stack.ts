@@ -40,12 +40,10 @@ import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-consta
 //     -c imageTag=<commit-sha> \
 //     -c bedrockModelId=<model-id-o-inference-profile>
 //
-// La identidad de dominio SES (DKIM/MAIL FROM) es única por cuenta+región, no
-// por ambiente. 'staging' es dueña por defecto (environment=staging =>
-// esDuenoIdentidadSes=true). Al desplegar 'prod' por primera vez agregar:
-//     -c esDuenoIdentidadSes=false
-// para que prod importe la identidad ya creada por staging en vez de
-// duplicarla (dos stacks creándola por separado colisionan).
+// La identidad de dominio SES ia.blend360.com (DKIM habilitado, Status
+// SUCCESS) ya existe en la cuenta AWS por fuera de este stack (verificada
+// manualmente antes de que este código existiera). CDK NUNCA debe intentar
+// crearla — solo se importa (falla con "AlreadyExists" si se intenta crear).
 // ─────────────────────────────────────────────────────────────────────────────
 const DEFAULT_HOSTED_ZONE = 'ia.blend360.com';
 const DEFAULT_HOSTED_ZONE_ID = 'Z10446292T6I6L9P7R8AQ';
@@ -71,14 +69,6 @@ export class SagrilaftStack extends cdk.Stack {
     ].join(',');
     const sesEmailOrigen = String(this.node.tryGetContext('sesEmailOrigen') ?? defaultSesEmailOrigen);
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
-    // La identidad de dominio SES (DKIM/MAIL FROM) es única por cuenta+región,
-    // no por ambiente. Hoy 'staging' es el único ambiente realmente desplegado,
-    // así que es el dueño por defecto. Al desplegar 'prod' por primera vez debe
-    // pasarse explícitamente -c esDuenoIdentidadSes=false para que prod
-    // IMPORTE la identidad ya creada por staging en vez de duplicarla.
-    const esDuenoIdentidadSes = String(
-      this.node.tryGetContext('esDuenoIdentidadSes') ?? (ambiente === 'staging' ? 'true' : 'false'),
-    ).toLowerCase() === 'true';
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
@@ -124,14 +114,6 @@ export class SagrilaftStack extends cdk.Stack {
         zoneName: hostedZoneName,
       })
       : undefined;
-    // Referencia como IPublicHostedZone (requerida por ses.Identity.publicHostedZone)
-    // para que SES cree DKIM + MAIL FROM automáticamente en la misma zona Route53.
-    const publicHostedZoneParaSes = hostedZoneName && hostedZoneId
-      ? route53.PublicHostedZone.fromPublicHostedZoneAttributes(this, 'PublicHostedZoneParaSes', {
-        hostedZoneId,
-        zoneName: hostedZoneName,
-      })
-      : undefined;
 
     // ── Constructs ─────────────────────────────────────────────────────────
     const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress });
@@ -143,8 +125,7 @@ export class SagrilaftStack extends cdk.Stack {
     const notifications = new Notifications(this, 'Notifications', {
       ambiente,
       sesEmailOrigen,
-      hostedZone: publicHostedZoneParaSes,
-      esDuenoIdentidadSes,
+      dominioSesVerificado: hostedZoneName || undefined,
       snsAlertasSub,
     });
     const ecrRepos = new Ecr(this, 'Ecr', { ambiente });
