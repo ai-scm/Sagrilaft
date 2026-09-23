@@ -160,6 +160,7 @@ class SmtpConfig:
     usuario:   str = field(default_factory=lambda: os.getenv("SMTP_USER", ""))
     contrasena: str = field(default_factory=lambda: os.getenv("SMTP_PASSWORD", ""))
     remitente:  str = field(default_factory=lambda: os.getenv("SMTP_FROM", ""))
+    responder_a: str = field(default_factory=lambda: os.getenv("SMTP_REPLY_TO", ""))
 
 
 @dataclass(frozen=True)

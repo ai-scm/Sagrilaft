@@ -10,6 +10,7 @@ export interface ConfigParametersProps {
   readonly dominioKeycloak: string;
   readonly s3BucketName: string;
   readonly sesEmailOrigen: string;
+  readonly smtpReplyTo: string;
   readonly alertasEmailDestino: string;
   readonly bedrockModelId: string;
   readonly proveedorListasCautela: string;
@@ -54,6 +55,7 @@ export class ConfigParameters extends Construct {
       SMTP_HOST: 'email-smtp.us-east-1.amazonaws.com',
       SMTP_PORT: '587',
       SMTP_FROM: props.sesEmailOrigen,
+      SMTP_REPLY_TO: props.smtpReplyTo,
       SES_EMAIL_ORIGEN: props.sesEmailOrigen,
       SES_NOTIFICACIONES_ENABLED: 'true',
       ALERTAS_EMAIL_DESTINATARIO: props.alertasEmailDestino,

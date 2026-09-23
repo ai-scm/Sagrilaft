@@ -88,6 +88,7 @@ class EmailService:
             asunto=asunto,
             cuerpo_texto=cuerpo_texto,
             cuerpo_html=cuerpo_html,
+            responder_a=self._config.responder_a,
         )
 
         return self._enviar(mensaje, correo_destinatario)
@@ -125,6 +126,7 @@ class EmailService:
             asunto="Formulario SAGRILAFT — Proceso finalizado",
             cuerpo_texto=_construir_cuerpo_texto_rechazo(mensaje_para_destinatario),
             cuerpo_html=_construir_cuerpo_html_rechazo(mensaje_para_destinatario),
+            responder_a=self._config.responder_a,
         )
         return self._enviar(mensaje, correo_destinatario)
 
@@ -159,6 +161,7 @@ class EmailService:
             cuerpo_html=_construir_cuerpo_html_actualizacion_reabierta(
                 observaciones, enlace_diligenciamiento, campos_identificados,
             ),
+            responder_a=self._config.responder_a,
         )
         return self._enviar(mensaje, correo_destinatario)
 
@@ -203,6 +206,7 @@ class EmailService:
             cuerpo_html=_construir_cuerpo_html_acceso_creado(
                 razon_social, codigo_peticion, pin, fecha_validez, enlace_diligenciamiento,
             ),
+            responder_a=self._config.responder_a,
         )
         return self._enviar(mensaje, correo_destinatario)
 
@@ -233,11 +237,14 @@ def _construir_mensaje(
     asunto: str,
     cuerpo_texto: str,
     cuerpo_html: str,
+    responder_a: str = "",
 ) -> MIMEMultipart:
     mensaje = MIMEMultipart("alternative")
     mensaje["Subject"] = asunto
     mensaje["From"]    = remitente
     mensaje["To"]      = destinatario
+    if responder_a:
+        mensaje["Reply-To"] = responder_a
     mensaje.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
     mensaje.attach(MIMEText(cuerpo_html,  "html",  "utf-8"))
     return mensaje
