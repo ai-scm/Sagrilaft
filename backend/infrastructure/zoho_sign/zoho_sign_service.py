@@ -17,6 +17,7 @@ from pathlib import Path
 
 import httpx
 from domain.contratos import SolicitudFirmaCreada
+from domain.excepciones import ZohoSignAutenticacionError, ZohoSignIndisponibleError
 from infrastructure.config.configuracion import ZohoSignConfig
 from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
@@ -26,6 +27,7 @@ _TOKEN_URL = "https://accounts.zoho.com/oauth/v2/token"
 _API_BASE  = "https://sign.zoho.com/api/v1"
 
 _HTTP_STATUS_REINTENTABLES = (429, 502, 503, 504)
+_HTTP_STATUS_AUTENTICACION = (401, 403)
 _MILISEGUNDOS_POR_SEGUNDO = 1000
 
 _ORDEN_FIRMA_UNICO_FIRMANTE = 0
@@ -80,7 +82,10 @@ class ZohoSignService:
                         time.sleep(espera)
                         espera *= self._config.factor_backoff_exponencial
                         continue
-                    raise
+                    raise ZohoSignIndisponibleError(
+                        f"ZohoSign no respondió con éxito tras {max_intentos} intentos "
+                        f"(último HTTP {e.response.status_code})."
+                    ) from e
                 except httpx.RequestError as e:
                     if intento < max_intentos:
                         logger.warning(
@@ -90,7 +95,10 @@ class ZohoSignService:
                         time.sleep(espera)
                         espera *= self._config.factor_backoff_exponencial
                         continue
-                    raise
+                    raise ZohoSignIndisponibleError(
+                        f"ZohoSign no respondió tras {max_intentos} intentos "
+                        f"(falla de red: {type(e).__name__})."
+                    ) from e
             
             raise RuntimeError("Inalcanzable")
         except Exception:
@@ -133,7 +141,15 @@ class ZohoSignService:
             },
             timeout=self._config.timeout_token_segundos,
         )
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in _HTTP_STATUS_AUTENTICACION:
+                raise ZohoSignAutenticacionError(
+                    f"ZohoSign rechazó las credenciales al refrescar el token "
+                    f"(HTTP {e.response.status_code})."
+                ) from e
+            raise
         datos = resp.json()
 
         if "access_token" not in datos:
@@ -221,10 +237,13 @@ class ZohoSignService:
             )
 
         if not resp_crear.is_success:
-            raise RuntimeError(
+            detalle = (
                 f"ZohoSign rechazó la creación del paquete (HTTP {resp_crear.status_code}): "
                 f"{resp_crear.text[:_MAX_CARACTERES_RESPUESTA_ERROR_CREACION]}"
             )
+            if resp_crear.status_code in _HTTP_STATUS_AUTENTICACION:
+                raise ZohoSignAutenticacionError(detalle)
+            raise RuntimeError(detalle)
         datos_crear = resp_crear.json()
 
         if datos_crear.get("code") != _CODIGO_RESPUESTA_EXITOSA_ZOHO:
@@ -262,10 +281,13 @@ class ZohoSignService:
         )
 
         if not resp_enviar.is_success:
-            raise RuntimeError(
+            detalle = (
                 f"ZohoSign rechazó el submit del paquete (HTTP {resp_enviar.status_code}): "
                 f"{resp_enviar.text[:_MAX_CARACTERES_RESPUESTA_ERROR_ENVIO]}"
             )
+            if resp_enviar.status_code in _HTTP_STATUS_AUTENTICACION:
+                raise ZohoSignAutenticacionError(detalle)
+            raise RuntimeError(detalle)
         datos_enviar = resp_enviar.json()
 
         if datos_enviar.get("code", _CODIGO_RESPUESTA_EXITOSA_ZOHO) != _CODIGO_RESPUESTA_EXITOSA_ZOHO:

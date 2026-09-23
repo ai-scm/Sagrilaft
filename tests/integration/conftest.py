@@ -173,8 +173,16 @@ class ZohoSignEnMemoria:
     solicitudes_canceladas: list[dict[str, Any]] = field(default_factory=list)
     estado_actual: str = "Completed"
     contenido_firmado: bytes = b"%PDF-1.4\n% documento firmado de prueba\n"
+    proxima_llamada_falla_con: Exception | None = None
+    """CA1/CA2: si se asigna, la siguiente llamada a crear_solicitud_firma_multiple
+    levanta esta excepción en vez de crear la solicitud, y se limpia el flag
+    (falla una sola vez, para poder simular un reintento exitoso después)."""
 
     def crear_solicitud_firma_multiple(self, **datos: Any) -> SolicitudFirmaCreada:
+        if self.proxima_llamada_falla_con is not None:
+            error = self.proxima_llamada_falla_con
+            self.proxima_llamada_falla_con = None
+            raise error
         self.solicitudes_creadas.append(datos)
         return SolicitudFirmaCreada(
             request_id=f"zoho-test-{len(self.solicitudes_creadas)}"

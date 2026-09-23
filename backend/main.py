@@ -33,6 +33,8 @@ from domain.excepciones import (
     WebhookTokenInvalidoError,
     AccesoActivoExistenteError,
     FrecuenciaEnvioExcedidaError,
+    ZohoSignIndisponibleError,
+    ZohoSignAutenticacionError,
 )
 from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
@@ -196,6 +198,20 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         handler_from_exception_with_hint(
             500,
             hint="Instala dependencias del backend (weasyprint + libs del sistema) para habilitar la exportación del PDF al radicar.",
+        ),
+    )
+    app.add_exception_handler(
+        ZohoSignIndisponibleError,
+        handler_from_exception_with_hint(
+            502,
+            hint="Falla temporal del proveedor de firma electrónica. Reintente en unos minutos.",
+        ),
+    )
+    app.add_exception_handler(
+        ZohoSignAutenticacionError,
+        handler_from_exception_with_hint(
+            502,
+            hint="Problema de credenciales con el proveedor de firma electrónica. Escale a soporte/administración de credenciales de ZohoSign.",
         ),
     )
 

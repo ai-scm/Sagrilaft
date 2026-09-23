@@ -158,3 +158,31 @@ class FrecuenciaEnvioExcedidaError(Exception):
     def __init__(self, segundos_restantes: int) -> None:
         self.segundos_restantes = segundos_restantes
         super().__init__(f"Debe esperar {segundos_restantes} segundos antes de solicitar otro correo.")
+
+
+class ZohoSignIndisponibleError(Exception):
+    """
+    Excepcion de dominio: ZohoSign no respondió con éxito tras agotar los
+    reintentos configurados (error transitorio: 429/502/503/504 o falla de red).
+
+    Distinta de ZohoSignAutenticacionError: aquí el problema es temporal, del
+    lado de Zoho o de la red — la acción correcta es reintentar la operación
+    más adelante, no revisar credenciales.
+    """
+
+    def __init__(self, mensaje: str) -> None:
+        super().__init__(mensaje)
+
+
+class ZohoSignAutenticacionError(Exception):
+    """
+    Excepcion de dominio: ZohoSign rechazó la solicitud por un problema de
+    autenticación (401/403) — credenciales inválidas, revocadas o expiradas.
+
+    Distinta de ZohoSignIndisponibleError: aquí reintentar no soluciona nada;
+    se requiere que alguien revise/renueve las credenciales de ZohoSign
+    (client_id, client_secret o refresh_token) configuradas en el servidor.
+    """
+
+    def __init__(self, mensaje: str) -> None:
+        super().__init__(mensaje)
