@@ -24,9 +24,14 @@ enrutador = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 
 def _normalizar_firma(valor: str) -> str:
+    """
+    Quita el prefijo opcional "sha256=" de la firma recibida.
+
+    No se debe tocar nada mas: la firma real (hex o base64) puede contener
+    "=" de forma legitima (padding de base64, ej. "...jO4m6Vvo="), y
+    recortar por el ultimo "=" destruye la firma entera dejandola vacia.
+    """
     firma = valor.strip()
-    if "=" in firma and not firma.startswith("sha256="):
-        firma = firma.rsplit("=", 1)[-1].strip()
     if firma.startswith("sha256="):
         firma = firma.removeprefix("sha256=").strip()
     return firma
@@ -54,11 +59,9 @@ async def _leer_payload_validado(request: Request) -> ZohoWebhookPayload:
     if not any(hmac.compare_digest(firma, esperada) for esperada in _firmas_esperadas(cuerpo, config.webhook_secret)):
         logger.warning(
             "Webhook ZohoSign rechazado: firma HMAC invalida "
-            "[diagnostico temporal] header_bruto=%r normalizada=%r "
-            "esperadas=%r",
-            firma_recibida,
-            firma,
-            sorted(_firmas_esperadas(cuerpo, config.webhook_secret)),
+            "(largo_recibido=%d, largo_normalizado=%d)",
+            len(firma_recibida),
+            len(firma),
         )
         raise WebhookTokenInvalidoError()
 
