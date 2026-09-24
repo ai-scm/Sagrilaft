@@ -52,7 +52,14 @@ async def _leer_payload_validado(request: Request) -> ZohoWebhookPayload:
 
     firma = _normalizar_firma(firma_recibida)
     if not any(hmac.compare_digest(firma, esperada) for esperada in _firmas_esperadas(cuerpo, config.webhook_secret)):
-        logger.warning("Webhook ZohoSign rechazado: firma HMAC invalida")
+        logger.warning(
+            "Webhook ZohoSign rechazado: firma HMAC invalida "
+            "[diagnostico temporal] header_bruto=%r normalizada=%r "
+            "esperadas=%r",
+            firma_recibida,
+            firma,
+            sorted(_firmas_esperadas(cuerpo, config.webhook_secret)),
+        )
         raise WebhookTokenInvalidoError()
 
     return ZohoWebhookPayload.model_validate_json(cuerpo)
