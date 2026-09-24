@@ -32,7 +32,7 @@ def _enviar_webhook_completado(cliente_api, request_id: str):
         "notifications": {"operation_type": "RequestCompleted"},
         "requests": {
             "request_id": request_id,
-            "request_status": "Completed",
+            "request_status": "completed",
         },
     }
     cuerpo = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -163,7 +163,7 @@ def test_webhook_zoho_con_hmac_invalido_no_modifica_expediente(
         "notifications": {"operation_type": "RequestCompleted"},
         "requests": {
             "request_id": request_id,
-            "request_status": "Completed",
+            "request_status": "completed",
         },
     }
     cuerpo = json.dumps(payload, separators=(",", ":")).encode("utf-8")

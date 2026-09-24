@@ -221,9 +221,18 @@ class FirmaService:
             logger.info("Webhook ZohoSign: request_id=%s no corresponde a ningún formulario", request_id)
             return
 
-        if request_status == "Completed":
+        # ZohoSign real envia el status en minuscula ('completed', 'declined',
+        # 'expired'), no capitalizado como asumia esta comparacion antes.
+        # Confirmado en logs reales de staging 2026-09-24: request_status
+        # llegaba como 'completed' y caia siempre al else ("no requiere
+        # accion"), dejando el formulario en PENDIENTE_FIRMA para siempre
+        # aunque el webhook llegara bien. El test de integracion existente
+        # construye el payload con "Completed" (capitalizado) y por eso no
+        # detecto el problema.
+        status_normalizado = request_status.lower()
+        if status_normalizado == "completed":
             self._procesar_firma_completada(formulario, request_id)
-        elif request_status in ("Declined", "Expired"):
+        elif status_normalizado in ("declined", "expired"):
             self._procesar_firma_cancelada(formulario, request_id, request_status)
         else:
             logger.info(
