@@ -17,7 +17,11 @@ from pathlib import Path
 
 import httpx
 from domain.contratos import SolicitudFirmaCreada
-from domain.excepciones import ZohoSignAutenticacionError, ZohoSignIndisponibleError
+from domain.excepciones import (
+    ZohoSignAutenticacionError,
+    ZohoSignIndisponibleError,
+    ZohoSignSolicitudNoCancelableError,
+)
 from infrastructure.config.configuracion import ZohoSignConfig
 from infrastructure.observabilidad.emf_logger import emitir_metrica_emf
 
@@ -36,7 +40,10 @@ _INDICE_PRIMERA_ACCION = 0
 
 _MAX_CARACTERES_RESPUESTA_ERROR_CREACION = 500
 _MAX_CARACTERES_RESPUESTA_ERROR_ENVIO = 500
+_MAX_CARACTERES_RESPUESTA_ERROR_CANCELACION = 500
 _MAX_CARACTERES_RESPUESTA_CONTENT_TYPE = 300
+
+_HTTP_STATUS_CONFLICTO_ESTADO = (400,)
 
 _TIPOS_CONTENIDO_DOCUMENTO_FIRMADO = (
     "application/pdf",
@@ -325,7 +332,20 @@ class ZohoSignService:
             headers=self._headers(),
             **kwargs
         )
-        resp.raise_for_status()
+
+        if not resp.is_success:
+            detalle = (
+                f"ZohoSign rechazó la cancelación (HTTP {resp.status_code}): "
+                f"{resp.text[:_MAX_CARACTERES_RESPUESTA_ERROR_CANCELACION]}"
+            )
+            if resp.status_code in _HTTP_STATUS_AUTENTICACION:
+                raise ZohoSignAutenticacionError(detalle)
+            if resp.status_code in _HTTP_STATUS_CONFLICTO_ESTADO:
+                raise ZohoSignSolicitudNoCancelableError(
+                    f"La solicitud '{request_id}' ya no admite cancelación "
+                    f"(probablemente ya fue firmada, expiró o se canceló antes). {detalle}"
+                )
+            raise RuntimeError(detalle)
         datos = resp.json()
 
         if datos.get("code") != _CODIGO_RESPUESTA_EXITOSA_ZOHO:

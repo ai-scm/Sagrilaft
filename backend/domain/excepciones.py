@@ -186,3 +186,19 @@ class ZohoSignAutenticacionError(Exception):
 
     def __init__(self, mensaje: str) -> None:
         super().__init__(mensaje)
+
+
+class ZohoSignSolicitudNoCancelableError(Exception):
+    """
+    Excepcion de dominio: ZohoSign rechazó el recall (cancelación) de una
+    solicitud con HTTP 400 — la solicitud ya no está en un estado que admita
+    cancelación (ya fue firmada, expiró o ya se canceló antes).
+
+    Distinta de ZohoSignIndisponibleError y ZohoSignAutenticacionError: aquí
+    no hay nada que reintentar ni credenciales que revisar — es un conflicto
+    de estado real. La accion correcta es que el operador verifique el
+    estado actual del expediente antes de intentar cancelarlo de nuevo.
+    """
+
+    def __init__(self, mensaje: str) -> None:
+        super().__init__(mensaje)

@@ -35,6 +35,7 @@ from domain.excepciones import (
     FrecuenciaEnvioExcedidaError,
     ZohoSignIndisponibleError,
     ZohoSignAutenticacionError,
+    ZohoSignSolicitudNoCancelableError,
 )
 from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
@@ -212,6 +213,13 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         handler_from_exception_with_hint(
             502,
             hint="Problema de credenciales con el proveedor de firma electrónica. Escale a soporte/administración de credenciales de ZohoSign.",
+        ),
+    )
+    app.add_exception_handler(
+        ZohoSignSolicitudNoCancelableError,
+        handler_from_exception_with_hint(
+            409,
+            hint="La solicitud de firma ya no admite cancelación (probablemente ya fue firmada, expiró o se canceló antes). Verifique el estado actual del expediente.",
         ),
     )
 
