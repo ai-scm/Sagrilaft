@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -19,8 +22,29 @@ env:
   ECR_REPOSITORY_KEYCLOAK: sagrilaft-prod-keycloak
 
 jobs:
+  test:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run pytest
+        run: python -m pytest -q
+
   build-and-push:
     name: Build and Push ECS Images
+    needs: test
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
