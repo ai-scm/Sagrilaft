@@ -31,7 +31,7 @@ export interface EcsFargateProps {
   readonly keycloakRepo: ecr.Repository;
   readonly dbSecret: secretsmanager.Secret;
   readonly appSecret: secretsmanager.Secret;
-  readonly zohoSecret: secretsmanager.Secret;
+  readonly zohoSecret: secretsmanager.ISecret;
   readonly keycloakAdminSecret: secretsmanager.Secret;
   readonly smtpSecret: secretsmanager.Secret;
   readonly sagrilaftSecret: secretsmanager.Secret;

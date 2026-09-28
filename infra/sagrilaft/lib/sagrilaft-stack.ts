@@ -40,6 +40,12 @@ import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-consta
 //     -c imageTag=<commit-sha> \
 //     -c bedrockModelId=<model-id-o-inference-profile>
 //
+// Si sagrilaft/{ambiente}/zoho_credentials ya fue creado manualmente por
+// fuera de CDK (ej. credenciales reales de Zoho cargadas antes del primer
+// bootstrap de prod), agregar:
+//     -c zohoSecretYaExiste=true
+// para que CDK lo IMPORTE en vez de intentar crearlo (evita AlreadyExists).
+//
 // La identidad de dominio SES ia.blend360.com (DKIM habilitado, Status
 // SUCCESS) ya existe en la cuenta AWS por fuera de este stack (verificada
 // manualmente antes de que este código existiera). CDK NUNCA debe intentar
@@ -63,6 +69,11 @@ export class SagrilaftStack extends cdk.Stack {
     const dominioPortal = String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
     const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
     const certArn = String(this.node.tryGetContext('certificateArn') ?? '');
+    // true si sagrilaft/{ambiente}/zoho_credentials ya fue creado manualmente
+    // por fuera de CDK (ver Secrets construct) antes del primer deploy.
+    const zohoSecretYaExiste = String(
+      this.node.tryGetContext('zohoSecretYaExiste') ?? 'false',
+    ).toLowerCase() === 'true';
     const defaultSesEmailOrigen = `no-reply-sagrilaft@${hostedZoneName}`;
     const defaultAlertasEmailDestino = [
       'Bryan.Ariza@blend360.com',
@@ -121,7 +132,7 @@ export class SagrilaftStack extends cdk.Stack {
       ambiente,
       dominioPortal,
     });
-    const secrets = new Secrets(this, 'Secrets', { ambiente });
+    const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste });
     const notifications = new Notifications(this, 'Notifications', {
       ambiente,
       sesEmailOrigen,

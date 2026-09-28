@@ -4,6 +4,17 @@
 
   export interface SecretsProps {
     readonly ambiente: string;
+    /**
+     * true si `sagrilaft/${ambiente}/zoho_credentials` ya fue creado
+     * manualmente por fuera de CDK (ej. para cargar credenciales reales de
+     * Zoho antes del primer bootstrap del stack). En ese caso se IMPORTA en
+     * vez de crearse — un secreto que ya existe no puede "crearse" de nuevo
+     * vía CloudFormation (falla con AlreadyExists, mismo patron que la
+     * identidad de dominio SES).
+     *
+     * @default false
+     */
+    readonly zohoSecretYaExiste?: boolean;
   }
 
   /**
@@ -16,7 +27,7 @@
   export class Secrets extends Construct {
     public readonly dbSecret: secretsmanager.Secret;
     public readonly appSecret: secretsmanager.Secret;
-    public readonly zohoSecret: secretsmanager.Secret;
+    public readonly zohoSecret: secretsmanager.ISecret;
     public readonly keycloakAdminSecret: secretsmanager.Secret;
     public readonly smtpSecret: secretsmanager.Secret;
     public readonly sagrilaftSecret: secretsmanager.Secret;
@@ -24,7 +35,7 @@
     constructor(scope: Construct, id: string, props: SecretsProps) {
       super(scope, id);
 
-      const { ambiente } = props;
+      const { ambiente, zohoSecretYaExiste } = props;
 
       this.dbSecret = new secretsmanager.Secret(this, 'DbSecret', {
         secretName: `sagrilaft/${ambiente}/db_credentials`,
@@ -46,15 +57,19 @@
         },
       });
 
-      this.zohoSecret = new secretsmanager.Secret(this, 'ZohoCredentialsSecret', {
-        secretName: `sagrilaft/${ambiente}/zoho_credentials`,
-        secretStringValue: cdk.SecretValue.unsafePlainText(JSON.stringify({
-          client_id: '',
-          client_secret: '',
-          refresh_token: '',
-          webhook_secret: '',
-        })),
-      });
+      this.zohoSecret = zohoSecretYaExiste
+        ? secretsmanager.Secret.fromSecretNameV2(
+          this, 'ZohoCredentialsSecret', `sagrilaft/${ambiente}/zoho_credentials`,
+        )
+        : new secretsmanager.Secret(this, 'ZohoCredentialsSecret', {
+          secretName: `sagrilaft/${ambiente}/zoho_credentials`,
+          secretStringValue: cdk.SecretValue.unsafePlainText(JSON.stringify({
+            client_id: '',
+            client_secret: '',
+            refresh_token: '',
+            webhook_secret: '',
+          })),
+        });
 
       this.keycloakAdminSecret = new secretsmanager.Secret(this, 'KeycloakAdminSecret', {
         secretName: `sagrilaft/${ambiente}/keycloak_admin`,
