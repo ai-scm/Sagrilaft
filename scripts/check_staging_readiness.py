@@ -17,10 +17,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET_ACCOUNT = "874641912777"
-BEDROCK_MODEL_ID = (
-    "arn:aws:bedrock:us-east-1:874641912777:"
-    "inference-profile/us.anthropic.claude-sonnet-4-6"
-)
 BEDROCK_RUNTIME_CONFIG_KEYS = [
     "BEDROCK_MAX_TOKENS",
     "BEDROCK_TEMPERATURE",
@@ -63,6 +59,13 @@ def read_first_existing(paths: list[str]) -> tuple[str, str]:
 
 def file_exists(path: str) -> bool:
     return (ROOT / path).exists()
+
+
+def strip_comment_lines(content: str) -> str:
+    """Drop full-line comments so substring checks don't match text inside them."""
+    return "\n".join(
+        line for line in content.splitlines() if not line.strip().startswith("#")
+    )
 
 
 def check_required_files() -> Check:
@@ -124,7 +127,10 @@ def check_phase1_cdk_contract() -> Check:
         "networking permite ALB hacia ECS 8080": "Port.tcp(8080)" in networking,
         "networking permite ALB hacia ECS 8000": "Port.tcp(8000)" in networking,
         "ECS usa FargateService": "new ecs.FargateService" in ecs,
-        "ECS usa subnets privadas aisladas": "SubnetType.PRIVATE_ISOLATED" in ecs,
+        "ECS consume subnet type parametrizado (NAT opcional)": "props.serviceSubnetType" in ecs,
+        "networking define subnet aislada y con egreso segun NAT": (
+            "SubnetType.PRIVATE_ISOLATED" in networking and "SubnetType.PRIVATE_WITH_EGRESS" in networking
+        ),
         "ECS usa target groups IP": "TargetType.IP" in ecs,
         "ECS define execution role": "TaskExecutionRole" in ecs,
         "ECS define task roles por servicio": all(item in ecs for item in ["FrontendTaskRole", "PortalTaskRole", "BackendTaskRole", "KeycloakTaskRole"]),
@@ -224,8 +230,8 @@ def check_phase0_env_contract() -> Check:
     staging_path, staging_content = read_first_existing([".env.staging.example", ".env.staging"])
     prod_path, prod_content = read_first_existing([".env.prod.example", ".env.prod"])
     files = {
-        staging_path: staging_content,
-        prod_path: prod_content,
+        staging_path: strip_comment_lines(staging_content),
+        prod_path: strip_comment_lines(prod_content),
     }
     missing_hits = [
         f"{path}:{item}"
@@ -293,16 +299,31 @@ def check_phase0_domain_contract() -> Check:
 
 
 def check_bedrock_target_account() -> Check:
-    files = {
-        read_first_existing([".env.staging.example", ".env.staging"])[0]: read_first_existing([".env.staging.example", ".env.staging"])[1],
-        read_first_existing([".env.prod.example", ".env.prod"])[0]: read_first_existing([".env.prod.example", ".env.prod"])[1],
-        "infra/sagrilaft/package.json": read("infra/sagrilaft/package.json"),
-        "infra/sagrilaft/lib/deployment-constants.ts": read("infra/sagrilaft/lib/deployment-constants.ts"),
-    }
-    missing = [path for path, content in files.items() if BEDROCK_MODEL_ID not in content]
+    """`DEFAULT_BEDROCK_MODEL_ID` en deployment-constants.ts es solo un fallback de
+    `cdk deploy` directo. Lo que de verdad importa es que ningun script de npm para
+    staging/prod dependa de ese fallback: todos deben pasar `-c bedrockModelId=`
+    explicito, para que el valor real siempre venga del contexto, nunca del default
+    hardcodeado (que puede quedar desactualizado sin que nadie lo note)."""
+    package = read("infra/sagrilaft/package.json")
+    constants = read("infra/sagrilaft/lib/deployment-constants.ts")
+    package_json = json.loads(package)
+    scripts = package_json.get("scripts", {})
+    target_scripts = [
+        name for name, command in scripts.items()
+        if command.strip().startswith("cdk ")
+        and (name.endswith(":staging") or name.endswith(":prod")
+             or name.endswith(":staging:bootstrap") or name.endswith(":prod:bootstrap"))
+    ]
+    missing = [
+        f"package.json:{name}"
+        for name in target_scripts
+        if "-c bedrockModelId=" not in scripts[name]
+    ]
+    if "DEFAULT_BEDROCK_MODEL_ID" not in constants:
+        missing.append("infra/sagrilaft/lib/deployment-constants.ts:DEFAULT_BEDROCK_MODEL_ID")
     ok = not missing
     detail = (
-        "Bedrock inference profile configured for target account"
+        "staging/prod npm scripts always pass -c bedrockModelId explicitly"
         if ok
         else f"missing={missing}"
     )
@@ -330,24 +351,35 @@ def check_bedrock_runtime_config_contract() -> Check:
 
 
 def check_frontend_api_contract() -> Check:
+    """En AWS el ALB enruta /api directo al backend antes de llegar al contenedor
+    frontend (ver 'ALB enruta ...' abajo); nginx ya no necesita ni tiene un
+    fallback propio para /api. VITE_BACKEND_URL solo alimenta el proxy del
+    servidor de desarrollo de Vite (vite.config.js) para docker-compose.dev.yml;
+    el bundle de produccion nunca debe leerlo en runtime, por eso se valida su
+    ausencia en el codigo fuente en vez de exigir que la variable este vacia."""
     shared_client = read("frontend/shared/services/apiClient.js")
     public_app = read("frontend/apps/formulario-publico/src/App.jsx")
-    public_nginx = read("frontend/apps/formulario-publico/nginx.conf")
-    portal_nginx = read("frontend/apps/portal-interno/nginx.conf")
     lb = read("infra/sagrilaft/lib/constructs/load-balancer.ts")
-    _, staging_env = read_first_existing([".env.staging.example", ".env.staging"])
-    _, prod_env = read_first_existing([".env.prod.example", ".env.prod"])
+
+    runtime_src_dirs = [
+        ROOT / "frontend/apps/formulario-publico/src",
+        ROOT / "frontend/apps/portal-interno/src",
+        ROOT / "frontend/shared",
+    ]
+    vite_backend_url_leaks = [
+        str(f.relative_to(ROOT))
+        for d in runtime_src_dirs
+        for f in d.rglob("*.js*")
+        if "import.meta.env.VITE_BACKEND_URL" in f.read_text(encoding="utf-8")
+    ]
 
     required = {
         "frontend usa /api relativo": "API_BASE = '/api'" in shared_client,
         "descarga publica usa /api relativo": 'href={`/api/formularios/${codigoPeticion}/pdf`}' in read("frontend/apps/formulario-publico/src/components/SubmittedView.jsx"),
         "formulario solo usa VITE_PORTAL_INTERNO_URL para redireccion": "VITE_PORTAL_INTERNO_URL" in public_app,
-        "nginx formulario mantiene fallback interno /api": "location /api/" in public_nginx and "proxy_pass         http://backend:8000;" in public_nginx,
-        "nginx portal mantiene fallback interno /api": "location /api/" in portal_nginx and "proxy_pass         http://backend:8000;" in portal_nginx,
         "ALB enruta /api formulario antes del frontend": "BackendApiPublica" in lb and "priority: 1" in lb and "pathPatterns(['/api/*', '/health'])" in lb,
         "ALB enruta /api portal antes del frontend": "BackendApiPortal" in lb and "priority: 2" in lb and "pathPatterns(['/api/*', '/health'])" in lb,
-        "staging deja VITE_BACKEND_URL vacio": re.search(r"(?m)^VITE_BACKEND_URL=$", staging_env) is not None,
-        "prod deja VITE_BACKEND_URL vacio": re.search(r"(?m)^VITE_BACKEND_URL=$", prod_env) is not None,
+        "codigo fuente del bundle nunca lee VITE_BACKEND_URL en runtime": not vite_backend_url_leaks,
     }
     failed = [name for name, ok in required.items() if not ok]
     return Check(
@@ -359,7 +391,7 @@ def check_frontend_api_contract() -> Check:
 
 def check_zoho_webhook_hmac_contract() -> Check:
     router = read("backend/api/routers/webhooks.py")
-    config = read("backend/infrastructure/configuracion.py")
+    config = read("backend/infrastructure/config/configuracion.py")
     service = read("backend/services/firma/firma_service.py")
 
     required = {
