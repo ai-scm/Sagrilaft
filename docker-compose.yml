@@ -85,6 +85,15 @@ services:
       # se almacenarán los documentos subidos.
       S3_BUCKET: ${S3_BUCKET:-}
 
+      # ── Listas de cautela (verificación SAGRILAFT) ─────────────────────────
+      # "sagrilaft": proveedor real (tusdatos.co). "dummy": simulado, sin llamar
+      # a la API real. "deshabilitado": oculta los botones "Verificar SAGRILAFT"
+      # / "Descargar Certificado SAGRILAFT" en el portal interno y el backend
+      # rechaza la verificación con 409 aunque se fuerce la llamada.
+      PROVEEDOR_LISTAS_CAUTELA: ${PROVEEDOR_LISTAS_CAUTELA:-dummy}
+      SAGRILAFT_API_URL: ${SAGRILAFT_API_URL:-}
+      SAGRILAFT_API_KEY: ${SAGRILAFT_API_KEY:-}
+
       # ── Zoho Sign (firma electrónica) ──────────────────────────────────────
       # Credenciales de la aplicación registrada en Zoho API Console.
       # Las tres primeras son obligatorias para que el flujo de firma funcione.
