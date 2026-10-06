@@ -45,7 +45,6 @@ htmlcov/
 
 # ── Node / React / Vite ──────────────────────────────────
 node_modules/
-dist/
 .vite/
 .cache/
 *.local
@@ -87,8 +86,12 @@ realm-sagrilaft.dev.json
 
 sns-policy.json
 
-infra/sagrilaft/cdk.context.json
 reset_entorno.sh
 docs
 tmp/
 PLAN.md
+
+
+frontend/apps/formulario-publico/coverage/
+frontend/apps/formulario-publico/playwright-report/
+frontend/apps/formulario-publico/test-results/
