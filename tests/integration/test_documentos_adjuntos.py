@@ -63,7 +63,7 @@ def _documentos_en_bd(sesion_bd, formulario_id: str) -> list[DocumentoAdjunto]:
 
 def _assert_ruta_temporal(ruta: str, codigo_peticion: str, nombre_archivo: str) -> None:
     """La key incluye un identificador único por carga (ver fix del bug de
-    concurrencia en docs/RUNBOOK_OPERATIVO.md sección 3): ya no es
+    concurrencia en docs/operacion/RUNBOOK_OPERATIVO.md sección 3): ya no es
     `tmp/{codigo}/{nombre}` exacto, sino `tmp/{codigo}/{uuid}_{nombre}`."""
     patron = rf"^tmp/{re.escape(codigo_peticion)}/[0-9a-f]{{12}}_{re.escape(nombre_archivo)}$"
     assert re.match(patron, ruta), f"ruta temporal inesperada: {ruta}"
@@ -543,7 +543,7 @@ def test_subidas_concurrentes_con_mismo_nombre_archivo_no_generan_500(
 ):
     """
     Regresión del bug de concurrencia encontrado en el load test del
-    2026-09-21 (docs/RUNBOOK_OPERATIVO.md sección 3): varias subidas casi
+    2026-09-21 (docs/operacion/RUNBOOK_OPERATIVO.md sección 3): varias subidas casi
     simultáneas al mismo formulario y tipo_documento, con el mismo nombre de
     archivo, generaban `500 NoSuchKey` porque `key_borrador` producía la
     misma key de S3 para todas — el reemplazo de una carga podía borrar el

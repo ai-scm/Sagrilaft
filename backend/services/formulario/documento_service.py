@@ -49,7 +49,7 @@ class DocumentoService:
         nombre de archivo (reintento de red, doble pestaña) comparten la misma key
         física. `reemplazar_documento_anterior` puede entonces borrar en S3 el
         archivo que otra petición concurrente todavía está leyendo para Bedrock,
-        provocando un 500 NoSuchKey (ver docs/RUNBOOK_OPERATIVO.md sección 3).
+        provocando un 500 NoSuchKey (ver docs/operacion/RUNBOOK_OPERATIVO.md sección 3).
         """
         identificador_unico = uuid.uuid4().hex[:12]
         nombre_seguro = _sanitizar_nombre_archivo(nombre_archivo)

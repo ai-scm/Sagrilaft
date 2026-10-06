@@ -1,6 +1,6 @@
 """
 Regresión del bug de concurrencia encontrado en el load test del 2026-09-21
-(ver docs/RUNBOOK_OPERATIVO.md sección 3): dos subidas con el mismo
+(ver docs/operacion/RUNBOOK_OPERATIVO.md sección 3): dos subidas con el mismo
 codigo_peticion + nombre_archivo generaban la misma key de S3, y
 `reemplazar_documento_anterior` podía borrar el archivo que otra petición
 concurrente todavía estaba leyendo para Bedrock (500 NoSuchKey).

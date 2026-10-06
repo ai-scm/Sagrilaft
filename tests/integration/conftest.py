@@ -12,6 +12,7 @@ import os
 import socket
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,10 @@ from typing import Any
 import httpx
 import pytest
 import uvicorn
-from sqlalchemy import create_engine
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -37,7 +41,10 @@ def _preparar_entorno_de_integracion() -> None:
         # El módulo de persistencia crea un engine global al importarse con
         # parámetros de pool propios de Postgres. En las pruebas se sobreescribe
         # get_db con SQLite aislado, así que esta URL solo permite importar.
-        "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/sagrilaft_test",
+        "DATABASE_URL": os.getenv(
+            "DATABASE_URL",
+            "postgresql+psycopg://user:pass@localhost:5432/sagrilaft_test",
+        ),
         "SECRET_KEY": "test-secret-key",
         "FRONTEND_URL": "http://frontend.test",
         "PORTAL_INTERNO_URL": "http://portal.test",
@@ -216,23 +223,86 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest.fixture
-def sesion_bd():
-    """Crea una base SQLite aislada para una prueba de integración."""
+def _crear_base_postgres(admin_url: str) -> tuple[str, str]:
+    """Crea una base temporal y devuelve su nombre y URL de conexión."""
 
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
+    nombre = f"sagrilaft_e2e_{uuid.uuid4().hex}"
+    admin = make_url(admin_url)
+    engine = create_engine(admin.render_as_string(hide_password=False), isolation_level="AUTOCOMMIT")
+    with engine.connect() as conexion:
+        conexion.execute(text(f'CREATE DATABASE "{nombre}"'))
+    engine.dispose()
+    return nombre, admin.set(database=nombre).render_as_string(hide_password=False)
+
+
+def _eliminar_base_postgres(admin_url: str, nombre: str) -> None:
+    """Termina conexiones y elimina únicamente la base temporal del harness."""
+
+    engine = create_engine(make_url(admin_url).render_as_string(hide_password=False), isolation_level="AUTOCOMMIT")
+    with engine.connect() as conexion:
+        conexion.execute(
+            text("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                 "WHERE datname = :nombre AND pid <> pg_backend_pid()"),
+            {"nombre": nombre},
+        )
+        conexion.execute(text(f'DROP DATABASE IF EXISTS "{nombre}"'))
+    engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def entorno_base_prueba():
+    """Selecciona SQLite o PostgreSQL y limpia la base temporal al finalizar.
+
+    Para PostgreSQL defina TEST_DATABASE_ADMIN_URL. También puede definir
+    TEST_DATABASE_URL para apuntar a una base ya creada; en ese caso el harness
+    no la elimina.
+    """
+
+    admin_url = os.getenv("TEST_DATABASE_ADMIN_URL")
+    database_url = os.getenv("TEST_DATABASE_URL")
+    nombre_temporal = None
+
+    if admin_url and not database_url:
+        nombre_temporal, database_url = _crear_base_postgres(admin_url)
+
+    if database_url:
+        os.environ["DATABASE_URL"] = database_url
+        config = Config(str(RAIZ_PROYECTO / "backend" / "alembic.ini"))
+        command.upgrade(config, "head")
+
+    try:
+        yield database_url
+    finally:
+        if nombre_temporal and admin_url:
+            _eliminar_base_postgres(admin_url, nombre_temporal)
+
+
+@pytest.fixture
+def sesion_bd(entorno_base_prueba):
+    """Crea una sesión aislada SQLite o PostgreSQL según el entorno."""
+
+    if entorno_base_prueba:
+        engine = create_engine(entorno_base_prueba)
+        with engine.begin() as conexion:
+            tablas = [tabla.name for tabla in Base.metadata.sorted_tables]
+            if tablas:
+                nombres = ", ".join(f'"{tabla}"' for tabla in tablas)
+                conexion.execute(text(f"TRUNCATE TABLE {nombres} RESTART IDENTITY CASCADE"))
+    else:
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(engine)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     sesion = Session()
     try:
         yield sesion
     finally:
         sesion.close()
-        Base.metadata.drop_all(engine)
+        if not entorno_base_prueba:
+            Base.metadata.drop_all(engine)
         engine.dispose()
 
 
