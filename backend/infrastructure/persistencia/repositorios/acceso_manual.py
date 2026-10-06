@@ -16,6 +16,13 @@ from infrastructure.persistencia.models import AccesoManual, Formulario
 from ._mappers import _orm_acceso_manual_a_datos, _orm_formulario_a_datos
 
 
+def _validar_correo_persistible(correo: str) -> None:
+    # EmailStr validates HTTP input; protect internal callers before any SQL.
+    if not isinstance(correo, str) or not correo.strip():
+        raise ValueError("correo_destinatario debe ser una cadena no vacía")
+
+
+
 class RepositorioAccesoManualSQLAlchemy:
     """Adaptador de persistencia para accesos manuales — usado por AccesoManualService."""
 
@@ -84,6 +91,7 @@ class RepositorioAccesoManualSQLAlchemy:
         token: str,
     ) -> ResultadoCreacionAcceso:
         """Crea el Formulario y el AccesoManual en una sola transacción."""
+        _validar_correo_persistible(solicitud.correo_destinatario)
         formulario = Formulario(
             tipo_contraparte=solicitud.tipo_contraparte,
             razon_social=solicitud.razon_social,
@@ -135,6 +143,7 @@ class RepositorioAccesoManualSQLAlchemy:
 
     def actualizar_correo_por_token(self, token: str, correo: str) -> None:
         """Actualiza el correo_destinatario del acceso asociado a un token."""
+        _validar_correo_persistible(correo)
         acceso = self._sesion.query(AccesoManual).filter(AccesoManual.token_diligenciamiento == token).first()
         if acceso:
             acceso.correo_destinatario = correo
