@@ -68,7 +68,7 @@ EOF
 #
 if [ "${RUN_MODE:-server}" = "migrate" ]; then
     echo "[entrypoint] Aplicando migraciones Alembic..."
-    alembic upgrade head
+    MIGRATION_VERIFY_HEAD=1 alembic upgrade head
     echo "[entrypoint] Migraciones completadas."
     exit 0
 fi
