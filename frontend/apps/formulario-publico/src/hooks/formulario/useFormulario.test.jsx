@@ -466,7 +466,6 @@ describe('useFormulario', () => {
         try { await result.current.handleSubmit(); } catch (e) { console.log("ERROR IN SUBMIT:", e); }
       });
 
-      console.log('Step:', result.current.step, 'Saving:', result.current.saving, 'Crear calls:', api.crearFormulario.mock.calls.length, 'Errores API:', api.crearFormulario.mock.results);
       expect(api.enviarFormulario).toHaveBeenCalled();
       expect(result.current.submitted).toBe(true);
       expect(result.current.saving).toBe(false);
