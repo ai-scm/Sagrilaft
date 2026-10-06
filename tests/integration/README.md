@@ -1,7 +1,7 @@
 # Pruebas De Integracion - SAGRILAFT
 
 Este documento explica como esta construido el harness de integracion, que valida
-hoy y que queda pendiente para las siguientes fases.
+y cómo ejecutarla. Las tareas de ampliación se siguen en [P19](../../docs/produccion/PENDIENTES_PRODUCCION.md#p19).
 
 ## Objetivo
 
@@ -85,11 +85,11 @@ Cada prueba recibe una sesion SQLAlchemy sobre SQLite en memoria:
 
 Esto permite probar repositorios y modelos reales sin tocar bases locales ni RDS.
 
-Limitacion actual: SQLite no replica todos los comportamientos de PostgreSQL.
-Las migraciones Alembic ya tienen una prueba opt-in contra PostgreSQL real, pero
-la mayoria de flujos funcionales siguen ejecutandose sobre SQLite. Para una
-cobertura completa falta una variante de integracion que ejecute repositorios y
-servicios sobre PostgreSQL de test.
+SQLite no replica todos los comportamientos de PostgreSQL. La variante
+PostgreSQL ya existe en el harness mediante `TEST_DATABASE_ADMIN_URL` o
+`TEST_DATABASE_URL`. El 2026-10-01 se registraron 12/12 pruebas del flujo en
+ambas bases y 2/2 de migraciones. Ver [evidencia y alcance](../../docs/evidencia/e2e-staging/VALIDACION_STAGING_E2E.md).
+Esto no acredita toda la suite sobre PostgreSQL ni su ejecución en CI.
 
 ### 3. API HTTP real
 
@@ -611,175 +611,97 @@ puede ver y operar cada usuario interno:
 
 `test_migraciones_alembic_postgres.py`
 
-Estos tests validan la salud de las migraciones:
-
-- Alembic tiene un solo `head`, evitando ramas sueltas sin merge;
-- si se define `TEST_POSTGRES_ADMIN_URL`, la prueba crea una base PostgreSQL
-  temporal `sagrilaft_alembic_test_*`;
-- ejecuta `alembic upgrade head` contra esa base vacia;
-- confirma que `alembic_version` queda en el `head` actual;
-- valida tablas criticas: `formularios`, `accesos_manuales`,
-  `documentos_adjuntos`, `eventos_formulario` y
-  `formulario_alertas_inconsistencia`;
-- valida columnas criticas agregadas por migraciones recientes:
-  `numero_correccion`, `zoho_request_id`, `ruta_documento_firmado`,
-  `sagrilaft_reporte_id`, `ultimo_envio_correo`, `version_numero`,
-  `version_anterior_id`, `hash_sha256` y `snapshot_datos`;
-- confirma que `accesos_manuales.correo_destinatario` queda `NOT NULL`;
-- confirma que existe el trigger PostgreSQL `tg_audit_estado`;
-- elimina la base temporal al finalizar.
-
-Si `TEST_POSTGRES_ADMIN_URL` no existe, solo se omite el test que necesita
-PostgreSQL real; el control de un unico `head` sigue ejecutandose.
-
-Ejecucion confirmada contra el PostgreSQL local real del stack Docker
-`solucion-postgres-1`:
+La validación objetivo usa **PostgreSQL 16 local y desechable**. El ejecutor
+[`scripts/test_migrations_pg16.py`](../../scripts/test_migrations_pg16.py) exige
+binarios 16.x, crea un clúster nuevo en `/tmp`, escucha solo en un socket Unix
+privado (sin TCP) y elimina el clúster al terminar. Cada caso de integración crea
+y elimina además su propia base `sagrilaft_alembic_test_*`. No utiliza AWS, Docker,
+RDS, staging ni datos de una base existente.
 
 ```bash
-TEST_POSTGRES_ADMIN_URL="postgresql+psycopg://sagrilaft_user:dev_local_1234@127.0.0.1:5432/postgres" \
-venv/bin/pytest tests/integration/test_migraciones_alembic_postgres.py -q
-2 passed
+venv/bin/python scripts/test_migrations_pg16.py \
+  --pg-bin /ruta/postgresql-16/bin \
+  --report-dir /tmp/validacion-pg16-nueva
 ```
 
-Despues de la ejecucion se verifico que no quedaran bases temporales
-`sagrilaft_alembic_test_*` colgadas.
+El directorio de evidencias debe ser nuevo. Conserva versión del servidor,
+`pytest.txt`, `pytest.xml`, `postgres.log`, `database-check.json` (incluye bases
+residuales) y `cleanup.txt`. Necesita `initdb`, `pg_ctl`, `postgres` y las dependencias
+Python de pruebas. Si el entorno restringe sockets Unix, hay que permitir la ejecución
+local del servidor; no sustituirlo por una URL de RDS o una base existente.
 
-## Que Se Valido En Esta Fase
+El ejecutor fija `TEST_POSTGRES_EXPECTED_MAJOR=16`; las pruebas verifican la versión
+antes de crear bases. La invocación directa de pytest sin `TEST_POSTGRES_ADMIN_URL`
+omite los casos que necesitan PostgreSQL: **una ejecución con skips no acredita PG16**.
+El ejecutor también incluye `tests/unit/test_migration_guard.py`.
 
-Se valido lo siguiente:
+Cobertura:
 
-- La suite de integracion puede arrancar la app sin AWS, Zoho, correo ni Keycloak.
-- La API responde por HTTP real local.
-- El estado de la app puede instalarse desde fixtures sin ejecutar el lifespan
-  productivo.
-- La base de datos de prueba puede crearse y destruirse por test.
-- Los overrides de FastAPI quedan registrados y se limpian al terminar.
-- Los contadores del rate limiter se limpian por prueba para evitar falsos
-  positivos de `429`.
-- El entorno de pruebas se restaura para no contaminar otras suites.
-- El backend rechaza creacion de acceso manual sin correo destinatario.
-- El backend rechaza correos destinatarios invalidos.
-- El backend crea acceso manual con correo obligatorio y dispara notificacion
-  controlada mediante `NotificadorEnMemoria`.
-- Un token inexistente no resuelve ningun formulario.
-- Un codigo de peticion inexistente no recupera sesion.
-- Un PIN incorrecto no recupera sesion.
-- Un token incorrecto no autoriza el envio final.
-- Un acceso expirado bloquea tanto el link de diligenciamiento como la
-  recuperacion por codigo + PIN.
-- La carga de documentos registra evidencia en BD, storage local y extractor IA.
-- Los seis documentos del flujo publico pueden cargarse, listarse y moverse al
-  radicar.
-- El reemplazo de documentos conserva versionado y borra logicamente el adjunto
-  anterior.
-- El listado de documentos no expone adjuntos reemplazados o eliminados
-  logicamente.
-- Los archivos invalidos por catalogo, extension, `content_type` o tamano son
-  rechazados sin guardar evidencia ni llamar IA.
-- Si falta uno de los seis documentos, la radicacion se bloquea indicando el
-  documento faltante exacto.
-- Si faltan todos los documentos, la radicacion se bloquea indicando los seis
-  faltantes exactos.
-- Un rechazo por documentos faltantes no consume el acceso, no genera PDF, no
-  registra auditoria y no emite alerta.
-- Despues de completar los documentos faltantes, el mismo usuario puede radicar
-  normalmente.
-- La radicacion mueve documentos activos desde `tmp/` a la carpeta definitiva de
-  la contraparte.
-- El destinatario puede entrar por link de diligenciamiento sin codigo ni PIN.
-- El autoguardado remoto conserva datos del borrador.
-- La sesion puede retomarse con codigo de peticion + PIN y recuperar los datos
-  autoguardados.
-- Un intento de envio incompleto devuelve errores de completitud y no consume
-  el acceso.
-- Existen fabricas de payload minimo para persona juridica y persona natural
-  basadas en
-  `ValidadorEnvioFormulario`.
-- Un formulario de persona juridica no puede radicarse sin los seis documentos
-  obligatorios.
-- Un formulario de persona natural no puede radicarse sin los seis documentos
-  obligatorios.
-- El envio final genera PDF oficial `FORMULARIO_PDF` y lo guarda en storage.
-- El envio final registra evento de auditoria `FORMULARIO_ENVIADO`.
-- El envio final emite alerta `FORMULARIO_RECIBIDO` al portal interno.
-- El portal interno lista solo expedientes no borrador.
-- El listado de expedientes respeta filtros por contraparte y busqueda por razon
-  social/codigo de peticion.
-- El detalle de expediente expone los documentos activos y el PDF oficial.
-- La descarga de documentos del expediente resuelve el archivo desde storage.
-- La aprobacion interna cambia `enviado` a `validado`.
-- La aprobacion registra auditoria `FORMULARIO_APROBADO` con actor operador.
-- La aprobacion no genera alerta nueva ni notificacion externa.
-- La devolucion cambia `enviado` a `en_correccion`.
-- La devolucion registra auditoria `FORMULARIO_DEVUELTO` con metadata de campos.
-- La devolucion reactiva el acceso externo con token nuevo.
-- La devolucion alerta al portal y notifica al destinatario.
-- El token anterior deja de resolver despues de la devolucion.
-- El token nuevo y codigo + PIN permiten retomar la correccion.
-- El reenvio de correccion cambia `en_correccion` a `enviado`.
-- El reenvio consume nuevamente el acceso externo.
-- El reenvio genera una nueva version del PDF oficial.
-- El reenvio emite alerta `FORMULARIO_CORREGIDO`.
-- El rechazo definitivo cambia `enviado` a `rechazado`.
-- El rechazo registra auditoria `FORMULARIO_RECHAZADO` con motivo interno.
-- El rechazo alerta al portal interno y notifica al destinatario cuando hay
-  mensaje externo.
-- El rechazo no reactiva el acceso externo.
-- El envio a firma cambia `validado` a `pendiente_firma`.
-- El envio a firma registra auditoria `FIRMA_INICIADA` con actor operador.
-- El envio a firma crea solicitud en `ZohoSignEnMemoria` con PDF oficial y
-  certificado SAGRILAFT.
-- El envio a firma guarda `zoho_request_id` y alerta al portal interno.
-- El webhook Zoho con HMAC valido cambia `pendiente_firma` a `firmado`.
-- El webhook valido registra auditoria `FIRMA_COMPLETADA` con actor sistema.
-- El webhook valido descarga y conserva el documento firmado en storage.
-- El webhook valido alerta al portal interno con `FORMULARIO_FIRMADO`.
-- El webhook Zoho con HMAC invalido responde `403`.
-- El webhook invalido no cambia `pendiente_firma`, no registra auditoria de
-  firma completada, no guarda documento firmado y no emite alerta de firmado.
-- El webhook Zoho duplicado es idempotente: no duplica auditoria, alerta ni
-  documento firmado.
-- El cierre con reporte final cambia `firmado` a `cerrado`.
-- El cierre con reporte final registra documento `REPORTE_FINAL` en BD y
-  storage.
-- El cierre con reporte final registra auditoria `REPORTE_FINAL_CARGADO` con
-  causal y justificacion.
-- El cierre con reporte final alerta al portal interno y expone la causal en el
-  detalle del expediente.
-- El cierre sin reporte final por `no_continuacion_dialogos` cambia `firmado` a
-  `cerrado`.
-- El cierre sin reporte final registra auditoria `EXPEDIENTE_CERRADO` sin crear
-  documento `REPORTE_FINAL`.
-- El cierre sin reporte final expone la causal en el detalle del expediente.
-- La comparacion de versiones detecta el cambio real entre version 1 y version
-  2 del PDF oficial.
-- La comparacion por IDs especificos devuelve la misma diferencia.
-- El reporte PDF de comparacion queda disponible para evidencia.
-- El rate limiting bloquea recuperacion por codigo + PIN despues de 5 intentos
-  invalidos por minuto.
-- El rate limiting bloquea envio final con token incorrecto despues de 10
-  intentos invalidos por minuto.
-- El RBAC del portal interno filtra accesos manuales y expedientes segun los
-  roles Keycloak `acceso_clientes` y `acceso_proveedores`.
-- Un usuario con solo `acceso_clientes` no puede ver, crear, reenviar ni operar
-  carpetas de proveedor.
-- Un usuario con solo `acceso_proveedores` no puede ver ni operar carpetas de
-  cliente.
-- Un usuario con ambos roles puede ver y operar ambos tipos de contraparte.
-- Un usuario sin roles de contraparte recibe `403 Acceso denegado`.
-- Un intento RBAC rechazado no crea acceso manual, no reenvia credenciales, no
-  cambia estado de expediente y no registra auditoria de aprobacion.
-- Alembic tiene un solo `head`.
-- Con PostgreSQL disponible, `alembic upgrade head` crea el esquema desde cero y
-  deja disponibles tablas, columnas y trigger criticos.
-- La ejecucion puntual contra PostgreSQL real local confirmo `2 passed` y limpio
-  la base temporal al finalizar.
-- El acceso queda consumido despues de una radicacion valida.
-- Una vez consumido, el token ya no permite entrar al formulario.
-- Una vez enviado, la recuperacion con codigo + PIN ya no permite retomar
-  sesion.
-- Para persona natural, el backend purga los bloques juridicos no aplicables.
-- La suite completa queda verde.
+- Las **28 revisiones**, recorridas individualmente en orden del grafo, merge de
+  ramas, head `f8a9b0c1d2e3` y repetición de `upgrade head`.
+- Actualización desde ambas ramas con una fila sintética conservada.
+- Datos de persona natural/jurídica: residencia, clasificación tributaria, fechas
+  ISO y meses españoles, bisiestos, vacíos, valores inválidos, redondeo monetario y
+  conversión de textos booleanos. Fechas inválidas pasan a NULL y textos booleanos
+  no reconocidos a false: se acredita ese comportamiento, no su validez de negocio.
+- Rechazo y rollback transaccional de CHECK inválidos, desbordamiento NUMERIC y
+  correo destinatario NULL; corrección/reintento para CHECK y correo.
+- Snapshot ausente, columna antigua y coexistencia de columnas; conservación del
+  JSON, versión del documento, trigger de auditoría, supresión de evento desde la
+  aplicación, índice y cascada de borrado.
+- Once pruebas funcionales/estructurales adicionales sobre el head: todas las tablas
+  y columnas del ORM actual existen; crear/guardar/leer/actualizar firma y ambos
+  contactos mediante repositorios actuales; las siete listas se crean juntas y se
+  actualizan/vacían individualmente sin modificar las demás. Las lecturas usan
+  sesiones nuevas para comprobar persistencia tras commit, sin `create_all`.
+- Lock PostgreSQL entre conexiones, espera acotada, liberación tras errores y
+  commit, bloqueo efectivo de Alembic, revisión previa/final, rechazo de head
+  incorrecto y separación entre arranque normal y modo migración.
+
+**Resultado local del 2026-10-06:** PostgreSQL **16.6**, compilado desde el tarball
+oficial bajo `/tmp`, GCC 15 con `-std=gnu17`, locale `C`, sin ICU. **44 passed,
+3 xfailed**, más cinco advertencias de deprecación Pydantic. No se modificaron las
+28 migraciones ni el código de despliegue. PostgreSQL 17 no se usó como sustituto.
+
+Los tres `xfail(strict=True, raises=AssertionError)` son **defectos de conservación
+reproducidos**, no aprobaciones de seguridad de datos:
+
+| Revisión | Dato sintético perdido al actualizar |
+|---|---|
+| `c3f1a2b4d5e6` | `fecha_firma` no se copia a día/mes/año |
+| `c8d9e0f1a2b3` | Contacto de órdenes no se copia a `contactos` |
+| `b7e4f2a19c3d` | Lista de accionistas no se copia a su tabla normalizada |
+
+Un error distinto de la aserción de conservación no queda oculto como fallo esperado.
+Si una corrección hace pasar alguno de estos casos, el XPASS estricto obliga a revisar
+la marca. No se reescriben aquí migraciones históricas potencialmente aplicadas.
+
+**Criterio aceptado para staging:** no se requiere conservar sus datos de prueba.
+Los tres fallos históricos de conservación no bloquean ese objetivo estructural.
+Las 11 pruebas funcionales/estructurales pasan en PG16.6: no se encontraron tablas
+ni columnas faltantes para el ORM ni incompatibilidades en los repositorios probados.
+Esto no acredita el servicio externo de firma, la API completa ni el estado vivo de
+staging. Las consultas posteriores de revisión/código están registradas por separado
+en [Estado](../../docs/estado/ESTADO_DESPLIEGUE_STAGING_PROD.md).
+
+**Antes de ejecutar en staging:** revalidar la revisión y el salto registrados en Estado. La pérdida de
+los datos de prueba descritos está aceptada; no se exige backfill para ellos. Auditar
+NULL, formatos/rangos y datos fuera de límites que puedan impedir la migración. Esta muestra no certifica todos los registros posibles ni
+compatibilidad del código anterior con el esquema final. Falta ensayar el salto real
+con datos anonimizados representativos, roles/permisos y configuración RDS, su versión
+menor concreta y collation, duración/bloqueos con volumen y recuperación. La versión
+16.6 ensayada no se propone como selección de parche para producción.
+
+La evidencia previa de `2 passed` sobre el contenedor local `solucion-postgres-1`
+correspondía al alcance anterior; no acreditaba estas pruebas ni PostgreSQL 16.
+
+## Resultados históricos de la suite
+
+La cobertura por endpoint y sus invariantes se describe en
+[Tipos de test](#tipos-de-test-de-integracion-implementados-hoy).
+Los conteos siguientes pertenecen a la ejecución registrada, no a una nueva
+corrida sobre el HEAD actual. La comparación PostgreSQL del 1 de octubre se
+conserva en la [evidencia local](../../docs/evidencia/e2e-staging/VALIDACION_STAGING_E2E.md).
 
 Resultado de verificacion:
 
@@ -845,13 +767,12 @@ En otras palabras: no se testeo solo un schema ni una funcion aislada. Se valido
 la colaboracion entre router, schema, dependencias, servicio, repositorio,
 modelo de BD y dobles de integraciones externas.
 
-## Que No Se Ha Validado Todavia
+## Alcance de esta suite y validaciones externas ya realizadas
 
-Todavia no se validaron estos flujos funcionales:
+La validación funcional PostgreSQL de 12 escenarios y las migraciones desde
+cero ya fueron ejecutadas; no quedan como pendientes generales de staging.
 
-- validar compatibilidad real con PostgreSQL.
-
-Tampoco se validan integraciones reales contra:
+Esta suite usa dobles y por sí sola no valida integraciones reales contra:
 
 - AWS Bedrock;
 - S3;
@@ -861,8 +782,11 @@ Tampoco se validan integraciones reales contra:
 - Zoho Sign real;
 - API real de listas de cautela.
 
-Eso debe cubrirse con pruebas contractuales, smoke tests de ambiente o pruebas
-manuales/controladas de staging, no con esta suite local base.
+La validación externa de Bedrock, S3, correo, Keycloak y Zoho ya está
+registrada en el [E2E de AWS staging](../../docs/evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
+SNS→correo se validó en el [runbook](../../docs/operacion/RUNBOOK_OPERATIVO.md).
+La API real de listas continúa diferida hasta contratar proveedor; producción
+arranca con listas deshabilitadas. Las validaciones productivas siguen abiertas.
 
 ## Por Que Un Harness
 
@@ -924,26 +848,12 @@ dialecto no es PostgreSQL y el identificador autoincremental de auditoria usa
 `Integer` solo bajo SQLite. En PostgreSQL se mantiene el comportamiento real:
 marca transaccional para triggers y columna `BIGINT`.
 
-SQLite es suficiente para validar wiring y flujos iniciales, pero no debe ser
-la unica base a largo plazo. Para una cobertura 10/10 se recomienda agregar una
-segunda variante con PostgreSQL de test para repositorios y flujos funcionales,
-ademas de la prueba de migraciones Alembic ya creada.
+La segunda variante con PostgreSQL ya está implementada y fue ejercitada en
+los 12 escenarios registrados. Conservar ambas variantes y ampliar la cobertura
+no equivale a repetir como pendiente la creación del harness.
 
-## Que Falta
+## Seguimiento de mejoras
 
-Ya se cubre el cierre base del diligenciamiento:
-autoguardado, recuperacion, validacion de credenciales, documentos obligatorios,
-radicacion, evidencia, consulta inicial del expediente en portal interno,
-aprobacion interna, devolucion para correccion, reenvio de correccion, rechazo
-definitivo, inicio de firma electronica, webhooks Zoho valido/invalido/duplicado
-y cierre con o sin reporte final segun causal, ademas de comparacion de
-versiones, rate limiting y RBAC por roles de contraparte.
-Tambien se valida la cadena de migraciones Alembic y, cuando hay PostgreSQL
-disponible, la creacion del esquema desde base vacia.
-
-Lo siguiente es extender desde ese flujo:
-
-1. Llevar la prueba opt-in de Alembic a CI/staging con
-   `TEST_POSTGRES_ADMIN_URL`, para que no dependa solo de ejecucion local.
-2. Validar compatibilidad completa de repositorios/servicios contra PostgreSQL,
-   no solo creacion de esquema.
+El trabajo de cobertura adicional y PostgreSQL en CI se mantiene en
+[P19](../../docs/produccion/PENDIENTES_PRODUCCION.md#p19). Este archivo describe
+el harness, los comandos y sus límites; no mantiene otra lista de tareas.

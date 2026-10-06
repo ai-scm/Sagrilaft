@@ -1,5 +1,5 @@
 # Estado de las Pruebas — Formulario SAGRILAFT
-### Lo que se revisó, lo que se verificó y lo que falta
+Función única: catálogo de cobertura frontend. Seguimiento de mejoras en [P19](../docs/produccion/PENDIENTES_PRODUCCION.md#p19).
 
 ---
 
@@ -158,7 +158,8 @@ Estas pruebas simulan a un usuario real usando la aplicación en un navegador, d
 
 ---
 
-## Lo que falta cubrir
+<a id="cobertura"></a>
+## Límites de cobertura automática
 
 ### Flujos del formulario que aún no tienen prueba automática
 
@@ -172,7 +173,7 @@ Estas pruebas simulan a un usuario real usando la aplicación en un navegador, d
 
 ### Partes del código sin prueba propia
 
-Estas partes existen en el sistema y funcionan en producción, pero no tienen una prueba automática que verifique su comportamiento de forma aislada:
+Estas partes existen en el sistema, pero no tienen una prueba automática propia que verifique su comportamiento de forma aislada; producción aún no está desplegada según el estado documentado.
 
 | Parte del sistema | Qué hace |
 |---|
@@ -185,17 +186,11 @@ Estas partes existen en el sistema y funcionan en producción, pero no tienen un
 | **Modo corrección** (`CorreccionContext`) | Todo el sistema de campos bloqueados/desbloqueados cuando el formulario es devuelto |
 | **Los 8 pasos individuales del formulario** | Cada sección (Paso 1 al 8) como pantalla completa no tiene prueba propia — solo se prueba su aparición desde la pantalla principal |
 
-### Pruebas que requieren conexión real al servidor (staging)
+### Evidencia de ambientes
 
-Estas situaciones no se pueden verificar de forma local porque dependen de sistemas externos reales:
-
-| Situación | Por qué requiere staging |
-|---|
-| Login con credenciales reales | El servidor verifica el PIN con un sistema de cifrado especial que no se puede simular |
-| Enlace de acceso real por correo | El enlace lo genera el portal interno |
-| Envío final a producción | El servidor ejecuta notificaciones, cambios de estado y registros reales |
-| IA de extracción de documentos | Está en Amazon Web Services y requiere conexión real |
-| Verificación en listas de cautela | Consulta fuentes externas en tiempo real |
+Las ejecuciones reales se consultan en [Estado](../docs/estado/ESTADO_DESPLIEGUE_STAGING_PROD.md)
+y su [evidencia AWS](../docs/evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
+Este catálogo describe cobertura automática; su ampliación se gestiona en P19.
 
 ---
 
@@ -236,8 +231,8 @@ Configuración:
   src/setupTests.js            ← Configuración de pruebas de lógica interna
 
 Documentación:
-  CLAUDE.md                    ← Guía de arquitectura del proyecto
-  GUIA_DESPLIEGUE_LOCAL.md     ← Instrucciones para correr el proyecto localmente
+  docs/README.md              ← Mapa de fuentes del proyecto
+  tests/integration/README.md ← Harness y pruebas backend
 ```
 
 > Ningún archivo de producción fue modificado durante la construcción de las pruebas —
