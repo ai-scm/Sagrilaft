@@ -19,7 +19,9 @@
     "deploy:staging": "cdk deploy -c environment=staging -c account=874641912777 -c region=us-east-1 -c hostedZoneName=ia.blend360.com -c hostedZoneId=Z10446292T6I6L9P7R8AQ -c domainName=forms-staging-sagrilaft.ia.blend360.com -c portalDomainName=staging-sagrilaft.ia.blend360.com -c keycloakDomainName=login-staging-sagrilaft.ia.blend360.com -c certificateArn=arn:aws:acm:us-east-1:874641912777:certificate/ca472ae9-a0bf-49ec-8203-d78dce36a364 -c imageTag=$IMAGE_TAG -c bedrockModelId=${BEDROCK_MODEL_ID:-amazon.nova-pro-v1:0} -c proveedorListasCautela=deshabilitado -c desiredCount=1",
     "deploy:prod:bootstrap": "cdk deploy -c environment=prod -c account=874641912777 -c region=us-east-1 -c hostedZoneName=ia.blend360.com -c hostedZoneId=Z10446292T6I6L9P7R8AQ -c domainName=forms-sagrilaft.ia.blend360.com -c portalDomainName=sagrilaft.ia.blend360.com -c keycloakDomainName=login-sagrilaft.ia.blend360.com -c certificateArn=arn:aws:acm:us-east-1:874641912777:certificate/ca472ae9-a0bf-49ec-8203-d78dce36a364 -c imageTag=bootstrap-placeholder -c desiredCount=0 -c bedrockModelId=${BEDROCK_MODEL_ID:-amazon.nova-pro-v1:0} -c habilitarNatEgress=true",
     "deploy:prod": "cdk deploy -c environment=prod -c account=874641912777 -c region=us-east-1 -c hostedZoneName=ia.blend360.com -c hostedZoneId=Z10446292T6I6L9P7R8AQ -c domainName=forms-sagrilaft.ia.blend360.com -c portalDomainName=sagrilaft.ia.blend360.com -c keycloakDomainName=login-sagrilaft.ia.blend360.com -c certificateArn=arn:aws:acm:us-east-1:874641912777:certificate/ca472ae9-a0bf-49ec-8203-d78dce36a364 -c imageTag=$IMAGE_TAG -c bedrockModelId=${BEDROCK_MODEL_ID:-amazon.nova-pro-v1:0} -c habilitarNatEgress=true",
-    "check:staging": "python3 ../../scripts/check_staging_readiness.py"
+    "check:staging": "python3 ../../scripts/check_staging_readiness.py",
+    "release:staging": "bash ../../scripts/deploy_release.sh --environment staging",
+    "release:prod": "bash ../../scripts/deploy_release.sh --environment prod"
   },
   "_nota_cdk_v2": "aws-sns, aws-sns-subscriptions y aws-ses son sub-módulos de aws-cdk-lib. No requieren paquetes npm adicionales.",
   "devDependencies": {
@@ -31,5 +33,6 @@
   "dependencies": {
     "aws-cdk-lib": "^2.120.0",
     "constructs": "^10.0.0"
-  }
+  },
+  "_nota_deploy": "deploy:* ejecuta solo CDK; no coordina migraciones. release:* usa plan y evidence-dir, consulta por defecto y requiere --execute para desplegar."
 }

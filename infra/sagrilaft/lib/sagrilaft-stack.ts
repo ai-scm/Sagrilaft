@@ -82,6 +82,9 @@ export class SagrilaftStack extends cdk.Stack {
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
+    // Omitirlo conserva bootstrap y despliegues existentes. Un override permite
+    // preparar la migración sin cambiar las imágenes de los servicios.
+    const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
     const proveedorListasCautela = String(
       this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
@@ -95,6 +98,15 @@ export class SagrilaftStack extends cdk.Stack {
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
+    }
+    if (['staging', 'prod'].includes(ambiente) && imageTag === 'latest') {
+      throw new Error(`El ambiente ${ambiente} requiere imageTag de una release explicita, no latest.`);
+    }
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(migrationImageTag)) {
+      throw new Error('migrationImageTag invalido: use una etiqueta de imagen no vacia de hasta 128 caracteres.');
+    }
+    if (['staging', 'prod'].includes(ambiente) && migrationImageTag === 'latest') {
+      throw new Error(`El ambiente ${ambiente} requiere migrationImageTag de una release explicita, no latest.`);
     }
     if (['staging', 'prod'].includes(ambiente) && !bedrockModelId) {
       throw new Error(`El ambiente ${ambiente} requiere -c bedrockModelId=<model-id-o-inference-profile>. No usar credenciales AWS personales.`);
@@ -165,6 +177,7 @@ export class SagrilaftStack extends cdk.Stack {
     const ecsFargate = new EcsFargate(this, 'EcsFargate', {
       ambiente,
       imageTag: imageTag || 'dev',
+      migrationImageTag,
       desiredCount,
       backendMaxCapacity,
       vpc: networking.vpc,
@@ -290,6 +303,7 @@ export class SagrilaftStack extends cdk.Stack {
     new CfnOutput(this, 'EcsKeycloakServiceName', { value: ecsFargate.keycloak.service.serviceName, description: 'Servicio ECS Keycloak conectado al ALB' });
     new CfnOutput(this, 'EcsBackendTargetGroupArn', { value: ecsFargate.backend.targetGroup.targetGroupArn, description: 'Target Group ECS backend' });
     new CfnOutput(this, 'EcsMigrationTaskDefinitionArn', { value: ecsFargate.migrationTaskDefinition.taskDefinitionArn, description: 'Task Definition ECS para ejecutar migraciones Alembic puntuales' });
+    new CfnOutput(this, 'EcsMigrationImageTag', { value: migrationImageTag, description: 'Tag efectivo de la imagen de migracion; no acredita su ejecucion' });
     new CfnOutput(this, 'EcsMigrationLogGroupName', { value: ecsFargate.migrationLogGroup.logGroupName, description: 'Log Group CloudWatch de migraciones Alembic' });
   }
 }

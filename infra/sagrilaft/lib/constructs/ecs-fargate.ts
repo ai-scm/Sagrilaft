@@ -17,6 +17,7 @@ import { SAGRILAFT_DB_NAME } from '../deployment-constants';
 export interface EcsFargateProps {
   readonly ambiente: string;
   readonly imageTag: string;
+  readonly migrationImageTag: string;
   readonly desiredCount: number;
   readonly backendMaxCapacity: number;
   readonly vpc: ec2.Vpc;
@@ -190,9 +191,12 @@ export class EcsFargate extends Construct {
     });
 
     taskDefinition.addContainer('migration', {
-      image: ecs.ContainerImage.fromEcrRepository(props.backendRepo, props.imageTag),
+      image: ecs.ContainerImage.fromEcrRepository(props.backendRepo, props.migrationImageTag),
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'migration' }),
-      environment: this.backendEnvironment(props, logGroup, { RUN_MODE: 'migrate' }),
+      environment: this.backendEnvironment(props, logGroup, {
+        RUN_MODE: 'migrate',
+        GIT_SHA: props.migrationImageTag,
+      }),
       secrets: this.backendSecrets(props, 'Migration'),
       command: [
         'sh',

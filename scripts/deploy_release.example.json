@@ -1,0 +1,32 @@
+{
+  "environment": "staging",
+  "account": "REEMPLAZAR_CUENTA",
+  "region": "us-east-1",
+  "mode": "compatible",
+  "previous_tag": "REEMPLAZAR_TAG_ACTIVO",
+  "candidate_tag": "REEMPLAZAR_SHA_APROBADO_DE_40_CARACTERES",
+  "desired_count": 1,
+  "expected_head": "REEMPLAZAR_HEAD_DE_LA_IMAGEN",
+  "previous_revisions": ["REEMPLAZAR_REVISION_REAL_DE_BD"],
+  "digests": {
+    "backend": "REEMPLAZAR_SHA256",
+    "formulario-publico": "REEMPLAZAR_SHA256",
+    "portal-interno": "REEMPLAZAR_SHA256",
+    "keycloak": "REEMPLAZAR_SHA256"
+  },
+  "context": {
+    "hostedZoneName": "REEMPLAZAR",
+    "hostedZoneId": "REEMPLAZAR",
+    "domainName": "REEMPLAZAR",
+    "portalDomainName": "REEMPLAZAR",
+    "keycloakDomainName": "REEMPLAZAR",
+    "certificateArn": "REEMPLAZAR",
+    "bedrockModelId": "REEMPLAZAR",
+    "zohoSecretYaExiste": true,
+    "proveedorListasCautela": "deshabilitado",
+    "habilitarNatEgress": false,
+    "snsAlertasSub": "REEMPLAZAR",
+    "backendMaxCapacity": 4
+  },
+  "smoke_command": ["REEMPLAZAR_EJECUTABLE_DE_SMOKE_APROBADO"]
+}
