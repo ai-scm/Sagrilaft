@@ -1,7 +1,7 @@
 """
 CA1/CA2 — traduccion de fallos de ZohoSign a excepciones de dominio.
 
-Ver docs/RUNBOOK_OPERATIVO.md seccion 2 y la spec aprobada: un error
+Ver docs/operacion/RUNBOOK_OPERATIVO.md seccion 2 y la spec aprobada: un error
 transitorio (429/502/503/504 o de red) que agota los reintentos debe
 levantar ZohoSignIndisponibleError; un error de autenticacion (401/403)
 debe levantar ZohoSignAutenticacionError. La politica de reintentos
