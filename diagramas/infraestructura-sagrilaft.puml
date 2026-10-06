@@ -1,0 +1,104 @@
+@startuml
+!define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v18.0/dist
+!include AWSPuml/AWSCommon.puml
+!include AWSPuml/AWSSimplified.puml
+!include AWSPuml/General/Internet.puml
+!include AWSPuml/NetworkingContentDelivery/ElasticLoadBalancing.puml
+!include AWSPuml/SecurityIdentityCompliance/WAF.puml
+!include AWSPuml/Containers/ElasticContainerService.puml
+!include AWSPuml/Containers/Fargate.puml
+!include AWSPuml/Database/RDS.puml
+!include AWSPuml/Storage/SimpleStorageService.puml
+!include AWSPuml/SecurityIdentityCompliance/SecretsManager.puml
+!include AWSPuml/MachineLearning/Bedrock.puml
+!include AWSPuml/BusinessApplications/SimpleEmailService.puml
+!include AWSPuml/SecurityIdentityCompliance/CertificateManager.puml
+!include AWSPuml/ManagementGovernance/CloudWatch.puml
+!include AWSPuml/ApplicationIntegration/SimpleNotificationService.puml
+!include AWSPuml/Containers/ElasticContainerRegistry.puml
+
+left to right direction
+
+actor "Usuarios" as users
+
+package "AWS Cloud" {
+
+  package "VPC 10.0.0.0/16" {
+
+    package "Subred Pública" #d5e8d4 {
+      WAF(waf, "AWS WAF\nEscudo Anti-Ataques", " ")
+      ElasticLoadBalancing(alb, "ALB\n:80 → redirige HTTPS\n:443 → enruta por dominio", " ")
+
+      note right of alb
+        sagrilaft.* → Formulario Público
+        portal.*    → Portal Interno
+        auth.*      → Keycloak
+        /api/*      → Backend
+      end note
+    }
+
+    package "Subred Privada de Aplicación" #f8cecc {
+      Fargate(fargate, "ECS Fargate Cluster\n(capacidad por entorno: staging=1, prod=2+)", " ") {
+          ElasticContainerService(ecs_back, "Backend (FastAPI)", " ")
+          ElasticContainerService(ecs_front, "Formularios UI", " ")
+          ElasticContainerService(ecs_auth, "Keycloak SSO", " ")
+      }
+      
+      RDS(rds, "RDS PostgreSQL 16\nSubredes de datos aisladas", " ")
+    }
+
+    component "VPC Endpoints\nS3 / ECR / Logs / Secrets / SSM" as endpoints
+    note right of endpoints
+      Las APIs externas (Zoho y otros proveedores)
+      requieren salida controlada (NAT o equivalente).
+      En staging se habilita solo durante pruebas
+      que necesitan comunicación externa.
+    end note
+  }
+
+  CertificateManager(acm, "ACM Certificate\nSSL/TLS", " ")
+  SimpleStorageService(s3, "S3 Bucket\nUploads Privados", " ")
+  SecretsManager(sm, "Secrets Manager\nCredenciales", " ")
+  Bedrock(bedrock, "Amazon Bedrock\nModelo configurado por entorno\nExtracción IA", " ")
+  SimpleEmailService(ses, "Amazon SES / SMTP\nCorreos transaccionales y alertas", " ")
+  CloudWatch(cw, "CloudWatch\nLogs JSON y Alarmas", " ")
+  SimpleNotificationService(sns, "AWS SNS\nAlertas a Equipo TI", " ")
+  ElasticContainerRegistry(ecr, "Amazon ECR\nImágenes Docker", " ")
+}
+
+cloud "Terceros" {
+    component "Zoho Sign\n(Contratos)" as zoho
+    component "Proveedor de listas de cautela\n(opcional; deshabilitado en staging)" as tusdatos
+}
+
+' Flujo principal
+users --> waf : HTTPS
+waf --> alb : Tráfico Limpio
+acm -[#red,dashed]-> alb : SSL/TLS
+
+alb --> ecs_front : :8080
+alb --> ecs_auth : :8080
+alb --> ecs_back : :8000
+
+ecs_back -[#red]-> rds : :5432 (SELECT FOR UPDATE)
+ecs_auth -[#red]-> rds : :5432
+
+' Servicios AWS consumidos por Fargate
+ecs_back -[#teal,dashed]-> s3 : Leer/Escribir archivos
+fargate -[#teal,dashed]-> endpoints : Acceso privado a AWS
+ecs_back -[#purple,dashed]-> sm : Leer secretos
+ecs_back -[#purple,dashed]-> bedrock : Recorte a 7 pags y Extracción
+ecs_back -[#orange,dashed]-> ses : Enviar emails
+ecs_back -[#blue,dashed]-> cw : Envía logs
+ecs_front -[#blue,dashed]-> cw : Envía logs
+ecs_auth -[#blue,dashed]-> cw : Envía logs
+cw -[#pink,dashed]-> sns : Alarmas 5xx / CPU
+fargate -[#gray,dashed]-> ecr : Pull de imágenes
+
+' Comunicaciones Externas e Internas
+ecs_back -[#green,dashed]-> zoho : OAuth/API saliente (reintentos)
+zoho -[#green,dashed]-> alb : POST /api/webhooks/zoho-sign\nHMAC (entrante)
+ecs_back -[#gray,dashed]-> tusdatos : API opcional\n(no activo en staging)
+ecs_back -[#black,dashed]-> ecs_auth : AWS Cloud Map (Interno)
+
+@enduml

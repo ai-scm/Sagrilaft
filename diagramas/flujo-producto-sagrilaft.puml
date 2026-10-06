@@ -1,0 +1,59 @@
+@startuml
+title SAGRILAFT — Flujo de negocio del producto
+left to right direction
+skinparam componentStyle rectangle
+
+actor "Contraparte" as counterparty
+actor "Analista / aprobador" as analyst
+rectangle "Formulario público" as public_form
+rectangle "Portal interno" as portal
+rectangle "Keycloak" as keycloak
+rectangle "Backend FastAPI" as api
+database "RDS PostgreSQL" as db
+folder "S3 documentos" as s3
+rectangle "Amazon Bedrock\n extracción opcional" as bedrock
+rectangle "Zoho Sign\n sandbox" as zoho
+rectangle "SES / SMTP" as mail
+
+counterparty --> public_form : Enlace + código/PIN
+public_form --> api : Guardar datos y documentos
+api --> db : Crear / actualizar expediente
+api --> s3 : Almacenar documentos
+api --> bedrock : Extraer información (si aplica)
+api --> mail : Enviar credenciales y avisos
+
+analyst --> keycloak : Iniciar sesión
+keycloak --> portal : Token y roles
+portal --> api : Consultar y gestionar expediente
+api --> db : Auditoría y transición de estados
+
+package "Estados del expediente" {
+  rectangle "BORRADOR" as borrador
+  rectangle "ENVIADO" as enviado
+  rectangle "EN_CORRECCION" as en_correccion
+  rectangle "VALIDADO" as validado
+  rectangle "PENDIENTE_FIRMA" as pendiente_firma
+  rectangle "FIRMADO" as firmado
+  rectangle "CERRADO" as cerrado
+  rectangle "RECHAZADO" as rechazado
+}
+
+borrador --> enviado : completar y enviar
+enviado --> en_correccion : devolver
+en_correccion --> enviado : corregir y reenviar
+enviado --> validado : aprobar
+validado --> pendiente_firma : enviar a firma
+pendiente_firma --> firmado : webhook Zoho válido
+firmado --> cerrado : cerrar expediente
+enviado --> rechazado : rechazar
+
+api --> zoho : OAuth/API saliente
+zoho --> api : Webhook HMAC
+api --> s3 : Guardar documento firmado
+api --> mail : Notificar cambios de estado
+
+note bottom of cerrado
+  Cada transición queda registrada en auditoría.
+  Los reintentos de operaciones y webhooks son idempotentes.
+end note
+@enduml
