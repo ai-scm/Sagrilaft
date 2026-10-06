@@ -43,6 +43,9 @@ export class Ecr extends Construct {
   private buildRepository(id: string, repositoryName: string, ambiente: string): ecr.Repository {
     return new ecr.Repository(this, id, {
       repositoryName,
+      imageTagMutability: ['staging', 'prod'].includes(ambiente)
+        ? ecr.TagMutability.IMMUTABLE
+        : ecr.TagMutability.MUTABLE,
       removalPolicy: ambiente === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
       emptyOnDelete: ambiente !== 'prod',
       imageScanOnPush: true,
