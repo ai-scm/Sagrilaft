@@ -52,12 +52,19 @@ for (const environment of ['staging', 'prod']) {
   });
 
   test(`${environment}: public ALB inserts HSTS on HTTPS responses`, () => {
-    const loadBalancer = Object.values(synth({ environment }).Resources)
-      .find((resource: any) => resource.Type === 'AWS::ElasticLoadBalancingV2::LoadBalancer') as any;
-    const hsts = loadBalancer.Properties.LoadBalancerAttributes.find(
+    const resources = Object.values(synth({ environment }).Resources) as any[];
+    const httpsListener = resources.find(resource =>
+      resource.Type === 'AWS::ElasticLoadBalancingV2::Listener'
+      && resource.Properties.Port === 443);
+    const loadBalancer = resources.find(resource =>
+      resource.Type === 'AWS::ElasticLoadBalancingV2::LoadBalancer');
+    const hsts = httpsListener?.Properties.ListenerAttributes?.find(
       (attribute: any) => attribute.Key === 'routing.http.response.strict_transport_security.header_value',
     );
     equal(hsts?.Value, 'max-age=31536000');
+    equal(loadBalancer?.Properties.LoadBalancerAttributes.some(
+      (attribute: any) => attribute.Key === 'routing.http.response.strict_transport_security.header_value',
+    ), false);
   });
 
   test(`${environment}: RDS uses the selected db.t3.medium instance class`, () => {

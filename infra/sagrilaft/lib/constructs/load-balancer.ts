@@ -47,15 +47,6 @@ export class LoadBalancer extends Construct {
       idleTimeout: Duration.seconds(300),
     });
 
-    // Apply HSTS at the public ingress so every HTTPS response is covered,
-    // including ALB-generated fixed responses and responses from ECS targets.
-    // Deliberately omit includeSubDomains/preload: this stack only owns the
-    // three application hosts, not every subdomain of the parent zone.
-    this.alb.setAttribute(
-      'routing.http.response.strict_transport_security.header_value',
-      'max-age=31536000',
-    );
-
     // HTTPS listener con enrutamiento por host y 404 por defecto
     const listenerHttps = this.alb.addListener('Https', {
       port: 443,
@@ -65,6 +56,14 @@ export class LoadBalancer extends Construct {
         messageBody: 'No encontrado - SAGRILAFT',
       }),
     });
+
+    // AWS configura la modificación de headers de respuesta en el listener.
+    // Así HSTS cubre las respuestas HTTPS del ALB y de sus targets.
+    // Se omiten includeSubDomains/preload: el stack no controla toda la zona.
+    listenerHttps.setAttribute(
+      'routing.http.response.strict_transport_security.header_value',
+      'max-age=31536000',
+    );
 
     listenerHttps.addAction('BackendApiPublica', {
       priority: 1,
