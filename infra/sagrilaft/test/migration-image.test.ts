@@ -36,6 +36,23 @@ function assertMigrationTag(template: ReturnType<typeof synth>, tag: string) {
 }
 
 for (const environment of ['staging', 'prod']) {
+  test(`${environment}: public ALB inserts HSTS on HTTPS responses`, () => {
+    const loadBalancer = Object.values(synth({ environment }).Resources)
+      .find((resource: any) => resource.Type === 'AWS::ElasticLoadBalancingV2::LoadBalancer') as any;
+    const hsts = loadBalancer.Properties.LoadBalancerAttributes.find(
+      (attribute: any) => attribute.Key === 'routing.http.response.strict_transport_security.header_value',
+    );
+    equal(hsts?.Value, 'max-age=31536000');
+  });
+
+  test(`${environment}: RDS uses the selected db.t3.medium instance class`, () => {
+    const database = Object.values(synth({ environment }).Resources)
+      .find((resource: any) => resource.Type === 'AWS::RDS::DBInstance') as any;
+    equal(database.Properties.DBInstanceClass, 'db.t3.medium');
+    equal(database.Properties.MultiAZ, false);
+    equal(database.Properties.BackupRetentionPeriod, 7);
+  });
+
   test(`${environment}: all four ECR repositories are immutable without exclusions`, () => {
     const repositories = Object.values(synth({ environment }).Resources)
       .filter((resource: any) => resource.Type === 'AWS::ECR::Repository') as any[];

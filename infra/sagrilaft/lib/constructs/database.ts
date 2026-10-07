@@ -27,7 +27,7 @@ export class Database extends Construct {
   constructor(scope: Construct, id: string, props: DatabaseProps) {
     super(scope, id);
 
-    const rdsComputeClass = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO);
+    const rdsComputeClass = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MEDIUM);
 
     this.instance = new rds.DatabaseInstance(this, 'Postgres', {
       engine: rds.DatabaseInstanceEngine.postgres({
@@ -41,7 +41,7 @@ export class Database extends Construct {
       securityGroups: [props.securityGroup],
       databaseName: SAGRILAFT_DB_NAME,
       credentials: rds.Credentials.fromSecret(props.credentialsSecret),
-      multiAz: false, // Free Tier no soporta Multi-AZ sin costos
+      multiAz: false, // Diseño de producción elegido; recuperación Multi-AZ no está habilitada.
       storageEncrypted: true,
       deletionProtection: true,
       backupRetention: Duration.days(7), // Acorde a la arquitectura de producción
