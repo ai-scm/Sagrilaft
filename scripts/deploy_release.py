@@ -2,6 +2,8 @@
 """Preparar -> migrar -> verificar evidencia -> activar -> smoke.
 
 Sin --execute solo consulta AWS y sintetiza localmente, sin mutaciones AWS.
+Excepción: --close-manual sin --execute revisa únicamente evidencia local.
+Modo manual (staging): salida 3 tras activar, lock retenido hasta cierre autorizado.
 Requiere stack existente: modo compatible, o bootstrap ya creado con cero tareas.
 No construye imágenes, no crea el bootstrap ni hace rollback automático.
 
@@ -9,6 +11,7 @@ Plan JSON (sin secretos): environment, account, region, mode (compatible/bootstr
 previous_tag, candidate_tag (SHA Git completo), desired_count, expected_head,
 previous_revisions (lista), digests (backend/formulario-publico/portal-interno/keycloak),
 context (contexto CDK completo), smoke_command (lista de argumentos ejecutables).
+Alternativa staging: smoke_mode=manual, smoke_command=[], manual_checks definidos.
 context incluye dominios, zona, certificado, Bedrock, flags Zoho/listas/NAT y SNS.
 Los tags candidatos deben existir en repositorios IMMUTABLE sin exclusiones.
 
@@ -22,6 +25,8 @@ Todos los operadores deben respetarlo; CDK directo puede saltárselo.
 import argparse
 from contextlib import contextmanager
 import copy
+from datetime import datetime, timezone
+import fcntl
 import hashlib
 import json
 import os
@@ -29,6 +34,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+import tempfile
 import uuid
 
 from run_ecs_migration import MigrationError, run_migration
@@ -50,6 +56,13 @@ def fingerprint(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+MANUAL_CHECKS = ("release_sha", "crear_y_leer_correo", "guardar_y_recuperar", "borrador_con_correo")
+
+
+def utc_now():
+    return datetime.now(timezone.utc).isoformat()
+
+
 def validate_plan(p):
     require(p["environment"] in ("staging", "prod"), "Ambiente inválido")
     require(p["mode"] in ("compatible", "bootstrap"), "Cambio incompatible: necesita un plan de mantenimiento separado")
@@ -66,8 +79,15 @@ def validate_plan(p):
             and all(isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_]+", x) for x in p["previous_revisions"]), "Revisiones previas inválidas")
     require(set(p["digests"]) == set(SERVICES), "Faltan digests de las cuatro imágenes")
     require(all(re.fullmatch(r"sha256:[a-f0-9]{64}", x) for x in p["digests"].values()), "Digest inválido")
-    require(isinstance(p["smoke_command"], list) and p["smoke_command"]
-            and all(isinstance(x, str) and x for x in p["smoke_command"]), "Falta comando smoke aprobado")
+    smoke_mode = p.get("smoke_mode", "automatic")
+    require(smoke_mode in ("automatic", "manual"), "Modalidad smoke inválida")
+    if smoke_mode == "manual":
+        require(p["environment"] == "staging", "Validación manual solo habilitada en staging")
+        require(p.get("smoke_command") == [], "Modo manual no admite comando smoke")
+        require(p.get("manual_checks") == list(MANUAL_CHECKS), "Faltan comprobaciones manuales")
+    else:
+        require(isinstance(p["smoke_command"], list) and p["smoke_command"]
+                and all(isinstance(x, str) and x for x in p["smoke_command"]), "Falta comando smoke aprobado")
     reserved = {"environment", "account", "region", "imageTag", "migrationImageTag", "desiredCount"}
     require(not reserved.intersection(p["context"]), "Contexto no puede sobrescribir ambiente/tags/capacidad")
     required_context = {"hostedZoneName", "hostedZoneId", "domainName", "portalDomainName",
@@ -86,10 +106,42 @@ def strip_metadata(value):
     return value
 
 
-def assert_transition(before, after, phase, bootstrap=False):
+# Excepción aprobada para staging: ocho rutas y pares completos, no reglas Unicode.
+# Solo afecta a copias de comparación; nunca a assemblies ni recursos AWS.
+STAGING_UNICODE_PAIRS = (
+    (('Resources', 'EcrBackendRepo0C255C53', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrFormularioPublicoRepo71B2173B', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrPortalInternoRepo64131791', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrKeycloakRepoD812844A', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'AlarmasCriticasAlarmaErroresServidor05DAF4B7', 'Properties', 'AlarmDescription'), 'Alarma Crítica: Se detectaron más de 5 errores HTTP 5xx en el servidor backend durante los últimos 5 minutos.', 'Alarma Cr?tica: Se detectaron m?s de 5 errores HTTP 5xx en el servidor backend durante los ?ltimos 5 minutos.'),
+    (('Resources', 'AlarmasCriticasAlarmaSaturacionCpu3C8591DA', 'Properties', 'AlarmDescription'), 'Alarma de Rendimiento: El uso de CPU del servicio Backend superó el 85% de su capacidad.', 'Alarma de Rendimiento: El uso de CPU del servicio Backend super? el 85% de su capacidad.'),
+    (('Resources', 'AlarmasCriticasAlarmaSaturacionMemoria42793BCD', 'Properties', 'AlarmDescription'), 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend superó el 85% de su capacidad.', 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend super? el 85% de su capacidad.'),
+    (('Resources', 'DashboardNegocio53ADAF63', 'Properties', 'DashboardBody', 'Fn::Join', 1, 0), '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de Éxito: Decisiones de Expedientes","region":"', '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de ?xito: Decisiones de Expedientes","region":"'),
+)
+
+
+def comparison_template(value, environment=None, *, preserve_metadata=False):
+    """Equivalencias exactas, conservando el criterio de metadata de cada comprobación."""
+    result = copy.deepcopy(value if preserve_metadata else strip_metadata(value))
+    if environment != "staging":
+        return result
+    for path, original, observed in STAGING_UNICODE_PAIRS:
+        cursor = result
+        try:
+            for key in path[:-1]:
+                cursor = cursor[key]
+            if cursor[path[-1]] == observed:
+                cursor[path[-1]] = original
+        except (KeyError, IndexError, TypeError):
+            # Una ruta ausente/cambiada no se repara; la comparación seguirá fallando.
+            continue
+    return result
+
+
+def assert_transition(before, after, phase, bootstrap=False, environment=None):
     """Rechaza cambios fuera de imagen/SHA; bootstrap admite capacidad/autoscaling."""
-    before = strip_metadata(before)
-    normalized = copy.deepcopy(strip_metadata(after))
+    before = comparison_template(before, environment)
+    normalized = comparison_template(after, environment)
     previous = before["Resources"]
     resources = normalized["Resources"]
     allowed_scaling = {"AWS::ApplicationAutoScaling::ScalableTarget", "AWS::ApplicationAutoScaling::ScalingPolicy"}
@@ -141,6 +193,57 @@ def environment(values):
                 os.environ[key] = value
 
 
+def atomic_write(path, content):
+    """Reemplazo POSIX en el mismo filesystem; nunca truncar el archivo vigente."""
+    path = Path(path)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix="." + path.name + ".", delete=False) as stream:
+            temporary = Path(stream.name)
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+ORCHESTRATOR_SOURCES = ("scripts/deploy_release.py", "scripts/deploy_release.sh",
+                        "scripts/run_ecs_migration.py")
+
+
+def record_orchestrator(rt, label="orchestrator", root=ROOT):
+    """Commit base más snapshot exacto; un checkout modificado no se presenta como HEAD puro."""
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=root, text=True, timeout=10).strip()
+    commit = git("rev-parse", "HEAD")
+    require(bool(re.fullmatch(r"[a-f0-9]{40}", commit)), "No se puede identificar el commit del orquestador")
+    status = git("status", "--porcelain", "--untracked-files=normal")
+    source_status = git("status", "--porcelain", "--", *ORCHESTRATOR_SOURCES)
+    snapshot = rt.directory / (label + "-sources")
+    snapshot.mkdir(mode=0o700, exist_ok=False)
+    hashes = {}
+    for name in ORCHESTRATOR_SOURCES:
+        content = (root / name).read_bytes()
+        hashes[name] = hashlib.sha256(content).hexdigest()
+        atomic_write(snapshot / Path(name).name, content.decode("utf-8"))
+    rt.save(label + ".json", {
+        "recordedAt": utc_now(), "baseCommit": commit,
+        "checkoutDirty": bool(status), "orchestratorModified": bool(source_status),
+        "sourceSha256": hashes, "sourceFingerprint": fingerprint(hashes),
+        "snapshotDirectory": snapshot.name, "candidateTag": rt.plan["candidate_tag"],
+        "note": "baseCommit no identifica por sí solo código modificado; usar snapshot y hashes"})
+
+
 class Runtime:
     def __init__(self, plan, directory):
         self.plan, self.directory = plan, directory
@@ -158,13 +261,12 @@ class Runtime:
             raise MigrationError(f"{service}/{operation}: fallo o resultado incierto; revisar evidencia") from None
 
     def save(self, name, value):
-        (self.directory / name).write_text(json.dumps(value, indent=2) + "\n")
+        atomic_write(self.directory / name, json.dumps(value, indent=2) + "\n")
 
     def event(self, value):
-        with (self.directory / "events.jsonl").open("a") as stream:
-            stream.write(json.dumps(value) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
+        path = self.directory / "events.jsonl"
+        previous = path.read_text(encoding="utf-8") if path.exists() else ""
+        atomic_write(path, previous + json.dumps(value) + "\n")
         print(json.dumps(value), flush=True)
 
     def synth(self, phase, image_tag, migration_tag, count):
@@ -321,8 +423,8 @@ def coordinate(rt, execute=False):
     verify_images(rt, outputs)
     prepare = rt.synth("prepare", p["previous_tag"], p["candidate_tag"], count)
     activate = rt.synth("activate", p["candidate_tag"], p["candidate_tag"], p["desired_count"])
-    assert_transition(baseline, prepare, "prepare")
-    assert_transition(prepare, activate, "activate", bootstrap)
+    assert_transition(baseline, prepare, "prepare", environment=p["environment"])
+    assert_transition(prepare, activate, "activate", bootstrap, environment=p["environment"])
     rt.event({"event": "plan_validated", "planHash": fingerprint(p), "prepareHash": fingerprint(prepare), "activateHash": fingerprint(activate)})
     if not execute:
         return
@@ -338,12 +440,12 @@ def coordinate(rt, execute=False):
     def assert_lock():
         current = rt.aws("s3api", "head-object", "--bucket", bucket, "--key", key, "--expected-bucket-owner", p["account"])
         require(current["ETag"] == etag, "Se perdió el bloqueo del despliegue")
-    require(stack_state(rt) == outputs and deployed_template(rt) == baseline, "Stack cambió después del preflight")
+    require(stack_state(rt) == outputs and comparison_template(deployed_template(rt), p["environment"], preserve_metadata=True) == comparison_template(baseline, p["environment"], preserve_metadata=True), "Stack cambió después del preflight")
     services(rt, outputs, p["previous_tag"], count)
     assert_lock()
     rt.deploy("prepare")
     outputs = stack_state(rt)
-    require(strip_metadata(deployed_template(rt)) == strip_metadata(prepare), "Preparación no coincide con template inspeccionado")
+    require(comparison_template(deployed_template(rt), p["environment"]) == comparison_template(prepare, p["environment"]), "Preparación no coincide con template inspeccionado")
     services(rt, outputs, p["previous_tag"], count)
     migration_environment(rt, outputs)
     service = rt.aws("ecs", "describe-services", "--cluster", outputs["EcsClusterName"],
@@ -369,14 +471,28 @@ def coordinate(rt, execute=False):
     rt.save("schema-evidence.json", proof)
     rt.event({"event": "schema_verified", **proof})
     assert_lock()
-    require(strip_metadata(deployed_template(rt)) == strip_metadata(prepare), "Stack cambió durante la migración")
+    require(comparison_template(deployed_template(rt), p["environment"]) == comparison_template(prepare, p["environment"]), "Stack cambió durante la migración")
     stack_state(rt)
     services(rt, outputs, p["previous_tag"], count)
     verify_images(rt, outputs)
     rt.deploy("activate")
     outputs = stack_state(rt)
-    require(strip_metadata(deployed_template(rt)) == strip_metadata(activate), "Activación no coincide con template aprobado")
+    require(comparison_template(deployed_template(rt), p["environment"]) == comparison_template(activate, p["environment"]), "Activación no coincide con template aprobado")
     rt.save("active-services.json", services(rt, outputs, p["candidate_tag"], p["desired_count"]))
+    if p.get("smoke_mode") == "manual":
+        assert_lock()
+        pending = {"status": "pending_manual", "runId": run_id, "planHash": fingerprint(p),
+                   "candidate": p["candidate_tag"], "environment": p["environment"],
+                   "startedAt": utc_now(), "bucket": bucket, "key": key, "etag": etag,
+                   "activateHash": fingerprint(comparison_template(activate, p["environment"])), "schemaHash": fingerprint(proof)}
+        rt.save("manual-state.json", pending)
+        rt.save("manual-validation.json", {
+            "runId": run_id, "planHash": fingerprint(p), "environment": p["environment"],
+            "candidate": p["candidate_tag"], "status": "pending", "operator": "", "completedAt": "",
+            "formularioId": "", "accesoId": "", "retention": "retained_no_delete_endpoint",
+            "checks": {name: {"status": "pending", "evidence": []} for name in MANUAL_CHECKS}})
+        rt.event({"event": "manual_validation_pending", "runId": run_id, "candidate": p["candidate_tag"]})
+        return 3
     rt.smoke()
     assert_lock()
     rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key, "--if-match", etag,
@@ -384,24 +500,110 @@ def coordinate(rt, execute=False):
     rt.event({"event": "release_completed", "candidate": p["candidate_tag"]})
 
 
+def read_json(path):
+    return json.loads(path.read_text())
+
+
+def review_manual(rt):
+    """Comprueba evidencia humana local. No interpreta capturas ni sustituye al revisor."""
+    p = rt.plan
+    validate_plan(p)
+    require(p.get("smoke_mode") == "manual", "El plan no admite cierre manual")
+    state = read_json(rt.directory / "manual-state.json")
+    record = read_json(rt.directory / "manual-validation.json")
+    require(state["status"] == "pending_manual", "La ejecución no está pendiente de validación manual")
+    for source in (state, record):
+        require(source["planHash"] == fingerprint(p) and source["candidate"] == p["candidate_tag"]
+                and source["environment"] == p["environment"], "Evidencia de otro plan, SHA o ambiente")
+    lock = read_json(rt.directory / "lock.json")
+    require(state["runId"] == record["runId"] == lock["runId"]
+            and lock["planHash"] == state["planHash"], "Evidencia de otra ejecución")
+    require(record["status"] == "approved", "Validación manual pendiente o fallida; conservar bloqueo")
+    require(all(isinstance(record.get(k), str) and record[k].strip()
+                for k in ("operator", "formularioId", "accesoId")), "Faltan responsable o IDs de prueba")
+    require(record.get("retention") == "retained_no_delete_endpoint", "Falta constancia de conservación")
+    started = datetime.fromisoformat(state["startedAt"])
+    completed = datetime.fromisoformat(record["completedAt"])
+    require(started.tzinfo is not None and completed.tzinfo is not None, "Fechas requieren zona horaria")
+    require(started <= completed <= datetime.now(timezone.utc), "Fecha de validación fuera de la ejecución")
+    require(set(record["checks"]) == set(MANUAL_CHECKS), "Comprobaciones incompletas")
+    artifacts = {}
+    for check in record["checks"].values():
+        require(check["status"] == "passed" and isinstance(check["evidence"], list)
+                and check["evidence"], "Comprobación sin aprobar o sin evidencia")
+        for name in check["evidence"]:
+            require(isinstance(name, str) and bool(name), "Referencia de evidencia inválida")
+            path = (rt.directory / name).resolve()
+            require(not Path(name).is_absolute() and path.is_relative_to(rt.directory.resolve()),
+                    "Evidencia debe estar dentro del directorio de ejecución")
+            require(path.is_file() and path.stat().st_size > 0, "Archivo de evidencia ausente o vacío")
+            artifacts[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    schema = read_json(rt.directory / "schema-evidence.json")
+    require(fingerprint(schema) == state["schemaHash"] and schema["schemaVerified"] is True
+            and schema["after"]["revisions"] == [p["expected_head"]], "Evidencia Alembic no corresponde")
+    require(state["key"] == f"_deployment/{rt.stack}.lock", "Clave de bloqueo incorrecta")
+    return state, record, artifacts
+
+
+def close_manual(rt, execute=False):
+    """Sin execute revisa solo archivos. Con execute consulta AWS y libera solo el lock propio."""
+    state, record, artifacts = review_manual(rt)
+    if not execute:
+        rt.event({"event": "manual_evidence_reviewed_locally", "runId": state["runId"]})
+        return 0
+    p = rt.plan
+    require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
+    outputs = stack_state(rt)
+    require(outputs["S3Bucket"] == state["bucket"], "Bucket del bloqueo no corresponde")
+    def check_lock():
+        current = rt.aws("s3api", "head-object", "--bucket", state["bucket"], "--key", state["key"],
+                         "--expected-bucket-owner", p["account"])
+        require(current["ETag"] == state["etag"], "Se perdió el bloqueo del despliegue")
+    check_lock()
+    require(fingerprint(comparison_template(deployed_template(rt), p["environment"])) == state["activateHash"],
+            "Stack cambió desde la activación; reconciliar")
+    rt.save("manual-close-services.json", services(rt, outputs, p["candidate_tag"], p["desired_count"]))
+    # Volver a leer antes de liberar: no admitir evidencia cambiada durante las consultas.
+    require(review_manual(rt) == (state, record, artifacts), "Evidencia cambió durante el cierre")
+    check_lock()
+    rt.save("manual-accepted.json", {"record": record, "artifactSha256": artifacts, "acceptedAt": utc_now()})
+    rt.event({"event": "manual_validation_accepted", "runId": state["runId"]})
+    rt.aws("s3api", "delete-object", "--bucket", state["bucket"], "--key", state["key"],
+           "--if-match", state["etag"], "--expected-bucket-owner", p["account"])
+    rt.save("manual-state.json", {**state, "status": "completed", "completedAt": utc_now()})
+    rt.event({"event": "release_completed", "candidate": p["candidate_tag"], "runId": state["runId"]})
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--environment", choices=("staging", "prod"), required=True)
-    parser.add_argument("--evidence-dir", type=Path, required=True, help="Directorio nuevo, privado, fuera de Git")
+    parser.add_argument("--evidence-dir", type=Path, required=True, help="Directorio privado; nuevo salvo para cierre manual")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--close-manual", action="store_true",
+                        help="Revisar evidencia local; con --execute verifica AWS y libera lock, sin deploy/migración")
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        plan = json.loads(args.plan.read_text())
+        plan = read_json(args.plan)
         validate_plan(plan)
         require(plan["environment"] == args.environment, "Ambiente del plan distinto al solicitado")
         directory = args.evidence_dir.resolve()
+        if args.close_manual:
+            require(directory.is_dir(), "Falta directorio de ejecución")
+            require(read_json(directory / "plan.json") == plan, "Plan distinto al de la ejecución")
+            # Serializa cierres desde la misma evidencia local; S3 protege contra otro propietario.
+            with (directory / ".manual-close.lock").open("a") as mutex:
+                fcntl.flock(mutex, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                rt = Runtime(plan, directory)
+                record_orchestrator(rt, "orchestrator-close-" + uuid.uuid4().hex)
+                return close_manual(rt, args.execute)
         directory.mkdir(mode=0o700, parents=True, exist_ok=False)
         rt = Runtime(plan, directory)
         rt.save("plan.json", plan)
-        coordinate(rt, args.execute)
-        return 0
+        record_orchestrator(rt)
+        return coordinate(rt, args.execute) or 0
     except MigrationError as error:
         print(f"ERROR: {error}. Revisar evidencia y reconciliar el bloqueo; no hay rollback automático.", flush=True)
         return 1

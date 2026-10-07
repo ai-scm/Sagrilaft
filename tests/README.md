@@ -237,3 +237,31 @@ Documentación:
 
 > Ningún archivo de producción fue modificado durante la construcción de las pruebas —
 > solo se corrigió un pequeño detalle en `useFormulario.js` relacionado con el guardado.
+
+## Validación manual del despliegue de staging
+
+`tests/unit/test_deploy_release.py` verifica el modo manual sin AWS: preflight sin
+mutaciones, salida 3 con lock conservado, revisión local de evidencia, cierre sin
+repetir despliegue/migración y rechazo de evidencia incompleta, ajena o cambiada,
+stack alterado, digest incorrecto y pérdida/fallo de liberación del lock. El modo
+automático conserva su cobertura anterior. La aceptación de capturas sigue siendo
+responsabilidad del operador; estas pruebas no acreditan staging real.
+
+Validación local de esta adaptación: **111 passed** (2026-10-06), ejecutando:
+
+```bash
+venv/bin/python -m pytest -q tests/unit/test_deploy_release.py tests/unit/test_run_ecs_migration.py tests/unit/test_migration_guard.py
+```
+
+Procedimiento y evidencia manual: [guía](../docs/produccion/GUIA_DESPLIEGUE_LOCAL.md#smoke-manual).
+
+Actualización local de escritura atómica y trazabilidad (2026-10-06): **120 passed**
+con el mismo comando anterior. Casos nuevos: reemplazo completo/permisos privados,
+fallos antes de reemplazar que conservan evidencia anterior, fallo de sincronización
+del directorio, conservación del historial de eventos y snapshots exactos del
+orquestador con checkout limpio/modificado. Sin AWS ni migraciones reales.
+
+Excepción Unicode específica de staging (2026-10-06): **129 passed** con el mismo
+comando. Ocho pares exactos aceptados; textos extendidos, otras rutas, cambios de
+retención/imágenes y uso en producción rechazados. Las plantillas originales no se
+modifican. Esta comprobación no reanuda un despliegue interrumpido.

@@ -320,3 +320,304 @@ def test_orchestrator_with_real_launcher_and_fake_aws(runtime, monkeypatch, exit
         release.coordinate(runtime, True)
         assert runtime.deployments == ["prepare", "activate"] and not runtime.locked
     assert runtime.migration_calls == 1
+
+
+def manual_runtime(runtime):
+    runtime.plan.update(smoke_mode="manual", smoke_command=[], manual_checks=list(release.MANUAL_CHECKS))
+    original = runtime.save
+    def save(name, value):
+        original(name, value)
+        (runtime.directory / name).write_text(json.dumps(value))
+    runtime.save = save
+    return runtime
+
+
+def approve_manual(rt):
+    record = release.read_json(rt.directory / 'manual-validation.json')
+    (rt.directory / 'capture.txt').write_text('Redacted functional evidence for this test')
+    record.update(status='approved', operator='Reviewer', completedAt=release.utc_now(),
+                  formularioId='form-test', accesoId='access-test')
+    for check in record['checks'].values():
+        check.update(status='passed', evidence=['capture.txt'])
+    rt.save('manual-validation.json', record)
+    return record
+
+
+def test_manual_preflight_does_not_create_pending_or_mutate(runtime):
+    rt = manual_runtime(runtime)
+    release.coordinate(rt)
+    assert not rt.locked and not rt.deployments and not rt.migration_calls
+    assert 'manual-state.json' not in rt.saved
+
+
+def test_manual_activation_keeps_lock_and_returns_pending(runtime):
+    rt = manual_runtime(runtime)
+    assert release.coordinate(rt, True) == 3
+    assert rt.locked and not rt.smoked and rt.migration_calls == 1
+    assert rt.saved['manual-validation.json']['status'] == 'pending'
+    assert not any(e['event'] == 'release_completed' for e in rt.events)
+
+
+def test_manual_local_review_then_close_without_redeploy(runtime):
+    rt = manual_runtime(runtime)
+    release.coordinate(rt, True)
+    approve_manual(rt)
+    rt.calls.clear()
+    assert release.close_manual(rt) == 0
+    assert rt.calls == [] and rt.locked
+    assert release.close_manual(rt, True) == 0
+    assert not rt.locked and rt.migration_calls == 1
+    assert rt.deployments == ['prepare', 'activate']
+    assert rt.events[-1]['event'] == 'release_completed'
+    assert rt.saved['manual-state.json']['status'] == 'completed'
+    with pytest.raises(release.MigrationError):
+        release.close_manual(rt, True)
+
+
+@pytest.mark.parametrize('problem', ['pending', 'failed', 'sha', 'run', 'plan', 'operator', 'ids',
+                                    'checks', 'check_failed', 'missing_file', 'empty_file', 'outside',
+                                    'date', 'schema', 'retention'])
+def test_manual_bad_evidence_keeps_lock_without_aws(runtime, problem):
+    rt = manual_runtime(runtime)
+    release.coordinate(rt, True)
+    record = approve_manual(rt)
+    if problem in ('pending', 'failed'): record['status'] = problem
+    if problem == 'sha': record['candidate'] = 'b' * 40
+    if problem == 'run': record['runId'] = 'other'
+    if problem == 'plan': record['planHash'] = 'other'
+    if problem == 'operator': record['operator'] = ''
+    if problem == 'ids': record['formularioId'] = ''
+    if problem == 'checks': del record['checks']['release_sha']
+    if problem == 'check_failed': record['checks']['release_sha']['status'] = 'failed'
+    if problem == 'missing_file': (rt.directory / 'capture.txt').unlink()
+    if problem == 'empty_file': (rt.directory / 'capture.txt').write_text('')
+    if problem == 'outside': record['checks']['release_sha']['evidence'] = ['../outside']
+    if problem == 'date': record['completedAt'] = '2000-01-01T00:00:00+00:00'
+    if problem == 'schema': rt.save('schema-evidence.json', {})
+    if problem == 'retention': record['retention'] = 'deleted'
+    rt.save('manual-validation.json', record)
+    rt.calls.clear()
+    with pytest.raises(release.MigrationError):
+        release.close_manual(rt, True)
+    assert rt.locked and rt.calls == []
+
+
+@pytest.mark.parametrize('problem', ['lock', 'template', 'images', 'account', 'delete'])
+def test_manual_close_rechecks_runtime_and_keeps_failure_uncompleted(runtime, problem):
+    rt = manual_runtime(runtime)
+    release.coordinate(rt, True)
+    approve_manual(rt)
+    if problem == 'lock': rt.lock_lost = True
+    if problem == 'template': rt.current['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    if problem == 'images':
+        original = rt.aws
+        def aws(service, operation, *args):
+            result = original(service, operation, *args)
+            if operation == 'describe-tasks':
+                result['tasks'][0]['containers'][0]['imageDigest'] = 'sha256:' + 'b' * 64
+            return result
+        rt.aws = aws
+    if problem == 'account': rt.account = '999999999999'
+    if problem == 'delete': rt.fail = 'delete-object'
+    with pytest.raises(release.MigrationError):
+        release.close_manual(rt, True)
+    assert rt.locked and rt.saved['manual-state.json']['status'] == 'pending_manual'
+    assert not any(e['event'] == 'release_completed' for e in rt.events)
+
+
+@pytest.mark.parametrize('problem', ['prod', 'command', 'checks', 'mode'])
+def test_manual_plan_rejects_ambiguous_configuration(problem):
+    p = plan()
+    p.update(smoke_mode='manual', smoke_command=[], manual_checks=list(release.MANUAL_CHECKS))
+    if problem == 'prod': p['environment'] = 'prod'
+    if problem == 'command': p['smoke_command'] = ['true']
+    if problem == 'checks': p['manual_checks'] = []
+    if problem == 'mode': p['smoke_mode'] = 'skip'
+    with pytest.raises(release.MigrationError): release.validate_plan(p)
+
+
+
+def test_manual_changed_evidence_during_close_is_rejected(runtime):
+    rt = manual_runtime(runtime)
+    release.coordinate(rt, True)
+    approve_manual(rt)
+    original = rt.aws
+    def aws(service, operation, *args):
+        if operation == 'describe-services':
+            (rt.directory / 'capture.txt').write_text('Changed while checking ECS')
+        return original(service, operation, *args)
+    rt.aws = aws
+    with pytest.raises(release.MigrationError, match='Evidencia cambió'):
+        release.close_manual(rt, True)
+    assert rt.locked and all(op != 'delete-object' for _, op, _ in rt.calls)
+
+
+def test_cli_pending_returns_three_without_calling_real_runtime(tmp_path, monkeypatch):
+    p = plan()
+    p.update(smoke_mode='manual', smoke_command=[], manual_checks=list(release.MANUAL_CHECKS))
+    plan_path = tmp_path / 'input.json'
+    plan_path.write_text(json.dumps(p))
+    monkeypatch.setattr(sys, 'argv', ['deploy_release', '--plan', str(plan_path),
+                                    '--environment', 'staging', '--evidence-dir', str(tmp_path / 'run'), '--execute'])
+    def coordinate(rt, execute):
+        assert execute and rt.plan == p
+        return 3
+    monkeypatch.setattr(release, 'coordinate', coordinate)
+    monkeypatch.setattr(release.Runtime, 'aws', lambda *a: pytest.fail('No real AWS permitted'))
+    assert release.main() == 3
+
+
+def test_atomic_save_replaces_complete_json_with_private_permissions(tmp_path):
+    rt = release.Runtime(plan(), tmp_path)
+    rt.save('state.json', {'status': 'pending'})
+    rt.save('state.json', {'status': 'completed', 'texto': 'validación'})
+    assert release.read_json(tmp_path / 'state.json')['status'] == 'completed'
+    assert (tmp_path / 'state.json').stat().st_mode & 0o777 == 0o600
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['state.json']
+
+
+@pytest.mark.parametrize('stage', ['serialize', 'write', 'file_fsync', 'replace'])
+def test_atomic_failure_preserves_previous_evidence(tmp_path, monkeypatch, stage):
+    rt = release.Runtime(plan(), tmp_path)
+    rt.save('state.json', {'status': 'pending'})
+    before = (tmp_path / 'state.json').read_bytes()
+    def fail(*args, **kwargs): raise OSError('simulated disk error')
+    if stage == 'write': monkeypatch.setattr(release.os, 'fchmod', fail)
+    if stage == 'file_fsync': monkeypatch.setattr(release.os, 'fsync', fail)
+    if stage == 'replace': monkeypatch.setattr(release.os, 'replace', fail)
+    value = {'bad': object()} if stage == 'serialize' else {'status': 'completed'}
+    with pytest.raises((OSError, TypeError)):
+        rt.save('state.json', value)
+    assert (tmp_path / 'state.json').read_bytes() == before
+    assert sorted(p.name for p in tmp_path.iterdir()) == ['state.json']
+
+
+def test_directory_fsync_failure_reports_error_but_json_remains_complete(tmp_path, monkeypatch):
+    rt = release.Runtime(plan(), tmp_path)
+    rt.save('state.json', {'status': 'pending'})
+    original = release.os.fsync
+    calls = []
+    def fsync(fd):
+        calls.append(fd)
+        if len(calls) == 2: raise OSError('directory sync failed')
+        return original(fd)
+    monkeypatch.setattr(release.os, 'fsync', fsync)
+    with pytest.raises(OSError): rt.save('state.json', {'status': 'completed'})
+    assert release.read_json(tmp_path / 'state.json') == {'status': 'completed'}
+
+
+def test_events_atomic_failure_preserves_existing_history(tmp_path, monkeypatch):
+    rt = release.Runtime(plan(), tmp_path)
+    rt.event({'event': 'first'})
+    def fail(*args): raise OSError('replace failed')
+    monkeypatch.setattr(release.os, 'replace', fail)
+    with pytest.raises(OSError): rt.event({'event': 'second'})
+    assert (tmp_path / 'events.jsonl').read_text().splitlines() == ['{"event": "first"}']
+
+
+@pytest.mark.parametrize('dirty', [False, True])
+def test_orchestrator_records_commit_and_exact_sources(tmp_path, monkeypatch, dirty):
+    root = tmp_path / 'checkout'
+    (root / 'scripts').mkdir(parents=True)
+    for name in release.ORCHESTRATOR_SOURCES:
+        (root / name).write_text('source with unicode: validación\n')
+    directory = tmp_path / 'evidence'
+    directory.mkdir()
+    def git(args, **kwargs):
+        assert args[0] == 'git'
+        return 'b' * 40 if args[1] == 'rev-parse' else (' M scripts/deploy_release.py' if dirty else '')
+    monkeypatch.setattr(release.subprocess, 'check_output', git)
+    rt = release.Runtime(plan(), directory)
+    release.record_orchestrator(rt, root=root)
+    data = release.read_json(directory / 'orchestrator.json')
+    assert data['baseCommit'] == 'b' * 40
+    assert data['orchestratorModified'] is dirty and data['checkoutDirty'] is dirty
+    assert data['candidateTag'] == plan()['candidate_tag']
+    for name, digest in data['sourceSha256'].items():
+        content = (directory / data['snapshotDirectory'] / Path(name).name).read_bytes()
+        assert content == (root / name).read_bytes()
+        assert release.hashlib.sha256(content).hexdigest() == digest
+
+
+def unicode_template(path, value):
+    result = value
+    for key in reversed(path):
+        if isinstance(key, int):
+            parent = [None] * (key + 1)
+            parent[key] = result
+            result = parent
+        else:
+            result = {key: result}
+    return result
+
+
+@pytest.mark.parametrize('path,original,observed', release.STAGING_UNICODE_PAIRS)
+def test_only_exact_approved_unicode_pair_is_equivalent(path, original, observed):
+    expected = unicode_template(path, original)
+    actual = unicode_template(path, observed)
+    snapshot = copy.deepcopy(actual)
+    assert release.comparison_template(actual, 'staging') == release.comparison_template(expected, 'staging')
+    assert actual == snapshot  # Nunca alterar el artefacto recibido.
+    assert release.comparison_template(actual, 'prod') != release.comparison_template(expected, 'prod')
+    changed = unicode_template(path, observed + ' CAMBIO')
+    assert release.comparison_template(changed, 'staging') != release.comparison_template(expected, 'staging')
+    other_path = ('OtherResource', *path[1:])
+    assert release.comparison_template(unicode_template(other_path, observed), 'staging') != release.comparison_template(unicode_template(other_path, original), 'staging')
+
+
+def test_unicode_exception_does_not_hide_retention_or_image_changes():
+    path, original, observed = release.STAGING_UNICODE_PAIRS[0]
+    expected = unicode_template(path, original)
+    actual = unicode_template(path, observed.replace('30', '31'))
+    assert release.comparison_template(actual, 'staging') != release.comparison_template(expected, 'staging')
+    before = template()
+    after = template(migration_tag='new')
+    before['Resources'].update(unicode_template(path, original)['Resources'])
+    after['Resources'].update(unicode_template(path, observed)['Resources'])
+    release.assert_transition(before, after, 'prepare', environment='staging')
+    after['Resources']['backend']['Properties']['ContainerDefinitions'][0]['Image'] = 'unauthorized'
+    with pytest.raises(release.MigrationError):
+        release.assert_transition(before, after, 'prepare', environment='staging')
+
+
+@pytest.mark.parametrize('env', ['staging', 'prod', None])
+def test_comparison_preserves_original_metadata_policy(env):
+    value = template()
+    value['Metadata'] = {'owner': 'example'}
+    value['Resources']['db']['Metadata'] = {'revision': 1}
+    value['Resources']['CDKMetadata'] = {'Type': 'AWS::CDK::Metadata', 'Properties': {'Analytics': 'example'}}
+    snapshot = copy.deepcopy(value)
+    assert release.comparison_template(value, env) == release.strip_metadata(value)
+    assert release.comparison_template(value, env, preserve_metadata=True) == value
+    assert value == snapshot
+
+
+@pytest.mark.parametrize('kind', ['root', 'resource', 'telemetry'])
+def test_metadata_change_after_lock_blocks_preparation(runtime, kind):
+    original = runtime.aws
+    reads = 0
+    def aws(service, operation, *args):
+        nonlocal reads
+        response = original(service, operation, *args)
+        if operation == 'get-template':
+            reads += 1
+            if reads == 2:
+                body = response['TemplateBody']
+                if kind == 'root': body['Metadata'] = {'changed': True}
+                if kind == 'resource': body['Resources']['db']['Metadata'] = {'changed': True}
+                if kind == 'telemetry': body['Resources']['CDKMetadata'] = {'Type': 'AWS::CDK::Metadata'}
+        return response
+    runtime.aws = aws
+    with pytest.raises(release.MigrationError, match='Stack cambió'):
+        release.coordinate(runtime, True)
+    assert runtime.locked and runtime.deployments == [] and runtime.migration_calls == 0
+
+
+@pytest.mark.parametrize('path,original,observed', release.STAGING_UNICODE_PAIRS)
+def test_strict_baseline_accepts_only_approved_unicode_preserving_metadata(path, original, observed):
+    a = unicode_template(path, original)
+    b = unicode_template(path, observed)
+    a['Metadata'] = b['Metadata'] = {'same': True}
+    assert release.comparison_template(a, 'staging', preserve_metadata=True) == release.comparison_template(b, 'staging', preserve_metadata=True)
+    b['Metadata'] = {'same': False}
+    assert release.comparison_template(a, 'staging', preserve_metadata=True) != release.comparison_template(b, 'staging', preserve_metadata=True)
