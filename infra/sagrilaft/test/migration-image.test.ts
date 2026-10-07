@@ -36,6 +36,21 @@ function assertMigrationTag(template: ReturnType<typeof synth>, tag: string) {
 }
 
 for (const environment of ['staging', 'prod']) {
+  test(`${environment}: technical dashboard queries the ECS backend log group`, () => {
+    const resources = Object.values(synth({ environment }).Resources) as any[];
+    const expectedLogGroup = `/sagrilaft/${environment}/ecs/backend`;
+    const backendLogGroup = resources.find(resource =>
+      resource.Type === 'AWS::Logs::LogGroup'
+      && resource.Properties.LogGroupName === expectedLogGroup);
+    const dashboard = resources.find(resource =>
+      resource.Type === 'AWS::CloudWatch::Dashboard'
+      && resource.Properties.DashboardName === `Sagrilaft-Operativo-${environment}`);
+
+    equal(backendLogGroup?.Properties.LogGroupName, expectedLogGroup);
+    equal(JSON.stringify(dashboard?.Properties.DashboardBody).includes(expectedLogGroup), true);
+    equal(JSON.stringify(dashboard?.Properties.DashboardBody).includes(`/ecs/sagrilaft-${environment}-backend`), false);
+  });
+
   test(`${environment}: public ALB inserts HSTS on HTTPS responses`, () => {
     const loadBalancer = Object.values(synth({ environment }).Resources)
       .find((resource: any) => resource.Type === 'AWS::ElasticLoadBalancingV2::LoadBalancer') as any;

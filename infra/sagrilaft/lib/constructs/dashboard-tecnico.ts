@@ -84,7 +84,7 @@ export class DashboardTecnico extends Construct {
     this.dashboard.addWidgets(widgetDbConn, widgetDbCpu);
 
     // Fila 4: Logs Insights
-    const logGroup = `/ecs/sagrilaft-${props.ambiente}-backend`;
+    const logGroup = `/sagrilaft/${props.ambiente}/ecs/backend`;
     const widgetLogs = new cloudwatch.LogQueryWidget({
       title: 'Buscador de Errores (Logs)',
       logGroupNames: [logGroup],

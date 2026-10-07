@@ -90,7 +90,6 @@ export class Networking extends Construct {
       ['SecretsManagerEndpoint', ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER],
       ['SsmEndpoint', ec2.InterfaceVpcEndpointAwsService.SSM],
       ['SsmMessagesEndpoint', ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES],
-      ['EcsExecControlChannelEndpoint', ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES],
       ['SesApiEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL],
       ['SesSmtpEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL_SMTP],
       ['BedrockRuntimeEndpoint', new ec2.InterfaceVpcEndpointService(`com.amazonaws.${Stack.of(this).region}.bedrock-runtime`, 443)],

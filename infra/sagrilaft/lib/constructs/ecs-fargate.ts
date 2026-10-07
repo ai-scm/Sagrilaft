@@ -138,7 +138,7 @@ export class EcsFargate extends Construct {
     // 2026-09-21 al redesplegar staging: el contenedor respondía 200 OK y de
     // todos modos fue terminado por el rollback).
     const targetGroup = this.buildTargetGroup('BackendTargetGroup', props, 'backend', 8000, '/health');
-    const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, 'backend', {
+    const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, undefined, {
       healthCheckGracePeriod: Duration.seconds(180),
     });
     service.attachToApplicationTargetGroup(targetGroup);
@@ -315,7 +315,7 @@ export class EcsFargate extends Construct {
     // de completar los 5 consecutivos (~150s) que exige el target group. Se sube a
     // 300s (mismo valor ya probado exitosamente en Keycloak) para dar margen real.
     const targetGroup = this.buildTargetGroup(`${idPrefix}TargetGroup`, props, serviceName, 8080, '/');
-    const service = this.buildService(`${idPrefix}Service`, props, taskDefinition, props.desiredCount, serviceName, {
+    const service = this.buildService(`${idPrefix}Service`, props, taskDefinition, props.desiredCount, undefined, {
       healthCheckGracePeriod: Duration.seconds(300),
     });
     service.attachToApplicationTargetGroup(targetGroup);
@@ -328,7 +328,7 @@ export class EcsFargate extends Construct {
     props: EcsFargateProps,
     taskDefinition: ecs.FargateTaskDefinition,
     desiredCount: number,
-    cloudMapName: string,
+    cloudMapName: string | undefined,
     options: { readonly healthCheckGracePeriod?: Duration } = {},
   ): ecs.FargateService {
     return new ecs.FargateService(this, id, {
@@ -343,9 +343,7 @@ export class EcsFargate extends Construct {
       maxHealthyPercent: 200,
       enableExecuteCommand: true,
       circuitBreaker: { rollback: true },
-      cloudMapOptions: {
-        name: cloudMapName,
-      },
+      cloudMapOptions: cloudMapName ? { name: cloudMapName } : undefined,
     });
   }
 
@@ -453,6 +451,18 @@ export class EcsFargate extends Construct {
 
   private buildBackendRole(props: EcsFargateProps): iam.Role {
     const role = this.buildTaskRole('BackendTaskRole');
+
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'EcsExec',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'ssmmessages:CreateControlChannel',
+        'ssmmessages:CreateDataChannel',
+        'ssmmessages:OpenControlChannel',
+        'ssmmessages:OpenDataChannel',
+      ],
+      resources: ['*'],
+    }));
 
     props.bucket.grantReadWrite(role);
     props.grantSecretsRead(role);
