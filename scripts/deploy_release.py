@@ -64,7 +64,8 @@ def utc_now():
 
 
 def validate_plan(p):
-    require(p["environment"] in ("staging", "prod"), "Ambiente inválido")
+    p20 = bool(re.fullmatch(r"p20-[a-f0-9]{12}", p.get("environment", "")))
+    require(p["environment"] in ("staging", "prod") or p20, "Ambiente inválido")
     require(p["mode"] in ("compatible", "bootstrap"), "Cambio incompatible: necesita un plan de mantenimiento separado")
     require(bool(re.fullmatch(r"\d{12}", p["account"])), "Cuenta inválida")
     require(bool(re.fullmatch(r"[a-z0-9-]+", p["region"])), "Región inválida")
@@ -88,13 +89,46 @@ def validate_plan(p):
     else:
         require(isinstance(p["smoke_command"], list) and p["smoke_command"]
                 and all(isinstance(x, str) and x for x in p["smoke_command"]), "Falta comando smoke aprobado")
-    reserved = {"environment", "account", "region", "imageTag", "migrationImageTag", "desiredCount"}
+    reserved = {"environment", "account", "region", "imageTag", "migrationImageTag", "desiredCount", "p20AllowActivation"}
     require(not reserved.intersection(p["context"]), "Contexto no puede sobrescribir ambiente/tags/capacidad")
     required_context = {"hostedZoneName", "hostedZoneId", "domainName", "portalDomainName",
                         "keycloakDomainName", "certificateArn", "bedrockModelId", "zohoSecretYaExiste",
                         "proveedorListasCautela", "habilitarNatEgress", "snsAlertasSub"}
     require(required_context.issubset(p["context"]), "Falta contexto CDK explícito del ambiente")
     require(all(isinstance(v, (str, bool, int)) for v in p["context"].values()), "Contexto debe contener valores escalares")
+    operation = p.get("p20_operation")
+    if operation is not None:
+        require(p20 and operation in ("rollback-services", "connect-restored-db", "activate-previous"),
+                "Operación P20 inválida o fuera del ambiente aislado")
+        require(p["mode"] == "compatible", "La operación P20 requiere un stack aislado ya preparado")
+        if operation in ("rollback-services", "activate-previous"):
+            require(set(p.get("previous_digests", {})) == set(SERVICES), "Rollback requiere digests previos de los cuatro servicios")
+            require(all(re.fullmatch(r"sha256:[a-f0-9]{64}", x) for x in p["previous_digests"].values()), "Digest previo inválido")
+        if operation == "connect-restored-db":
+            require(bool(p["context"].get("databaseHostOverride")), "La conexión requiere host de RDS restaurada")
+            require(bool(re.fullmatch(r"p20-[a-f0-9]{12}-restore-[a-z0-9-]{1,32}",
+                                      p["context"].get("restoredDbIdentifier", ""))),
+                    "La conexión requiere identificador de RDS restaurada etiquetado para P20")
+    if p20:
+        require(p["mode"] in ("bootstrap", "compatible"), "P20 solo admite bootstrap aislado o actualización compatible")
+        require(p["context"].get("hostedZoneName") == "" and p["context"].get("hostedZoneId") == "",
+                "P20 no puede usar Hosted Zone ni crear DNS público")
+        require(p["context"].get("snsAlertasSub") == "", "P20 no admite suscripciones SNS de correo")
+        require(p["context"].get("habilitarNatEgress") is False, "P20 requiere egreso NAT deshabilitado")
+        require(p["context"].get("proveedorListasCautela") in ("dummy", "deshabilitado"), "P20 requiere proveedor de listas simulado/deshabilitado")
+        require(p["context"].get("zohoSecretYaExiste") is False, "P20 no puede importar secretos externos compartidos")
+        require(not p["context"].get("sesEmailOrigen"), "P20 no admite correo SES de salida")
+        db_override = p["context"].get("databaseHostOverride", "")
+        require(isinstance(db_override, str) and (not db_override or bool(re.fullmatch(r"[A-Za-z0-9.-]+", db_override))),
+                "Host de BD restaurada inválido")
+        fault = p.get("p20_migration_fault")
+        require(fault in (None, "fail-before-ddl", "observer-loss-after-launch"),
+                "Modo de fallo de migración P20 inválido")
+        if fault:
+            require(p["mode"] == "compatible" and operation is None,
+                    "Fault injection requiere el flujo coordinado compatible P20")
+    else:
+        require("p20_migration_fault" not in p, "Fault injection solo se permite en P20")
 
 
 def strip_metadata(value):
@@ -274,6 +308,8 @@ class Runtime:
         context = {**self.plan["context"], "environment": self.plan["environment"],
                    "account": self.plan["account"], "region": self.plan["region"],
                    "imageTag": image_tag, "migrationImageTag": migration_tag, "desiredCount": count}
+        if re.fullmatch(r"p20-[a-f0-9]{12}", self.plan["environment"]):
+            context["p20AllowActivation"] = "true"
         args = [str(INFRA / "node_modules/.bin/cdk"), "synth", self.stack, "--output", str(path), "--lookups", "false"]
         for key, value in context.items():
             args += ["-c", f"{key}={str(value).lower() if isinstance(value, bool) else value}"]
@@ -358,11 +394,392 @@ def verify_images(rt, outputs):
         require(len(images) == 1 and images[0]["imageDigest"] == rt.plan["digests"][kind], "Digest candidato distinto del aprobado")
 
 
+def verify_tag_digests(rt, outputs, tag, digests):
+    for kind, output in REPOS.items():
+        uri = outputs[output]
+        prefix = f"{rt.plan['account']}.dkr.ecr.{rt.plan['region']}.amazonaws.com/"
+        require(uri.startswith(prefix), "Repositorio de otra cuenta/región")
+        repo = uri[len(prefix):]
+        repository = rt.aws("ecr", "describe-repositories", "--repository-names", repo)["repositories"]
+        require(len(repository) == 1 and repository[0]["imageTagMutability"] == "IMMUTABLE",
+                "Repositorio mutable: rollback no verificable")
+        images = rt.aws("ecr", "describe-images", "--repository-name", repo,
+                        "--image-ids", f"imageTag={tag}")["imageDetails"]
+        require(len(images) == 1 and images[0]["imageDigest"] == digests[kind],
+                f"Digest previo distinto del aprobado para {kind}")
+
+
+def assert_service_rollback_transition(before, after):
+    """Permite solo cambiar task definitions y referencias de los 4 servicios ECS."""
+    original = strip_metadata(before)
+    target = strip_metadata(after)
+    old_resources, new_resources = original["Resources"], target["Resources"]
+    changed_task_defs = set()
+    service_ids = set()
+    for logical_id in set(old_resources) | set(new_resources):
+        old, new = old_resources.get(logical_id), new_resources.get(logical_id)
+        if old == new:
+            continue
+        require(old is not None and new is not None and old["Type"] == new["Type"],
+                f"Rollback ECS alteraría recursos ajenos: {logical_id}")
+        if old["Type"] == "AWS::ECS::TaskDefinition":
+            old_props, new_props = copy.deepcopy(old["Properties"]), copy.deepcopy(new["Properties"])
+            old_containers = old_props.get("ContainerDefinitions", [])
+            new_containers = new_props.get("ContainerDefinitions", [])
+            require(len(old_containers) == len(new_containers) == 1, "Task definition inesperada en rollback")
+            require(old_containers[0].get("Name") != "migration", "Rollback de servicios no debe cambiar migración")
+            old_containers[0]["Image"] = new_containers[0]["Image"] = "<release>"
+            for container in (old_containers[0], new_containers[0]):
+                for item in container.get("Environment", []):
+                    if item.get("Name") == "GIT_SHA":
+                        item["Value"] = "<release>"
+            require(old_props == new_props, f"Rollback cambia configuración de task definition: {logical_id}")
+            changed_task_defs.add(logical_id)
+        elif old["Type"] == "AWS::ECS::Service":
+            old_props, new_props = old["Properties"], new["Properties"]
+            require(old_props.get("DesiredCount") == new_props.get("DesiredCount"),
+                    f"Rollback no puede cambiar capacidad ECS: {logical_id}")
+            old_fixed, new_fixed = copy.deepcopy(old_props), copy.deepcopy(new_props)
+            old_fixed.pop("TaskDefinition", None)
+            new_fixed.pop("TaskDefinition", None)
+            require(old_fixed == new_fixed, f"Rollback cambia configuración del servicio: {logical_id}")
+            service_ids.add(logical_id)
+        else:
+            raise MigrationError(f"Rollback ECS modificaría un recurso no permitido: {logical_id}")
+    service_ids = {logical_id for logical_id, resource in new_resources.items()
+                   if resource["Type"] == "AWS::ECS::Service"}
+    require(len(changed_task_defs) == len(service_ids) == 4,
+            "Rollback debe incluir cuatro task definitions de aplicación y cuatro servicios")
+    for logical_id in service_ids:
+        service = new_resources[logical_id]["Properties"]
+        reference = service.get("TaskDefinition", {}).get("Ref")
+        require(reference in changed_task_defs,
+                f"Servicio no apunta a una de las task definitions revertidas: {logical_id}")
+    require(original.get("Outputs") == target.get("Outputs"), "Rollback ECS cambia outputs del stack")
+
+
+def assert_database_repoint_transition(before, after, host, desired_count):
+    """Permite BD restaurada y activar servicios P20 desde cero, sin migrar."""
+    original, target = strip_metadata(before), strip_metadata(after)
+    old_resources, new_resources = original["Resources"], target["Resources"]
+    changed_containers = set()
+    changed_services = set()
+    for logical_id in set(old_resources) | set(new_resources):
+        old, new = old_resources.get(logical_id), new_resources.get(logical_id)
+        if old == new:
+            continue
+        require(old is not None and new is not None and old["Type"] == new["Type"],
+                f"Reapuntar BD cambiaría recursos adicionales: {logical_id}")
+        if old["Type"] == "AWS::ECS::Service":
+            old_props, new_props = copy.deepcopy(old["Properties"]), copy.deepcopy(new["Properties"])
+            require(old_props.get("DesiredCount") == 0 and new_props.get("DesiredCount") == desired_count,
+                    f"P20 solo permite activar servicios desde cero a la capacidad planeada: {logical_id}")
+            old_props.pop("DesiredCount", None)
+            new_props.pop("DesiredCount", None)
+            require(old_props == new_props, f"Reapuntar BD modifica otra configuración del servicio: {logical_id}")
+            changed_services.add(logical_id)
+            continue
+        require(old["Type"] == "AWS::ECS::TaskDefinition",
+                f"Reapuntar BD cambiaría un recurso ajeno a ECS: {logical_id}")
+        old_props, new_props = copy.deepcopy(old["Properties"]), copy.deepcopy(new["Properties"])
+        old_containers, new_containers = old_props.get("ContainerDefinitions", []), new_props.get("ContainerDefinitions", [])
+        require(len(old_containers) == len(new_containers) == 1, "Task definition inesperada al reapuntar BD")
+        old_container, new_container = old_containers[0], new_containers[0]
+        require(old_container.get("Name") == new_container.get("Name"), "Reapuntar BD cambia nombre de contenedor")
+        env_names = {"DATABASE_HOST", "KEYCLOAK_DB_URL", "KC_DB_URL"}
+        def normalize(container, check_target):
+            env = container.get("Environment", [])
+            found = set()
+            for item in env:
+                if item.get("Name") in env_names:
+                    found.add(item["Name"])
+                    if check_target:
+                        expected = host if item["Name"] == "DATABASE_HOST" else f"jdbc:postgresql://{host}:5432/sagrilaft"
+                        require(item.get("Value") == expected, "Task definition no apunta al host de BD aprobado")
+                    item["Value"] = "<database-endpoint>"
+            return found
+        old_fields = normalize(old_container, False)
+        new_fields = normalize(new_container, True)
+        require(old_fields == new_fields and new_fields, "No se identificaron campos de conexión de BD consistentes")
+        require(old_props == new_props, f"Reapuntar BD altera imágenes u otra configuración: {logical_id}")
+        changed_containers.add(new_container["Name"])
+    require(changed_containers == {"backend", "keycloak", "migration"},
+            "Reapuntar BD debe cambiar solo backend, Keycloak y task de migración")
+    require(len(changed_services) == 4, "Reapuntar BD debe activar exactamente los cuatro servicios P20 desde cero")
+    old_outputs, new_outputs = copy.deepcopy(original.get("Outputs", {})), copy.deepcopy(target.get("Outputs", {}))
+    require("EcsDatabaseHost" in old_outputs and "EcsDatabaseHost" in new_outputs,
+            "Template P20 sin output del host de BD")
+    old_outputs.pop("EcsDatabaseHost")
+    new_output = new_outputs.pop("EcsDatabaseHost")
+    require("EcsDesiredCount" in old_outputs and "EcsDesiredCount" in new_outputs,
+            "Template P20 sin output de capacidad ECS")
+    old_outputs.pop("EcsDesiredCount")
+    new_count_output = new_outputs.pop("EcsDesiredCount")
+    require(new_output["Value"] == host and new_count_output["Value"] == str(desired_count)
+            and old_outputs == new_outputs,
+            "Reapuntar BD modifica outputs adicionales o no registra el host esperado")
+
+
+def coordinate_p20_service_rollback(rt, execute=False):
+    """Rollback solo de las cuatro aplicaciones P20; nunca ejecuta Alembic."""
+    p = rt.plan
+    require(bool(re.fullmatch(r"p20-[a-f0-9]{12}", p["environment"])), "Rollback solo permitido en stack P20")
+    require(p.get("previous_tag") != p.get("candidate_tag"), "Tags previo/candidato deben diferir")
+    require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
+    outputs = stack_state(rt)
+    count = p["desired_count"]
+    require(int(outputs["EcsDesiredCount"]) == count and count > 0,
+            "Capacidad P20 no coincide con el plan de rollback")
+    baseline = deployed_template(rt)
+    rt.save("rollback-baseline.json", baseline)
+    rt.save("rollback-current-services.json", services(rt, outputs, p["candidate_tag"], count))
+    verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
+    migration_tag = outputs["EcsMigrationImageTag"]
+    rollback = rt.synth("rollback", p["previous_tag"], migration_tag, count)
+    assert_service_rollback_transition(baseline, rollback)
+    rt.save("rollback-template.json", rollback)
+    rt.event({"event": "p20_service_rollback_preflight_validated",
+              "planHash": fingerprint(p), "templateHash": fingerprint(rollback),
+              "migrationTagPreserved": migration_tag, "migrationWillRun": False})
+    if not execute:
+        return
+
+    lock_file = rt.directory / "lock.json"
+    run_id = uuid.uuid4().hex
+    rt.save("lock.json", {"runId": run_id, "planHash": fingerprint(p)})
+    bucket, key = outputs["S3Bucket"], f"_deployment/{rt.stack}.lock"
+    rt.event({"event": "lock_requested", "bucket": bucket, "key": key, "runId": run_id,
+              "operation": "p20-service-rollback"})
+    lock = rt.aws("s3api", "put-object", "--bucket", bucket, "--key", key, "--body", str(lock_file),
+                  "--if-none-match", "*", "--expected-bucket-owner", p["account"])
+    etag = lock["ETag"]
+
+    def assert_lock():
+        current = rt.aws("s3api", "head-object", "--bucket", bucket, "--key", key,
+                         "--expected-bucket-owner", p["account"])
+        require(current["ETag"] == etag, "Se perdió el bloqueo del rollback P20")
+
+    require(stack_state(rt) == outputs
+            and comparison_template(deployed_template(rt), p["environment"], preserve_metadata=True)
+            == comparison_template(baseline, p["environment"], preserve_metadata=True),
+            "Stack cambió después del preflight de rollback")
+    services(rt, outputs, p["candidate_tag"], count)
+    verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
+    assert_lock()
+    rt.deploy("rollback")
+    outputs = stack_state(rt)
+    require(comparison_template(deployed_template(rt), p["environment"])
+            == comparison_template(rollback, p["environment"]), "Rollback no coincide con template revisado")
+    rt.save("rollback-final-services.json", services(rt, outputs, p["previous_tag"], count))
+    rt.smoke()
+    assert_lock()
+    rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key,
+           "--if-match", etag, "--expected-bucket-owner", p["account"])
+    rt.event({"event": "p20_service_rollback_completed", "runId": run_id,
+              "previousTag": p["previous_tag"], "migrationWillRun": False})
+
+
+def assert_p20_baseline_activation_transition(before, after, desired_count):
+    """From zero, permit only four app task definitions and desired count."""
+    original, target = copy.deepcopy(before), copy.deepcopy(after)
+    old_outputs, new_outputs = original.get("Outputs", {}), target.get("Outputs", {})
+    require(old_outputs.get("EcsDesiredCount", {}).get("Value") == "0"
+            and new_outputs.get("EcsDesiredCount", {}).get("Value") == str(desired_count),
+            "Activación baseline P20 debe cambiar capacidad de cero al valor planeado")
+    new_outputs["EcsDesiredCount"] = copy.deepcopy(old_outputs["EcsDesiredCount"])
+    old_services = {key: value for key, value in original["Resources"].items()
+                    if value["Type"] == "AWS::ECS::Service"}
+    new_services = {key: value for key, value in target["Resources"].items()
+                    if value["Type"] == "AWS::ECS::Service"}
+    require(len(old_services) == len(new_services) == 4, "Se requieren exactamente cuatro servicios ECS")
+    for key in old_services:
+        old_props, new_props = old_services[key]["Properties"], new_services[key]["Properties"]
+        require(old_props.get("DesiredCount") == 0 and new_props.get("DesiredCount") == desired_count,
+                f"Capacidad inicial ECS no coincide: {key}")
+        new_props["DesiredCount"] = 0
+    assert_service_rollback_transition(original, target)
+
+
+def verify_p20_target_health(rt, services_response):
+    summary = []
+    for service in services_response:
+        groups = service.get("loadBalancers", [])
+        require(len(groups) == 1 and groups[0].get("targetGroupArn"),
+                "Cada servicio P20 debe tener exactamente un target group")
+        response = rt.aws("elbv2", "describe-target-health", "--target-group-arn",
+                          groups[0]["targetGroupArn"])
+        targets = response.get("TargetHealthDescriptions", [])
+        require(len(targets) >= service["desiredCount"]
+                and all(item.get("TargetHealth", {}).get("State") == "healthy" for item in targets),
+                "La release anterior no está saludable en los target groups")
+        summary.append({"service": service["serviceName"], "healthyTargets": len(targets)})
+    return summary
+
+
+def require_p20_services_stopped(rt, outputs):
+    response = rt.aws("ecs", "describe-services", "--cluster", outputs["EcsClusterName"],
+                      "--services", *(outputs[key] for key in SERVICES.values()))
+    require(not response.get("failures") and len(response.get("services", [])) == 4,
+            "No se pueden verificar los cuatro servicios P20 en cero")
+    for service in response["services"]:
+        require(service.get("status") == "ACTIVE" and service.get("desiredCount") == 0
+                and service.get("runningCount") == 0 and service.get("pendingCount") == 0,
+                "Activación baseline requiere servicios ECS P20 detenidos")
+        deployments = service.get("deployments", [])
+        require(len(deployments) == 1 and deployments[0].get("rolloutState") == "COMPLETED",
+                "Servicio P20 tiene despliegue en curso o fallido")
+    return response["services"]
+
+
+def coordinate_p20_activate_previous(rt, execute=False):
+    """Initialize a healthy P20 baseline without invoking Alembic."""
+    p = rt.plan
+    require(bool(re.fullmatch(r"p20-[a-f0-9]{12}", p["environment"])),
+            "Activar baseline solo está permitido en P20")
+    require(p["desired_count"] == 1, "Baseline P20 debe comenzar con una tarea por servicio")
+    require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
+    outputs = stack_state(rt)
+    require(outputs["EcsDesiredCount"] == "0", "Baseline solo activa servicios que están en cero")
+    require_p20_services_stopped(rt, outputs)
+    verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
+    baseline = deployed_template(rt)
+    rt.save("p20-baseline-template.json", baseline)
+    active = rt.synth("activate-previous", p["previous_tag"], outputs["EcsMigrationImageTag"], 1)
+    assert_p20_baseline_activation_transition(baseline, active, 1)
+    rt.event({"event": "p20_previous_activation_preflight_validated",
+              "planHash": fingerprint(p), "templateHash": fingerprint(active),
+              "previousTag": p["previous_tag"], "migrationWillRun": False})
+    if not execute:
+        return
+
+    lock_file = rt.directory / "lock.json"
+    run_id = uuid.uuid4().hex
+    rt.save("lock.json", {"runId": run_id, "planHash": fingerprint(p)})
+    bucket, key = outputs["S3Bucket"], f"_deployment/{rt.stack}.lock"
+    rt.event({"event": "lock_requested", "bucket": bucket, "key": key, "runId": run_id,
+              "operation": "p20-activate-previous"})
+    lock = rt.aws("s3api", "put-object", "--bucket", bucket, "--key", key,
+                  "--body", str(lock_file), "--if-none-match", "*", "--expected-bucket-owner", p["account"])
+    etag = lock["ETag"]
+
+    def assert_lock():
+        current = rt.aws("s3api", "head-object", "--bucket", bucket, "--key", key,
+                         "--expected-bucket-owner", p["account"])
+        require(current["ETag"] == etag, "Se perdió el lock de activación baseline P20")
+
+    require(stack_state(rt) == outputs
+            and comparison_template(deployed_template(rt), p["environment"], preserve_metadata=True)
+            == comparison_template(baseline, p["environment"], preserve_metadata=True),
+            "Stack P20 cambió después del preflight baseline")
+    require_p20_services_stopped(rt, outputs)
+    assert_lock()
+    rt.deploy("activate-previous")
+    outputs = stack_state(rt)
+    require(comparison_template(deployed_template(rt), p["environment"])
+            == comparison_template(active, p["environment"]), "Activación baseline no coincide con plantilla")
+    final = services(rt, outputs, p["previous_tag"], 1)
+    for service in final:
+        kind = next(name for name, output_key in SERVICES.items() if outputs[output_key] == service["serviceName"])
+        require(service["verifiedTasks"] and all(task["imageDigest"] == p["previous_digests"][kind]
+                for task in service["verifiedTasks"]), f"Digest baseline no coincide para {kind}")
+    target_health = verify_p20_target_health(rt, final)
+    rt.save("p20-baseline-services.json", final)
+    rt.save("p20-baseline-target-health.json", target_health)
+    assert_lock()
+    rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key,
+           "--if-match", etag, "--expected-bucket-owner", p["account"])
+    rt.event({"event": "p20_previous_activation_completed", "runId": run_id,
+              "previousTag": p["previous_tag"], "targetHealthVerified": True,
+              "migrationWillRun": False})
+
+
+def verify_restored_database(rt, outputs):
+    context = rt.plan["context"]
+    identifier, expected_host = context["restoredDbIdentifier"], context["databaseHostOverride"]
+    response = rt.aws("rds", "describe-db-instances", "--db-instance-identifier", identifier)
+    instances = response.get("DBInstances", [])
+    require(len(instances) == 1, "No se encontró una única instancia RDS restaurada")
+    instance = instances[0]
+    require(instance.get("DBInstanceStatus") == "available", "La BD restaurada no está available")
+    require(instance.get("Endpoint", {}).get("Address") == expected_host, "Host RDS no coincide con el plan")
+    require(instance.get("DBSubnetGroup", {}).get("VpcId") == outputs.get("P20VpcId"),
+            "La BD restaurada no pertenece a la VPC del laboratorio")
+    attached = {group.get("VpcSecurityGroupId") for group in instance.get("VpcSecurityGroups", [])}
+    require(outputs.get("P20RdsSecurityGroupId") in attached,
+            "La BD restaurada no usa el Security Group RDS aislado de P20")
+    tags = rt.aws("rds", "list-tags-for-resource", "--resource-name", instance["DBInstanceArn"]).get("TagList", [])
+    tag_map = {tag.get("Key"): tag.get("Value") for tag in tags}
+    require(tag_map.get("Project") == "sagrilaft" and tag_map.get("Environment") == rt.plan["environment"],
+            "La BD restaurada no tiene etiquetas de propiedad P20")
+    return {"identifier": identifier, "host": expected_host, "status": instance["DBInstanceStatus"],
+            "vpcId": outputs["P20VpcId"], "securityGroupId": outputs["P20RdsSecurityGroupId"]}
+
+
+def coordinate_p20_database_repoint(rt, execute=False):
+    """Cambia las referencias de BD en task definitions P20 sin ejecutar Alembic."""
+    p = rt.plan
+    require(bool(re.fullmatch(r"p20-[a-f0-9]{12}", p["environment"])), "Reapuntar BD solo permitido en P20")
+    require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
+    outputs = stack_state(rt)
+    count = p["desired_count"]
+    require(count > 0 and int(outputs["EcsDesiredCount"]) == 0,
+            "La conexión debe partir con los cuatro servicios detenidos y una capacidad final explícita")
+    db_evidence = verify_restored_database(rt, outputs)
+    baseline = deployed_template(rt)
+    rt.save("repoint-baseline.json", baseline)
+    rt.save("repoint-current-services.json", services(rt, outputs, p["candidate_tag"], 0))
+    verify_images(rt, outputs)
+    migration_tag = outputs["EcsMigrationImageTag"]
+    target = rt.synth("repoint-restored-db", p["candidate_tag"], migration_tag, count)
+    assert_database_repoint_transition(baseline, target, p["context"]["databaseHostOverride"], count)
+    rt.save("repoint-template.json", target)
+    rt.save("restored-db-evidence.json", db_evidence)
+    rt.event({"event": "p20_restored_database_repoint_preflight_validated",
+              "planHash": fingerprint(p), "templateHash": fingerprint(target), "migrationWillRun": False})
+    if not execute:
+        return
+
+    lock_file = rt.directory / "lock.json"
+    run_id = uuid.uuid4().hex
+    rt.save("lock.json", {"runId": run_id, "planHash": fingerprint(p)})
+    bucket, key = outputs["S3Bucket"], f"_deployment/{rt.stack}.lock"
+    rt.event({"event": "lock_requested", "bucket": bucket, "key": key, "runId": run_id,
+              "operation": "p20-restored-db-repoint"})
+    lock = rt.aws("s3api", "put-object", "--bucket", bucket, "--key", key, "--body", str(lock_file),
+                  "--if-none-match", "*", "--expected-bucket-owner", p["account"])
+    etag = lock["ETag"]
+
+    def assert_lock():
+        current = rt.aws("s3api", "head-object", "--bucket", bucket, "--key", key,
+                         "--expected-bucket-owner", p["account"])
+        require(current["ETag"] == etag, "Se perdió el bloqueo de conexión a RDS restaurada")
+
+    require(stack_state(rt) == outputs
+            and comparison_template(deployed_template(rt), p["environment"], preserve_metadata=True)
+            == comparison_template(baseline, p["environment"], preserve_metadata=True),
+            "Stack cambió después del preflight de conexión a RDS")
+    verify_restored_database(rt, outputs)
+    services(rt, outputs, p["candidate_tag"], count)
+    assert_lock()
+    rt.deploy("repoint-restored-db")
+    outputs = stack_state(rt)
+    require(comparison_template(deployed_template(rt), p["environment"])
+            == comparison_template(target, p["environment"]), "Conexión a BD restaurada no coincide con template revisado")
+    rt.save("repoint-final-services.json", services(rt, outputs, p["candidate_tag"], count))
+    rt.smoke()
+    assert_lock()
+    rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key,
+           "--if-match", etag, "--expected-bucket-owner", p["account"])
+    rt.event({"event": "p20_restored_database_repoint_completed", "runId": run_id,
+              "databaseIdentifier": db_evidence["identifier"], "migrationWillRun": False})
+
+
 def migration_environment(rt, outputs):
     definition = rt.aws("ecs", "describe-task-definition", "--task-definition", outputs["EcsMigrationTaskDefinitionArn"])["taskDefinition"]
     container = definition["containerDefinitions"][0]
     env = {x["name"]: x["value"] for x in container["environment"]}
-    require(env["DATABASE_HOST"] == outputs["RdsEndpoint"] and env["DATABASE_NAME"] == outputs["KeycloakDbName"], "BD de migración no corresponde al stack")
+    database_host = rt.plan["context"].get("databaseHostOverride") or outputs["RdsEndpoint"]
+    require(env["DATABASE_HOST"] == database_host and env["DATABASE_NAME"] == outputs["KeycloakDbName"], "BD de migración no corresponde al stack")
     secrets = {x["name"]: x["valueFrom"] for x in container["secrets"]}
     for key, field in (("DB_USER", "username"), ("DB_PASSWORD", "password")):
         require(secrets[key] == outputs["DbSecretArn"] + f":{field}::", "Credenciales BD no corresponden al stack")
@@ -412,6 +829,12 @@ def schema_evidence(rt, completion, sleep=time.sleep, clock=time.monotonic):
 def coordinate(rt, execute=False):
     p = rt.plan
     validate_plan(p)
+    if p.get("p20_operation") == "activate-previous":
+        return coordinate_p20_activate_previous(rt, execute)
+    if p.get("p20_operation") == "rollback-services":
+        return coordinate_p20_service_rollback(rt, execute)
+    if p.get("p20_operation") == "connect-restored-db":
+        return coordinate_p20_database_repoint(rt, execute)
     require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
     outputs = stack_state(rt)
     bootstrap = p["mode"] == "bootstrap"
@@ -457,6 +880,9 @@ def coordinate(rt, execute=False):
               "ECS_SECURITY_GROUP_ID": outputs["EcsSecurityGroupId"], "ECS_PRIVATE_SUBNET_IDS": ",".join(network["subnets"]),
               "ECS_MIGRATION_EXPECTED_IMAGE": outputs["EcrBackendUri"] + ":" + p["candidate_tag"],
               "ECS_MIGRATION_EXPECTED_DIGEST": p["digests"]["backend"], "ECS_MIGRATION_CLIENT_TOKEN": run_id}
+    if p.get("p20_migration_fault"):
+        values["ECS_MIGRATION_ENVIRONMENT"] = p["environment"]
+        values["ECS_MIGRATION_P20_FAULT"] = p["p20_migration_fault"]
     events = []
     def emit(line):
         event = json.loads(line)
@@ -578,7 +1004,8 @@ def close_manual(rt, execute=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plan", type=Path, required=True)
-    parser.add_argument("--environment", choices=("staging", "prod"), required=True)
+    parser.add_argument("--environment", required=True,
+                        help="staging, prod o p20-<runId de 12 caracteres hexadecimales>")
     parser.add_argument("--evidence-dir", type=Path, required=True, help="Directorio privado; nuevo salvo para cierre manual")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--close-manual", action="store_true",

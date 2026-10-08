@@ -216,6 +216,254 @@ def test_rejects_incomplete_or_unsafe_plans(change):
     with pytest.raises(release.MigrationError): release.validate_plan(p)
 
 
+def p20_plan():
+    p = plan()
+    p['environment'] = 'p20-012345abcdef'
+    p['context'].update({
+        'hostedZoneName': '', 'hostedZoneId': '', 'snsAlertasSub': '',
+        'habilitarNatEgress': False, 'proveedorListasCautela': 'dummy',
+        'zohoSecretYaExiste': False, 'sesEmailOrigen': '',
+    })
+    return p
+
+
+def test_p20_plan_requires_run_scoped_environment_and_isolated_context():
+    p = p20_plan()
+    p['p20_operation'] = 'rollback-services'
+    p['previous_digests'] = {k: 'sha256:' + 'b' * 64 for k in release.SERVICES}
+    release.validate_plan(p)
+    for field, value in [
+        ('environment', 'staging'),
+        ('environment', 'p20-prod'),
+    ]:
+        unsafe = copy.deepcopy(p)
+        unsafe[field] = value
+        with pytest.raises(release.MigrationError):
+            release.validate_plan(unsafe)
+    for key, value in [('snsAlertasSub', 'someone@example.invalid'),
+                       ('habilitarNatEgress', True), ('hostedZoneName', 'example.com')]:
+        unsafe = copy.deepcopy(p)
+        unsafe['context'][key] = value
+        with pytest.raises(release.MigrationError):
+            release.validate_plan(unsafe)
+
+
+@pytest.mark.parametrize("fault", ["fail-before-ddl", "observer-loss-after-launch"])
+def test_p20_migration_fault_modes_are_allowlisted(fault):
+    p = p20_plan()
+    p["p20_migration_fault"] = fault
+    release.validate_plan(p)
+
+    p["environment"] = "staging"
+    with pytest.raises(release.MigrationError, match="solo se permite en P20"):
+        release.validate_plan(p)
+
+    p = p20_plan()
+    p["p20_migration_fault"] = "run-arbitrary-command"
+    with pytest.raises(release.MigrationError, match="Modo de fallo de migración P20 inválido"):
+        release.validate_plan(p)
+
+    p = p20_plan()
+    p["p20_migration_fault"] = fault
+    p["p20_operation"] = "rollback-services"
+    p["previous_digests"] = {key: "sha256:" + "b" * 64 for key in release.SERVICES}
+    with pytest.raises(release.MigrationError, match="flujo coordinado compatible P20"):
+        release.validate_plan(p)
+
+
+def test_p20_service_rollback_plan_requires_four_previous_digests():
+    p = p20_plan()
+    p['p20_operation'] = 'rollback-services'
+    p['previous_digests'] = {k: 'sha256:' + 'b' * 64 for k in release.SERVICES}
+    release.validate_plan(p)
+    del p['previous_digests']['keycloak']
+    with pytest.raises(release.MigrationError, match='digests previos'):
+        release.validate_plan(p)
+
+
+def test_p20_activate_previous_plan_is_isolated_and_requires_prior_digests():
+    p = p20_plan()
+    p['p20_operation'] = 'activate-previous'
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    release.validate_plan(p)
+    del p['previous_digests']['backend']
+    with pytest.raises(release.MigrationError, match='digests previos'):
+        release.validate_plan(p)
+
+
+def test_p20_baseline_activation_only_changes_four_app_images_and_zero_to_one_capacity():
+    before = rollback_template('bootstrap-placeholder', migration_tag='bootstrap-placeholder', count=0)
+    after = rollback_template('previous', migration_tag='bootstrap-placeholder', count=1)
+    release.assert_p20_baseline_activation_transition(before, after, 1)
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['migration']['Properties']['ContainerDefinitions'][0]['Image'] = 'repo:other'
+    with pytest.raises(release.MigrationError, match='migración'):
+        release.assert_p20_baseline_activation_transition(before, unsafe, 1)
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    with pytest.raises(release.MigrationError, match='recurso no permitido'):
+        release.assert_p20_baseline_activation_transition(before, unsafe, 1)
+
+
+def test_p20_baseline_activation_rejects_already_running_service():
+    class Runtime:
+        def aws(self, service, operation, *args):
+            return {'services': [{'status': 'ACTIVE', 'desiredCount': 0,
+                                  'runningCount': 1, 'pendingCount': 0,
+                                  'deployments': [{'rolloutState': 'COMPLETED'}]}] * 4,
+                    'failures': []}
+
+    outputs = {'EcsClusterName': 'sagrilaft-p20-012345abcdef'}
+    outputs.update({value: value for value in release.SERVICES.values()})
+    with pytest.raises(release.MigrationError, match='detenidos'):
+        release.require_p20_services_stopped(Runtime(), outputs)
+
+
+def test_p20_previous_activation_preflight_is_read_only_and_never_migrates(tmp_path):
+    p = p20_plan()
+    p['p20_operation'] = 'activate-previous'
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    environment = p['environment']
+    cluster = f'sagrilaft-{environment}'
+    resources = {}
+    outputs = {'EcsDesiredCount': {'Value': '0'}, 'EcsMigrationImageTag': {'Value': 'bootstrap'},
+               'S3Bucket': {'Value': 'p20-evidence'}, 'EcsClusterName': {'Value': cluster}}
+    service_names = {}
+    repository_uris = {}
+    for name in release.SERVICES:
+        task_id, service_id = name + 'Task', name + 'Service'
+        repo = f'{p["account"]}.dkr.ecr.us-east-1.amazonaws.com/sagrilaft-{environment}-{name}'
+        resources[task_id] = {'Type': 'AWS::ECS::TaskDefinition', 'Properties': {
+            'ContainerDefinitions': [{'Name': name, 'Image': repo + ':bootstrap',
+                                      'Environment': [{'Name': 'GIT_SHA', 'Value': 'bootstrap'}]}]}}
+        resources[service_id] = {'Type': 'AWS::ECS::Service', 'Properties': {
+            'DesiredCount': 0, 'TaskDefinition': {'Ref': task_id}}}
+        service_names[name] = f'{cluster}-{name}'
+        repository_uris[name] = repo
+    outputs.update({key: {'Value': service_names[name]} for name, key in release.SERVICES.items()})
+    outputs.update({key: {'Value': repository_uris[name]} for name, key in release.REPOS.items()})
+    resources['MigrationTask'] = {'Type': 'AWS::ECS::TaskDefinition', 'Properties': {
+        'ContainerDefinitions': [{'Name': 'migration', 'Image': 'migration:bootstrap'}]}}
+    baseline = {'Resources': resources, 'Outputs': outputs}
+
+    class Runtime:
+        def __init__(self):
+            self.plan, self.directory = p, tmp_path
+            self.stack = f'SagrilaftStack-{environment}'
+            self.events, self.saved, self.deployments, self.migration_calls = [], {}, [], 0
+
+        def aws(self, service, operation, *args):
+            if (service, operation) == ('sts', 'get-caller-identity'):
+                return {'Account': p['account']}
+            if (service, operation) == ('cloudformation', 'describe-stacks'):
+                return {'Stacks': [{'StackStatus': 'CREATE_COMPLETE', 'StackId':
+                    f'arn:aws:cloudformation:us-east-1:{p["account"]}:stack/{self.stack}/id',
+                    'Outputs': [{'OutputKey': key, 'OutputValue': value['Value']}
+                                for key, value in outputs.items()]}]}
+            if (service, operation) == ('cloudformation', 'get-template'):
+                return {'TemplateBody': baseline}
+            if (service, operation) == ('ecs', 'describe-services'):
+                return {'failures': [], 'services': [{
+                    'serviceName': service_names[name], 'status': 'ACTIVE', 'desiredCount': 0,
+                    'runningCount': 0, 'pendingCount': 0,
+                    'deployments': [{'rolloutState': 'COMPLETED'}]} for name in release.SERVICES]}
+            if (service, operation) == ('ecr', 'describe-repositories'):
+                return {'repositories': [{'imageTagMutability': 'IMMUTABLE'}]}
+            if (service, operation) == ('ecr', 'describe-images'):
+                kind = next(name for name, repo in service_names.items()
+                            if f'sagrilaft-{environment}-{name}' in args[1])
+                return {'imageDetails': [{'imageDigest': p['previous_digests'][kind]}]}
+            pytest.fail(f'Unexpected AWS call: {service}/{operation}')
+
+        def save(self, name, value): self.saved[name] = value
+        def event(self, value): self.events.append(value)
+        def synth(self, phase, image_tag, migration_tag, count):
+            result = copy.deepcopy(baseline)
+            for name in release.SERVICES:
+                result['Resources'][name + 'Task']['Properties']['ContainerDefinitions'][0]['Image'] = f'{repository_uris[name]}:{image_tag}'
+                result['Resources'][name + 'Task']['Properties']['ContainerDefinitions'][0]['Environment'][0]['Value'] = image_tag
+                result['Resources'][name + 'Service']['Properties']['DesiredCount'] = count
+            result['Outputs']['EcsDesiredCount']['Value'] = str(count)
+            return result
+
+        def deploy(self, phase): self.deployments.append(phase)
+
+    runtime = Runtime()
+    release.coordinate(runtime)
+    assert not runtime.deployments and runtime.migration_calls == 0
+    assert runtime.events[-1]['event'] == 'p20_previous_activation_preflight_validated'
+    assert runtime.events[-1]['migrationWillRun'] is False
+
+
+def test_p20_restored_database_connection_plan_is_run_scoped():
+    p = p20_plan()
+    p['p20_operation'] = 'connect-restored-db'
+    p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
+    release.validate_plan(p)
+
+    p['environment'] = 'prod'
+    with pytest.raises(release.MigrationError):
+        release.validate_plan(p)
+
+
+def test_database_repoint_transition_only_changes_database_endpoints():
+    before = template('active', 'active', 0)
+    before['Resources'].pop('service')
+    for name in release.SERVICES:
+        before['Resources'][name + 'Service'] = {
+            'Type': 'AWS::ECS::Service', 'Properties': {'DesiredCount': 0, 'TaskDefinition': {'Ref': name}},
+        }
+    before['Outputs']['EcsDatabaseHost'] = {'Value': 'primary.p20.internal'}
+    for name, host_key in [('backend', 'DATABASE_HOST'), ('migration', 'DATABASE_HOST'), ('keycloak', 'KC_DB_URL')]:
+        container = before['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        container['Environment'].append({'Name': host_key, 'Value': 'primary.p20.internal' if host_key == 'DATABASE_HOST' else 'jdbc:postgresql://primary.p20.internal:5432/sagrilaft'})
+    after = copy.deepcopy(before)
+    after['Outputs']['EcsDatabaseHost'] = {'Value': 'restore-db.p20.internal'}
+    for name, host_key in [('backend', 'DATABASE_HOST'), ('migration', 'DATABASE_HOST'), ('keycloak', 'KC_DB_URL')]:
+        container = after['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        item = next(item for item in container['Environment'] if item['Name'] == host_key)
+        item['Value'] = 'restore-db.p20.internal' if host_key == 'DATABASE_HOST' else 'jdbc:postgresql://restore-db.p20.internal:5432/sagrilaft'
+    for name in release.SERVICES:
+        after['Resources'][name + 'Service']['Properties']['DesiredCount'] = 1
+    after['Outputs']['EcsDesiredCount'] = {'Value': '1'}
+    after['Outputs']['EcsDatabaseHost'] = {'Value': 'restore-db.p20.internal'}
+    release.assert_database_repoint_transition(before, after, 'restore-db.p20.internal', 1)
+
+    after['Resources']['backend']['Properties']['ContainerDefinitions'][0]['Image'] = 'repo:unexpected'
+    with pytest.raises(release.MigrationError, match='imágenes'):
+        release.assert_database_repoint_transition(before, after, 'restore-db.p20.internal', 1)
+
+
+def rollback_template(service_tag, migration_tag='candidate', count=1):
+    result = template(service_tag, migration_tag, count)
+    result['Resources'].pop('service')
+    for name in release.SERVICES:
+        result['Resources'][name + 'Service'] = {
+            'Type': 'AWS::ECS::Service',
+            'Properties': {'DesiredCount': count, 'TaskDefinition': {'Ref': name}},
+        }
+    return result
+
+
+def test_service_rollback_transition_only_changes_four_app_releases():
+    before = rollback_template('candidate')
+    after = rollback_template('previous')
+    release.assert_service_rollback_transition(before, after)
+
+    migration_change = copy.deepcopy(after)
+    migration_change['Resources']['migration']['Properties']['ContainerDefinitions'][0]['Image'] = 'repo:other'
+    with pytest.raises(release.MigrationError, match='migración'):
+        release.assert_service_rollback_transition(before, migration_change)
+
+    db_change = copy.deepcopy(after)
+    db_change['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    with pytest.raises(release.MigrationError, match='recurso no permitido'):
+        release.assert_service_rollback_transition(before, db_change)
+
+
 @pytest.mark.parametrize("kind", ["service_image", "command", "db", "capacity", "output"])
 def test_prepare_diff_rejects_unrelated_changes(kind):
     before = template()
