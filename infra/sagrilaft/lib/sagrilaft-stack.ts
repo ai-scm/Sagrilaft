@@ -63,8 +63,12 @@ export class SagrilaftStack extends cdk.Stack {
 
     // ── Parámetros de contexto ─────────────────────────────────────────────
     const ambiente = String(this.node.tryGetContext('environment') ?? 'prod');
-    const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? DEFAULT_HOSTED_ZONE);
-    const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? DEFAULT_HOSTED_ZONE_ID);
+    const laboratorioP20 = /^p20-[a-f0-9]{12}$/.test(ambiente);
+    if (ambiente.startsWith('p20-') && !laboratorioP20) {
+      throw new Error('Ambiente P20 inválido: use p20-<runId de 12 caracteres hexadecimales>.');
+    }
+    const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE));
+    const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE_ID));
     const dominio = String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
     const dominioPortal = String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
     const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
@@ -74,27 +78,43 @@ export class SagrilaftStack extends cdk.Stack {
     const zohoSecretYaExiste = String(
       this.node.tryGetContext('zohoSecretYaExiste') ?? 'false',
     ).toLowerCase() === 'true';
-    const defaultSesEmailOrigen = `no-reply-sagrilaft@${hostedZoneName}`;
+    const defaultSesEmailOrigen = laboratorioP20 ? '' : `no-reply-sagrilaft@${hostedZoneName}`;
     const defaultAlertasEmailDestino = [
       'Bryan.Ariza@blend360.com',
     ].join(',');
     const sesEmailOrigen = String(this.node.tryGetContext('sesEmailOrigen') ?? defaultSesEmailOrigen);
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
-    const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
+    const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? (laboratorioP20 ? '' : defaultAlertasEmailDestino));
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     // Omitirlo conserva bootstrap y despliegues existentes. Un override permite
     // preparar la migración sin cambiar las imágenes de los servicios.
     const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
     const proveedorListasCautela = String(
-      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
+      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' || laboratorioP20 ? 'dummy' : 'sagrilaft'),
     ).toLowerCase();
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? (laboratorioP20 ? '0' : '2'));
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
     const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
     const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
+    const databaseHostOverride = String(this.node.tryGetContext('databaseHostOverride') ?? '');
+    const p20AllowActivation = String(this.node.tryGetContext('p20AllowActivation') ?? 'false').toLowerCase() === 'true';
+
+    if (laboratorioP20 && (habilitarNatEgress || snsAlertasSub.trim() !== ''
+      || hostedZoneName !== '' || hostedZoneId !== '')) {
+      throw new Error('P20 requiere egreso NAT deshabilitado, SNS sin suscripciones y Hosted Zone vacía.');
+    }
+    if (laboratorioP20 && desiredCount > 0 && !p20AllowActivation) {
+      throw new Error('P20 requiere p20AllowActivation=true para permitir capacidad ECS mayor que cero.');
+    }
+    if (laboratorioP20 && (!certArn || !/^arn:aws:acm:[a-z0-9-]+:\d{12}:certificate\//.test(certArn))) {
+      throw new Error('P20 requiere importar un certificado ACM existente; no debe crear uno ni solicitar validación DNS.');
+    }
+    if (databaseHostOverride && !laboratorioP20) {
+      throw new Error('databaseHostOverride solo se permite en un ambiente P20 aislado.');
+    }
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
@@ -131,7 +151,7 @@ export class SagrilaftStack extends cdk.Stack {
     cdk.Tags.of(this).add('Project', 'sagrilaft');
     cdk.Tags.of(this).add('Environment', ambiente);
 
-    const hostedZone = hostedZoneName && hostedZoneId
+    const hostedZone = !laboratorioP20 && hostedZoneName && hostedZoneId
       ? route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
         hostedZoneId,
         zoneName: hostedZoneName,
@@ -139,17 +159,19 @@ export class SagrilaftStack extends cdk.Stack {
       : undefined;
 
     // ── Constructs ─────────────────────────────────────────────────────────
-    const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress });
+    const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress, laboratorioP20 });
     const storage = new Storage(this, 'Storage', { 
       ambiente,
       dominioPortal,
+      disposable: laboratorioP20,
     });
     const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste });
     const notifications = new Notifications(this, 'Notifications', {
       ambiente,
       sesEmailOrigen,
-      dominioSesVerificado: hostedZoneName || undefined,
+      dominioSesVerificado: laboratorioP20 ? undefined : (hostedZoneName || undefined),
       snsAlertasSub,
+      enableSesIdentity: !laboratorioP20,
     });
     const ecrRepos = new Ecr(this, 'Ecr', { ambiente });
     const configParams = new ConfigParameters(this, 'ConfigParameters', {
@@ -164,6 +186,7 @@ export class SagrilaftStack extends cdk.Stack {
       bedrockModelId,
       proveedorListasCautela,
       sagrilaftApiUrl,
+      testMode: laboratorioP20,
     });
 
     const database = new Database(this, 'Database', {
@@ -172,10 +195,12 @@ export class SagrilaftStack extends cdk.Stack {
       credentialsSecret: secrets.dbSecret,
       ambiente,
       subnetType: networking.ecsSubnetType,
+      disposable: laboratorioP20,
     });
 
     const ecsFargate = new EcsFargate(this, 'EcsFargate', {
       ambiente,
+      databaseHostOverride: databaseHostOverride || undefined,
       imageTag: imageTag || 'dev',
       migrationImageTag,
       desiredCount,
@@ -224,11 +249,14 @@ export class SagrilaftStack extends cdk.Stack {
       dominio,
       dominioPortal,
       dominioKeycloak,
+      internal: laboratorioP20,
     });
 
-    const cortafuegos = new CortafuegosWeb(this, 'CortafuegosWeb', {
-      arnBalanceadorCarga: lb.alb.loadBalancerArn,
-    });
+    if (!laboratorioP20) {
+      new CortafuegosWeb(this, 'CortafuegosWeb', {
+        arnBalanceadorCarga: lb.alb.loadBalancerArn,
+      });
+    }
 
     const alarmas = new ObservabilidadAlarmas(this, 'AlarmasCriticas', {
       balanceadorCarga: lb.alb,
@@ -272,11 +300,22 @@ export class SagrilaftStack extends cdk.Stack {
     }
 
     // ── Outputs ────────────────────────────────────────────────────────────
-    new CfnOutput(this, 'AlbDns', { value: lb.alb.loadBalancerDnsName, description: 'DNS del ALB publico creado para SAGRILAFT' });
+    new CfnOutput(this, 'AlbDns', {
+      value: lb.alb.loadBalancerDnsName,
+      description: laboratorioP20 ? 'DNS privado del ALB interno P20; no crear DNS público' : 'DNS del ALB publico creado para SAGRILAFT',
+    });
     new CfnOutput(this, 'HostedZoneName', { value: hostedZoneName || 'no-configurada', description: 'Zona Route 53 usada para crear registros A Alias' });
     new CfnOutput(this, 'DominiosEsperados', { value: `${dominio}, ${dominioPortal}, ${dominioKeycloak}`, description: 'Hostnames que deben apuntar al ALB' });
     new CfnOutput(this, 'S3Bucket', { value: storage.bucket.bucketName, description: 'Nombre del bucket S3 para uploads' });
     new CfnOutput(this, 'RdsEndpoint', { value: database.instance.dbInstanceEndpointAddress, description: 'Host RDS PostgreSQL' });
+    if (laboratorioP20) {
+      new CfnOutput(this, 'EcsDatabaseHost', {
+        value: databaseHostOverride || database.instance.dbInstanceEndpointAddress,
+        description: 'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauración aislada',
+      });
+      new CfnOutput(this, 'P20VpcId', { value: networking.vpc.vpcId });
+      new CfnOutput(this, 'P20RdsSecurityGroupId', { value: networking.sgRds.securityGroupId });
+    }
     new CfnOutput(this, 'KeycloakDbName', { value: SAGRILAFT_DB_NAME, description: 'Base de datos RDS usada por Keycloak en ECS' });
     new CfnOutput(this, 'DbSecretArn', { value: secrets.dbSecret.secretArn, description: 'ARN del secreto con la contrasena de la BD' });
     new CfnOutput(this, 'AppSecretArn', { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });

@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 export interface NetworkingProps {
   readonly ambiente: string;
   readonly habilitarNatEgress: boolean;
+  readonly laboratorioP20?: boolean;
 }
 
 /**
@@ -27,6 +28,7 @@ export class Networking extends Construct {
     super(scope, id);
 
     const usaEgressExterno = props.habilitarNatEgress;
+    const laboratorioP20 = props.laboratorioP20 ?? false;
     this.ecsSubnetType = usaEgressExterno
       ? ec2.SubnetType.PRIVATE_WITH_EGRESS
       : ec2.SubnetType.PRIVATE_ISOLATED;
@@ -52,8 +54,10 @@ export class Networking extends Construct {
       vpc: this.vpc,
       description: 'ALB',
     });
-    this.sgAlb.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'HTTP');
-    this.sgAlb.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'HTTPS');
+    if (!laboratorioP20) {
+      this.sgAlb.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'HTTP');
+      this.sgAlb.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'HTTPS');
+    }
 
     this.sgEcs = new ec2.SecurityGroup(this, 'SgEcs', {
       vpc: this.vpc,
@@ -64,6 +68,9 @@ export class Networking extends Construct {
     this.sgEcs.addIngressRule(this.sgAlb, ec2.Port.tcp(8000), 'desde ALB to backend ECS');
     this.sgEcs.addIngressRule(this.sgEcs, ec2.Port.tcp(8080), 'trafico interno ECS hacia frontends/Keycloak');
     this.sgEcs.addIngressRule(this.sgEcs, ec2.Port.tcp(8000), 'trafico interno ECS hacia backend');
+    if (laboratorioP20) {
+      this.sgAlb.addIngressRule(this.sgEcs, ec2.Port.tcp(443), 'Solo ECS del laboratorio puede probar el ALB interno');
+    }
 
     this.sgRds = new ec2.SecurityGroup(this, 'SgRds', {
       vpc: this.vpc,
@@ -76,24 +83,29 @@ export class Networking extends Construct {
       description: 'VPC endpoints para ECS Fargate sin NAT',
     });
     sgVpcEndpoints.addIngressRule(this.sgEcs, ec2.Port.tcp(443), 'ECS hacia endpoints privados AWS');
-    sgVpcEndpoints.addIngressRule(this.sgEcs, ec2.Port.tcp(587), 'ECS hacia SES SMTP privado');
+    if (!laboratorioP20) {
+      sgVpcEndpoints.addIngressRule(this.sgEcs, ec2.Port.tcp(587), 'ECS hacia SES SMTP privado');
+    }
 
     this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
       subnets: [{ subnetType: this.ecsSubnetType }],
     });
 
-    [
+    const endpointServices: Array<[string, ec2.IInterfaceVpcEndpointService]> = [
       ['EcrApiEndpoint', ec2.InterfaceVpcEndpointAwsService.ECR],
       ['EcrDockerEndpoint', ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER],
       ['CloudWatchLogsEndpoint', ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS],
       ['SecretsManagerEndpoint', ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER],
       ['SsmEndpoint', ec2.InterfaceVpcEndpointAwsService.SSM],
       ['SsmMessagesEndpoint', ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES],
-      ['SesApiEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL],
-      ['SesSmtpEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL_SMTP],
-      ['BedrockRuntimeEndpoint', new ec2.InterfaceVpcEndpointService(`com.amazonaws.${Stack.of(this).region}.bedrock-runtime`, 443)],
-    ].forEach(([id, service]) => {
+    ];
+    if (!laboratorioP20) {
+      endpointServices.push(['SesApiEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL]);
+      endpointServices.push(['SesSmtpEndpoint', ec2.InterfaceVpcEndpointAwsService.EMAIL_SMTP]);
+      endpointServices.push(['BedrockRuntimeEndpoint', new ec2.InterfaceVpcEndpointService(`com.amazonaws.${Stack.of(this).region}.bedrock-runtime`, 443)]);
+    }
+    endpointServices.forEach(([id, service]) => {
       this.vpc.addInterfaceEndpoint(id as string, {
         service: service as ec2.IInterfaceVpcEndpointService,
         privateDnsEnabled: true,

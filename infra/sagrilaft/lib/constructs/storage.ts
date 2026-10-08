@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 export interface StorageProps {
   readonly ambiente: string;
   readonly dominioPortal: string;
+  readonly disposable?: boolean;
 }
 
 /**
@@ -29,7 +30,8 @@ export class Storage extends Construct {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: props.ambiente === 'prod',
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: props.disposable ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
+      autoDeleteObjects: props.disposable ?? false,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],

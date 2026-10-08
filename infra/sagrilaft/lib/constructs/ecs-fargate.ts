@@ -16,6 +16,7 @@ import { SAGRILAFT_DB_NAME } from '../deployment-constants';
 
 export interface EcsFargateProps {
   readonly ambiente: string;
+  readonly databaseHostOverride?: string;
   readonly imageTag: string;
   readonly migrationImageTag: string;
   readonly desiredCount: number;
@@ -228,7 +229,7 @@ export class EcsFargate extends Construct {
       command: ['start', '--import-realm'],
       environment: {
         KC_DB: 'postgres',
-        KC_DB_URL: `jdbc:postgresql://${props.db.dbInstanceEndpointAddress}:5432/${SAGRILAFT_DB_NAME}`,
+        KC_DB_URL: `jdbc:postgresql://${props.databaseHostOverride ?? props.db.dbInstanceEndpointAddress}:5432/${SAGRILAFT_DB_NAME}`,
         KC_PROXY_HEADERS: 'xforwarded',
         KC_HTTP_ENABLED: 'true',
         KC_HOSTNAME_STRICT: 'false',
@@ -352,7 +353,7 @@ export class EcsFargate extends Construct {
     logGroup: logs.LogGroup,
     extra: Record<string, string> = {},
   ): Record<string, string> {
-    const dbEndpoint = props.db.dbInstanceEndpointAddress;
+    const dbEndpoint = props.databaseHostOverride ?? props.db.dbInstanceEndpointAddress;
     return {
       UPLOAD_DIR: '/app/uploads',
       DATABASE_HOST: dbEndpoint,
@@ -537,7 +538,9 @@ export class EcsFargate extends Construct {
       targetType: elbv2.TargetType.IP,
       protocol: elbv2.ApplicationProtocol.HTTP,
       port,
-      targetGroupName: `sagrilaft-${props.ambiente}-${service}-ecs`,
+      targetGroupName: props.ambiente.startsWith('p20-')
+        ? `p20-${props.ambiente.slice(4)}-${service}`
+        : `sagrilaft-${props.ambiente}-${service}-ecs`,
       deregistrationDelay: Duration.seconds(30),
       healthCheck: {
         path: healthPath,

@@ -15,6 +15,7 @@ export interface ConfigParametersProps {
   readonly bedrockModelId: string;
   readonly proveedorListasCautela: string;
   readonly sagrilaftApiUrl: string;
+  readonly testMode?: boolean;
 }
 
 export class ConfigParameters extends Construct {
@@ -27,8 +28,14 @@ export class ConfigParameters extends Construct {
 
     const prefix = `/sagrilaft/${props.ambiente}`;
     const sagrilaftApiUrl = props.sagrilaftApiUrl || 'dummy://listas-cautela';
+    // SSM StringParameter rejects empty values. P20 keeps these settings inert
+    // because SES/SNS notifications are disabled and the lab has no mail egress.
+    const p20DisabledEmail = 'disabled-p20@example.invalid';
+    const smtpFrom = props.testMode ? p20DisabledEmail : props.sesEmailOrigen;
+    const sesEmailOrigen = props.testMode ? p20DisabledEmail : props.sesEmailOrigen;
+    const alertasEmailDestino = props.testMode ? p20DisabledEmail : props.alertasEmailDestino;
     const values: Record<string, string> = {
-      APP_ENV: props.ambiente === 'prod' ? 'production' : props.ambiente,
+      APP_ENV: props.ambiente === 'prod' ? 'production' : (props.testMode ? 'staging' : props.ambiente),
       AWS_REGION: DEFAULT_REGION,
       FRONTEND_URL: `https://${props.dominio},https://${props.dominioPortal}`,
       PORTAL_INTERNO_URL: `https://${props.dominioPortal}`,
@@ -50,11 +57,11 @@ export class ConfigParameters extends Construct {
       KEYCLOAK_HOSTNAME: props.dominioKeycloak,
       SMTP_HOST: 'email-smtp.us-east-1.amazonaws.com',
       SMTP_PORT: '587',
-      SMTP_FROM: props.sesEmailOrigen,
+      SMTP_FROM: smtpFrom,
       SMTP_REPLY_TO: props.smtpReplyTo,
-      SES_EMAIL_ORIGEN: props.sesEmailOrigen,
-      SES_NOTIFICACIONES_ENABLED: 'true',
-      ALERTAS_EMAIL_DESTINATARIO: props.alertasEmailDestino,
+      SES_EMAIL_ORIGEN: sesEmailOrigen,
+      SES_NOTIFICACIONES_ENABLED: props.testMode ? 'false' : 'true',
+      ALERTAS_EMAIL_DESTINATARIO: alertasEmailDestino,
       SNS_NOTIFICACIONES_ENABLED: 'false',
       ZOHO_REDIRECT_URI: `https://${props.dominioPortal}/oauth/zoho/callback`,
       ZOHO_WEBHOOK_SIGNATURE_HEADER: 'X-ZS-WEBHOOK-SIGNATURE',
