@@ -39,6 +39,10 @@ def require(condition, message):
         raise PrecondicionError(message)
 
 
+def valid_environment(environment):
+    return environment in ("staging", "prod") or bool(re.fullmatch(r"p20-[a-f0-9]{12}", environment))
+
+
 def parse_env(path):
     values = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -91,11 +95,18 @@ def publication_lock(registry, tag):
         os.close(fd)
 
 
-def validate_source(tag):
+def validate_source(tag, environment="staging", source_ref=None):
     head = output(["git", "rev-parse", "HEAD"])
     tag = head if tag is None else tag
     require(bool(re.fullmatch(r"[a-f0-9]{40}", tag)), "El tag debe ser SHA completo, no latest ni alias")
-    require(tag == head, "El SHA solicitado no coincide con HEAD")
+    if source_ref is not None:
+        require(bool(re.fullmatch(r"p20-[a-f0-9]{12}", environment)),
+                "--source-ref solo se permite al publicar en un laboratorio P20")
+        require(bool(re.fullmatch(r"[a-f0-9]{40}", source_ref)) and tag == source_ref,
+                "--source-ref debe ser el mismo SHA completo indicado en --tag")
+        output(["git", "cat-file", "-e", f"{source_ref}^{{commit}}"])
+    else:
+        require(tag == head, "El SHA solicitado no coincide con HEAD")
     require(not output(["git", "status", "--porcelain", "--untracked-files=all"]),
             "Checkout modificado o con archivos sin registrar; confirmar los cambios antes de publicar")
     stages = output(["git", "ls-files", "--stage", "--", "backend", "frontend", "keycloak"])
@@ -286,16 +297,20 @@ def main():
     config = parser.add_mutually_exclusive_group()
     config.add_argument("--env-file", type=Path)
     config.add_argument("--from-environment", action="store_true", help="Leer configuración del proceso (CI)")
-    parser.add_argument("--environment", choices=("staging", "prod"), required=True)
+    parser.add_argument("--environment", required=True,
+                        help="staging, prod o p20-<runId de 12 caracteres hexadecimales>")
     parser.add_argument("--account", required=True, help="Cuenta AWS esperada")
     parser.add_argument("--region")
     parser.add_argument("--tag")
+    parser.add_argument("--source-ref", help="SHA fuente histórico; permitido solo para P20 y debe coincidir con --tag")
     parser.add_argument("--manifest", type=Path, required=True, help="Archivo nuevo, preferiblemente fuera del checkout")
     parser.add_argument("--reuse-manifest", type=Path, help="Evidencia existente revisada y aprobada")
     args = parser.parse_args()
     os.umask(0o077)
     try:
-        tag = validate_source(args.tag)
+        require(valid_environment(args.environment),
+                "Ambiente inválido: P20 requiere p20-<runId de 12 caracteres hexadecimales>")
+        tag = validate_source(args.tag, args.environment, args.source_ref)
         env = dict(os.environ) if args.from_environment else parse_env(args.env_file or ROOT / f".env.{args.environment}")
         region = args.region or env.get("AWS_REGION") or "us-east-1"
         require(bool(re.fullmatch(r"\d{12}", args.account)) and bool(re.fullmatch(r"[a-z0-9-]+", region)), "Cuenta/región inválidas")

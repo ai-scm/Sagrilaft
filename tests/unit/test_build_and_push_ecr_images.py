@@ -219,6 +219,44 @@ def test_final_digest_is_rechecked(rig, monkeypatch):
     assert not json.loads(path.read_text())["complete"]
 
 
+def test_historical_source_sha_is_allowed_only_for_matching_p20_tag(monkeypatch):
+    historical = "c" * 40
+    head = "d" * 40
+
+    def output(command):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return head
+        if command == ["git", "cat-file", "-e", f"{historical}^{{commit}}"]:
+            return ""
+        if command[1:2] == ["status"] or command[1:2] == ["ls-files"]:
+            return ""
+        raise AssertionError(command)
+
+    monkeypatch.setattr(publisher, "output", output)
+    assert publisher.validate_source(historical, "p20-012345abcdef", historical) == historical
+    with pytest.raises(publisher.PrecondicionError, match="solo se permite"):
+        publisher.validate_source(historical, "staging", historical)
+    with pytest.raises(publisher.PrecondicionError, match="mismo SHA"):
+        publisher.validate_source(head, "p20-012345abcdef", historical)
+
+
+def test_historical_source_sha_requires_clean_checkout(monkeypatch):
+    historical = "c" * 40
+
+    def output(command):
+        if command == ["git", "rev-parse", "HEAD"]:
+            return "d" * 40
+        if command[1:2] == ["status"]:
+            return " M source.py"
+        if command == ["git", "cat-file", "-e", f"{historical}^{{commit}}"]:
+            return ""
+        return ""
+
+    monkeypatch.setattr(publisher, "output", output)
+    with pytest.raises(publisher.PrecondicionError, match="Checkout modificado"):
+        publisher.validate_source(historical, "p20-012345abcdef", historical)
+
+
 @pytest.mark.parametrize("tag,dirty,stages", [("latest", "", ""), ("abcdef0", "", ""),
     ("b" * 40, "", ""), (SHA, " M backend/main.py", ""),
     (SHA, "?? untracked", ""), (SHA, "", "160000 abc 0\tbackend/submodule")])
@@ -309,7 +347,7 @@ def test_cli_environment_uses_shared_publisher(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(sys, "argv", ["publisher", "--environment", "prod", "--account", ACCOUNT,
         "--region", REGION, "--from-environment", "--tag", SHA, "--manifest", str(tmp_path / "result.json")])
-    monkeypatch.setattr(publisher, "validate_source", lambda tag: tag)
+    monkeypatch.setattr(publisher, "validate_source", lambda tag, environment, source_ref: tag)
     monkeypatch.setattr(publisher.os, "umask", lambda _: None)
     for key, val in CONFIG.items():
         monkeypatch.setenv(key, val)
@@ -317,6 +355,16 @@ def test_cli_environment_uses_shared_publisher(tmp_path, monkeypatch):
     assert publisher.main() == 0
     assert calls[0][:4] == ("prod", ACCOUNT, REGION, SHA)
     assert set(calls[0][4]) == set(publisher.COMPONENTS)
+
+
+@pytest.mark.parametrize("environment", ["staging", "prod", "p20-012345abcdef"])
+def test_allowed_build_environments_are_explicit_and_run_scoped(environment):
+    assert publisher.valid_environment(environment)
+
+
+@pytest.mark.parametrize("environment", ["p20", "p20-prod", "p20-01234567890g", "p20-01234567890abcdef"])
+def test_invalid_p20_build_environment_is_rejected(environment):
+    assert not publisher.valid_environment(environment)
 
 
 @pytest.mark.parametrize("stage", ["build", "push", "inspect"])
