@@ -9,12 +9,19 @@ Variables requeridas:
 Reutilizar el mismo token y parámetros al reconciliar un intento incierto.
 AWS_REGION: us-east-1; ECS_MIGRATION_TIMEOUT_SECONDS: 900.
 
+Fault injection is available only for an isolated P20 environment. It is
+selected by ECS_MIGRATION_P20_FAULT in a reviewed P20 plan. The
+fail-before-ddl mode overrides only the migration container command with the
+inert fixture. observer-loss-after-launch returns an uncertain result after
+recording the task ARN; it never launches a second task.
+
 El éxito acredita imagen/exitCode, NO la revisión final del esquema. Esa
 comprobación pertenece al contenedor y se añadirá en otra fase. Un tag mutable
 puede cambiar entre la comprobación ECR y el pull: no sustituye pinning/inmutabilidad.
 """
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -65,6 +72,15 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     check(tag not in ("latest", "bootstrap-placeholder", "synth-placeholder"), "Tag no ejecutable para migracion")
     check(bool(re.fullmatch(r"sha256:[0-9a-f]{64}", digest)), "Digest esperado invalido")
     check(bool(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", token)), "Client token invalido")
+    p20_fault = os.environ.get("ECS_MIGRATION_P20_FAULT", "")
+    if p20_fault:
+        environment = os.environ.get("ECS_MIGRATION_ENVIRONMENT", "")
+        check(bool(re.fullmatch(r"p20-[a-f0-9]{12}", environment)),
+              "Fault injection solo permitido en ambiente P20")
+        check(cluster == f"sagrilaft-{environment}" and repository == f"sagrilaft-{environment}-backend",
+              "Fault injection fuera del cluster/repository P20 correspondiente")
+        check(p20_fault in ("fail-before-ddl", "observer-loss-after-launch"),
+              "Modo de fault injection P20 inválido")
     try:
         timeout = int(os.environ.get("ECS_MIGRATION_TIMEOUT_SECONDS", "900"))
     except ValueError:
@@ -94,13 +110,21 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     # Seleccionar campos concretos; nunca imprimir environment, secrets o respuestas AWS completas.
     emit(json.dumps({"event": "migration_request", "clusterArn": cluster_arn,
                      "taskDefinitionArn": definition, "image": image, "expectedDigest": digest,
-                     "clientToken": token, "logGroup": log_options.get("awslogs-group"),
-                     "logRegion": log_options.get("awslogs-region")}))
-    response = aws("ecs", "run-task", "--cluster", cluster_arn,
+                     "clientTokenSha256": hashlib.sha256(token.encode()).hexdigest(),
+                     "logGroup": log_options.get("awslogs-group"),
+                     "logRegion": log_options.get("awslogs-region"),
+                     "logStreamPrefix": log_options.get("awslogs-stream-prefix")}))
+    run_args = ["ecs", "run-task", "--cluster", cluster_arn,
                    "--launch-type", "FARGATE", "--count", "1", "--task-definition", definition,
                    "--client-token", token, "--network-configuration",
                    json.dumps({"awsvpcConfiguration": {"subnets": subnets, "securityGroups": [group],
-                                                       "assignPublicIp": "DISABLED"}}))
+                                                       "assignPublicIp": "DISABLED"}})]
+    if p20_fault == "fail-before-ddl":
+        run_args += ["--overrides", json.dumps({"containerOverrides": [{
+            "name": "migration", "command": ["python", "scripts/p20_fail_before_ddl.py"],
+            "environment": [{"name": "P20_LAB_RUN_ID", "value": os.environ["ECS_MIGRATION_ENVIRONMENT"]}],
+        }]})]
+    response = aws(*run_args)
     tasks = response.get("tasks", [])
     # Conservar ARNs incluso si AWS devuelve simultáneamente failures.
     for task in tasks:
@@ -110,6 +134,8 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     check(not response.get("failures") and len(tasks) == 1, "Lanzamiento fallido o incierto: reconciliar el intento; no activar")
     arn = tasks[0].get("taskArn", "")
     check(isinstance(arn, str) and arn.startswith(prefix + "task/"), "Task ARN ausente o inesperado")
+    if p20_fault == "observer-loss-after-launch":
+        raise MigrationError("P20: observador interrumpido tras registrar taskArn; reconciliar, no relanzar")
     deadline = clock() + timeout
     while clock() < deadline:
         result = aws("ecs", "describe-tasks", "--cluster", cluster_arn, "--tasks", arn)
