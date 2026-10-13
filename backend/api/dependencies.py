@@ -105,6 +105,15 @@ def obtener_alertas_portal(solicitud: Request) -> Optional[IAlertasPortal]:
     return getattr(solicitud.app.state, 'alertas_portal', None)
 
 
+def exigir_zoho_sign_habilitado(solicitud: Request) -> None:
+    """Bloquea rutas de firma antes de que lean o muten datos del expediente."""
+    if not solicitud.app.state.config.zoho_sign.habilitado:
+        raise HTTPException(
+            status_code=503,
+            detail="La firma electrónica está deshabilitada en este laboratorio P20.",
+        )
+
+
 def obtener_carga_handler(
     repo: RepositorioExpediente = Depends(obtener_repo_expediente),
     repo_doc: RepositorioDocumento = Depends(obtener_repo_documento),

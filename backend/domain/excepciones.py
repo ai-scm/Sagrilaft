@@ -174,6 +174,13 @@ class ZohoSignIndisponibleError(Exception):
         super().__init__(mensaje)
 
 
+class ZohoSignDeshabilitadoError(Exception):
+    """Zoho Sign se deshabilitó explícitamente para un entorno aislado."""
+
+    def __init__(self, mensaje: str = "Zoho Sign está deshabilitado en este laboratorio.") -> None:
+        super().__init__(mensaje)
+
+
 class ZohoSignAutenticacionError(Exception):
     """
     Excepcion de dominio: ZohoSign rechazó la solicitud por un problema de

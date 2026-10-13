@@ -34,6 +34,7 @@ from domain.excepciones import (
     AccesoActivoExistenteError,
     FrecuenciaEnvioExcedidaError,
     ZohoSignIndisponibleError,
+    ZohoSignDeshabilitadoError,
     ZohoSignAutenticacionError,
     ZohoSignSolicitudNoCancelableError,
 )
@@ -42,6 +43,7 @@ from api.routers import acceso_manual, auditoria, expedientes, formulario, lista
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.notificaciones.email_service import CorreoDestinatarioVacioError
 from infrastructure.zoho_sign.zoho_sign_service import ZohoSignService
+from infrastructure.zoho_sign.zoho_sign_disabled import ZohoSignDisabledService
 from api.middleware.trazabilidad import trazabilidad_middleware, RequestIdFilter, request_id_context
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -94,7 +96,7 @@ async def lifespan(app: FastAPI):
     """Ciclo de vida: inicialización y limpieza de la aplicación."""
     config = load_config()
 
-    config.zoho_sign.validar()
+    config.zoho_sign.validar(entorno=config.entorno)
 
     app.state.storage = crear_storage(
         upload_dir=config.upload_dir,
@@ -105,7 +107,11 @@ async def lifespan(app: FastAPI):
     app.state.orchestrator            = crear_orquestador_validacion(config)
     app.state.config                  = config
     app.state.servicio_listas_cautela = crear_servicio_listas_cautela()
-    app.state.zoho_sign               = ZohoSignService(config.zoho_sign)
+    app.state.zoho_sign = (
+        ZohoSignService(config.zoho_sign)
+        if config.zoho_sign.habilitado
+        else ZohoSignDisabledService()
+    )
     app.state.alertas_portal          = crear_alertas_portal(config)
 
     # Validar SNS si está habilitado
@@ -199,6 +205,13 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         handler_from_exception_with_hint(
             500,
             hint="Instala dependencias del backend (weasyprint + libs del sistema) para habilitar la exportación del PDF al radicar.",
+        ),
+    )
+    app.add_exception_handler(
+        ZohoSignDeshabilitadoError,
+        handler_from_exception_with_hint(
+            503,
+            hint="La firma electrónica está deshabilitada en este laboratorio P20.",
         ),
     )
     app.add_exception_handler(

@@ -355,6 +355,9 @@ export class EcsFargate extends Construct {
   ): Record<string, string> {
     const dbEndpoint = props.databaseHostOverride ?? props.db.dbInstanceEndpointAddress;
     return {
+      ...(props.ambiente.match(/^p20-[a-f0-9]{12}$/)
+        ? { P20_RUN_ID: props.ambiente, ZOHO_SIGN_ENABLED: 'false' }
+        : {}),
       UPLOAD_DIR: '/app/uploads',
       DATABASE_HOST: dbEndpoint,
       DATABASE_NAME: SAGRILAFT_DB_NAME,

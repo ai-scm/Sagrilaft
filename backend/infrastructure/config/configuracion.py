@@ -5,6 +5,7 @@ Usa variables de entorno con valores por defecto seguros.
 
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,9 +49,19 @@ def _float_env(nombre: str, default: float) -> float:
     return float(os.getenv(nombre, str(default)))
 
 
+def _bool_env(nombre: str, default: str) -> bool:
+    valor = os.getenv(nombre, default).strip().lower()
+    if valor not in {"true", "false"}:
+        raise RuntimeError(f"{nombre} debe ser 'true' o 'false'.")
+    return valor == "true"
+
+
 @dataclass(frozen=True)
 class ZohoSignConfig:
     """Configuración de ZohoSign para firma electrónica."""
+    habilitado: bool = field(
+        default_factory=lambda: _bool_env("ZOHO_SIGN_ENABLED", "true")
+    )
     client_id:      str = field(default_factory=lambda: os.getenv("ZOHO_CLIENT_ID", ""))
     client_secret:  str = field(default_factory=lambda: os.getenv("ZOHO_CLIENT_SECRET", ""))
     refresh_token:  str = field(default_factory=lambda: os.getenv("ZOHO_REFRESH_TOKEN", ""))
@@ -99,16 +110,25 @@ class ZohoSignConfig:
         default_factory=lambda: _int_env("ZOHO_SIGN_REQUEST_EXPIRATION_DAYS", 15)
     )
 
-    def validar(self) -> None:
+    def validar(self, *, entorno: str | None = None) -> None:
         """Lanza RuntimeError si ZohoSign no está configurado correctamente.
 
-        Siempre valida las credenciales OAuth, tanto en sandbox (modo_prueba=True)
-        como en producción (modo_prueba=False), ya que ambos modos hacen llamadas
-        reales a la API de Zoho.
+        El modo deshabilitado solo se permite en un laboratorio P20 identificado
+        explícitamente; staging y producción conservan la validación OAuth.
 
         webhook_secret se omite: se valida en FirmaService al recibir el webhook,
         ya que puede estar ausente en entornos sin URL pública.
         """
+        if not self.habilitado:
+            run_id_p20 = os.getenv("P20_RUN_ID", "")
+            entorno_app = (entorno or os.getenv("APP_ENV", "")).lower()
+            if entorno_app != "staging" or not re.fullmatch(r"p20-[a-f0-9]{12}", run_id_p20):
+                raise RuntimeError(
+                    "ZOHO_SIGN_ENABLED=false solo se permite en un laboratorio P20 "
+                    "con APP_ENV=staging y P20_RUN_ID=p20-<12 hex>."
+                )
+            return
+
         _REQUERIDAS = {
             "client_id":     "ZOHO_CLIENT_ID",
             "client_secret": "ZOHO_CLIENT_SECRET",

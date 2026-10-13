@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from starlette.responses import Response
 
 from api.dependencies import (
+    exigir_zoho_sign_habilitado,
     exigir_sagrilaft_habilitado,
     obtener_max_upload_mb,
     obtener_servicio_expediente,
@@ -470,6 +471,7 @@ def actualizar_estado_alerta(
 
 @enrutador.post(
     "/{formulario_id}/enviar-a-firma",
+    dependencies=[Depends(exigir_zoho_sign_habilitado)],
     summary="Enviar formulario a firma electrónica",
     description=(
         "Envía el PDF del formulario a ZohoSign para firma electrónica. "
@@ -493,6 +495,7 @@ def enviar_a_firma(
 
 @enrutador.post(
     "/{formulario_id}/verificar-firma",
+    dependencies=[Depends(exigir_zoho_sign_habilitado)],
     summary="Verificar estado de firma en ZohoSign",
     description="Consulta ZohoSign y actualiza el estado del formulario si la firma cambió. Alternativa al webhook para entornos sin URL pública.",
     responses={400: {"description": "Formulario no está en estado 'pendiente_firma'"}},
@@ -509,6 +512,7 @@ def verificar_estado_firma(
 
 @enrutador.post(
     "/{formulario_id}/cancelar-firma",
+    dependencies=[Depends(exigir_zoho_sign_habilitado)],
     summary="Cancelar solicitud de firma pendiente",
     description=(
         "Cancela la solicitud de firma en ZohoSign (recall) y devuelve el formulario "
