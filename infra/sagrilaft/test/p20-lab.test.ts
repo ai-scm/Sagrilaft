@@ -115,6 +115,8 @@ test('P20 restored-database override reaches backend and Keycloak task configura
     resource.Type === 'AWS::ECS::TaskDefinition') as any[];
   const backend = tasks.find(task => task.Properties.ContainerDefinitions.some((container: any) => container.Name === 'backend'));
   const backendContainer = backend.Properties.ContainerDefinitions.find((container: any) => container.Name === 'backend');
+  equal(backendContainer.Environment.find((item: any) => item.Name === 'ZOHO_SIGN_ENABLED').Value, 'false');
+  equal(backendContainer.Environment.find((item: any) => item.Name === 'P20_RUN_ID').Value, environment);
   equal(backendContainer.Environment.find((item: any) => item.Name === 'DATABASE_HOST').Value, 'restored-db.p20.internal');
   equal(backendContainer.Environment.find((item: any) => item.Name === 'KEYCLOAK_DB_URL').Value,
     'jdbc:postgresql://restored-db.p20.internal:5432/sagrilaft');
