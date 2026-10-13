@@ -307,6 +307,62 @@ def test_p20_baseline_activation_only_changes_four_app_images_and_zero_to_one_ca
         release.assert_p20_baseline_activation_transition(before, unsafe, 1)
 
 
+def test_p20_previous_release_can_be_prepared_on_a_restored_database_without_migration():
+    before = rollback_template('bootstrap-placeholder', migration_tag='bootstrap-placeholder', count=0)
+    after = rollback_template('previous', migration_tag='bootstrap-placeholder', count=1)
+    for target in (before, after):
+        target['Resources']['formulario-publico']['Properties']['ContainerDefinitions'][0]['Name'] = 'frontend'
+        target['Resources']['portal-interno']['Properties']['ContainerDefinitions'][0]['Name'] = 'portal'
+    before['Outputs']['EcsDatabaseHost'] = {'Value': 'primary.p20.internal'}
+    after['Outputs']['EcsDatabaseHost'] = {'Value': 'restore.p20.internal'}
+    for name in ('backend', 'migration'):
+        old = before['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        new = after['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        old['Environment'].append({'Name': 'DATABASE_HOST', 'Value': 'primary.p20.internal'})
+        new['Environment'].append({'Name': 'DATABASE_HOST', 'Value': 'restore.p20.internal'})
+    for name, host in [('keycloak', 'primary.p20.internal')]:
+        before['Resources'][name]['Properties']['ContainerDefinitions'][0]['Environment'].append(
+            {'Name': 'KC_DB_URL', 'Value': f'jdbc:postgresql://{host}:5432/sagrilaft'})
+        after['Resources'][name]['Properties']['ContainerDefinitions'][0]['Environment'].append(
+            {'Name': 'KC_DB_URL', 'Value': 'jdbc:postgresql://restore.p20.internal:5432/sagrilaft'})
+
+    release.assert_p20_baseline_restored_db_transition(
+        before, after, 1, 'restore.p20.internal', 'previous',
+        'bootstrap-placeholder', 'p20-012345abcdef')
+
+    # Si frontend y portal ya apuntan al baseline, sus task definitions no
+    # necesitan una revisión nueva para activar los cuatro servicios.
+    unchanged_optional_tasks = copy.deepcopy(before)
+    for name in ('formulario-publico', 'portal-interno'):
+        unchanged_optional_tasks['Resources'][name] = copy.deepcopy(after['Resources'][name])
+    release.assert_p20_baseline_restored_db_transition(
+        unchanged_optional_tasks, after, 1, 'restore.p20.internal', 'previous',
+        'bootstrap-placeholder', 'p20-012345abcdef')
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    with pytest.raises(release.MigrationError, match='recurso ajeno'):
+        release.assert_p20_baseline_restored_db_transition(
+            before, unsafe, 1, 'restore.p20.internal', 'previous',
+            'bootstrap-placeholder', 'p20-012345abcdef')
+
+def test_p20_baseline_activation_allows_only_the_ten_approved_ascii_text_diffs():
+    before = rollback_template('bootstrap-placeholder', migration_tag='bootstrap-placeholder', count=0)
+    after = rollback_template('previous', migration_tag='bootstrap-placeholder', count=1)
+    for path, expected, observed in release.P20_ASCII_PAIRS:
+        set_template_path(before, path, observed)
+        set_template_path(after, path, expected)
+        if path[0] == 'Resources':
+            before['Resources'][path[1]].setdefault('Type', 'AWS::CloudFormation::WaitCondition')
+            after['Resources'][path[1]].setdefault('Type', 'AWS::CloudFormation::WaitCondition')
+    release.assert_p20_baseline_activation_transition(before, after, 1, environment='p20-9c67b6ea6842')
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    with pytest.raises(release.MigrationError):
+        release.assert_p20_baseline_activation_transition(before, unsafe, 1, environment='p20-9c67b6ea6842')
+
+
 def test_p20_baseline_activation_rejects_already_running_service():
     class Runtime:
         def aws(self, service, operation, *args):
@@ -401,12 +457,164 @@ def test_p20_restored_database_connection_plan_is_run_scoped():
     p = p20_plan()
     p['p20_operation'] = 'connect-restored-db'
     p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-c7-test-20261012'
+    release.validate_plan(p)
+
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-c7-test-latest'
+    with pytest.raises(release.MigrationError):
+        release.validate_plan(p)
+
+    p['environment'] = 'prod'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
+    with pytest.raises(release.MigrationError):
+        release.validate_plan(p)
+
+
+def test_p20_activate_previous_restored_db_requires_scoped_database_and_previous_digests():
+    p = p20_plan()
+    p['p20_operation'] = 'activate-previous-restored-db'
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
     p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
     release.validate_plan(p)
 
-    p['environment'] = 'prod'
-    with pytest.raises(release.MigrationError):
+    del p['context']['databaseHostOverride']
+    with pytest.raises(release.MigrationError, match='host de RDS restaurada'):
         release.validate_plan(p)
+
+
+@pytest.mark.parametrize(('field', 'value'), [
+    ('PubliclyAccessible', True), ('StorageEncrypted', False),
+    ('DBInstanceClass', 'db.t3.micro'), ('MultiAZ', True), ('Engine', 'mysql'),
+    ('EngineVersion', '15.7'),
+])
+def test_p20_restored_database_rejects_nonisolated_or_unapproved_profile(field, value):
+    p = p20_plan()
+    p['p20_operation'] = 'activate-previous-restored-db'
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
+    instance = {
+        'DBInstanceIdentifier': 'p20-012345abcdef-restore-c',
+        'DBInstanceStatus': 'available',
+        'Endpoint': {'Address': 'restore-db.p20.internal'},
+        'Engine': 'postgres', 'EngineVersion': '16.13', 'DBInstanceClass': 'db.t3.medium',
+        'MultiAZ': False, 'PubliclyAccessible': False, 'StorageEncrypted': True,
+        'DBSubnetGroup': {'VpcId': 'vpc-p20'},
+        'VpcSecurityGroups': [{'VpcSecurityGroupId': 'sg-p20-rds'}],
+        'DBInstanceArn': 'arn:aws:rds:us-east-1:123456789012:db/p20-restore',
+    }
+    instance[field] = value
+
+    class ReadOnlyRuntime:
+        plan = p
+
+        def aws(self, service, operation, *args):
+            if (service, operation) == ('rds', 'describe-db-instances'):
+                return {'DBInstances': [instance]}
+            if (service, operation) == ('rds', 'list-tags-for-resource'):
+                return {'TagList': [
+                    {'Key': 'Project', 'Value': 'sagrilaft'},
+                    {'Key': 'Environment', 'Value': p['environment']},
+                ]}
+            pytest.fail(f'Unexpected AWS call: {service}/{operation}')
+
+    outputs = {'P20VpcId': 'vpc-p20', 'P20RdsSecurityGroupId': 'sg-p20-rds'}
+    with pytest.raises(release.MigrationError):
+        release.verify_restored_database(ReadOnlyRuntime(), outputs)
+
+
+def test_p20_restored_database_accepts_only_private_encrypted_p16_instance():
+    p = p20_plan()
+    p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
+    instance = {
+        'DBInstanceIdentifier': 'p20-012345abcdef-restore-c', 'DBInstanceStatus': 'available',
+        'Endpoint': {'Address': 'restore-db.p20.internal'}, 'Engine': 'postgres',
+        'EngineVersion': '16.13', 'DBInstanceClass': 'db.t3.medium', 'MultiAZ': False,
+        'PubliclyAccessible': False, 'StorageEncrypted': True,
+        'DBSubnetGroup': {'VpcId': 'vpc-p20'},
+        'VpcSecurityGroups': [{'VpcSecurityGroupId': 'sg-p20-rds'}],
+        'DBInstanceArn': 'arn:aws:rds:us-east-1:123456789012:db/p20-restore',
+    }
+
+    class ReadOnlyRuntime:
+        plan = p
+
+        def aws(self, service, operation, *args):
+            if (service, operation) == ('rds', 'describe-db-instances'):
+                return {'DBInstances': [instance]}
+            if (service, operation) == ('rds', 'list-tags-for-resource'):
+                return {'TagList': [
+                    {'Key': 'Project', 'Value': 'sagrilaft'},
+                    {'Key': 'Environment', 'Value': p['environment']},
+                ]}
+            pytest.fail(f'Unexpected AWS call: {service}/{operation}')
+
+    outputs = {'P20VpcId': 'vpc-p20', 'P20RdsSecurityGroupId': 'sg-p20-rds'}
+    result = release.verify_restored_database(ReadOnlyRuntime(), outputs)
+    assert result['status'] == 'available' and result['host'] == 'restore-db.p20.internal'
+
+
+def test_p20_restored_baseline_preflight_is_read_only_and_never_migrates(tmp_path, monkeypatch):
+    p = p20_plan()
+    p['p20_operation'] = 'activate-previous-restored-db'
+    p['preflightOnly'] = True
+    p['executionAuthorized'] = False
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    p['context']['databaseHostOverride'] = 'restore-db.p20.internal'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-restore-c'
+    outputs = {
+        'EcsDesiredCount': '0', 'EcsMigrationImageTag': p['candidate_tag'],
+        'EcsClusterName': 'sagrilaft-p20-012345abcdef', 'S3Bucket': 'p20-bucket',
+    }
+
+    class Runtime:
+        def __init__(self):
+            self.plan, self.directory = p, tmp_path
+            self.stack, self.calls, self.deployments, self.events, self.saved = 'SagrilaftStack-' + p['environment'], [], [], [], {}
+
+        def aws(self, service, operation, *args):
+            self.calls.append((service, operation, args))
+            if (service, operation) == ('sts', 'get-caller-identity'):
+                return {'Account': p['account']}
+            pytest.fail(f'Unexpected AWS call: {service}/{operation}')
+
+        def save(self, name, value): self.saved[name] = copy.deepcopy(value)
+        def event(self, value): self.events.append(copy.deepcopy(value))
+        def synth(self, phase, image_tag, migration_tag, count):
+            assert phase == 'activate-previous-restored-db'
+            assert image_tag == p['previous_tag'] and migration_tag == p['candidate_tag'] and count == 1
+            return {'Resources': {}, 'Outputs': {'EcsDesiredCount': {'Value': '1'},
+                                                  'EcsDatabaseHost': {'Value': 'restore-db.p20.internal'}}}
+        def deploy(self, phase): self.deployments.append(phase)
+
+    checks = []
+    monkeypatch.setattr(release, 'stack_state', lambda _rt: outputs)
+    monkeypatch.setattr(release, 'require_p20_services_stopped', lambda *_args: checks.append('services_stopped'))
+    monkeypatch.setattr(release, 'verify_restored_database', lambda *_args: {
+        'identifier': 'p20-012345abcdef-restore-c', 'host': 'restore-db.p20.internal', 'status': 'available'})
+    monkeypatch.setattr(release, 'verify_tag_digests', lambda *_args: checks.append('previous_digests'))
+    monkeypatch.setattr(release, 'deployed_template', lambda _rt: {'Resources': {}, 'Outputs': {}})
+    monkeypatch.setattr(release, 'assert_p20_baseline_restored_db_transition',
+                        lambda *args: checks.append(('transition', args[2], args[3], args[4], args[5])))
+
+    runtime = Runtime()
+    release.coordinate(runtime)
+    assert runtime.deployments == []
+    assert runtime.saved['p20-restored-db-preflight.json']['status'] == 'available'
+    assert runtime.events[-1]['event'] == 'p20_previous_restored_db_preflight_validated'
+    assert runtime.events[-1]['migrationWillRun'] is False
+    assert checks == ['services_stopped', 'previous_digests',
+                      ('transition', 1, 'restore-db.p20.internal', p['previous_tag'], p['candidate_tag'])]
+    assert all(operation not in {'put-object', 'delete-object', 'run-task', 'update-service'}
+               for _, operation, _ in runtime.calls)
+
+    with pytest.raises(release.MigrationError, match='solo preflight o no autoriza'):
+        release.coordinate(runtime, execute=True)
+    assert runtime.deployments == []
+    assert all(operation not in {'put-object', 'delete-object', 'run-task', 'update-service'}
+               for _, operation, _ in runtime.calls)
 
 
 def test_database_repoint_transition_only_changes_database_endpoints():

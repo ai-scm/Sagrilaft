@@ -98,15 +98,16 @@ def validate_plan(p):
     require(all(isinstance(v, (str, bool, int)) for v in p["context"].values()), "Contexto debe contener valores escalares")
     operation = p.get("p20_operation")
     if operation is not None:
-        require(p20 and operation in ("rollback-services", "connect-restored-db", "activate-previous"),
+        require(p20 and operation in ("rollback-services", "connect-restored-db", "activate-previous",
+                                      "activate-previous-restored-db"),
                 "Operación P20 inválida o fuera del ambiente aislado")
         require(p["mode"] == "compatible", "La operación P20 requiere un stack aislado ya preparado")
-        if operation in ("rollback-services", "activate-previous"):
+        if operation in ("rollback-services", "activate-previous", "activate-previous-restored-db"):
             require(set(p.get("previous_digests", {})) == set(SERVICES), "Rollback requiere digests previos de los cuatro servicios")
             require(all(re.fullmatch(r"sha256:[a-f0-9]{64}", x) for x in p["previous_digests"].values()), "Digest previo inválido")
-        if operation == "connect-restored-db":
+        if operation in ("connect-restored-db", "activate-previous-restored-db"):
             require(bool(p["context"].get("databaseHostOverride")), "La conexión requiere host de RDS restaurada")
-            require(bool(re.fullmatch(r"p20-[a-f0-9]{12}-restore-[a-z0-9-]{1,32}",
+            require(bool(re.fullmatch(r"p20-[a-f0-9]{12}-(?:restore-[a-z0-9-]{1,32}|c7-test-[0-9]{8})",
                                       p["context"].get("restoredDbIdentifier", ""))),
                     "La conexión requiere identificador de RDS restaurada etiquetado para P20")
     if p20:
@@ -643,7 +644,86 @@ def assert_p20_baseline_activation_transition(before, after, desired_count, envi
         require(old_props.get("DesiredCount") == 0 and new_props.get("DesiredCount") == desired_count,
                 f"Capacidad inicial ECS no coincide: {key}")
         new_props["DesiredCount"] = 0
-    assert_service_rollback_transition(original, target)
+    assert_service_rollback_transition(original, target, environment=environment)
+
+
+def assert_p20_baseline_restored_db_transition(before, after, desired_count, host, release_tag,
+                                              migration_tag, environment):
+    """Allow only prior app images, restored DB endpoints, and 0->1 services in P20."""
+    original = comparison_template(before, environment)
+    target = comparison_template(after, environment)
+    old_outputs = copy.deepcopy(original.get("Outputs", {}))
+    new_outputs = copy.deepcopy(target.get("Outputs", {}))
+    require(old_outputs.get("EcsDesiredCount", {}).get("Value") == "0"
+            and new_outputs.get("EcsDesiredCount", {}).get("Value") == str(desired_count),
+            "Baseline restaurado debe cambiar capacidad de cero al valor planeado")
+    require(new_outputs.get("EcsDatabaseHost", {}).get("Value") == host,
+            "Output P20 no apunta a la RDS restaurada")
+    old_outputs.pop("EcsDesiredCount", None)
+    new_outputs.pop("EcsDesiredCount", None)
+    old_outputs.pop("EcsDatabaseHost", None)
+    new_outputs.pop("EcsDatabaseHost", None)
+    require(old_outputs == new_outputs, "Baseline restaurado cambia outputs adicionales")
+
+    old_resources, new_resources = original["Resources"], target["Resources"]
+    require(set(old_resources) == set(new_resources), "Baseline restaurado agrega o elimina recursos")
+    changed_services, changed_tasks = set(), set()
+    for logical_id in old_resources:
+        old, new = old_resources[logical_id], new_resources[logical_id]
+        if old == new:
+            continue
+        require(old["Type"] == new["Type"], f"Baseline restaurado cambia tipo de recurso: {logical_id}")
+        if old["Type"] == "AWS::ECS::Service":
+            old_props, new_props = copy.deepcopy(old["Properties"]), copy.deepcopy(new["Properties"])
+            require(old_props.get("DesiredCount") == 0 and new_props.get("DesiredCount") == desired_count,
+                    f"Baseline restaurado cambia capacidad inesperada: {logical_id}")
+            old_props["DesiredCount"] = new_props["DesiredCount"]
+            require(old_props == new_props, f"Baseline restaurado altera configuración de servicio: {logical_id}")
+            changed_services.add(logical_id)
+            continue
+        require(old["Type"] == "AWS::ECS::TaskDefinition",
+                f"Baseline restaurado cambia recurso ajeno a ECS: {logical_id}")
+        old_props, new_props = copy.deepcopy(old["Properties"]), copy.deepcopy(new["Properties"])
+        old_containers, new_containers = old_props.get("ContainerDefinitions", []), new_props.get("ContainerDefinitions", [])
+        require(len(old_containers) == len(new_containers) == 1, "Task definition inesperada en baseline restaurado")
+        old_container, new_container = old_containers[0], new_containers[0]
+        name = old_container.get("Name")
+        require(name == new_container.get("Name") and name in {"backend", "frontend", "portal", "keycloak", "migration"},
+                "Contenedor inesperado en baseline restaurado")
+        if name == "migration":
+            require(old_container.get("Image") == new_container.get("Image")
+                    and migration_tag in json.dumps(new_container.get("Image")),
+                    "Baseline restaurado no conserva la imagen de migración actual")
+        else:
+            require(release_tag in json.dumps(new_container.get("Image")),
+                    f"Task definition no usa la release anterior: {name}")
+            old_container["Image"] = new_container["Image"] = "<app-image>"
+            for container in (old_container, new_container):
+                for item in container.get("Environment", []):
+                    if item.get("Name") == "GIT_SHA":
+                        if container is new_container:
+                            require(item.get("Value") == release_tag, f"GIT_SHA no coincide con la release anterior: {name}")
+                        item["Value"] = "<app-release>"
+        for container in (old_container, new_container):
+            for item in container.get("Environment", []):
+                env_name = item.get("Name")
+                if env_name == "DATABASE_HOST":
+                    if container is new_container:
+                        require(item.get("Value") == host, f"DATABASE_HOST no apunta a RDS restaurada: {name}")
+                    item["Value"] = "<database-host>"
+                elif env_name in ("KC_DB_URL", "KEYCLOAK_DB_URL"):
+                    if container is new_container:
+                        require(host in json.dumps(item.get("Value")), f"URL DB no apunta a RDS restaurada: {name}")
+                    item["Value"] = "<database-url>"
+        require(old_props == new_props, f"Baseline restaurado cambia task definition inesperadamente: {name}")
+        changed_tasks.add(name)
+    # Backend, Keycloak y migration siempre cambian porque deben apuntar al
+    # endpoint restaurado. Frontend y portal solo necesitan una nueva task
+    # definition si su imagen actual no es ya la release anterior.
+    required_tasks = {"backend", "keycloak", "migration"}
+    allowed_tasks = required_tasks | {"frontend", "portal"}
+    require(len(changed_services) == 4 and required_tasks <= changed_tasks <= allowed_tasks,
+            "Baseline restaurado debe cambiar los cuatro servicios y solo las task definitions necesarias")
 
 
 def verify_p20_target_health(rt, services_response):
@@ -660,6 +740,34 @@ def verify_p20_target_health(rt, services_response):
                 "La release anterior no está saludable en los target groups")
         summary.append({"service": service["serviceName"], "healthyTargets": len(targets)})
     return summary
+
+
+def verify_p20_backend_database_startup(rt, outputs, services_response, environment,
+                                       sleep=time.sleep, clock=time.monotonic):
+    """Prove the backend entrypoint completed its SELECT 1 before serving HTTP."""
+    backend = next((service for service in services_response
+                    if service.get("serviceName") == outputs["EcsBackendServiceName"]), None)
+    require(backend and len(backend.get("verifiedTasks", [])) == 1,
+            "La verificación de BD requiere exactamente una tarea backend P20")
+    task_arn = backend["verifiedTasks"][0]["taskArn"]
+    log_group = f"/sagrilaft/{environment}/ecs/backend"
+    deadline = clock() + 60
+    while clock() < deadline:
+        result = rt.aws("ecs", "describe-tasks", "--cluster", outputs["EcsClusterName"], "--tasks", task_arn)
+        tasks = result.get("tasks", [])
+        require(not result.get("failures") and len(tasks) == 1, "No se puede reconciliar la tarea backend P20")
+        containers = tasks[0].get("containers", [])
+        require(len(containers) == 1 and containers[0].get("name") == "backend",
+                "Tarea backend P20 sin contenedor esperado")
+        stream = containers[0].get("logStreamName")
+        require(stream, "La tarea backend todavía no tiene log stream")
+        events = rt.aws("logs", "get-log-events", "--log-group-name", log_group,
+                        "--log-stream-name", stream, "--start-from-head", "--limit", "200").get("events", [])
+        if any("[entrypoint] Base de datos disponible" in event.get("message", "") for event in events):
+            return {"taskArn": task_arn, "logGroup": log_group, "logStream": stream,
+                    "databaseConnectivity": "SELECT 1 succeeded before application startup"}
+        sleep(2)
+    raise MigrationError("No se encontró evidencia de SELECT 1 exitoso en el arranque del backend P20")
 
 
 def require_p20_services_stopped(rt, outputs):
@@ -729,13 +837,16 @@ def coordinate_p20_activate_previous(rt, execute=False):
         require(service["verifiedTasks"] and all(task["imageDigest"] == p["previous_digests"][kind]
                 for task in service["verifiedTasks"]), f"Digest baseline no coincide para {kind}")
     target_health = verify_p20_target_health(rt, final)
+    database_check = verify_p20_backend_database_startup(rt, outputs, final, p["environment"])
     rt.save("p20-baseline-services.json", final)
     rt.save("p20-baseline-target-health.json", target_health)
+    rt.save("p20-baseline-database-connectivity.json", database_check)
     assert_lock()
     rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key,
            "--if-match", etag, "--expected-bucket-owner", p["account"])
     rt.event({"event": "p20_previous_activation_completed", "runId": run_id,
               "previousTag": p["previous_tag"], "targetHealthVerified": True,
+              "databaseConnectivityVerified": True,
               "migrationWillRun": False})
 
 
@@ -747,7 +858,15 @@ def verify_restored_database(rt, outputs):
     require(len(instances) == 1, "No se encontró una única instancia RDS restaurada")
     instance = instances[0]
     require(instance.get("DBInstanceStatus") == "available", "La BD restaurada no está available")
+    require(instance.get("DBInstanceIdentifier") == identifier,
+            "La identidad de la RDS restaurada no coincide con el plan")
     require(instance.get("Endpoint", {}).get("Address") == expected_host, "Host RDS no coincide con el plan")
+    require(instance.get("Engine") == "postgres" and instance.get("EngineVersion", "").startswith("16."),
+            "La RDS restaurada no usa PostgreSQL 16")
+    require(instance.get("DBInstanceClass") == "db.t3.medium" and instance.get("MultiAZ") is False,
+            "La RDS restaurada no conserva la clase/AZ aprobadas para P20")
+    require(instance.get("PubliclyAccessible") is False and instance.get("StorageEncrypted") is True,
+            "La RDS restaurada debe permanecer privada y cifrada")
     require(instance.get("DBSubnetGroup", {}).get("VpcId") == outputs.get("P20VpcId"),
             "La BD restaurada no pertenece a la VPC del laboratorio")
     attached = {group.get("VpcSecurityGroupId") for group in instance.get("VpcSecurityGroups", [])}
@@ -759,6 +878,83 @@ def verify_restored_database(rt, outputs):
             "La BD restaurada no tiene etiquetas de propiedad P20")
     return {"identifier": identifier, "host": expected_host, "status": instance["DBInstanceStatus"],
             "vpcId": outputs["P20VpcId"], "securityGroupId": outputs["P20RdsSecurityGroupId"]}
+
+
+def coordinate_p20_activate_previous_restored_db(rt, execute=False):
+    """Start the previous release against a validated P20 PITR copy, without Alembic."""
+    p = rt.plan
+    require(bool(re.fullmatch(r"p20-[a-f0-9]{12}", p["environment"])),
+            "Baseline con RDS restaurada solo permitido en P20")
+    require(p["desired_count"] == 1, "Baseline con RDS restaurada debe iniciar una tarea por servicio")
+    require(rt.aws("sts", "get-caller-identity")["Account"] == p["account"], "Cuenta activa incorrecta")
+    outputs = stack_state(rt)
+    require(outputs["EcsDesiredCount"] == "0", "Baseline restaurado solo activa servicios que están en cero")
+    require_p20_services_stopped(rt, outputs)
+    db_evidence = verify_restored_database(rt, outputs)
+    verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
+    baseline = deployed_template(rt)
+    rt.save("p20-restored-baseline-template.json", baseline)
+    active = rt.synth("activate-previous-restored-db", p["previous_tag"],
+                      outputs["EcsMigrationImageTag"], 1)
+    assert_p20_baseline_restored_db_transition(
+        baseline, active, 1, db_evidence["host"], p["previous_tag"],
+        outputs["EcsMigrationImageTag"], p["environment"])
+    rt.save("p20-restored-db-template.json", active)
+    rt.save("p20-restored-db-preflight.json", db_evidence)
+    rt.event({"event": "p20_previous_restored_db_preflight_validated",
+              "planHash": fingerprint(p), "templateHash": fingerprint(active),
+              "previousTag": p["previous_tag"], "restoredDb": p["context"]["restoredDbIdentifier"],
+              "migrationWillRun": False})
+    if not execute:
+        return
+    require(p.get("preflightOnly") is not True and p.get("executionAuthorized") is True,
+            "El plan es solo preflight o no autoriza la activación")
+
+    lock_file = rt.directory / "lock.json"
+    run_id = uuid.uuid4().hex
+    rt.save("lock.json", {"runId": run_id, "planHash": fingerprint(p)})
+    bucket, key = outputs["S3Bucket"], f"_deployment/{rt.stack}.lock"
+    rt.event({"event": "lock_requested", "bucket": bucket, "key": key, "runId": run_id,
+              "operation": "p20-activate-previous-restored-db"})
+    lock = rt.aws("s3api", "put-object", "--bucket", bucket, "--key", key,
+                  "--body", str(lock_file), "--if-none-match", "*", "--expected-bucket-owner", p["account"])
+    etag = lock["ETag"]
+
+    def assert_lock():
+        current = rt.aws("s3api", "head-object", "--bucket", bucket, "--key", key,
+                         "--expected-bucket-owner", p["account"])
+        require(current["ETag"] == etag, "Se perdió el lock de baseline con RDS restaurada")
+
+    require(stack_state(rt) == outputs
+            and comparison_template(deployed_template(rt), p["environment"], preserve_metadata=True)
+            == comparison_template(baseline, p["environment"], preserve_metadata=True),
+            "Stack cambió después del preflight de baseline con RDS restaurada")
+    require_p20_services_stopped(rt, outputs)
+    verify_restored_database(rt, outputs)
+    verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
+    assert_lock()
+    rt.deploy("activate-previous-restored-db")
+    outputs = stack_state(rt)
+    require(comparison_template(deployed_template(rt), p["environment"])
+            == comparison_template(active, p["environment"]),
+            "Baseline con RDS restaurada no coincide con el template revisado")
+    final = services(rt, outputs, p["previous_tag"], 1)
+    for service in final:
+        kind = next(name for name, output_key in SERVICES.items() if outputs[output_key] == service["serviceName"])
+        require(service["verifiedTasks"] and all(task["imageDigest"] == p["previous_digests"][kind]
+                for task in service["verifiedTasks"]), f"Digest baseline no coincide para {kind}")
+    target_health = verify_p20_target_health(rt, final)
+    database_check = verify_p20_backend_database_startup(rt, outputs, final, p["environment"])
+    rt.save("p20-restored-baseline-services.json", final)
+    rt.save("p20-restored-baseline-target-health.json", target_health)
+    rt.save("p20-restored-baseline-database-connectivity.json", database_check)
+    assert_lock()
+    rt.aws("s3api", "delete-object", "--bucket", bucket, "--key", key,
+           "--if-match", etag, "--expected-bucket-owner", p["account"])
+    rt.event({"event": "p20_previous_restored_db_activation_completed", "runId": run_id,
+              "previousTag": p["previous_tag"], "restoredDb": db_evidence["identifier"],
+              "targetHealthVerified": True, "databaseConnectivityVerified": True,
+              "migrationWillRun": False})
 
 
 def coordinate_p20_database_repoint(rt, execute=False):
@@ -777,7 +973,8 @@ def coordinate_p20_database_repoint(rt, execute=False):
     verify_images(rt, outputs)
     migration_tag = outputs["EcsMigrationImageTag"]
     target = rt.synth("repoint-restored-db", p["candidate_tag"], migration_tag, count)
-    assert_database_repoint_transition(baseline, target, p["context"]["databaseHostOverride"], count)
+    assert_database_repoint_transition(baseline, target, p["context"]["databaseHostOverride"], count,
+                                        environment=p["environment"])
     rt.save("repoint-template.json", target)
     rt.save("restored-db-evidence.json", db_evidence)
     rt.event({"event": "p20_restored_database_repoint_preflight_validated",
@@ -877,6 +1074,8 @@ def coordinate(rt, execute=False):
     validate_plan(p)
     if p.get("p20_operation") == "activate-previous":
         return coordinate_p20_activate_previous(rt, execute)
+    if p.get("p20_operation") == "activate-previous-restored-db":
+        return coordinate_p20_activate_previous_restored_db(rt, execute)
     if p.get("p20_operation") == "rollback-services":
         return coordinate_p20_service_rollback(rt, execute)
     if p.get("p20_operation") == "connect-restored-db":
