@@ -351,10 +351,62 @@ def test_cli_environment_uses_shared_publisher(tmp_path, monkeypatch):
     monkeypatch.setattr(publisher.os, "umask", lambda _: None)
     for key, val in CONFIG.items():
         monkeypatch.setenv(key, val)
-    monkeypatch.setattr(publisher, "publish", lambda *a: calls.append(a))
+    monkeypatch.setattr(publisher, "publish", lambda *a, **kw: calls.append((a, kw)))
     assert publisher.main() == 0
-    assert calls[0][:4] == ("prod", ACCOUNT, REGION, SHA)
-    assert set(calls[0][4]) == set(publisher.COMPONENTS)
+    assert calls[0][0][:4] == ("prod", ACCOUNT, REGION, SHA)
+    assert set(calls[0][0][4]) == set(publisher.COMPONENTS)
+    assert calls[0][1]["components"] == publisher.COMPONENTS
+
+
+def test_backend_only_build_needs_no_frontend_configuration():
+    assert publisher.builds({}, ("backend",)) == {"backend": ["--platform", "linux/amd64", "./backend"]}
+
+
+def test_publish_backend_only_never_builds_or_pushes_other_components(rig):
+    api, calls, _, path, _ = rig
+    selected = ("backend",)
+    options = publisher.builds({}, selected)
+    result = publisher.publish("p20-012345abcdef", ACCOUNT, REGION, SHA,
+                               options, path, api=api, components=selected)
+
+    builds = [call for call in calls if call[:2] == ["docker", "build"]]
+    pushes = [call for call in calls if call[:2] == ["docker", "push"]]
+    assert len(builds) == len(pushes) == 1
+    assert "./backend" in builds[0]
+    assert "sagrilaft-p20-012345abcdef-backend" in " ".join(builds[0])
+    assert all(component not in " ".join(builds[0] + pushes[0])
+               for component in ("formulario-publico", "portal-interno", "keycloak"))
+    assert pushes[0][-1].endswith("sagrilaft-p20-012345abcdef-backend:" + SHA)
+    assert set(result["images"]) == {"backend"}
+    assert result["components"] == ["backend"]
+    assert result["digests"] == {"backend": DIGEST}
+    assert set(api.images) == {"sagrilaft-p20-012345abcdef-backend"}
+
+
+@pytest.mark.parametrize("components", [(), ("backend", "backend"), ("backend", "unknown")])
+def test_invalid_component_selection_fails_before_writing_manifest(tmp_path, components):
+    path = tmp_path / "manifest.json"
+    with pytest.raises(publisher.PrecondicionError):
+        publisher.publish("p20-012345abcdef", ACCOUNT, REGION, SHA,
+                          publisher.builds({}, ("backend",)), path,
+                          components=components)
+    assert not path.exists()
+
+
+def test_cli_passes_backend_only_selection(tmp_path, monkeypatch):
+    calls = []
+    manifest = tmp_path / "manifest.json"
+    monkeypatch.setattr(sys, "argv", ["publisher", "--environment", "p20-012345abcdef",
+        "--account", ACCOUNT, "--region", REGION, "--from-environment", "--tag", SHA,
+        "--source-ref", SHA, "--components", "backend", "--manifest", str(manifest)])
+    monkeypatch.setattr(publisher, "validate_source", lambda tag, environment, source_ref: tag)
+    monkeypatch.setattr(publisher.os, "umask", lambda _: None)
+    monkeypatch.setattr(publisher, "publish", lambda *a, **kw: calls.append((a, kw)))
+    assert publisher.main() == 0
+    args, kwargs = calls[0]
+    assert args[0:4] == ("p20-012345abcdef", ACCOUNT, REGION, SHA)
+    assert set(args[4]) == {"backend"}
+    assert kwargs["components"] == ("backend",)
 
 
 @pytest.mark.parametrize("environment", ["staging", "prod", "p20-012345abcdef"])

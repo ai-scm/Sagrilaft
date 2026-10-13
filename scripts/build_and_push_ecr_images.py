@@ -127,45 +127,65 @@ def source_snapshot(tag):
         yield path
 
 
-def builds(env):
+def selected_components(components=None):
+    requested = COMPONENTS if components is None else tuple(components)
+    require(bool(requested), "Debe seleccionarse al menos un componente")
+    require(len(requested) == len(set(requested)), "No se permiten componentes duplicados")
+    require(set(requested).issubset(COMPONENTS), "Componente de imagen inválido")
+    return tuple(name for name in COMPONENTS if name in requested)
+
+
+def builds(env, components=None):
+    selected = selected_components(components)
     def value(key, default=None):
         result = env.get(key, default)
         require(isinstance(result, str) and bool(result.strip()), f"Falta configuración de build: {key}")
         return result
-    # An explicit empty origin selects same-origin /api in staging/prod.
-    # A missing key remains an error: do not hide incomplete build configuration.
-    backend = env.get("VITE_BACKEND_URL")
-    require(isinstance(backend, str) and (backend == "" or bool(backend.strip())),
-            "Falta configuración de build: VITE_BACKEND_URL (vacío explícito permitido)")
-    portal = value("VITE_PORTAL_INTERNO_URL")
-    form = env.get("KEYCLOAK_FORMULARIO_URL") or env.get("FRONTEND_URL", "").split(",")[0]
-    arguments = {
-        "backend": {},
-        "formulario-publico": {
-            "VITE_BACKEND_URL": backend, "VITE_PORTAL_INTERNO_URL": portal,
-            "VITE_RAZON_SOCIAL": value("VITE_RAZON_SOCIAL", "HIGH TECH SOFTWARE S.A.S"),
-            "VITE_CORREO_DATOS": value("VITE_CORREO_DATOS", "administrativocol@blend360.com"),
-        },
-        "portal-interno": {
-            "VITE_BACKEND_URL": backend, "VITE_KEYCLOAK_URL": value("VITE_KEYCLOAK_URL"),
-            "VITE_KEYCLOAK_REALM": value("VITE_KEYCLOAK_REALM", "sagrilaft"),
-            "VITE_KEYCLOAK_CLIENT_ID": value("VITE_KEYCLOAK_CLIENT_ID", "sagrilaft-portal"),
-        },
-        "keycloak": {
-            "KEYCLOAK_PORTAL_URL": env.get("KEYCLOAK_PORTAL_URL") or portal,
-            "KEYCLOAK_FORMULARIO_URL": value("KEYCLOAK_FORMULARIO_URL", form),
-        },
-    }
+
     result = {}
-    for name in COMPONENTS:
-        options = ["--platform", PLATFORM]
-        for key, val in arguments[name].items():
-            options += ["--build-arg", f"{key}={val}"]
-        if name in ("formulario-publico", "portal-interno"):
-            options += ["-f", f"./frontend/apps/{name}/Dockerfile", "./frontend"]
-        else:
-            options += [f"./{name}"]
-        result[name] = options
+    if "backend" in selected:
+        result["backend"] = ["--platform", PLATFORM, "./backend"]
+
+    frontend_components = {"formulario-publico", "portal-interno"}.intersection(selected)
+    if frontend_components:
+        # An explicit empty origin selects same-origin /api in staging/prod.
+        # A missing key remains an error: do not hide incomplete configuration.
+        backend = env.get("VITE_BACKEND_URL")
+        require(isinstance(backend, str) and (backend == "" or bool(backend.strip())),
+                "Falta configuración de build: VITE_BACKEND_URL (vacío explícito permitido)")
+        portal = value("VITE_PORTAL_INTERNO_URL")
+        if "formulario-publico" in selected:
+            result["formulario-publico"] = [
+                "--platform", PLATFORM,
+                "--build-arg", f"VITE_BACKEND_URL={backend}",
+                "--build-arg", f"VITE_PORTAL_INTERNO_URL={portal}",
+                "--build-arg", f"VITE_RAZON_SOCIAL={value('VITE_RAZON_SOCIAL', 'HIGH TECH SOFTWARE S.A.S')}",
+                "--build-arg", f"VITE_CORREO_DATOS={value('VITE_CORREO_DATOS', 'administrativocol@blend360.com')}",
+                "-f", "./frontend/apps/formulario-publico/Dockerfile", "./frontend",
+            ]
+        if "portal-interno" in selected:
+            result["portal-interno"] = [
+                "--platform", PLATFORM,
+                "--build-arg", f"VITE_BACKEND_URL={backend}",
+                "--build-arg", f"VITE_KEYCLOAK_URL={value('VITE_KEYCLOAK_URL')}",
+                "--build-arg", f"VITE_KEYCLOAK_REALM={value('VITE_KEYCLOAK_REALM', 'sagrilaft')}",
+                "--build-arg", f"VITE_KEYCLOAK_CLIENT_ID={value('VITE_KEYCLOAK_CLIENT_ID', 'sagrilaft-portal')}",
+                "-f", "./frontend/apps/portal-interno/Dockerfile", "./frontend",
+            ]
+
+    if "keycloak" in selected:
+        portal = env.get("VITE_PORTAL_INTERNO_URL")
+        if not isinstance(portal, str) or not portal.strip():
+            raise PrecondicionError("Falta configuración de build: VITE_PORTAL_INTERNO_URL")
+        form = env.get("KEYCLOAK_FORMULARIO_URL") or env.get("FRONTEND_URL", "").split(",")[0]
+        keycloak_portal = env.get("KEYCLOAK_PORTAL_URL") or portal
+        result["keycloak"] = [
+            "--platform", PLATFORM,
+            "--build-arg", f"KEYCLOAK_PORTAL_URL={keycloak_portal}",
+            "--build-arg", f"KEYCLOAK_FORMULARIO_URL={value('KEYCLOAK_FORMULARIO_URL', form)}",
+            "./keycloak",
+        ]
+
     return result
 
 
@@ -224,15 +244,21 @@ def login_ecr(region, registry):
                    input=password, text=True, check=True)
 
 
-def publish(environment, account, region, tag, options, manifest_path, approved=None, api=None):
+def publish(environment, account, region, tag, options, manifest_path, approved=None, api=None,
+            components=None):
+    components = selected_components(components)
+    require(set(options) == set(components), "Las opciones de build deben coincidir con los componentes seleccionados")
     api = api or Ecr(region)
     manifest = {"version": 1, "environment": environment, "account": account, "region": region,
-                "tag": tag, "platform": PLATFORM, "complete": False, "images": {}}
+                "tag": tag, "platform": PLATFORM, "components": list(components),
+                "complete": False, "images": {}}
     if approved is not None:
         require(isinstance(approved, dict), "Manifiesto aprobado inválido")
         require(all(approved.get(k) == manifest[k] for k in ("version", "environment", "account", "region", "tag", "platform")),
                 "El manifiesto aprobado pertenece a otra release/ambiente/plataforma")
-        require(isinstance(approved.get("images"), dict) and set(approved["images"]).issubset(COMPONENTS), "Manifiesto aprobado inválido")
+        approved_components = tuple(approved.get("components", COMPONENTS))
+        require(approved_components == components, "El manifiesto aprobado corresponde a otros componentes")
+        require(isinstance(approved.get("images"), dict) and set(approved["images"]).issubset(components), "Manifiesto aprobado inválido")
     with manifest_path.open("x"):
         pass  # Nunca sobrescribir un manifiesto previo o el usado para reintentar.
     save_manifest(manifest_path, manifest)
@@ -240,7 +266,7 @@ def publish(environment, account, region, tag, options, manifest_path, approved=
     existing = {}
     try:
         require(api.call("sts", "get-caller-identity").get("Account") == account, "Cuenta activa distinta de --account")
-        for name in COMPONENTS:
+        for name in components:
             repo = f"sagrilaft-{environment}-{name}"
             api.immutable(repo)
             digest = api.digest(repo, tag)
@@ -256,7 +282,7 @@ def publish(environment, account, region, tag, options, manifest_path, approved=
                 save_manifest(manifest_path, manifest)
             else:
                 require(evidence is None, f"{name}: imagen acreditada ya no existe; reconciliar")
-        missing = [name for name in COMPONENTS if name not in existing]
+        missing = [name for name in components if name not in existing]
         if missing:
             with publication_lock(registry, tag):
                 run(["docker", "info"])
@@ -277,13 +303,14 @@ def publish(environment, account, region, tag, options, manifest_path, approved=
                         manifest["images"][name] = {"repository": uri, "digest": digest,
                                                     "inputsHash": inputs_hash(tag, options[name]), "status": "published"}
                         save_manifest(manifest_path, manifest)
-        for name in COMPONENTS:
+        for name in components:
             api.immutable(f"sagrilaft-{environment}-{name}")
             require(api.digest(f"sagrilaft-{environment}-{name}", tag) == manifest["images"][name]["digest"], "Imagen cambió durante la publicación")
-        manifest["digests"] = {name: manifest["images"][name]["digest"] for name in COMPONENTS}
+        manifest["digests"] = {name: manifest["images"][name]["digest"] for name in components}
         manifest["complete"] = True
         save_manifest(manifest_path, manifest)
-        print(f"Cuatro imágenes acreditadas. Manifiesto: {manifest_path}. No se ha ejecutado ni autorizado un deploy.")
+        print(f"{len(components)} imagen(es) acreditada(s): {', '.join(components)}. "
+              f"Manifiesto: {manifest_path}. No se ha ejecutado ni autorizado un deploy.")
         return manifest
     except BaseException:
         manifest["complete"] = False
@@ -303,6 +330,8 @@ def main():
     parser.add_argument("--region")
     parser.add_argument("--tag")
     parser.add_argument("--source-ref", help="SHA fuente histórico; permitido solo para P20 y debe coincidir con --tag")
+    parser.add_argument("--components", nargs="+", choices=COMPONENTS,
+                        help="Componentes a publicar; por defecto publica los cuatro")
     parser.add_argument("--manifest", type=Path, required=True, help="Archivo nuevo, preferiblemente fuera del checkout")
     parser.add_argument("--reuse-manifest", type=Path, help="Evidencia existente revisada y aprobada")
     args = parser.parse_args()
@@ -314,9 +343,11 @@ def main():
         env = dict(os.environ) if args.from_environment else parse_env(args.env_file or ROOT / f".env.{args.environment}")
         region = args.region or env.get("AWS_REGION") or "us-east-1"
         require(bool(re.fullmatch(r"\d{12}", args.account)) and bool(re.fullmatch(r"[a-z0-9-]+", region)), "Cuenta/región inválidas")
-        options = builds(env)
+        components = selected_components(args.components)
+        options = builds(env, components)
         approved = json.loads(args.reuse_manifest.read_text()) if args.reuse_manifest else None
-        publish(args.environment, args.account, region, tag, options, args.manifest, approved)
+        publish(args.environment, args.account, region, tag, options, args.manifest, approved,
+                components=components)
         return 0
     except (PrecondicionError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         message = str(error) if isinstance(error, PrecondicionError) else type(error).__name__
