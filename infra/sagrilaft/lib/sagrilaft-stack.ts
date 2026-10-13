@@ -302,7 +302,7 @@ export class SagrilaftStack extends cdk.Stack {
     // ── Outputs ────────────────────────────────────────────────────────────
     new CfnOutput(this, 'AlbDns', {
       value: lb.alb.loadBalancerDnsName,
-      description: laboratorioP20 ? 'DNS privado del ALB interno P20; no crear DNS público' : 'DNS del ALB publico creado para SAGRILAFT',
+      description: laboratorioP20 ? 'DNS privado del ALB interno P20; no crear DNS publico' : 'DNS del ALB publico creado para SAGRILAFT',
     });
     new CfnOutput(this, 'HostedZoneName', { value: hostedZoneName || 'no-configurada', description: 'Zona Route 53 usada para crear registros A Alias' });
     new CfnOutput(this, 'DominiosEsperados', { value: `${dominio}, ${dominioPortal}, ${dominioKeycloak}`, description: 'Hostnames que deben apuntar al ALB' });
@@ -311,7 +311,7 @@ export class SagrilaftStack extends cdk.Stack {
     if (laboratorioP20) {
       new CfnOutput(this, 'EcsDatabaseHost', {
         value: databaseHostOverride || database.instance.dbInstanceEndpointAddress,
-        description: 'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauración aislada',
+        description: 'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauracion aislada',
       });
       new CfnOutput(this, 'P20VpcId', { value: networking.vpc.vpcId });
       new CfnOutput(this, 'P20RdsSecurityGroupId', { value: networking.sgRds.securityGroupId });

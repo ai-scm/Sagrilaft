@@ -18,7 +18,7 @@ export class DashboardNegocio extends Construct {
 
     // Fila 1: Embudo de Aprobación
     const widgetEmbudo = new cloudwatch.GraphWidget({
-      title: 'Tasas de Éxito: Decisiones de Expedientes',
+      title: 'Tasas de Exito: Decisiones de Expedientes',
       view: cloudwatch.GraphWidgetView.BAR,
       left: [
         new cloudwatch.Metric({

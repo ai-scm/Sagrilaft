@@ -75,6 +75,40 @@ test('P20 synthesis is isolated, disposable, and starts with four ECS services a
   deepStrictEqual(template.Outputs.EcsDatabaseHost.Value, template.Outputs.RdsEndpoint.Value);
 });
 
+test('deployment descriptions use the exact ASCII text intended for CloudFormation', () => {
+  const template = synth();
+  const resources = Object.values(template.Resources) as any[];
+  const repositories = resources.filter(resource => resource.Type === 'AWS::ECR::Repository');
+  equal(repositories.length, 4);
+  for (const repository of repositories) {
+    const policy = JSON.parse(repository.Properties.LifecyclePolicy.LifecyclePolicyText);
+    equal(policy.rules[0].description, 'Mantener las ultimas 30 imagenes para ahorrar costos');
+  }
+
+  const alarms = resources.filter(resource => resource.Type === 'AWS::CloudWatch::Alarm');
+  deepStrictEqual(alarms.map(alarm => alarm.Properties.AlarmDescription).sort(), [
+    'Alarma Critica: Se detectaron mas de 5 errores HTTP 5xx en el servidor backend durante los ultimos 5 minutos.',
+    'Alarma de Rendimiento: El uso de CPU del servicio Backend supero el 85% de su capacidad.',
+    'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend supero el 85% de su capacidad.',
+  ].sort());
+
+  const dashboard = resources.find(resource => resource.Type === 'AWS::CloudWatch::Dashboard'
+    && resource.Properties.DashboardName === 'Sagrilaft-Negocio-p20-012345abcdef');
+  equal(JSON.stringify(dashboard?.Properties.DashboardBody).includes('Tasas de Exito: Decisiones de Expedientes'), true);
+  equal(template.Outputs.AlbDns.Description, 'DNS privado del ALB interno P20; no crear DNS publico');
+  equal(template.Outputs.EcsDatabaseHost.Description,
+    'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauracion aislada');
+
+  const deploymentText = [
+    ...repositories.map(repository => repository.Properties.LifecyclePolicy.LifecyclePolicyText),
+    ...alarms.map(alarm => alarm.Properties.AlarmDescription),
+    JSON.stringify(dashboard?.Properties.DashboardBody),
+    template.Outputs.AlbDns.Description,
+    template.Outputs.EcsDatabaseHost.Description,
+  ].join('\n');
+  equal(/[\u00C0-\u024F?]/.test(deploymentText), false);
+});
+
 test('P20 restored-database override reaches backend and Keycloak task configuration', () => {
   const template = synth({ databaseHostOverride: 'restored-db.p20.internal' });
   const tasks = Object.values(template.Resources).filter((resource: any) =>

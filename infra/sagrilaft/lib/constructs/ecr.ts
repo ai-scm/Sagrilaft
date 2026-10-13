@@ -52,7 +52,7 @@ export class Ecr extends Construct {
       lifecycleRules: [
         {
           rulePriority: 1,
-          description: 'Mantener las últimas 30 imágenes para ahorrar costos',
+          description: 'Mantener las ultimas 30 imagenes para ahorrar costos',
           maxImageCount: 30,
         },
       ],

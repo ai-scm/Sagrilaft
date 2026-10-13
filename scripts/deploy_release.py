@@ -153,19 +153,64 @@ STAGING_UNICODE_PAIRS = (
     (('Resources', 'DashboardNegocio53ADAF63', 'Properties', 'DashboardBody', 'Fn::Join', 1, 0), '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de Éxito: Decisiones de Expedientes","region":"', '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de ?xito: Decisiones de Expedientes","region":"'),
 )
 
+# El template histórico P20 contiene exactamente estos textos descriptivos con
+# sustituciones `?`. Solo se equiparan con la versión ASCII aprobada y solo en
+# P20; una diferencia en cualquier otro path/valor continúa bloqueando.
+P20_ASCII_PAIRS = (
+    (('Resources', 'EcrBackendRepo0C255C53', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'),
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ultimas 30 imagenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}',
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrFormularioPublicoRepo71B2173B', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'),
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ultimas 30 imagenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}',
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrKeycloakRepoD812844A', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'),
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ultimas 30 imagenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}',
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'EcrPortalInternoRepo64131791', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'),
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ultimas 30 imagenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}',
+     '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
+    (('Resources', 'AlarmasCriticasAlarmaErroresServidor05DAF4B7', 'Properties', 'AlarmDescription'),
+     'Alarma Critica: Se detectaron mas de 5 errores HTTP 5xx en el servidor backend durante los ultimos 5 minutos.',
+     'Alarma Cr?tica: Se detectaron m?s de 5 errores HTTP 5xx en el servidor backend durante los ?ltimos 5 minutos.'),
+    (('Resources', 'AlarmasCriticasAlarmaSaturacionCpu3C8591DA', 'Properties', 'AlarmDescription'),
+     'Alarma de Rendimiento: El uso de CPU del servicio Backend supero el 85% de su capacidad.',
+     'Alarma de Rendimiento: El uso de CPU del servicio Backend super? el 85% de su capacidad.'),
+    (('Resources', 'AlarmasCriticasAlarmaSaturacionMemoria42793BCD', 'Properties', 'AlarmDescription'),
+     'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend supero el 85% de su capacidad.',
+     'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend super? el 85% de su capacidad.'),
+    (('Resources', 'DashboardNegocio53ADAF63', 'Properties', 'DashboardBody', 'Fn::Join', 1, 0),
+     'Tasas de Exito: Decisiones de Expedientes',
+     'Tasas de ?xito: Decisiones de Expedientes'),
+    (('Outputs', 'AlbDns', 'Description'),
+     'DNS privado del ALB interno P20; no crear DNS publico',
+     'DNS privado del ALB interno P20; no crear DNS p?blico'),
+    (('Outputs', 'EcsDatabaseHost', 'Description'),
+     'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauracion aislada',
+     'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauraci?n aislada'),
+)
+
 
 def comparison_template(value, environment=None, *, preserve_metadata=False):
     """Equivalencias exactas, conservando el criterio de metadata de cada comprobación."""
     result = copy.deepcopy(value if preserve_metadata else strip_metadata(value))
-    if environment != "staging":
+    if environment == "staging":
+        pairs = STAGING_UNICODE_PAIRS
+    elif re.fullmatch(r"p20-[a-f0-9]{12}", environment or ""):
+        pairs = P20_ASCII_PAIRS
+    else:
         return result
-    for path, original, observed in STAGING_UNICODE_PAIRS:
+    for path, expected, observed in pairs:
         cursor = result
         try:
             for key in path[:-1]:
                 cursor = cursor[key]
-            if cursor[path[-1]] == observed:
-                cursor[path[-1]] = original
+            value_at_path = cursor[path[-1]]
+            if value_at_path == observed:
+                cursor[path[-1]] = expected
+            elif isinstance(value_at_path, str) and isinstance(observed, str) and value_at_path.count(observed) == 1:
+                # Para DashboardBody solo se normaliza el título conocido; el
+                # resto del documento JSON embebido se compara byte por byte.
+                cursor[path[-1]] = value_at_path.replace(observed, expected, 1)
         except (KeyError, IndexError, TypeError):
             # Una ruta ausente/cambiada no se repara; la comparación seguirá fallando.
             continue
@@ -409,10 +454,10 @@ def verify_tag_digests(rt, outputs, tag, digests):
                 f"Digest previo distinto del aprobado para {kind}")
 
 
-def assert_service_rollback_transition(before, after):
+def assert_service_rollback_transition(before, after, environment=None):
     """Permite solo cambiar task definitions y referencias de los 4 servicios ECS."""
-    original = strip_metadata(before)
-    target = strip_metadata(after)
+    original = comparison_template(before, environment)
+    target = comparison_template(after, environment)
     old_resources, new_resources = original["Resources"], target["Resources"]
     changed_task_defs = set()
     service_ids = set()
@@ -458,9 +503,10 @@ def assert_service_rollback_transition(before, after):
     require(original.get("Outputs") == target.get("Outputs"), "Rollback ECS cambia outputs del stack")
 
 
-def assert_database_repoint_transition(before, after, host, desired_count):
+def assert_database_repoint_transition(before, after, host, desired_count, environment=None):
     """Permite BD restaurada y activar servicios P20 desde cero, sin migrar."""
-    original, target = strip_metadata(before), strip_metadata(after)
+    original = comparison_template(before, environment)
+    target = comparison_template(after, environment)
     old_resources, new_resources = original["Resources"], target["Resources"]
     changed_containers = set()
     changed_services = set()
@@ -536,14 +582,13 @@ def coordinate_p20_service_rollback(rt, execute=False):
     verify_tag_digests(rt, outputs, p["previous_tag"], p["previous_digests"])
     migration_tag = outputs["EcsMigrationImageTag"]
     rollback = rt.synth("rollback", p["previous_tag"], migration_tag, count)
-    assert_service_rollback_transition(baseline, rollback)
+    assert_service_rollback_transition(baseline, rollback, environment=p["environment"])
     rt.save("rollback-template.json", rollback)
     rt.event({"event": "p20_service_rollback_preflight_validated",
               "planHash": fingerprint(p), "templateHash": fingerprint(rollback),
               "migrationTagPreserved": migration_tag, "migrationWillRun": False})
     if not execute:
         return
-
     lock_file = rt.directory / "lock.json"
     run_id = uuid.uuid4().hex
     rt.save("lock.json", {"runId": run_id, "planHash": fingerprint(p)})
@@ -579,9 +624,10 @@ def coordinate_p20_service_rollback(rt, execute=False):
               "previousTag": p["previous_tag"], "migrationWillRun": False})
 
 
-def assert_p20_baseline_activation_transition(before, after, desired_count):
+def assert_p20_baseline_activation_transition(before, after, desired_count, environment=None):
     """From zero, permit only four app task definitions and desired count."""
-    original, target = copy.deepcopy(before), copy.deepcopy(after)
+    original = comparison_template(before, environment)
+    target = comparison_template(after, environment)
     old_outputs, new_outputs = original.get("Outputs", {}), target.get("Outputs", {})
     require(old_outputs.get("EcsDesiredCount", {}).get("Value") == "0"
             and new_outputs.get("EcsDesiredCount", {}).get("Value") == str(desired_count),
@@ -645,7 +691,7 @@ def coordinate_p20_activate_previous(rt, execute=False):
     baseline = deployed_template(rt)
     rt.save("p20-baseline-template.json", baseline)
     active = rt.synth("activate-previous", p["previous_tag"], outputs["EcsMigrationImageTag"], 1)
-    assert_p20_baseline_activation_transition(baseline, active, 1)
+    assert_p20_baseline_activation_transition(baseline, active, 1, environment=p["environment"])
     rt.event({"event": "p20_previous_activation_preflight_validated",
               "planHash": fingerprint(p), "templateHash": fingerprint(active),
               "previousTag": p["previous_tag"], "migrationWillRun": False})

@@ -799,6 +799,26 @@ def unicode_template(path, value):
     return result
 
 
+def set_template_path(root, path, value):
+    cursor = root
+    for index, key in enumerate(path[:-1]):
+        following = path[index + 1]
+        if isinstance(cursor, list):
+            while len(cursor) <= key:
+                cursor.append(None)
+            if cursor[key] is None:
+                cursor[key] = [] if isinstance(following, int) else {}
+            cursor = cursor[key]
+        else:
+            if key not in cursor:
+                cursor[key] = [] if isinstance(following, int) else {}
+            cursor = cursor[key]
+    if isinstance(cursor, list):
+        while len(cursor) <= path[-1]:
+            cursor.append(None)
+    cursor[path[-1]] = value
+
+
 @pytest.mark.parametrize('path,original,observed', release.STAGING_UNICODE_PAIRS)
 def test_only_exact_approved_unicode_pair_is_equivalent(path, original, observed):
     expected = unicode_template(path, original)
@@ -811,6 +831,30 @@ def test_only_exact_approved_unicode_pair_is_equivalent(path, original, observed
     assert release.comparison_template(changed, 'staging') != release.comparison_template(expected, 'staging')
     other_path = ('OtherResource', *path[1:])
     assert release.comparison_template(unicode_template(other_path, observed), 'staging') != release.comparison_template(unicode_template(other_path, original), 'staging')
+
+
+@pytest.mark.parametrize('path,expected,observed', release.P20_ASCII_PAIRS)
+def test_p20_only_exact_observed_text_maps_to_approved_ascii(path, expected, observed):
+    before = unicode_template(path, observed)
+    after = unicode_template(path, expected)
+    snapshot = copy.deepcopy(before)
+    assert release.comparison_template(before, 'p20-9c67b6ea6842') == release.comparison_template(after, 'p20-9c67b6ea6842')
+    assert before == snapshot
+    assert release.comparison_template(before, 'staging') != release.comparison_template(after, 'staging')
+    assert release.comparison_template(before, 'prod') != release.comparison_template(after, 'prod')
+    changed = unicode_template(path, observed + ' extra')
+    assert release.comparison_template(changed, 'p20-9c67b6ea6842') != release.comparison_template(after, 'p20-9c67b6ea6842')
+
+
+def test_p20_ascii_equivalences_do_not_allow_other_resource_changes():
+    before = template()
+    after = template()
+    for path, expected, observed in release.P20_ASCII_PAIRS:
+        for target, value in ((before, observed), (after, expected)):
+            set_template_path(target, path, value)
+    assert release.comparison_template(before, 'p20-9c67b6ea6842') == release.comparison_template(after, 'p20-9c67b6ea6842')
+    after['Outputs']['extra'] = {'Value': 'unapproved'}
+    assert release.comparison_template(before, 'p20-9c67b6ea6842') != release.comparison_template(after, 'p20-9c67b6ea6842')
 
 
 def test_unicode_exception_does_not_hide_retention_or_image_changes():
