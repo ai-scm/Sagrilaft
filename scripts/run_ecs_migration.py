@@ -11,9 +11,10 @@ AWS_REGION: us-east-1; ECS_MIGRATION_TIMEOUT_SECONDS: 900.
 
 Fault injection is available only for an isolated P20 environment. It is
 selected by ECS_MIGRATION_P20_FAULT in a reviewed P20 plan. The
-fail-before-ddl mode overrides only the migration container command with the
-inert fixture. observer-loss-after-launch returns an uncertain result after
-recording the task ARN; it never launches a second task.
+two modes always replace the migration command with the same inert fixture,
+which does not connect to the database and exits 42. observer-loss-after-launch
+then returns an uncertain result after recording the task ARN; it never polls
+or launches a second task. Neither mode can report migration_completed.
 
 El éxito acredita imagen/exitCode, NO la revisión final del esquema. Esa
 comprobación pertenece al contenedor y se añadirá en otra fase. Un tag mutable
@@ -79,6 +80,9 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
               "Fault injection solo permitido en ambiente P20")
         check(cluster == f"sagrilaft-{environment}" and repository == f"sagrilaft-{environment}-backend",
               "Fault injection fuera del cluster/repository P20 correspondiente")
+        check(bool(re.fullmatch(re.escape(prefix + f"task-definition/sagrilaft-{environment}-migration:")
+                                + r"\d+", definition)),
+              "Fault injection requiere la task definition de migración del mismo P20")
         check(p20_fault in ("fail-before-ddl", "observer-loss-after-launch"),
               "Modo de fault injection P20 inválido")
     try:
@@ -99,6 +103,11 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     containers = taskdef.get("containerDefinitions", [])
     check(len(containers) == 1 and containers[0].get("name") == "migration", "Se requiere un unico contenedor migration")
     container = containers[0]
+    if p20_fault:
+        # RunTask cannot override entryPoint. A shell/custom entrypoint could
+        # execute the ordinary migration before consuming our fixture command.
+        check(not container.get("entryPoint"),
+              "Fixture P20 requiere entryPoint vacío; no se puede sobrescribir con RunTask")
     check(container.get("image") == image, "Imagen de task definition distinta de la esperada")
     env = {item["name"]: item.get("value") for item in container.get("environment", [])}
     check(env.get("RUN_MODE") == "migrate" and env.get("GIT_SHA") == tag, "RUN_MODE/GIT_SHA no corresponden a la migracion")
@@ -119,11 +128,17 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
                    "--client-token", token, "--network-configuration",
                    json.dumps({"awsvpcConfiguration": {"subnets": subnets, "securityGroups": [group],
                                                        "assignPublicIp": "DISABLED"}})]
-    if p20_fault == "fail-before-ddl":
+    if p20_fault:
+        # Both subcases must bypass the ordinary command. In particular, losing
+        # the observer must never leave RUN_MODE=migrate/upgrade head running.
         run_args += ["--overrides", json.dumps({"containerOverrides": [{
             "name": "migration", "command": ["python", "scripts/p20_fail_before_ddl.py"],
-            "environment": [{"name": "P20_LAB_RUN_ID", "value": os.environ["ECS_MIGRATION_ENVIRONMENT"]}],
+            "environment": [{"name": "P20_LAB_RUN_ID", "value": os.environ["ECS_MIGRATION_ENVIRONMENT"]},
+                            {"name": "RUN_MODE", "value": "p20-fixture"}],
         }]})]
+        emit(json.dumps({"event": "p20_migration_fixture_selected", "faultMode": p20_fault,
+                         "command": ["python", "scripts/p20_fail_before_ddl.py"],
+                         "runMode": "p20-fixture", "activationAllowed": False}))
     response = aws(*run_args)
     tasks = response.get("tasks", [])
     # Conservar ARNs incluso si AWS devuelve simultáneamente failures.
@@ -154,6 +169,12 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
             check(len(runtime) == 1 and runtime[0].get("name") == "migration", "Resultado sin contenedor migration unico")
             runtime = runtime[0]
             check(runtime.get("image") == image and runtime.get("imageDigest") == digest, "Imagen/digest ejecutado distinto o no verificable")
+            if p20_fault:
+                emit(json.dumps({"event": "p20_migration_fixture_stopped", "taskArn": arn,
+                                 "faultMode": p20_fault, "exitCode": runtime.get("exitCode"),
+                                 "schemaVerified": False, "activationAllowed": False}))
+                # Even an unexpected exit 0 is not a real migration success.
+                raise MigrationError("Migracion fallida o resultado inesperado del fixture P20; reconciliar, no activar")
             check(type(runtime.get("exitCode")) is int and runtime["exitCode"] == 0, "Migracion fallida o sin exitCode=0")
             check(task.get("stopCode") == "EssentialContainerExited", "Tarea interrumpida o detenida por causa inesperada")
             emit(json.dumps({"event": "migration_completed", "taskArn": arn, "imageDigest": digest,
