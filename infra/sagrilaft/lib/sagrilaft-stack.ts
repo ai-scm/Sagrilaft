@@ -86,6 +86,7 @@ export class SagrilaftStack extends cdk.Stack {
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? (laboratorioP20 ? '' : defaultAlertasEmailDestino));
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
+    const backendImageTag = String(this.node.tryGetContext('backendImageTag') ?? '');
     // Omitirlo conserva bootstrap y despliegues existentes. Un override permite
     // preparar la migración sin cambiar las imágenes de los servicios.
     const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
@@ -96,18 +97,42 @@ export class SagrilaftStack extends cdk.Stack {
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? (laboratorioP20 ? '0' : '2'));
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
+    const backendDesiredCountRaw = this.node.tryGetContext('backendDesiredCount');
+    const backendDesiredCount = Number.parseInt(String(backendDesiredCountRaw ?? desiredCount), 10);
+    const p20BackendOnlyOperation = String(
+      this.node.tryGetContext('p20BackendOnlyOperation') ?? 'false',
+    ).toLowerCase() === 'true';
     const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
     const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
     const databaseHostOverride = String(this.node.tryGetContext('databaseHostOverride') ?? '');
+    if (privateBrowser) {
+      const cloneId = String(this.node.tryGetContext('restoredDbIdentifier') ?? '');
+      if (!new RegExp(`^${ambiente}-c7-test-[0-9]{8}$`).test(cloneId)
+        || !databaseHostOverride.startsWith(`${cloneId}.`)
+        || !new RegExp(`^${cloneId}\\.[a-z0-9]+\\.${this.region}\\.rds\\.amazonaws\\.com$`).test(databaseHostOverride)) {
+        throw new Error('El navegador P20 requiere identificador y endpoint coherentes de la RDS clonada c7-test.');
+      }
+    }
     const p20AllowActivation = String(this.node.tryGetContext('p20AllowActivation') ?? 'false').toLowerCase() === 'true';
 
     if (laboratorioP20 && (habilitarNatEgress || snsAlertasSub.trim() !== ''
       || hostedZoneName !== '' || hostedZoneId !== '')) {
       throw new Error('P20 requiere egreso NAT deshabilitado, SNS sin suscripciones y Hosted Zone vacía.');
     }
-    if (laboratorioP20 && desiredCount > 0 && !p20AllowActivation) {
+    if (laboratorioP20 && (desiredCount > 0 || backendDesiredCount > 0) && !p20AllowActivation) {
       throw new Error('P20 requiere p20AllowActivation=true para permitir capacidad ECS mayor que cero.');
+    }
+    if (backendDesiredCountRaw !== undefined && !p20BackendOnlyOperation) {
+      throw new Error('backendDesiredCount solo se permite en la operación P20 de backend único.');
+    }
+    if (p20BackendOnlyOperation && (!laboratorioP20 || desiredCount !== 0
+      || backendDesiredCountRaw === undefined || ![0, 1].includes(backendDesiredCount)
+      || backendMaxCapacity !== 1)) {
+      throw new Error('La operación P20 de backend único exige capacidad global 0, backend 0/1 y backendMaxCapacity=1.');
+    }
+    if (!p20BackendOnlyOperation && backendDesiredCount !== desiredCount) {
+      throw new Error('La capacidad del backend debe coincidir con desiredCount fuera de la operación P20 de backend único.');
     }
     if (laboratorioP20 && (!certArn || !/^arn:aws:acm:[a-z0-9-]+:\d{12}:certificate\//.test(certArn))) {
       throw new Error('P20 requiere importar un certificado ACM existente; no debe crear uno ni solicitar validación DNS.');
@@ -121,6 +146,9 @@ export class SagrilaftStack extends cdk.Stack {
     }
     if (['staging', 'prod'].includes(ambiente) && imageTag === 'latest') {
       throw new Error(`El ambiente ${ambiente} requiere imageTag de una release explicita, no latest.`);
+    }
+    if (backendImageTag && (!laboratorioP20 || !/^[a-f0-9]{40}$/.test(backendImageTag))) {
+      throw new Error('backendImageTag solo admite un SHA completo dentro de P20.');
     }
     if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(migrationImageTag)) {
       throw new Error('migrationImageTag invalido: use una etiqueta de imagen no vacia de hasta 128 caracteres.');
@@ -143,9 +171,12 @@ export class SagrilaftStack extends cdk.Stack {
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
       throw new Error(`desiredCount invalido: ${desiredCountRaw}. Use 0 para bootstrap o 1+ para activar servicios.`);
     }
-    if (!Number.isInteger(backendMaxCapacity) || backendMaxCapacity < desiredCount) {
+    if (!Number.isInteger(backendDesiredCount) || backendDesiredCount < 0) {
+      throw new Error(`backendDesiredCount invalido: ${backendDesiredCountRaw}.`);
+    }
+    if (!Number.isInteger(backendMaxCapacity) || backendMaxCapacity < Math.max(desiredCount, backendDesiredCount)) {
       throw new Error(
-        `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe ser un entero >= desiredCount (${desiredCount}).`,
+        `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe cubrir la capacidad ECS solicitada.`,
       );
     }
     cdk.Tags.of(this).add('Project', 'sagrilaft');
@@ -165,7 +196,7 @@ export class SagrilaftStack extends cdk.Stack {
       dominioPortal,
       disposable: laboratorioP20,
     });
-    const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste });
+    const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste, laboratorioP20 });
     const notifications = new Notifications(this, 'Notifications', {
       ambiente,
       sesEmailOrigen,
@@ -202,8 +233,10 @@ export class SagrilaftStack extends cdk.Stack {
       ambiente,
       databaseHostOverride: databaseHostOverride || undefined,
       imageTag: imageTag || 'dev',
+      backendImageTag: backendImageTag || undefined,
       migrationImageTag,
       desiredCount,
+      backendDesiredCount: p20BackendOnlyOperation ? backendDesiredCount : undefined,
       backendMaxCapacity,
       vpc: networking.vpc,
       serviceSubnetType: networking.ecsSubnetType,
@@ -216,6 +249,7 @@ export class SagrilaftStack extends cdk.Stack {
       portalInternoRepo: ecrRepos.portalInternoRepo,
       keycloakRepo: ecrRepos.keycloakRepo,
       dbSecret: secrets.dbSecret,
+      cInventoryDbSecret: secrets.cInventoryDbSecret,
       appSecret: secrets.appSecret,
       zohoSecret: secrets.zohoSecret,
       keycloakAdminSecret: secrets.keycloakAdminSecret,
@@ -336,6 +370,20 @@ export class SagrilaftStack extends cdk.Stack {
     new CfnOutput(this, 'EcsSecurityGroupId', { value: networking.sgEcs.securityGroupId, description: 'Security Group para servicios ECS Fargate' });
     new CfnOutput(this, 'EcsTaskExecutionRoleArn', { value: ecsFargate.executionRole.roleArn, description: 'Task Execution Role ECS para pull ECR, logs y secrets/SSM' });
     new CfnOutput(this, 'EcsBackendTaskRoleArn', { value: ecsFargate.backendTaskRole.roleArn, description: 'Task Role ECS para backend' });
+    if (laboratorioP20 && secrets.cInventoryDbSecret && ecsFargate.cInventoryTaskRole && ecsFargate.cInventoryExecutionRole) {
+      new CfnOutput(this, 'P20CInventoryDbSecretArn', { value: secrets.cInventoryDbSecret.secretArn,
+        description: 'Secreto dedicado a credenciales PostgreSQL de solo lectura para inventario P20-C' });
+      new CfnOutput(this, 'P20CInventoryTaskRoleArn', { value: ecsFargate.cInventoryTaskRole.roleArn,
+        description: 'Task role sin permisos AWS para inventario P20-C' });
+      new CfnOutput(this, 'P20CInventoryExecutionRoleArn', { value: ecsFargate.cInventoryExecutionRole.roleArn,
+        description: 'Execution role limitado a ECR, logs y secreto P20-C de inventario' });
+      if (ecsFargate.cInventoryProvisionTaskRole && ecsFargate.cInventoryProvisionExecutionRole) {
+        new CfnOutput(this, 'P20CInventoryProvisionTaskRoleArn', { value: ecsFargate.cInventoryProvisionTaskRole.roleArn,
+          description: 'Task role sin permisos AWS para provisionar el rol de inventario P20-C' });
+        new CfnOutput(this, 'P20CInventoryProvisionExecutionRoleArn', { value: ecsFargate.cInventoryProvisionExecutionRole.roleArn,
+          description: 'Execution role limitado a ECR, logs y secretos DB P20-C requeridos para provisionar inventario' });
+      }
+    }
     new CfnOutput(this, 'EcsFrontendServiceName', { value: ecsFargate.frontend.service.serviceName, description: 'Servicio ECS formulario publico conectado al ALB' });
     new CfnOutput(this, 'EcsPortalServiceName', { value: ecsFargate.portal.service.serviceName, description: 'Servicio ECS portal interno conectado al ALB' });
     new CfnOutput(this, 'EcsBackendServiceName', { value: ecsFargate.backend.service.serviceName, description: 'Servicio ECS backend' });

@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
+import { ArnFormat, Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -18,8 +18,12 @@ export interface EcsFargateProps {
   readonly ambiente: string;
   readonly databaseHostOverride?: string;
   readonly imageTag: string;
+  /** P20-only override for the backend; other services keep imageTag. */
+  readonly backendImageTag?: string;
   readonly migrationImageTag: string;
   readonly desiredCount: number;
+  /** Optional P20-only backend capacity override; other services keep desiredCount. */
+  readonly backendDesiredCount?: number;
   readonly backendMaxCapacity: number;
   readonly vpc: ec2.Vpc;
   readonly serviceSubnetType: ec2.SubnetType;
@@ -32,6 +36,7 @@ export interface EcsFargateProps {
   readonly portalInternoRepo: ecr.Repository;
   readonly keycloakRepo: ecr.Repository;
   readonly dbSecret: secretsmanager.Secret;
+  readonly cInventoryDbSecret?: secretsmanager.Secret;
   readonly appSecret: secretsmanager.Secret;
   readonly zohoSecret: secretsmanager.ISecret;
   readonly keycloakAdminSecret: secretsmanager.Secret;
@@ -63,6 +68,10 @@ export class EcsFargate extends Construct {
   public readonly frontendTaskRole: iam.Role;
   public readonly portalTaskRole: iam.Role;
   public readonly backendTaskRole: iam.Role;
+  public readonly cInventoryTaskRole?: iam.Role;
+  public readonly cInventoryExecutionRole?: iam.Role;
+  public readonly cInventoryProvisionTaskRole?: iam.Role;
+  public readonly cInventoryProvisionExecutionRole?: iam.Role;
   public readonly keycloakTaskRole: iam.Role;
   public readonly migrationTaskDefinition: ecs.FargateTaskDefinition;
   public readonly migrationLogGroup: logs.LogGroup;
@@ -95,6 +104,13 @@ export class EcsFargate extends Construct {
 
     this.backend = this.buildBackendService(props);
     this.keycloak = this.buildKeycloakService(props);
+
+    if (props.ambiente.match(/^p20-[a-f0-9]{12}$/) && props.cInventoryDbSecret) {
+      this.cInventoryTaskRole = this.buildCInventoryTaskRole(props);
+      this.cInventoryExecutionRole = this.buildCInventoryExecutionRole(props);
+      this.cInventoryProvisionTaskRole = this.buildCInventoryProvisionTaskRole(props);
+      this.cInventoryProvisionExecutionRole = this.buildCInventoryProvisionExecutionRole(props);
+    }
     this.frontend = this.buildFrontendService(props);
     this.portal = this.buildPortalService(props);
   }
@@ -110,7 +126,7 @@ export class EcsFargate extends Construct {
     });
 
     const container = taskDefinition.addContainer('backend', {
-      image: ecs.ContainerImage.fromEcrRepository(props.backendRepo, props.imageTag),
+      image: ecs.ContainerImage.fromEcrRepository(props.backendRepo, props.backendImageTag ?? props.imageTag),
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'backend' }),
       environment: this.backendEnvironment(props, logGroup, { RUN_MODE: 'server' }),
       secrets: this.backendSecrets(props, 'Backend'),
@@ -139,12 +155,13 @@ export class EcsFargate extends Construct {
     // 2026-09-21 al redesplegar staging: el contenedor respondía 200 OK y de
     // todos modos fue terminado por el rollback).
     const targetGroup = this.buildTargetGroup('BackendTargetGroup', props, 'backend', 8000, '/health');
-    const service = this.buildService('BackendService', props, taskDefinition, props.desiredCount, undefined, {
+    const backendDesiredCount = props.backendDesiredCount ?? props.desiredCount;
+    const service = this.buildService('BackendService', props, taskDefinition, backendDesiredCount, undefined, {
       healthCheckGracePeriod: Duration.seconds(180),
     });
     service.attachToApplicationTargetGroup(targetGroup);
     service.node.addDependency(props.db);
-    this.configureBackendAutoScaling(service, props);
+    this.configureBackendAutoScaling(service, props, backendDesiredCount);
 
     return { taskDefinition, service, targetGroup, logGroup };
   }
@@ -158,13 +175,14 @@ export class EcsFargate extends Construct {
    * despliegue sin tráfico, y si backendMaxCapacity no deja rango por encima de
    * desiredCount (autoscaling deshabilitado a propósito, ej. entornos de prueba).
    */
-  private configureBackendAutoScaling(service: ecs.FargateService, props: EcsFargateProps): void {
-    if (props.desiredCount === 0 || props.backendMaxCapacity <= props.desiredCount) {
+  private configureBackendAutoScaling(service: ecs.FargateService, props: EcsFargateProps,
+                                      backendDesiredCount: number): void {
+    if (backendDesiredCount === 0 || props.backendMaxCapacity <= backendDesiredCount) {
       return;
     }
 
     const scaling = service.autoScaleTaskCount({
-      minCapacity: props.desiredCount,
+      minCapacity: backendDesiredCount,
       maxCapacity: props.backendMaxCapacity,
     });
 
@@ -365,7 +383,7 @@ export class EcsFargate extends Construct {
       SNS_TOPIC_ARN: props.alertasTopic.topicArn,
       CW_LOG_GROUP_BACKEND: logGroup.logGroupName,
       MAX_UPLOAD_SIZE_MB: '15',
-      GIT_SHA: props.imageTag,
+      GIT_SHA: props.backendImageTag ?? props.imageTag,
       ...extra,
     };
   }
@@ -445,6 +463,78 @@ export class EcsFargate extends Construct {
     this.grantParameterRead(role, props.configParameterNames);
 
     return role;
+  }
+
+  /** P20-C inventory container needs no AWS API permissions. */
+  private buildCInventoryTaskRole(props: EcsFargateProps): iam.Role {
+    return new iam.Role(this, 'CInventoryTaskRole', {
+      roleName: `sagrilaft-${props.ambiente}-c-inventory-task`,
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+  }
+
+  /** Agent-only permissions for one pinned image, one secret, and one log group. */
+  private buildCInventoryExecutionRole(props: EcsFargateProps): iam.Role {
+    const role = new iam.Role(this, 'CInventoryExecutionRole', {
+      roleName: `sagrilaft-${props.ambiente}-c-inventory-execution`,
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+    // grantPull scopes layer/image actions to the backend P20 repository;
+    // GetAuthorizationToken remains account-scoped as required by ECR.
+    props.backendRepo.grantPull(role);
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'ReadOnlyInventoryCredential',
+      effect: iam.Effect.ALLOW,
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [props.cInventoryDbSecret!.secretArn],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'CInventoryBackendLogs',
+      effect: iam.Effect.ALLOW,
+      actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+      resources: [this.backendLogStreamArn()],
+    }));
+    return role;
+  }
+
+  /** One-shot DB role provisioning task: no AWS permissions from the container. */
+  private buildCInventoryProvisionTaskRole(props: EcsFargateProps): iam.Role {
+    return new iam.Role(this, 'CInventoryProvisionTaskRole', {
+      roleName: `sagrilaft-${props.ambiente}-c-inventory-provision-task`,
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+  }
+
+  /** Pull one backend image, read only the two P20 DB secrets, and write backend logs. */
+  private buildCInventoryProvisionExecutionRole(props: EcsFargateProps): iam.Role {
+    const role = new iam.Role(this, 'CInventoryProvisionExecutionRole', {
+      roleName: `sagrilaft-${props.ambiente}-c-inventory-provision-execution`,
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    });
+    props.backendRepo.grantPull(role);
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'ReadOnlyP20DatabaseProvisioningCredentials',
+      effect: iam.Effect.ALLOW,
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [props.dbSecret.secretArn, props.cInventoryDbSecret!.secretArn],
+    }));
+    role.addToPolicy(new iam.PolicyStatement({
+      sid: 'CInventoryProvisionBackendLogs',
+      effect: iam.Effect.ALLOW,
+      actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+      resources: [this.backendLogStreamArn()],
+    }));
+    return role;
+  }
+
+  /** Scope task log writes to streams inside the existing backend log group. */
+  private backendLogStreamArn(): string {
+    return Stack.of(this).formatArn({
+      service: 'logs',
+      resource: 'log-group',
+      resourceName: `${this.backend.logGroup.logGroupName}:log-stream:*`,
+      arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+    });
   }
 
   private buildFrontendRole(id: string, props: EcsFargateProps): iam.Role {

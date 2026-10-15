@@ -4,6 +4,7 @@
 
   export interface SecretsProps {
     readonly ambiente: string;
+    readonly laboratorioP20?: boolean;
     /**
      * true si `sagrilaft/${ambiente}/zoho_credentials` ya fue creado
      * manualmente por fuera de CDK (ej. para cargar credenciales reales de
@@ -26,6 +27,7 @@
    */
   export class Secrets extends Construct {
     public readonly dbSecret: secretsmanager.Secret;
+    public readonly cInventoryDbSecret?: secretsmanager.Secret;
     public readonly appSecret: secretsmanager.Secret;
     public readonly zohoSecret: secretsmanager.ISecret;
     public readonly keycloakAdminSecret: secretsmanager.Secret;
@@ -35,7 +37,7 @@
     constructor(scope: Construct, id: string, props: SecretsProps) {
       super(scope, id);
 
-      const { ambiente, zohoSecretYaExiste } = props;
+      const { ambiente, zohoSecretYaExiste, laboratorioP20 = false } = props;
 
       this.dbSecret = new secretsmanager.Secret(this, 'DbSecret', {
         secretName: `sagrilaft/${ambiente}/db_credentials`,
@@ -46,6 +48,21 @@
           passwordLength: 32,
         },
       });
+
+      // Credential dedicated to the read-only P20 C inventory. This secret
+      // does not create a PostgreSQL role; that grant is a separately reviewed
+      // database operation against the disposable clone.
+      if (laboratorioP20) {
+        this.cInventoryDbSecret = new secretsmanager.Secret(this, 'CInventoryDbSecret', {
+          secretName: `sagrilaft/${ambiente}/c_inventory_db_credentials`,
+          generateSecretString: {
+            secretStringTemplate: '{"username": "p20_c_inventory"}',
+            generateStringKey: 'password',
+            excludePunctuation: true,
+            passwordLength: 32,
+          },
+        });
+      }
 
       this.appSecret = new secretsmanager.Secret(this, 'AppSecret', {
         secretName: `sagrilaft/${ambiente}/app_secret`,
