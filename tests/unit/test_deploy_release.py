@@ -240,6 +240,400 @@ def test_p20_plan_requires_run_scoped_environment_and_isolated_context():
         unsafe[field] = value
         with pytest.raises(release.MigrationError):
             release.validate_plan(unsafe)
+
+
+def test_p20_stopped_clone_repoint_plan_requires_zero_capacity_and_same_run_id():
+    p = p20_plan()
+    p['p20_operation'] = 'configure-restored-db-stopped'
+    p['desired_count'] = 0
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    p['context']['databaseHostOverride'] = 'p20-012345abcdef-c7-test-20261012.cbm5sq1kjl57.us-east-1.rds.amazonaws.com'
+    p['context']['restoredDbIdentifier'] = 'p20-012345abcdef-c7-test-20261012'
+    release.validate_plan(p)
+
+    unsafe = copy.deepcopy(p)
+    unsafe['desired_count'] = 1
+    with pytest.raises(release.MigrationError, match='Capacidad inválida'):
+        release.validate_plan(unsafe)
+
+    unsafe = copy.deepcopy(p)
+    unsafe['context']['restoredDbIdentifier'] = 'p20-fedcba654321-c7-test-20261012'
+    with pytest.raises(release.MigrationError, match='identificador de RDS'):
+        release.validate_plan(unsafe)
+
+    fixed_backend = copy.deepcopy(p)
+    fixed_backend.update({
+        'backend_image_tag': '4d63c1356cc92b8d8d515e7147a7ac06565b0583',
+        'backend_image_digest': 'sha256:' + 'c' * 64,
+    })
+    release.validate_plan(fixed_backend)
+
+    unsafe = copy.deepcopy(fixed_backend)
+    unsafe['backend_image_digest'] = None
+    with pytest.raises(release.MigrationError, match='tag y digest juntos'):
+        release.validate_plan(unsafe)
+
+    unsafe = copy.deepcopy(fixed_backend)
+    unsafe['environment'] = 'staging'
+    with pytest.raises(release.MigrationError, match='override de imagen backend'):
+        release.validate_plan(unsafe)
+
+
+def backend_only_plan(count=1):
+    p = p20_plan()
+    p.update({
+        'p20_operation': 'backend-only-restored-db',
+        'desired_count': 0,
+        'backend_desired_count': count,
+        'backend_image_tag': '4d63c1356cc92b8d8d515e7147a7ac06565b0583',
+        'backend_image_digest': 'sha256:' + 'c' * 64,
+        'preflightOnly': True,
+        'executionAuthorized': False,
+    })
+    p['context'].update({
+        'databaseHostOverride': 'restore.p20.internal',
+        'restoredDbIdentifier': 'p20-012345abcdef-c7-test-20261012',
+        'backendMaxCapacity': 1,
+    })
+    return p
+
+
+def backend_only_templates(host='restore.p20.internal', tag='4d63c1356cc92b8d8d515e7147a7ac06565b0583'):
+    task_names = [*release.SERVICES, 'migration']
+    resources = {}
+    task_ids = {}
+    for name in task_names:
+        container_name = {'formulario-publico': 'frontend', 'portal-interno': 'portal'}.get(name, name)
+        task_id = 'task-' + name
+        task_ids[name] = task_id
+        if container_name == 'backend':
+            env = {'GIT_SHA': tag, 'DATABASE_HOST': host,
+                   'KEYCLOAK_DB_URL': f'jdbc:postgresql://{host}:5432/sagrilaft',
+                   'P20_RUN_ID': 'p20-012345abcdef', 'ZOHO_SIGN_ENABLED': 'false'}
+        elif container_name == 'keycloak':
+            env = {'KC_DB_URL': f'jdbc:postgresql://{host}:5432/sagrilaft'}
+        elif container_name == 'migration':
+            env = {'GIT_SHA': 'candidate', 'DATABASE_HOST': host,
+                   'KEYCLOAK_DB_URL': f'jdbc:postgresql://{host}:5432/sagrilaft',
+                   'P20_RUN_ID': 'p20-012345abcdef', 'ZOHO_SIGN_ENABLED': 'false'}
+        else:
+            env = {'GIT_SHA': 'baseline'}
+        image_tag = tag if container_name == 'backend' else ('candidate' if container_name == 'migration' else 'baseline')
+        resources[task_id] = {'Type': 'AWS::ECS::TaskDefinition', 'Properties': {
+            'ContainerDefinitions': [{'Name': container_name, 'Image': 'repo:' + image_tag,
+                                     'Environment': [{'Name': k, 'Value': v} for k, v in env.items()],
+                                     'Secrets': [{'Name': 'DB_PASSWORD', 'ValueFrom': 'p20-secret'}]}]}}
+    for name in release.SERVICES:
+        resources['service-' + name] = {'Type': 'AWS::ECS::Service', 'Properties': {
+            'DesiredCount': 0, 'TaskDefinition': {'Ref': task_ids[name]}, 'Cluster': 'p20-cluster'}}
+    outputs = {'EcsDesiredCount': {'Value': '0'}, 'EcsDatabaseHost': {'Value': host},
+               'RdsEndpoint': {'Value': 'original.p20.internal'}}
+    before = {'Resources': resources, 'Outputs': outputs}
+    after = copy.deepcopy(before)
+    after['Resources']['service-backend']['Properties']['DesiredCount'] = 1
+    return before, after
+
+
+def test_p20_backend_only_plan_requires_one_cloned_db_and_pinned_image():
+    release.validate_plan(backend_only_plan(1))
+    release.validate_plan(backend_only_plan(0))
+
+    unsafe = backend_only_plan(2)
+    with pytest.raises(release.MigrationError, match='backend_desired_count=0 o 1'):
+        release.validate_plan(unsafe)
+
+    unsafe = backend_only_plan()
+    unsafe['desired_count'] = 1
+    with pytest.raises(release.MigrationError, match='Capacidad inválida'):
+        release.validate_plan(unsafe)
+
+    unsafe = backend_only_plan()
+    unsafe['backend_image_digest'] = None
+    with pytest.raises(release.MigrationError, match='tag y digest juntos'):
+        release.validate_plan(unsafe)
+
+    unsafe = backend_only_plan()
+    unsafe['context']['restoredDbIdentifier'] = 'p20-fedcba654321-c7-test-20261012'
+    with pytest.raises(release.MigrationError, match='identificador de RDS'):
+        release.validate_plan(unsafe)
+
+    unsafe = backend_only_plan()
+    unsafe['context']['backendMaxCapacity'] = 2
+    with pytest.raises(release.MigrationError, match='backendMaxCapacity=1'):
+        release.validate_plan(unsafe)
+
+
+@pytest.mark.parametrize(('source_count', 'target_count'), [(0, 1), (1, 0)])
+def test_p20_backend_only_transition_changes_only_backend_capacity(source_count, target_count):
+    before, activated = backend_only_templates()
+    after = activated if target_count == 1 else copy.deepcopy(activated)
+    if target_count == 0:
+        after['Resources']['service-backend']['Properties']['DesiredCount'] = 0
+    release.assert_p20_backend_only_transition(
+        before if source_count == 0 else activated, after, source_count, target_count,
+        'restore.p20.internal', '4d63c1356cc92b8d8d515e7147a7ac06565b0583', 'p20-012345abcdef')
+
+
+@pytest.mark.parametrize('mutation', [
+    'frontend_count', 'frontend_image', 'portal_image', 'keycloak_image',
+    'backend_image', 'db_host', 'zoho_enabled', 'extra_resource',
+])
+def test_p20_backend_only_transition_rejects_out_of_scope_changes(mutation):
+    before, after = backend_only_templates()
+    unsafe = copy.deepcopy(after)
+    if mutation == 'frontend_count':
+        unsafe['Resources']['service-formulario-publico']['Properties']['DesiredCount'] = 1
+    elif mutation in ('frontend_image', 'portal_image', 'keycloak_image'):
+        task_id = {'frontend_image': 'task-formulario-publico', 'portal_image': 'task-portal-interno',
+                   'keycloak_image': 'task-keycloak'}[mutation]
+        unsafe['Resources'][task_id]['Properties']['ContainerDefinitions'][0]['Image'] = 'repo:unexpected'
+    elif mutation == 'backend_image':
+        unsafe['Resources']['task-backend']['Properties']['ContainerDefinitions'][0]['Image'] = 'repo:wrong'
+    elif mutation == 'db_host':
+        env = unsafe['Resources']['task-backend']['Properties']['ContainerDefinitions'][0]['Environment']
+        next(item for item in env if item['Name'] == 'DATABASE_HOST')['Value'] = 'original.p20.internal'
+    elif mutation == 'zoho_enabled':
+        env = unsafe['Resources']['task-backend']['Properties']['ContainerDefinitions'][0]['Environment']
+        next(item for item in env if item['Name'] == 'ZOHO_SIGN_ENABLED')['Value'] = 'true'
+    else:
+        unsafe['Resources']['unexpected'] = {'Type': 'AWS::S3::Bucket', 'Properties': {}}
+    with pytest.raises(release.MigrationError):
+        release.assert_p20_backend_only_transition(
+            before, unsafe, 0, 1, 'restore.p20.internal',
+            '4d63c1356cc92b8d8d515e7147a7ac06565b0583', 'p20-012345abcdef')
+
+
+@pytest.mark.parametrize('target_count', [0, 1])
+def test_p20_backend_only_preflight_is_read_only_and_never_migrates(tmp_path, monkeypatch, target_count):
+    p = backend_only_plan(target_count)
+    outputs = {
+        'EcsDesiredCount': '0', 'EcsDatabaseHost': 'restore.p20.internal',
+        'RdsEndpoint': 'original.p20.internal', 'EcsMigrationImageTag': p['candidate_tag'],
+        'EcsClusterName': 'sagrilaft-' + p['environment'], 'S3Bucket': 'p20-bucket',
+        'EcsMigrationTaskDefinitionArn': 'migration:4',
+        'EcsBackendTargetGroupArn': 'arn:target-group:backend',
+    }
+    outputs.update({key: p['environment'] + '-' + kind for kind, key in release.SERVICES.items()})
+    before, activated = backend_only_templates()
+    baseline = before if target_count == 1 else activated
+    target = activated if target_count == 1 else before
+
+    class Runtime:
+        plan, stack = p, 'SagrilaftStack-' + p['environment']
+
+        def __init__(self):
+            self.directory, self.calls, self.saved, self.events, self.deployments = tmp_path, [], {}, [], []
+
+        def aws(self, service, operation, *args):
+            self.calls.append((service, operation, args))
+            if (service, operation) == ('sts', 'get-caller-identity'):
+                return {'Account': p['account']}
+            pytest.fail(f'Unexpected AWS call during preflight: {service}/{operation}')
+
+        def save(self, name, value): self.saved[name] = copy.deepcopy(value)
+        def event(self, value): self.events.append(copy.deepcopy(value))
+        def synth(self, phase, image_tag, migration_tag, count):
+            assert phase == 'p20-backend-only-restored-db'
+            assert image_tag == p['previous_tag'] and migration_tag == p['candidate_tag'] and count == 0
+            return copy.deepcopy(target)
+        def deploy(self, phase): self.deployments.append(phase)
+
+    state_checks = []
+    monkeypatch.setattr(release, 'stack_state', lambda _rt: outputs)
+    monkeypatch.setattr(release, 'verify_restored_database', lambda *_args: {
+        'identifier': p['context']['restoredDbIdentifier'], 'host': 'restore.p20.internal',
+        'status': 'available', 'kmsKeyArn': 'arn:kms'})
+    monkeypatch.setattr(release, 'verify_p20_clone_network_and_kms', lambda *_args: {'isolated': True})
+    monkeypatch.setattr(release, 'verify_p20_backend_image', lambda *_args: state_checks.append('image-digest'))
+    monkeypatch.setattr(release, 'verify_p20_backend_only_services',
+                        lambda _rt, _outputs, count, *_args, **_kwargs: state_checks.append(('services', count)) or [])
+    monkeypatch.setattr(release, 'deployed_template', lambda _rt: copy.deepcopy(baseline))
+
+    rt = Runtime()
+    release.coordinate(rt)
+    assert rt.deployments == []
+    assert rt.events[-1]['event'] == 'p20_backend_only_preflight_validated'
+    assert rt.events[-1]['backendDesiredCountBefore'] == 1 - target_count
+    assert rt.events[-1]['backendDesiredCountAfter'] == target_count
+    assert rt.events[-1]['otherServicesRemainZero'] is True
+    assert rt.events[-1]['migrationWillRun'] is False
+    assert ('services', 1 - target_count) in state_checks
+    assert all(operation not in {'put-object', 'delete-object', 'run-task', 'update-service'}
+               for _, operation, _ in rt.calls)
+
+
+def stopped_repoint_templates(source='primary.p20.internal', target='restore.p20.internal'):
+    before = rollback_template('previous', migration_tag='candidate', count=0)
+    before['Outputs'].update({
+        'EcsDesiredCount': {'Value': '0'}, 'RdsEndpoint': {'Value': source},
+        'EcsDatabaseHost': {'Value': source},
+    })
+    db_fields = {
+        'backend': {'DATABASE_HOST': source, 'KEYCLOAK_DB_URL': f'jdbc:postgresql://{source}:5432/sagrilaft'},
+        'keycloak': {'KC_DB_URL': f'jdbc:postgresql://{source}:5432/sagrilaft'},
+        'migration': {'DATABASE_HOST': source, 'KEYCLOAK_DB_URL': f'jdbc:postgresql://{source}:5432/sagrilaft'},
+    }
+    for name, fields in db_fields.items():
+        container = before['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        container['Environment'].extend({'Name': key, 'Value': value} for key, value in fields.items())
+        if name in {'backend', 'migration'}:
+            container['Environment'].extend([
+                {'Name': 'P20_RUN_ID', 'Value': 'p20-012345abcdef'},
+                {'Name': 'ZOHO_SIGN_ENABLED', 'Value': 'false'},
+            ])
+        container['Secrets'] = [{'Name': 'DB_PASSWORD', 'ValueFrom': 'p20-db-secret'}]
+    after = copy.deepcopy(before)
+    after['Outputs']['EcsDatabaseHost'] = {'Value': target}
+    for name, fields in db_fields.items():
+        container = after['Resources'][name]['Properties']['ContainerDefinitions'][0]
+        for item in container['Environment']:
+            if item['Name'] in fields:
+                item['Value'] = target if item['Name'] == 'DATABASE_HOST' else f'jdbc:postgresql://{target}:5432/sagrilaft'
+    return before, after
+
+
+def test_p20_stopped_clone_repoint_transition_changes_only_db_endpoints():
+    before, after = stopped_repoint_templates()
+    release.assert_p20_stopped_database_transition(
+        before, after, 'primary.p20.internal', 'restore.p20.internal', 'p20-012345abcdef')
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Outputs']['EcsDesiredCount']['Value'] = '1'
+    with pytest.raises(release.MigrationError, match='desiredCount=0'):
+        release.assert_p20_stopped_database_transition(
+            before, unsafe, 'primary.p20.internal', 'restore.p20.internal', 'p20-012345abcdef')
+
+
+def test_p20_stopped_clone_backend_override_changes_only_backend_image():
+    tag = '4d63c1356cc92b8d8d515e7147a7ac06565b0583'
+    before, after = stopped_repoint_templates('restore.p20.internal', 'restore.p20.internal')
+    backend = after['Resources']['backend']['Properties']['ContainerDefinitions'][0]
+    backend['Image'] = '123456789012.dkr.ecr.us-east-1.amazonaws.com/backend:' + tag
+    next(item for item in backend['Environment'] if item['Name'] == 'GIT_SHA')['Value'] = tag
+    release.assert_p20_stopped_database_transition(
+        before, after, 'restore.p20.internal', 'restore.p20.internal', 'p20-012345abcdef',
+        backend_image_tag=tag)
+
+    unsafe = copy.deepcopy(after)
+    frontend = unsafe['Resources']['formulario-publico']['Properties']['ContainerDefinitions'][0]
+    frontend['Image'] = '123456789012.dkr.ecr.us-east-1.amazonaws.com/frontend:' + tag
+    with pytest.raises(release.MigrationError):
+        release.assert_p20_stopped_database_transition(
+            before, unsafe, 'restore.p20.internal', 'restore.p20.internal', 'p20-012345abcdef',
+            backend_image_tag=tag)
+
+
+def test_p20_stopped_clone_repoint_accepts_original_rds_intrinsics_from_cfn():
+    before, after = stopped_repoint_templates()
+    before['Resources']['DatabasePostgresA1'] = {'Type': 'AWS::RDS::DBInstance'}
+    after['Resources']['DatabasePostgresA1'] = {'Type': 'AWS::RDS::DBInstance'}
+    original_endpoint = {'Fn::GetAtt': ['DatabasePostgresA1', 'Endpoint.Address']}
+    before['Outputs']['RdsEndpoint']['Value'] = original_endpoint
+    after['Outputs']['RdsEndpoint']['Value'] = original_endpoint
+    for name in ('backend', 'migration'):
+        env = before['Resources'][name]['Properties']['ContainerDefinitions'][0]['Environment']
+        for item in env:
+            if item['Name'] == 'DATABASE_HOST':
+                item['Value'] = {'Fn::GetAtt': ['DatabasePostgresA1', 'Endpoint.Address']}
+            elif item['Name'] == 'KEYCLOAK_DB_URL':
+                item['Value'] = {'Fn::Join': ['', [
+                    'jdbc:postgresql://',
+                    {'Fn::GetAtt': ['DatabasePostgresA1', 'Endpoint.Address']},
+                    ':5432/sagrilaft',
+                ]]}
+    env = before['Resources']['keycloak']['Properties']['ContainerDefinitions'][0]['Environment']
+    for item in env:
+        if item['Name'] == 'KC_DB_URL':
+            item['Value'] = {'Fn::Join': ['', [
+                'jdbc:postgresql://',
+                {'Fn::GetAtt': ['DatabasePostgresA1', 'Endpoint.Address']},
+                ':5432/sagrilaft',
+            ]]}
+    release.assert_p20_stopped_database_transition(
+        before, after, 'primary.p20.internal', 'restore.p20.internal', 'p20-012345abcdef')
+
+
+def test_p20_stopped_clone_repoint_preflight_never_deploys_or_starts_tasks(tmp_path, monkeypatch):
+    p = p20_plan()
+    p.update({'p20_operation': 'configure-restored-db-stopped', 'desired_count': 0,
+              'preflightOnly': True, 'executionAuthorized': False})
+    p['previous_digests'] = {key: 'sha256:' + 'b' * 64 for key in release.SERVICES}
+    p['context'].update({
+        'databaseHostOverride': 'restore.p20.internal',
+        'restoredDbIdentifier': 'p20-012345abcdef-c7-test-20261012',
+    })
+    names = {kind: f'{p["environment"]}-{kind}' for kind in release.SERVICES}
+    outputs = {
+        'EcsDesiredCount': '0', 'EcsMigrationImageTag': p['candidate_tag'],
+        'EcsClusterName': f'sagrilaft-{p["environment"]}', 'S3Bucket': 'p20-bucket',
+        'EcsMigrationTaskDefinitionArn': 'migration:2', 'RdsEndpoint': 'primary.p20.internal',
+        'EcsDatabaseHost': 'primary.p20.internal',
+    }
+    outputs.update({release.SERVICES[kind]: name for kind, name in names.items()})
+    before, after = stopped_repoint_templates('primary.p20.internal', 'restore.p20.internal')
+
+    class Runtime:
+        plan, stack = p, 'SagrilaftStack-' + p['environment']
+
+        def __init__(self):
+            self.directory, self.calls, self.saved, self.events, self.deployments = tmp_path, [], {}, [], []
+
+        def aws(self, service, operation, *args):
+            self.calls.append((service, operation, args))
+            if (service, operation) == ('sts', 'get-caller-identity'):
+                return {'Account': p['account']}
+            pytest.fail(f'Unexpected AWS call: {service}/{operation}')
+
+        def save(self, name, value): self.saved[name] = copy.deepcopy(value)
+        def event(self, value): self.events.append(copy.deepcopy(value))
+        def synth(self, phase, image_tag, migration_tag, count):
+            assert (phase, image_tag, migration_tag, count) == (
+                'repoint-restored-db-stopped', p['previous_tag'], p['candidate_tag'], 0)
+            return copy.deepcopy(after)
+        def deploy(self, phase): self.deployments.append(phase)
+
+    checks = []
+    monkeypatch.setattr(release, 'stack_state', lambda _rt: outputs)
+    monkeypatch.setattr(release, 'require_p20_services_stopped', lambda *_args: checks.append('stopped'))
+    monkeypatch.setattr(release, 'verify_restored_database', lambda *_args: {
+        'identifier': p['context']['restoredDbIdentifier'], 'host': 'restore.p20.internal',
+        'status': 'available', 'kmsKeyArn': 'arn:kms'})
+    monkeypatch.setattr(release, 'verify_p20_clone_network_and_kms', lambda *_args: {'postgresIngressFromEcsVerified': True})
+    monkeypatch.setattr(release, 'verify_tag_digests', lambda *_args: checks.append('digests'))
+    monkeypatch.setattr(release, 'deployed_template', lambda _rt: copy.deepcopy(before))
+    monkeypatch.setattr(release, 'services', lambda *_args: [
+        {'serviceName': names[kind], 'taskDefinition': f'{kind}:2'} for kind in release.SERVICES])
+    monkeypatch.setattr(release, 'verify_p20_task_database_and_secret_scope',
+                        lambda *_args, **kwargs: checks.append(('db-secret-scope', kwargs.get('before_host'))))
+
+    runtime = Runtime()
+    release.coordinate(runtime)
+    assert runtime.deployments == []
+    assert runtime.events[-1]['event'] == 'p20_restored_database_stopped_preflight_validated'
+    assert runtime.events[-1]['desiredCount'] == 0
+    assert runtime.events[-1]['servicesWillStart'] is False
+    assert runtime.events[-1]['migrationWillRun'] is False
+    assert checks == ['stopped', 'digests', ('db-secret-scope', 'primary.p20.internal')]
+    assert all(operation not in {'put-object', 'delete-object', 'run-task', 'update-service'}
+               for _, operation, _ in runtime.calls)
+
+    with pytest.raises(release.MigrationError, match='no autoriza actualizar task definitions'):
+        release.coordinate(runtime, execute=True)
+    assert runtime.deployments == []
+    assert all(operation not in {'put-object', 'delete-object', 'run-task', 'update-service'}
+               for _, operation, _ in runtime.calls)
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['keycloak']['Properties']['ContainerDefinitions'][0]['Environment'][-1]['Value'] = 'jdbc:postgresql://prod.example:5432/sagrilaft'
+    with pytest.raises(release.MigrationError, match='Conexión de destino incorrecta'):
+        release.assert_p20_stopped_database_transition(
+            before, unsafe, 'primary.p20.internal', 'restore.p20.internal', 'p20-012345abcdef')
+
+    unsafe = copy.deepcopy(after)
+    unsafe['Resources']['backend']['Properties']['ContainerDefinitions'][0]['Secrets'][0]['ValueFrom'] = 'staging-db-secret'
+    with pytest.raises(release.MigrationError, match='secretos'):
+        release.assert_p20_stopped_database_transition(
+            before, unsafe, 'primary.p20.internal', 'restore.p20.internal', 'p20-012345abcdef')
     for key, value in [('snsAlertasSub', 'someone@example.invalid'),
                        ('habilitarNatEgress', True), ('hostedZoneName', 'example.com')]:
         unsafe = copy.deepcopy(p)
@@ -252,7 +646,8 @@ def test_p20_plan_requires_run_scoped_environment_and_isolated_context():
 def test_p20_migration_fault_modes_are_allowlisted(fault):
     p = p20_plan()
     p["p20_migration_fault"] = fault
-    release.validate_plan(p)
+    with pytest.raises(release.MigrationError, match="ruta exclusiva scenario-a-fixture"):
+        release.validate_plan(p)
 
     p["environment"] = "staging"
     with pytest.raises(release.MigrationError, match="solo se permite en P20"):
@@ -267,7 +662,7 @@ def test_p20_migration_fault_modes_are_allowlisted(fault):
     p["p20_migration_fault"] = fault
     p["p20_operation"] = "rollback-services"
     p["previous_digests"] = {key: "sha256:" + "b" * 64 for key in release.SERVICES}
-    with pytest.raises(release.MigrationError, match="flujo coordinado compatible P20"):
+    with pytest.raises(release.MigrationError, match="ruta exclusiva scenario-a-fixture"):
         release.validate_plan(p)
 
 
@@ -1121,3 +1516,146 @@ def test_strict_baseline_accepts_only_approved_unicode_preserving_metadata(path,
     assert release.comparison_template(a, 'staging', preserve_metadata=True) == release.comparison_template(b, 'staging', preserve_metadata=True)
     b['Metadata'] = {'same': False}
     assert release.comparison_template(a, 'staging', preserve_metadata=True) != release.comparison_template(b, 'staging', preserve_metadata=True)
+
+
+class BackendStartupLogsRuntime:
+    """Simula únicamente las lecturas ECS/Logs del verificador de arranque."""
+    def __init__(self):
+        self.plan = {'account': '123456789012', 'region': 'us-east-1'}
+        self.environment = 'p20-012345abcdef'
+        self.outputs = {'EcsBackendServiceName': 'backend-service',
+                        'EcsClusterName': 'sagrilaft-' + self.environment}
+        self.task_arn = ('arn:aws:ecs:us-east-1:123456789012:task/'
+                         + self.outputs['EcsClusterName'] + '/' + 'a' * 32)
+        self.definition_arn = ('arn:aws:ecs:us-east-1:123456789012:task-definition/'
+                               'sagrilaft-p20-012345abcdef-backend:5')
+        self.services = [{'serviceName': 'backend-service', 'taskDefinition': self.definition_arn,
+                          'verifiedTasks': [{'taskArn': self.task_arn}]}]
+        self.task = {'taskArn': self.task_arn, 'taskDefinitionArn': self.definition_arn,
+                     'lastStatus': 'RUNNING', 'containers': [{'name': 'backend'}]}
+        self.group = '/sagrilaft/' + self.environment + '/ecs/backend'
+        self.stream = 'custom-prefix/backend/' + 'a' * 32
+        self.options = {'awslogs-group': self.group, 'awslogs-region': 'us-east-1',
+                        'awslogs-stream-prefix': 'custom-prefix'}
+        self.elapsed, self.available_at, self.marker_at = 0, 0, 0
+        self.calls = []
+        self.extra_stream_suffix = ''
+        self.fail = None
+        self.pages = []
+        self.stop_at = None
+
+    def sleep(self, seconds):
+        self.elapsed += seconds
+
+    def clock(self):
+        return self.elapsed
+
+    def aws(self, service, operation, *args):
+        self.calls.append((service, operation, args))
+        if operation == self.fail:
+            raise release.MigrationError('AWS: acceso denegado o resultado incierto')
+        if (service, operation) == ('ecs', 'describe-task-definition'):
+            assert args == ('--task-definition', self.definition_arn)
+            return {'taskDefinition': {'taskDefinitionArn': self.definition_arn,
+                    'containerDefinitions': [{'name': 'backend', 'logConfiguration': {
+                        'logDriver': 'awslogs', 'options': self.options}}]}}
+        if (service, operation) == ('ecs', 'describe-tasks'):
+            assert args == ('--cluster', self.outputs['EcsClusterName'], '--tasks', self.task_arn)
+            if self.stop_at is not None and self.elapsed >= self.stop_at:
+                self.task['lastStatus'] = 'STOPPED'
+            return {'tasks': [self.task]}
+        if (service, operation) == ('logs', 'describe-log-streams'):
+            assert args == ('--log-group-name', self.group, '--log-stream-name-prefix', self.stream)
+            return {'logStreams': [{'logStreamName': self.stream + self.extra_stream_suffix}]
+                    if self.elapsed >= self.available_at else []}
+        if (service, operation) == ('logs', 'filter-log-events'):
+            assert args[args.index('--log-stream-names') + 1] == self.stream
+            assert args[args.index('--log-group-name') + 1] == self.group
+            assert '--no-paginate' in args
+            if self.pages:
+                return self.pages.pop(0)
+            return {'events': [{'message': '[entrypoint] Base de datos disponible (intento 1).',
+                                'logStreamName': self.stream}]
+                    if self.elapsed >= self.marker_at else []}
+        pytest.fail(f'Operación ajena a lectura ECS/Logs: {service}/{operation}')
+
+    def verify(self):
+        return release.verify_p20_backend_database_startup(
+            self, self.outputs, self.services, self.environment,
+            sleep=self.sleep, clock=self.clock)
+
+
+def test_backend_startup_resolves_awslogs_without_ecs_log_stream_field():
+    rt = BackendStartupLogsRuntime()
+    result = rt.verify()
+    assert result['taskArn'] == rt.task_arn and result['logStream'] == rt.stream
+    assert rt.elapsed == 0
+
+
+def test_backend_startup_waits_for_stream_and_then_marker():
+    rt = BackendStartupLogsRuntime()
+    rt.available_at, rt.marker_at = 4, 8
+    assert rt.verify()['databaseConnectivity'].startswith('SELECT 1 succeeded')
+    assert rt.elapsed == 8
+    assert sum(op == 'filter-log-events' for _, op, _ in rt.calls) == 3
+
+
+@pytest.mark.parametrize('missing', ['stream', 'marker', 'different-stream'])
+def test_backend_startup_times_out_without_using_other_task_logs(missing):
+    rt = BackendStartupLogsRuntime()
+    if missing == 'stream': rt.available_at = 100
+    if missing == 'marker': rt.marker_at = 100
+    if missing == 'different-stream': rt.extra_stream_suffix = '-other-task'
+    with pytest.raises(release.MigrationError, match='conservar evidencia y lock'):
+        rt.verify()
+    assert rt.elapsed == 60
+    if missing != 'marker':
+        assert not any(op == 'filter-log-events' for _, op, _ in rt.calls)
+
+
+def test_backend_startup_follows_empty_log_page_without_losing_marker():
+    rt = BackendStartupLogsRuntime()
+    rt.pages = [{'events': [], 'nextToken': 'page-2'}]
+    assert rt.verify()['logStream'] == rt.stream
+    log_calls = [args for _, op, args in rt.calls if op == 'filter-log-events']
+    assert log_calls[1][-2:] == ('--next-token', 'page-2')
+
+
+@pytest.mark.parametrize('operation', ['describe-task-definition', 'describe-tasks',
+                                       'describe-log-streams', 'filter-log-events'])
+def test_backend_startup_does_not_retry_aws_errors_or_modify_resources(operation):
+    rt = BackendStartupLogsRuntime()
+    rt.fail = operation
+    with pytest.raises(release.MigrationError, match='acceso denegado'):
+        rt.verify()
+    assert rt.elapsed == 0
+    assert sum(op == operation for _, op, _ in rt.calls) == 1
+
+
+@pytest.mark.parametrize('option,value', [('awslogs-group', '/sagrilaft/staging/ecs/backend'),
+                                         ('awslogs-region', 'eu-west-1'),
+                                         ('awslogs-stream-prefix', '')])
+def test_backend_startup_rejects_wrong_log_configuration(option, value):
+    rt = BackendStartupLogsRuntime()
+    rt.options[option] = value
+    with pytest.raises(release.MigrationError, match='Configuración awslogs'):
+        rt.verify()
+    assert not any(service == 'logs' for service, _, _ in rt.calls)
+
+
+def test_backend_startup_stops_if_task_stops_while_waiting():
+    rt = BackendStartupLogsRuntime()
+    rt.available_at, rt.stop_at = 100, 2
+    with pytest.raises(release.MigrationError, match='dejó de estar RUNNING'):
+        rt.verify()
+    assert rt.elapsed == 2
+
+
+@pytest.mark.parametrize('field,value', [('taskArn', 'another-task'),
+                                       ('taskDefinitionArn', 'another-definition')])
+def test_backend_startup_rejects_changed_task_identity(field, value):
+    rt = BackendStartupLogsRuntime()
+    rt.task[field] = value
+    with pytest.raises(release.MigrationError, match='La tarea backend cambió'):
+        rt.verify()
+    assert not any(service == 'logs' for service, _, _ in rt.calls)
