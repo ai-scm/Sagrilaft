@@ -69,10 +69,40 @@ export class SagrilaftStack extends cdk.Stack {
     }
     const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE));
     const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE_ID));
-    const dominio = String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
-    const dominioPortal = String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
-    const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
-    const certArn = String(this.node.tryGetContext('certificateArn') ?? '');
+    // Opt-in: conserva la sintesis existente hasta revisar y aprobar el cambio.
+    const privateBrowserRaw = String(this.node.tryGetContext('p20PrivateBrowserAccess') ?? 'false');
+    if (!['true', 'false'].includes(privateBrowserRaw)) {
+      throw new Error('p20PrivateBrowserAccess debe ser true o false.');
+    }
+    const privateBrowser = privateBrowserRaw === 'true';
+    const browserCertArn = String(this.node.tryGetContext('p20BrowserCertificateArn') ?? '');
+    if ((privateBrowser || browserCertArn) && !laboratorioP20) {
+      throw new Error('El acceso privado de navegador solo se permite en P20.');
+    }
+    if (browserCertArn && !privateBrowser) {
+      throw new Error('p20BrowserCertificateArn requiere p20PrivateBrowserAccess=true.');
+    }
+    const isolatedDomains = [`formulario.${ambiente}.invalid`, `portal.${ambiente}.invalid`, `login.${ambiente}.invalid`];
+    const domainKeys = ['domainName', 'portalDomainName', 'keycloakDomainName'];
+    if (privateBrowser) {
+      domainKeys.forEach((key, i) => {
+        const supplied = this.node.tryGetContext(key);
+        if (supplied !== undefined && supplied !== isolatedDomains[i]) {
+          throw new Error(`${key} debe coincidir con el origen exclusivo de P20: ${isolatedDomains[i]}`);
+        }
+      });
+      // El ARN no acredita SAN, vigencia ni confianza. Verificarlos por API
+      // antes de desplegar; no reutilizar ni reimportar el certificado compartido.
+      const currentCert = String(this.node.tryGetContext('certificateArn') ?? '');
+      if (!new RegExp(`^arn:aws:acm:${this.region}:${this.account}:certificate/[a-f0-9-]{36}$`).test(browserCertArn)
+        || browserCertArn === currentCert) {
+        throw new Error('P20 browser requiere un certificado ACM dedicado en la misma cuenta y region.');
+      }
+    }
+    const dominio = privateBrowser ? isolatedDomains[0] : String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
+    const dominioPortal = privateBrowser ? isolatedDomains[1] : String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
+    const dominioKeycloak = privateBrowser ? isolatedDomains[2] : String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
+    const certArn = privateBrowser ? browserCertArn : String(this.node.tryGetContext('certificateArn') ?? '');
     // true si sagrilaft/{ambiente}/zoho_credentials ya fue creado manualmente
     // por fuera de CDK (ver Secrets construct) antes del primer deploy.
     const zohoSecretYaExiste = String(
