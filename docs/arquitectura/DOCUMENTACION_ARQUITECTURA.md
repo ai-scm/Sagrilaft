@@ -1,6 +1,6 @@
 # Documentación de Arquitectura Cloud y Despliegue - SAGRILAFT
 
-Función única: topología, recursos, permisos y fundamentos AWS. Estado en [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md); ejecución en [Checklist](../produccion/CHECKLIST_CORTE_PRODUCCION.md).
+Función única: topología, recursos, permisos y fundamentos AWS. Estado en [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md); ejecución en [Checklist](../produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md).
 
 Este documento explica la infraestructura del sistema, cómo está desplegado, qué componentes tecnológicos utilizamos y, lo más importante, **por qué** tomamos cada decisión arquitectónica basándonos en los requisitos de negocio, seguridad y estabilización para Producción.
 
@@ -59,7 +59,7 @@ Para garantizar un Go-Live tranquilo, adaptamos la arquitectura con:
 3.  **Observabilidad Dual (EMF y Dashboards AWS):** Separamos el monitoreo en dos tableros (Técnico y de Negocio). El backend de Python inyecta logs en formato AWS EMF para medir silenciosamente el costo de IA (Tokens Bedrock), latencia de proveedores (TusDatos, Zoho) y el embudo de aprobaciones, convirtiéndolos automáticamente en gráficas sin costo adicional.
 4.  **Límite de tamaño de archivos subidos (2026-07-30):** Antes, el backend leía cualquier archivo subido completo a memoria de una sola vez (`archivo.read()`), sin ningún límite — un solo archivo gigante podía agotar la memoria del proceso sin necesitar volumen de tráfico (DoS de un solo tiro). Ahora el backend lee en bloques de 1 MiB y aborta apenas se supera `MAX_UPLOAD_SIZE_MB` (default 15 MB, configurable por entorno), devolviendo HTTP 413. Se evaluó resolverlo en AWS WAF, pero WAF solo inspecciona hasta 64 KB del cuerpo de la petición — insuficiente para archivos de varios MB — por lo que el control tenía que vivir en la aplicación.
 5.  **`FRONTEND_URL` obligatorio y plantillas `.env.example` (2026-07-30):** `load_config()` ahora exige `FRONTEND_URL` en staging/producción (antes caía en silencio a `http://localhost:5173`, arriesgando una configuración de CORS incorrecta sin aviso). Además se crearon `.env.dev.example`, `.env.staging.example` y `.env.prod.example` en la raíz — ya existía `scripts/validate_envs.py` esperándolos (con la lista completa de variables por entorno) pero nunca se habían creado los archivos; los 3 entornos ya pasan la validación (`APROBADO`), y ese script quedó conectado como paso temprano en `.github/workflows/ci.yml`.
-6.  **Trazabilidad de versión desplegada (2026-07-30):** antes no había forma rápida de saber, durante un incidente, qué versión exacta corría en un ambiente. `GET /health` y `GET /` ahora responden con `commit` (el `GIT_SHA`, igual al tag de la imagen en ECR — ver `ecs-fargate.ts`), inyectado como variable de entorno desde el mismo `imageTag` que usa el CDK. El registro de versión y notas de release se mantiene en la [guía](../produccion/GUIA_DESPLIEGUE_LOCAL.md#release).
+6.  **Trazabilidad de versión desplegada (2026-07-30):** antes no había forma rápida de saber, durante un incidente, qué versión exacta corría en un ambiente. `GET /health` y `GET /` ahora responden con `commit` (el `GIT_SHA`, igual al tag de la imagen en ECR — ver `ecs-fargate.ts`), inyectado como variable de entorno desde el mismo `imageTag` que usa el CDK. El registro de versión y notas de release se mantiene en la [guía](../produccion/despliegue/GUIA_DESPLIEGUE_LOCAL.md#release).
 
 ## 5. Diagramas para explicar la solución
 
@@ -68,7 +68,7 @@ Las vistas visuales se mantienen en `diagramas/`. `infraestructura-sagrilaft.pum
 ## Referencia de recursos, red y permisos
 
 Los identificadores de cuenta, certificado y dominios se mantienen en el
-[catálogo por ambiente](../produccion/checklist-valores-staging-prod.md).
+[catálogo por ambiente](../produccion/configuracion/checklist-valores-staging-prod.md).
 
 ### Recursos gestionados por CDK
 
