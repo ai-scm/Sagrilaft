@@ -12,7 +12,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Request
 
-from api.dependencies import exigir_zoho_sign_habilitado, obtener_servicio_firma
+from api.dependencies import obtener_servicio_firma
 from api.schemas import ZohoWebhookPayload
 from domain.excepciones import WebhookTokenInvalidoError
 from domain.utils.seguridad import sanitizar_log
@@ -70,7 +70,6 @@ async def _leer_payload_validado(request: Request) -> ZohoWebhookPayload:
 
 @enrutador.post(
     "/zoho-sign",
-    dependencies=[Depends(exigir_zoho_sign_habilitado)],
     summary="Webhook de ZohoSign",
     description=(
         "Recibe notificaciones de ZohoSign sobre cambios de estado en solicitudes de firma. "
