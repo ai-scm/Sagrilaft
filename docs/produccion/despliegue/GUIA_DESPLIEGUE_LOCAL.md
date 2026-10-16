@@ -3,7 +3,7 @@
 Función única: despliegue rutinario desde local sobre un ambiente existente,
 build/push compartido y registro de release. El primer corte se ejecuta con el
 [procedimiento específico](CHECKLIST_CORTE_PRODUCCION.md). Para incidentes usar
-el [runbook](../operacion/RUNBOOK_OPERATIVO.md#ecs). Estado y tareas no se registran aquí.
+el [runbook](../../operacion/RUNBOOK_OPERATIVO.md#ecs). Estado y tareas no se registran aquí.
 
 ## El Concepto Clave: Consistencia de Etiquetas (Tags)
 La arquitectura actual en CDK exige que **los 4 contenedores de la plataforma (Frontend, Backend, Portal y Keycloak)** utilicen exactamente la misma etiqueta de imagen (el SHA aprobado para la release).
@@ -104,12 +104,12 @@ otra ejecución de CI.
 <a id="coordinado"></a>
 ### Paso 2: Preparar y revisar el despliegue coordinado
 
-El flujo implementado está en [deploy_release.py](../../scripts/deploy_release.py).
+El flujo implementado está en [deploy_release.py](../../../scripts/deploy_release.py).
 Los comandos directos `deploy:staging`/`deploy:prod` de CDK son operaciones de
 infraestructura: **no ejecutan migraciones ni sustituyen esta barrera**.
 No activar una release que exige otro esquema antes de verificar su migración.
 
-1. Preparar un plan privado a partir del [ejemplo](../../scripts/deploy_release.example.json):
+1. Preparar un plan privado a partir del [ejemplo](../../../scripts/deploy_release.example.json):
    cuenta/ambiente, contexto completo, capacidad, tag anterior y candidato,
    revisiones previa/objetivo, cuatro digests y validación funcional aprobada.
    Por defecto se exige `smoke_command`; staging admite la modalidad manual descrita abajo.
@@ -155,10 +155,10 @@ ruta, retención o imagen sigue sujeto a comparación estricta. No se aplica a p
    verifica tareas/digests y ejecuta el smoke automático o queda pendiente de validación
    manual en staging (código 3, lock conservado). No construye imágenes.
 4. Un fallo o resultado incierto detiene el avance y conserva el lock; no se debe
-   borrar ni reintentar a ciegas. Ver [recuperación](../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
+   borrar ni reintentar a ciegas. Ver [recuperación](../../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
 
 El cambio aislado de ECR no demuestra que el diff del próximo plan sea aceptable.
-Alcance validado y seguimiento: [P20](PENDIENTES_PRODUCCION.md#p20).
+Alcance validado y seguimiento: [P20](../PENDIENTES_PRODUCCION.md#p20).
 
 <a id="smoke-manual"></a>
 ### Validación manual de staging
@@ -214,7 +214,7 @@ archiva `manual-accepted.json` con hashes de evidencia antes de liberar. El éxi
 El validador exige archivos existentes y no vacíos, pero no interpreta capturas ni
 certifica la veracidad de la declaración humana. La revisión del operador es necesaria.
 Evidencia inválida, estado cambiado o resultado incierto no se consideran éxito;
-seguir el [runbook](../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
+seguir el [runbook](../../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
 Conservar localmente plan/evidencia; no editar `manual-state.json` ni `lock.json`.
 El cierre usa bloqueo local POSIX; no ejecutar cierres concurrentes desde copias de evidencia.
 
@@ -224,7 +224,7 @@ Esperar `UPDATE_COMPLETE`, verificar tareas ECS y target groups saludables, y
 comprobar el endpoint del ambiente. CloudFormation completo no sustituye los smoke tests.
 
 Definir `PORTAL_VALIDACION` con la URL del portal del ambiente en el
-[catálogo](checklist-valores-staging-prod.md) y ejecutar:
+[catálogo](../configuracion/checklist-valores-staging-prod.md) y ejecutar:
 
 ```bash
 curl -fsS "${PORTAL_VALIDACION}/health"
@@ -256,6 +256,6 @@ git push origin v2.1.0
 
 ## Diagnóstico
 
-Usar el [runbook ECS](../operacion/RUNBOOK_OPERATIVO.md#ecs) para eventos
+Usar el [runbook ECS](../../operacion/RUNBOOK_OPERATIVO.md#ecs) para eventos
 CloudFormation/ECS y logs. La lista de herramientas y comandos de incidentes
 se mantiene allí, sin una segunda copia en esta guía.
