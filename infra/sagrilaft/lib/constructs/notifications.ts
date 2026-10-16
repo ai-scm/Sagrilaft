@@ -17,7 +17,6 @@ export interface NotificationsProps {
   readonly dominioSesVerificado?: string;
   /** Email del equipo de analistas que se suscribe al topic SNS. */
   readonly snsAlertasSub: string;
-  readonly enableSesIdentity?: boolean;
 }
 
 /**
@@ -32,7 +31,7 @@ export interface NotificationsProps {
  * AWS enviará un correo de confirmación que debe aceptarse para activar la suscripción.
  */
 export class Notifications extends Construct {
-  public readonly sesIdentity?: ses.IEmailIdentity;
+  public readonly sesIdentity: ses.IEmailIdentity;
   public readonly alertasTopic: sns.Topic;
 
   constructor(scope: Construct, id: string, props: NotificationsProps) {
@@ -40,13 +39,11 @@ export class Notifications extends Construct {
 
     const { ambiente, sesEmailOrigen, dominioSesVerificado, snsAlertasSub } = props;
 
-    if (props.enableSesIdentity ?? true) {
-      this.sesIdentity = dominioSesVerificado
-        ? ses.EmailIdentity.fromEmailIdentityName(this, 'SesIdentity', dominioSesVerificado)
-        : new ses.EmailIdentity(this, 'SesIdentity', {
-          identity: ses.Identity.email(sesEmailOrigen),
-        });
-    }
+    this.sesIdentity = dominioSesVerificado
+      ? ses.EmailIdentity.fromEmailIdentityName(this, 'SesIdentity', dominioSesVerificado)
+      : new ses.EmailIdentity(this, 'SesIdentity', {
+        identity: ses.Identity.email(sesEmailOrigen),
+      });
 
     this.alertasTopic = new sns.Topic(this, 'AlertasTopic', {
       displayName: `Sagrilaft Alertas (${ambiente})`,

@@ -63,122 +63,44 @@ export class SagrilaftStack extends cdk.Stack {
 
     // ── Parámetros de contexto ─────────────────────────────────────────────
     const ambiente = String(this.node.tryGetContext('environment') ?? 'prod');
-    const laboratorioP20 = /^p20-[a-f0-9]{12}$/.test(ambiente);
-    if (ambiente.startsWith('p20-') && !laboratorioP20) {
-      throw new Error('Ambiente P20 inválido: use p20-<runId de 12 caracteres hexadecimales>.');
-    }
-    const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE));
-    const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? (laboratorioP20 ? '' : DEFAULT_HOSTED_ZONE_ID));
-    // Opt-in: conserva la sintesis existente hasta revisar y aprobar el cambio.
-    const privateBrowserRaw = String(this.node.tryGetContext('p20PrivateBrowserAccess') ?? 'false');
-    if (!['true', 'false'].includes(privateBrowserRaw)) {
-      throw new Error('p20PrivateBrowserAccess debe ser true o false.');
-    }
-    const privateBrowser = privateBrowserRaw === 'true';
-    const browserCertArn = String(this.node.tryGetContext('p20BrowserCertificateArn') ?? '');
-    if ((privateBrowser || browserCertArn) && !laboratorioP20) {
-      throw new Error('El acceso privado de navegador solo se permite en P20.');
-    }
-    if (browserCertArn && !privateBrowser) {
-      throw new Error('p20BrowserCertificateArn requiere p20PrivateBrowserAccess=true.');
-    }
-    const isolatedDomains = [`formulario.${ambiente}.invalid`, `portal.${ambiente}.invalid`, `login.${ambiente}.invalid`];
-    const domainKeys = ['domainName', 'portalDomainName', 'keycloakDomainName'];
-    if (privateBrowser) {
-      domainKeys.forEach((key, i) => {
-        const supplied = this.node.tryGetContext(key);
-        if (supplied !== undefined && supplied !== isolatedDomains[i]) {
-          throw new Error(`${key} debe coincidir con el origen exclusivo de P20: ${isolatedDomains[i]}`);
-        }
-      });
-      // El ARN no acredita SAN, vigencia ni confianza. Verificarlos por API
-      // antes de desplegar; no reutilizar ni reimportar el certificado compartido.
-      const currentCert = String(this.node.tryGetContext('certificateArn') ?? '');
-      if (!new RegExp(`^arn:aws:acm:${this.region}:${this.account}:certificate/[a-f0-9-]{36}$`).test(browserCertArn)
-        || browserCertArn === currentCert) {
-        throw new Error('P20 browser requiere un certificado ACM dedicado en la misma cuenta y region.');
-      }
-    }
-    const dominio = privateBrowser ? isolatedDomains[0] : String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
-    const dominioPortal = privateBrowser ? isolatedDomains[1] : String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
-    const dominioKeycloak = privateBrowser ? isolatedDomains[2] : String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
-    const certArn = privateBrowser ? browserCertArn : String(this.node.tryGetContext('certificateArn') ?? '');
+    const hostedZoneName = String(this.node.tryGetContext('hostedZoneName') ?? DEFAULT_HOSTED_ZONE);
+    const hostedZoneId = String(this.node.tryGetContext('hostedZoneId') ?? DEFAULT_HOSTED_ZONE_ID);
+    const dominio = String(this.node.tryGetContext('domainName') ?? DEFAULT_DOMINIO);
+    const dominioPortal = String(this.node.tryGetContext('portalDomainName') ?? DEFAULT_DOMINIO_PORTAL);
+    const dominioKeycloak = String(this.node.tryGetContext('keycloakDomainName') ?? DEFAULT_DOMINIO_KEYCLOAK);
+    const certArn = String(this.node.tryGetContext('certificateArn') ?? '');
     // true si sagrilaft/{ambiente}/zoho_credentials ya fue creado manualmente
     // por fuera de CDK (ver Secrets construct) antes del primer deploy.
     const zohoSecretYaExiste = String(
       this.node.tryGetContext('zohoSecretYaExiste') ?? 'false',
     ).toLowerCase() === 'true';
-    const defaultSesEmailOrigen = laboratorioP20 ? '' : `no-reply-sagrilaft@${hostedZoneName}`;
+    const defaultSesEmailOrigen = `no-reply-sagrilaft@${hostedZoneName}`;
     const defaultAlertasEmailDestino = [
       'Bryan.Ariza@blend360.com',
     ].join(',');
     const sesEmailOrigen = String(this.node.tryGetContext('sesEmailOrigen') ?? defaultSesEmailOrigen);
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
-    const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? (laboratorioP20 ? '' : defaultAlertasEmailDestino));
+    const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
-    const backendImageTag = String(this.node.tryGetContext('backendImageTag') ?? '');
     // Omitirlo conserva bootstrap y despliegues existentes. Un override permite
     // preparar la migración sin cambiar las imágenes de los servicios.
     const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
     const proveedorListasCautela = String(
-      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' || laboratorioP20 ? 'dummy' : 'sagrilaft'),
+      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
     ).toLowerCase();
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? (laboratorioP20 ? '0' : '2'));
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
-    const backendDesiredCountRaw = this.node.tryGetContext('backendDesiredCount');
-    const backendDesiredCount = Number.parseInt(String(backendDesiredCountRaw ?? desiredCount), 10);
-    const p20BackendOnlyOperation = String(
-      this.node.tryGetContext('p20BackendOnlyOperation') ?? 'false',
-    ).toLowerCase() === 'true';
     const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
     const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
-    const databaseHostOverride = String(this.node.tryGetContext('databaseHostOverride') ?? '');
-    if (privateBrowser) {
-      const cloneId = String(this.node.tryGetContext('restoredDbIdentifier') ?? '');
-      if (!new RegExp(`^${ambiente}-c7-test-[0-9]{8}$`).test(cloneId)
-        || !databaseHostOverride.startsWith(`${cloneId}.`)
-        || !new RegExp(`^${cloneId}\\.[a-z0-9]+\\.${this.region}\\.rds\\.amazonaws\\.com$`).test(databaseHostOverride)) {
-        throw new Error('El navegador P20 requiere identificador y endpoint coherentes de la RDS clonada c7-test.');
-      }
-    }
-    const p20AllowActivation = String(this.node.tryGetContext('p20AllowActivation') ?? 'false').toLowerCase() === 'true';
-
-    if (laboratorioP20 && (habilitarNatEgress || snsAlertasSub.trim() !== ''
-      || hostedZoneName !== '' || hostedZoneId !== '')) {
-      throw new Error('P20 requiere egreso NAT deshabilitado, SNS sin suscripciones y Hosted Zone vacía.');
-    }
-    if (laboratorioP20 && (desiredCount > 0 || backendDesiredCount > 0) && !p20AllowActivation) {
-      throw new Error('P20 requiere p20AllowActivation=true para permitir capacidad ECS mayor que cero.');
-    }
-    if (backendDesiredCountRaw !== undefined && !p20BackendOnlyOperation) {
-      throw new Error('backendDesiredCount solo se permite en la operación P20 de backend único.');
-    }
-    if (p20BackendOnlyOperation && (!laboratorioP20 || desiredCount !== 0
-      || backendDesiredCountRaw === undefined || ![0, 1].includes(backendDesiredCount)
-      || backendMaxCapacity !== 1)) {
-      throw new Error('La operación P20 de backend único exige capacidad global 0, backend 0/1 y backendMaxCapacity=1.');
-    }
-    if (!p20BackendOnlyOperation && backendDesiredCount !== desiredCount) {
-      throw new Error('La capacidad del backend debe coincidir con desiredCount fuera de la operación P20 de backend único.');
-    }
-    if (laboratorioP20 && (!certArn || !/^arn:aws:acm:[a-z0-9-]+:\d{12}:certificate\//.test(certArn))) {
-      throw new Error('P20 requiere importar un certificado ACM existente; no debe crear uno ni solicitar validación DNS.');
-    }
-    if (databaseHostOverride && !laboratorioP20) {
-      throw new Error('databaseHostOverride solo se permite en un ambiente P20 aislado.');
-    }
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
     }
     if (['staging', 'prod'].includes(ambiente) && imageTag === 'latest') {
       throw new Error(`El ambiente ${ambiente} requiere imageTag de una release explicita, no latest.`);
-    }
-    if (backendImageTag && (!laboratorioP20 || !/^[a-f0-9]{40}$/.test(backendImageTag))) {
-      throw new Error('backendImageTag solo admite un SHA completo dentro de P20.');
     }
     if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(migrationImageTag)) {
       throw new Error('migrationImageTag invalido: use una etiqueta de imagen no vacia de hasta 128 caracteres.');
@@ -201,18 +123,15 @@ export class SagrilaftStack extends cdk.Stack {
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
       throw new Error(`desiredCount invalido: ${desiredCountRaw}. Use 0 para bootstrap o 1+ para activar servicios.`);
     }
-    if (!Number.isInteger(backendDesiredCount) || backendDesiredCount < 0) {
-      throw new Error(`backendDesiredCount invalido: ${backendDesiredCountRaw}.`);
-    }
-    if (!Number.isInteger(backendMaxCapacity) || backendMaxCapacity < Math.max(desiredCount, backendDesiredCount)) {
+    if (!Number.isInteger(backendMaxCapacity) || backendMaxCapacity < desiredCount) {
       throw new Error(
-        `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe cubrir la capacidad ECS solicitada.`,
+        `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe ser un entero >= desiredCount (${desiredCount}).`,
       );
     }
     cdk.Tags.of(this).add('Project', 'sagrilaft');
     cdk.Tags.of(this).add('Environment', ambiente);
 
-    const hostedZone = !laboratorioP20 && hostedZoneName && hostedZoneId
+    const hostedZone = hostedZoneName && hostedZoneId
       ? route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
         hostedZoneId,
         zoneName: hostedZoneName,
@@ -220,19 +139,17 @@ export class SagrilaftStack extends cdk.Stack {
       : undefined;
 
     // ── Constructs ─────────────────────────────────────────────────────────
-    const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress, laboratorioP20 });
+    const networking = new Networking(this, 'Networking', { ambiente, habilitarNatEgress });
     const storage = new Storage(this, 'Storage', { 
       ambiente,
       dominioPortal,
-      disposable: laboratorioP20,
     });
-    const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste, laboratorioP20 });
+    const secrets = new Secrets(this, 'Secrets', { ambiente, zohoSecretYaExiste });
     const notifications = new Notifications(this, 'Notifications', {
       ambiente,
       sesEmailOrigen,
-      dominioSesVerificado: laboratorioP20 ? undefined : (hostedZoneName || undefined),
+      dominioSesVerificado: hostedZoneName || undefined,
       snsAlertasSub,
-      enableSesIdentity: !laboratorioP20,
     });
     const ecrRepos = new Ecr(this, 'Ecr', { ambiente });
     const configParams = new ConfigParameters(this, 'ConfigParameters', {
@@ -247,7 +164,6 @@ export class SagrilaftStack extends cdk.Stack {
       bedrockModelId,
       proveedorListasCautela,
       sagrilaftApiUrl,
-      testMode: laboratorioP20,
     });
 
     const database = new Database(this, 'Database', {
@@ -256,17 +172,13 @@ export class SagrilaftStack extends cdk.Stack {
       credentialsSecret: secrets.dbSecret,
       ambiente,
       subnetType: networking.ecsSubnetType,
-      disposable: laboratorioP20,
     });
 
     const ecsFargate = new EcsFargate(this, 'EcsFargate', {
       ambiente,
-      databaseHostOverride: databaseHostOverride || undefined,
       imageTag: imageTag || 'dev',
-      backendImageTag: backendImageTag || undefined,
       migrationImageTag,
       desiredCount,
-      backendDesiredCount: p20BackendOnlyOperation ? backendDesiredCount : undefined,
       backendMaxCapacity,
       vpc: networking.vpc,
       serviceSubnetType: networking.ecsSubnetType,
@@ -279,7 +191,6 @@ export class SagrilaftStack extends cdk.Stack {
       portalInternoRepo: ecrRepos.portalInternoRepo,
       keycloakRepo: ecrRepos.keycloakRepo,
       dbSecret: secrets.dbSecret,
-      cInventoryDbSecret: secrets.cInventoryDbSecret,
       appSecret: secrets.appSecret,
       zohoSecret: secrets.zohoSecret,
       keycloakAdminSecret: secrets.keycloakAdminSecret,
@@ -313,14 +224,11 @@ export class SagrilaftStack extends cdk.Stack {
       dominio,
       dominioPortal,
       dominioKeycloak,
-      internal: laboratorioP20,
     });
 
-    if (!laboratorioP20) {
-      new CortafuegosWeb(this, 'CortafuegosWeb', {
-        arnBalanceadorCarga: lb.alb.loadBalancerArn,
-      });
-    }
+    const cortafuegos = new CortafuegosWeb(this, 'CortafuegosWeb', {
+      arnBalanceadorCarga: lb.alb.loadBalancerArn,
+    });
 
     const alarmas = new ObservabilidadAlarmas(this, 'AlarmasCriticas', {
       balanceadorCarga: lb.alb,
@@ -364,22 +272,11 @@ export class SagrilaftStack extends cdk.Stack {
     }
 
     // ── Outputs ────────────────────────────────────────────────────────────
-    new CfnOutput(this, 'AlbDns', {
-      value: lb.alb.loadBalancerDnsName,
-      description: laboratorioP20 ? 'DNS privado del ALB interno P20; no crear DNS publico' : 'DNS del ALB publico creado para SAGRILAFT',
-    });
+    new CfnOutput(this, 'AlbDns', { value: lb.alb.loadBalancerDnsName, description: 'DNS del ALB publico creado para SAGRILAFT' });
     new CfnOutput(this, 'HostedZoneName', { value: hostedZoneName || 'no-configurada', description: 'Zona Route 53 usada para crear registros A Alias' });
     new CfnOutput(this, 'DominiosEsperados', { value: `${dominio}, ${dominioPortal}, ${dominioKeycloak}`, description: 'Hostnames que deben apuntar al ALB' });
     new CfnOutput(this, 'S3Bucket', { value: storage.bucket.bucketName, description: 'Nombre del bucket S3 para uploads' });
     new CfnOutput(this, 'RdsEndpoint', { value: database.instance.dbInstanceEndpointAddress, description: 'Host RDS PostgreSQL' });
-    if (laboratorioP20) {
-      new CfnOutput(this, 'EcsDatabaseHost', {
-        value: databaseHostOverride || database.instance.dbInstanceEndpointAddress,
-        description: 'Host de BD usado por tareas ECS; en P20 puede apuntar a una restauracion aislada',
-      });
-      new CfnOutput(this, 'P20VpcId', { value: networking.vpc.vpcId });
-      new CfnOutput(this, 'P20RdsSecurityGroupId', { value: networking.sgRds.securityGroupId });
-    }
     new CfnOutput(this, 'KeycloakDbName', { value: SAGRILAFT_DB_NAME, description: 'Base de datos RDS usada por Keycloak en ECS' });
     new CfnOutput(this, 'DbSecretArn', { value: secrets.dbSecret.secretArn, description: 'ARN del secreto con la contrasena de la BD' });
     new CfnOutput(this, 'AppSecretArn', { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });
@@ -400,20 +297,6 @@ export class SagrilaftStack extends cdk.Stack {
     new CfnOutput(this, 'EcsSecurityGroupId', { value: networking.sgEcs.securityGroupId, description: 'Security Group para servicios ECS Fargate' });
     new CfnOutput(this, 'EcsTaskExecutionRoleArn', { value: ecsFargate.executionRole.roleArn, description: 'Task Execution Role ECS para pull ECR, logs y secrets/SSM' });
     new CfnOutput(this, 'EcsBackendTaskRoleArn', { value: ecsFargate.backendTaskRole.roleArn, description: 'Task Role ECS para backend' });
-    if (laboratorioP20 && secrets.cInventoryDbSecret && ecsFargate.cInventoryTaskRole && ecsFargate.cInventoryExecutionRole) {
-      new CfnOutput(this, 'P20CInventoryDbSecretArn', { value: secrets.cInventoryDbSecret.secretArn,
-        description: 'Secreto dedicado a credenciales PostgreSQL de solo lectura para inventario P20-C' });
-      new CfnOutput(this, 'P20CInventoryTaskRoleArn', { value: ecsFargate.cInventoryTaskRole.roleArn,
-        description: 'Task role sin permisos AWS para inventario P20-C' });
-      new CfnOutput(this, 'P20CInventoryExecutionRoleArn', { value: ecsFargate.cInventoryExecutionRole.roleArn,
-        description: 'Execution role limitado a ECR, logs y secreto P20-C de inventario' });
-      if (ecsFargate.cInventoryProvisionTaskRole && ecsFargate.cInventoryProvisionExecutionRole) {
-        new CfnOutput(this, 'P20CInventoryProvisionTaskRoleArn', { value: ecsFargate.cInventoryProvisionTaskRole.roleArn,
-          description: 'Task role sin permisos AWS para provisionar el rol de inventario P20-C' });
-        new CfnOutput(this, 'P20CInventoryProvisionExecutionRoleArn', { value: ecsFargate.cInventoryProvisionExecutionRole.roleArn,
-          description: 'Execution role limitado a ECR, logs y secretos DB P20-C requeridos para provisionar inventario' });
-      }
-    }
     new CfnOutput(this, 'EcsFrontendServiceName', { value: ecsFargate.frontend.service.serviceName, description: 'Servicio ECS formulario publico conectado al ALB' });
     new CfnOutput(this, 'EcsPortalServiceName', { value: ecsFargate.portal.service.serviceName, description: 'Servicio ECS portal interno conectado al ALB' });
     new CfnOutput(this, 'EcsBackendServiceName', { value: ecsFargate.backend.service.serviceName, description: 'Servicio ECS backend' });

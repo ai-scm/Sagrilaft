@@ -46,7 +46,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaErrores5xx,
       threshold: 5,
       evaluationPeriods: 1, // 1 periodo de 5 minutos
-      alarmDescription: 'Alarma Critica: Se detectaron mas de 5 errores HTTP 5xx en el servidor backend durante los ultimos 5 minutos.',
+      alarmDescription: 'Alarma Crítica: Se detectaron más de 5 errores HTTP 5xx en el servidor backend durante los últimos 5 minutos.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
@@ -61,7 +61,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaCpuBackend,
       threshold: 85,
       evaluationPeriods: 1,
-      alarmDescription: 'Alarma de Rendimiento: El uso de CPU del servicio Backend supero el 85% de su capacidad.',
+      alarmDescription: 'Alarma de Rendimiento: El uso de CPU del servicio Backend superó el 85% de su capacidad.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
@@ -76,7 +76,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaMemoriaBackend,
       threshold: 85,
       evaluationPeriods: 1,
-      alarmDescription: 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend supero el 85% de su capacidad.',
+      alarmDescription: 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend superó el 85% de su capacidad.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });

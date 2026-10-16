@@ -43,7 +43,7 @@ export class Ecr extends Construct {
   private buildRepository(id: string, repositoryName: string, ambiente: string): ecr.Repository {
     return new ecr.Repository(this, id, {
       repositoryName,
-      imageTagMutability: ['staging', 'prod'].includes(ambiente) || ambiente.startsWith('p20-')
+      imageTagMutability: ['staging', 'prod'].includes(ambiente)
         ? ecr.TagMutability.IMMUTABLE
         : ecr.TagMutability.MUTABLE,
       removalPolicy: ambiente === 'prod' ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
@@ -52,7 +52,7 @@ export class Ecr extends Construct {
       lifecycleRules: [
         {
           rulePriority: 1,
-          description: 'Mantener las ultimas 30 imagenes para ahorrar costos',
+          description: 'Mantener las últimas 30 imágenes para ahorrar costos',
           maxImageCount: 30,
         },
       ],

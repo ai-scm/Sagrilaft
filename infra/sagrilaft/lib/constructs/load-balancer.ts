@@ -15,11 +15,10 @@ export interface LoadBalancerProps {
   readonly dominio: string;
   readonly dominioPortal: string;
   readonly dominioKeycloak: string;
-  readonly internal?: boolean;
 }
 
 /**
- * LoadBalancer: ALB con enrutamiento basado en host; P20 puede usarlo interno.
+ * LoadBalancer: ALB público con enrutamiento basado en host.
  * Los tipos de VPC y Security Group representan red compartida del ALB.
  *
  * Routing:
@@ -39,7 +38,7 @@ export class LoadBalancer extends Construct {
 
     this.alb = new elbv2.ApplicationLoadBalancer(this, 'Alb', {
       vpc: props.vpc,
-      internetFacing: !(props.internal ?? false),
+      internetFacing: true,
       securityGroup: props.securityGroup,
       // 300 s > read_timeout de boto3 (90 s por defecto) para que el backend
       // pueda responder el error si Bedrock no completa la extraccion a tiempo.

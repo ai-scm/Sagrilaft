@@ -12,7 +12,6 @@ export interface DatabaseProps {
   readonly credentialsSecret: secretsmanager.Secret;
   readonly ambiente: string;
   readonly subnetType: ec2.SubnetType;
-  readonly disposable?: boolean;
 }
 
 /**
@@ -44,10 +43,9 @@ export class Database extends Construct {
       credentials: rds.Credentials.fromSecret(props.credentialsSecret),
       multiAz: false, // Diseño de producción elegido; recuperación Multi-AZ no está habilitada.
       storageEncrypted: true,
-      deletionProtection: !(props.disposable ?? false),
+      deletionProtection: true,
       backupRetention: Duration.days(7), // Acorde a la arquitectura de producción
-      copyTagsToSnapshot: props.disposable ? true : undefined,
-      removalPolicy: props.disposable ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
+      removalPolicy: RemovalPolicy.RETAIN,
     });
   }
 }
