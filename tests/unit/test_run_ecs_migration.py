@@ -77,7 +77,6 @@ def test_success_preserves_identity_token_and_reports_only_safe_evidence(setup):
     assert run[run.index("--client-token") + 1] == "staging-release-new-attempt-1"
     assert run[run.index("--task-definition") + 1] == DEFINITION
     assert run[run.index("--cluster") + 1] == CLUSTER
-    assert "--overrides" not in run
     network = json.loads(run[run.index("--network-configuration") + 1])["awsvpcConfiguration"]
     assert network["assignPublicIp"] == "DISABLED"
     assert network["subnets"] == ["subnet-123abc", "subnet-456def"]
@@ -86,10 +85,6 @@ def test_success_preserves_identity_token_and_reports_only_safe_evidence(setup):
     assert result["schemaVerified"] is False
     assert result["logStream"] == "migration/migration/abc123"
     assert "DO-NOT-PRINT" not in "".join(events)
-    request = json.loads(events[0])
-    assert request["clientTokenSha256"]
-    assert "clientToken" not in request
-    assert "staging-release-new-attempt-1" not in "".join(events)
     assert not any(operation in ("update-service", "register-task-definition") for _, operation, _ in calls)
 
 
@@ -185,130 +180,6 @@ def test_partial_launch_failure_preserves_arn_for_reconciliation(setup):
         launcher.run_migration(lambda service, operation, *args: setup[operation], events.append)
     assert any(json.loads(event).get("taskArn") == TASK for event in events)
     assert all(json.loads(event)["event"] != "migration_completed" for event in events)
-
-
-def p20_setup(setup, monkeypatch, fault):
-    environment = "p20-a1b2c3d4e5f6"
-    cluster = PREFIX + f"cluster/sagrilaft-{environment}"
-    definition = PREFIX + f"task-definition/sagrilaft-{environment}-migration:42"
-    task = PREFIX + f"task/sagrilaft-{environment}/abc123"
-    image = f"123456789012.dkr.ecr.us-east-1.amazonaws.com/sagrilaft-{environment}-backend:release-new"
-    monkeypatch.setenv("ECS_CLUSTER_NAME", f"sagrilaft-{environment}")
-    monkeypatch.setenv("ECS_MIGRATION_TASK_DEFINITION_ARN", definition)
-    monkeypatch.setenv("ECS_MIGRATION_EXPECTED_IMAGE", image)
-    monkeypatch.setenv("ECS_MIGRATION_ENVIRONMENT", environment)
-    monkeypatch.setenv("ECS_MIGRATION_P20_FAULT", fault)
-    setup["describe-clusters"]["clusters"][0]["clusterArn"] = cluster
-    taskdef = setup["describe-task-definition"]["taskDefinition"]
-    taskdef["taskDefinitionArn"] = definition
-    taskdef["containerDefinitions"][0]["image"] = image
-    setup["describe-images"]["imageDetails"][0]["imageDigest"] = DIGEST
-    setup["run-task"]["tasks"][0]["taskArn"] = task
-    task_result = setup["describe-tasks"]["tasks"][0]
-    task_result.update({"taskArn": task, "clusterArn": cluster, "taskDefinitionArn": definition})
-    task_result["containers"][0].update({"image": image, "imageDigest": DIGEST})
-    return task
-
-
-def test_p20_fail_before_ddl_uses_only_inert_container_override(setup, monkeypatch):
-    p20_setup(setup, monkeypatch, "fail-before-ddl")
-    setup["describe-tasks"]["tasks"][0]["containers"][0]["exitCode"] = 42
-    calls, events = [], []
-    with pytest.raises(launcher.MigrationError, match="Migracion fallida"):
-        launcher.run_migration(lambda service, operation, *args: calls.append((service, operation, args)) or setup[operation],
-                               events.append)
-    args = next(args for _, operation, args in calls if operation == "run-task")
-    overrides = json.loads(args[args.index("--overrides") + 1])
-    assert overrides["containerOverrides"][0]["command"] == ["python", "scripts/p20_fail_before_ddl.py"]
-    assert overrides["containerOverrides"][0]["environment"] == [{
-        "name": "P20_LAB_RUN_ID", "value": "p20-a1b2c3d4e5f6"},
-        {"name": "RUN_MODE", "value": "p20-fixture"}]
-    assert all(operation != "update-service" for _, operation, _ in calls)
-    assert all(json.loads(event)["event"] != "migration_completed" for event in events)
-
-
-def test_p20_observer_loss_records_task_and_never_polls_or_relaunches(setup, monkeypatch):
-    task_arn = p20_setup(setup, monkeypatch, "observer-loss-after-launch")
-    setup["describe-tasks"] = AssertionError("Observer-loss mode must stop before polling")
-    calls, events = [], []
-    with pytest.raises(launcher.MigrationError, match="observador interrumpido"):
-        launcher.run_migration(lambda service, operation, *args: calls.append((service, operation, args)) or setup[operation],
-                               events.append)
-    assert [operation for _, operation, _ in calls].count("run-task") == 1
-    assert not any(operation == "describe-tasks" for _, operation, _ in calls)
-    assert json.loads(events[-1]) == {"event": "migration_launched", "taskArn": task_arn}
-
-
-@pytest.mark.parametrize("fault", ["fail-before-ddl", "observer-loss-after-launch"])
-def test_both_p20_faults_replace_upgrade_head_and_never_activate(setup, monkeypatch, fault):
-    p20_setup(setup, monkeypatch, fault)
-    container = setup["describe-task-definition"]["taskDefinition"]["containerDefinitions"][0]
-    # Reproduce the live migration definition: normal command would run DDL.
-    container["entryPoint"] = []
-    container["command"] = ["sh", "-c", "exec sh entrypoint.sh"]
-    setup["describe-tasks"]["tasks"][0]["containers"][0]["exitCode"] = 42
-    calls, events = [], []
-    with pytest.raises(launcher.MigrationError):
-        launcher.run_migration(lambda service, operation, *args:
-                               calls.append((service, operation, args)) or setup[operation], events.append)
-    runs = [args for _, operation, args in calls if operation == "run-task"]
-    assert len(runs) == 1
-    run = runs[0]
-    override = json.loads(run[run.index("--overrides") + 1])["containerOverrides"]
-    assert len(override) == 1 and override[0]["name"] == "migration"
-    assert override[0]["command"] == ["python", "scripts/p20_fail_before_ddl.py"]
-    assert {x["name"]: x["value"] for x in override[0]["environment"]} == {
-        "P20_LAB_RUN_ID": "p20-a1b2c3d4e5f6", "RUN_MODE": "p20-fixture"}
-    assert "entrypoint.sh" not in json.dumps(override) and "alembic" not in json.dumps(override)
-    assert {operation for _, operation, _ in calls} <= {
-        "get-caller-identity", "describe-clusters", "describe-task-definition",
-        "describe-images", "run-task", "describe-tasks"}
-    assert not any(json.loads(e)["event"] == "migration_completed" for e in events)
-    selected = next(json.loads(e) for e in events if json.loads(e)["event"] == "p20_migration_fixture_selected")
-    assert selected["activationAllowed"] is False
-
-
-@pytest.mark.parametrize("exit_code", [0, 42, None])
-def test_p20_fixture_never_reports_migration_success_even_on_exit_zero(setup, monkeypatch, exit_code):
-    p20_setup(setup, monkeypatch, "fail-before-ddl")
-    setup["describe-tasks"]["tasks"][0]["containers"][0]["exitCode"] = exit_code
-    events = []
-    with pytest.raises(launcher.MigrationError, match="no activar"):
-        launcher.run_migration(lambda service, operation, *args: setup[operation], events.append)
-    assert not any(json.loads(e)["event"] == "migration_completed" for e in events)
-
-
-@pytest.mark.parametrize("fault", ["fail-before-ddl", "observer-loss-after-launch"])
-def test_p20_fault_rejects_entrypoint_that_cannot_be_overridden(setup, monkeypatch, fault):
-    p20_setup(setup, monkeypatch, fault)
-    setup["describe-task-definition"]["taskDefinition"]["containerDefinitions"][0]["entryPoint"] = ["sh", "entrypoint.sh"]
-    setup["run-task"] = AssertionError("Must refuse before launch")
-    with pytest.raises(launcher.MigrationError, match="entryPoint vacío"):
-        execute(setup)
-
-
-@pytest.mark.parametrize("environment", ["staging", "prod"])
-@pytest.mark.parametrize("fault", ["fail-before-ddl", "observer-loss-after-launch"])
-def test_both_faults_reject_shared_environments_before_any_aws_call(setup, monkeypatch, environment, fault):
-    monkeypatch.setenv("ECS_MIGRATION_ENVIRONMENT", environment)
-    monkeypatch.setenv("ECS_MIGRATION_P20_FAULT", fault)
-    with pytest.raises(launcher.MigrationError, match="solo permitido en ambiente P20"):
-        launcher.run_migration(lambda *args: pytest.fail("No AWS calls allowed"))
-
-
-def test_p20_fault_rejects_foreign_definition_before_any_aws_call(setup, monkeypatch):
-    p20_setup(setup, monkeypatch, "observer-loss-after-launch")
-    monkeypatch.setenv("ECS_MIGRATION_TASK_DEFINITION_ARN", DEFINITION)
-    with pytest.raises(launcher.MigrationError, match="task definition de migración del mismo P20"):
-        launcher.run_migration(lambda *args: pytest.fail("No AWS calls allowed"))
-
-
-def test_p20_fault_injection_is_rejected_for_staging(setup, monkeypatch):
-    monkeypatch.setenv("ECS_MIGRATION_ENVIRONMENT", "staging")
-    monkeypatch.setenv("ECS_MIGRATION_P20_FAULT", "fail-before-ddl")
-    setup["get-caller-identity"] = AssertionError("Must fail before AWS calls")
-    with pytest.raises(launcher.MigrationError, match="solo permitido en ambiente P20"):
-        execute(setup)
 
 
 def test_describe_failure_other_than_missing_stops_polling(setup):

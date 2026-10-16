@@ -219,44 +219,6 @@ def test_final_digest_is_rechecked(rig, monkeypatch):
     assert not json.loads(path.read_text())["complete"]
 
 
-def test_historical_source_sha_is_allowed_only_for_matching_p20_tag(monkeypatch):
-    historical = "c" * 40
-    head = "d" * 40
-
-    def output(command):
-        if command == ["git", "rev-parse", "HEAD"]:
-            return head
-        if command == ["git", "cat-file", "-e", f"{historical}^{{commit}}"]:
-            return ""
-        if command[1:2] == ["status"] or command[1:2] == ["ls-files"]:
-            return ""
-        raise AssertionError(command)
-
-    monkeypatch.setattr(publisher, "output", output)
-    assert publisher.validate_source(historical, "p20-012345abcdef", historical) == historical
-    with pytest.raises(publisher.PrecondicionError, match="solo se permite"):
-        publisher.validate_source(historical, "staging", historical)
-    with pytest.raises(publisher.PrecondicionError, match="mismo SHA"):
-        publisher.validate_source(head, "p20-012345abcdef", historical)
-
-
-def test_historical_source_sha_requires_clean_checkout(monkeypatch):
-    historical = "c" * 40
-
-    def output(command):
-        if command == ["git", "rev-parse", "HEAD"]:
-            return "d" * 40
-        if command[1:2] == ["status"]:
-            return " M source.py"
-        if command == ["git", "cat-file", "-e", f"{historical}^{{commit}}"]:
-            return ""
-        return ""
-
-    monkeypatch.setattr(publisher, "output", output)
-    with pytest.raises(publisher.PrecondicionError, match="Checkout modificado"):
-        publisher.validate_source(historical, "p20-012345abcdef", historical)
-
-
 @pytest.mark.parametrize("tag,dirty,stages", [("latest", "", ""), ("abcdef0", "", ""),
     ("b" * 40, "", ""), (SHA, " M backend/main.py", ""),
     (SHA, "?? untracked", ""), (SHA, "", "160000 abc 0\tbackend/submodule")])
@@ -347,76 +309,14 @@ def test_cli_environment_uses_shared_publisher(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(sys, "argv", ["publisher", "--environment", "prod", "--account", ACCOUNT,
         "--region", REGION, "--from-environment", "--tag", SHA, "--manifest", str(tmp_path / "result.json")])
-    monkeypatch.setattr(publisher, "validate_source", lambda tag, environment, source_ref: tag)
+    monkeypatch.setattr(publisher, "validate_source", lambda tag: tag)
     monkeypatch.setattr(publisher.os, "umask", lambda _: None)
     for key, val in CONFIG.items():
         monkeypatch.setenv(key, val)
-    monkeypatch.setattr(publisher, "publish", lambda *a, **kw: calls.append((a, kw)))
+    monkeypatch.setattr(publisher, "publish", lambda *a: calls.append(a))
     assert publisher.main() == 0
-    assert calls[0][0][:4] == ("prod", ACCOUNT, REGION, SHA)
-    assert set(calls[0][0][4]) == set(publisher.COMPONENTS)
-    assert calls[0][1]["components"] == publisher.COMPONENTS
-
-
-def test_backend_only_build_needs_no_frontend_configuration():
-    assert publisher.builds({}, ("backend",)) == {"backend": ["--platform", "linux/amd64", "./backend"]}
-
-
-def test_publish_backend_only_never_builds_or_pushes_other_components(rig):
-    api, calls, _, path, _ = rig
-    selected = ("backend",)
-    options = publisher.builds({}, selected)
-    result = publisher.publish("p20-012345abcdef", ACCOUNT, REGION, SHA,
-                               options, path, api=api, components=selected)
-
-    builds = [call for call in calls if call[:2] == ["docker", "build"]]
-    pushes = [call for call in calls if call[:2] == ["docker", "push"]]
-    assert len(builds) == len(pushes) == 1
-    assert "./backend" in builds[0]
-    assert "sagrilaft-p20-012345abcdef-backend" in " ".join(builds[0])
-    assert all(component not in " ".join(builds[0] + pushes[0])
-               for component in ("formulario-publico", "portal-interno", "keycloak"))
-    assert pushes[0][-1].endswith("sagrilaft-p20-012345abcdef-backend:" + SHA)
-    assert set(result["images"]) == {"backend"}
-    assert result["components"] == ["backend"]
-    assert result["digests"] == {"backend": DIGEST}
-    assert set(api.images) == {"sagrilaft-p20-012345abcdef-backend"}
-
-
-@pytest.mark.parametrize("components", [(), ("backend", "backend"), ("backend", "unknown")])
-def test_invalid_component_selection_fails_before_writing_manifest(tmp_path, components):
-    path = tmp_path / "manifest.json"
-    with pytest.raises(publisher.PrecondicionError):
-        publisher.publish("p20-012345abcdef", ACCOUNT, REGION, SHA,
-                          publisher.builds({}, ("backend",)), path,
-                          components=components)
-    assert not path.exists()
-
-
-def test_cli_passes_backend_only_selection(tmp_path, monkeypatch):
-    calls = []
-    manifest = tmp_path / "manifest.json"
-    monkeypatch.setattr(sys, "argv", ["publisher", "--environment", "p20-012345abcdef",
-        "--account", ACCOUNT, "--region", REGION, "--from-environment", "--tag", SHA,
-        "--source-ref", SHA, "--components", "backend", "--manifest", str(manifest)])
-    monkeypatch.setattr(publisher, "validate_source", lambda tag, environment, source_ref: tag)
-    monkeypatch.setattr(publisher.os, "umask", lambda _: None)
-    monkeypatch.setattr(publisher, "publish", lambda *a, **kw: calls.append((a, kw)))
-    assert publisher.main() == 0
-    args, kwargs = calls[0]
-    assert args[0:4] == ("p20-012345abcdef", ACCOUNT, REGION, SHA)
-    assert set(args[4]) == {"backend"}
-    assert kwargs["components"] == ("backend",)
-
-
-@pytest.mark.parametrize("environment", ["staging", "prod", "p20-012345abcdef"])
-def test_allowed_build_environments_are_explicit_and_run_scoped(environment):
-    assert publisher.valid_environment(environment)
-
-
-@pytest.mark.parametrize("environment", ["p20", "p20-prod", "p20-01234567890g", "p20-01234567890abcdef"])
-def test_invalid_p20_build_environment_is_rejected(environment):
-    assert not publisher.valid_environment(environment)
+    assert calls[0][:4] == ("prod", ACCOUNT, REGION, SHA)
+    assert set(calls[0][4]) == set(publisher.COMPONENTS)
 
 
 @pytest.mark.parametrize("stage", ["build", "push", "inspect"])

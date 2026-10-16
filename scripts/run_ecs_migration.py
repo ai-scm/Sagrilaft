@@ -9,20 +9,12 @@ Variables requeridas:
 Reutilizar el mismo token y parámetros al reconciliar un intento incierto.
 AWS_REGION: us-east-1; ECS_MIGRATION_TIMEOUT_SECONDS: 900.
 
-Fault injection is available only for an isolated P20 environment. It is
-selected by ECS_MIGRATION_P20_FAULT in a reviewed P20 plan. The
-two modes always replace the migration command with the same inert fixture,
-which does not connect to the database and exits 42. observer-loss-after-launch
-then returns an uncertain result after recording the task ARN; it never polls
-or launches a second task. Neither mode can report migration_completed.
-
 El éxito acredita imagen/exitCode, NO la revisión final del esquema. Esa
 comprobación pertenece al contenedor y se añadirá en otra fase. Un tag mutable
 puede cambiar entre la comprobación ECR y el pull: no sustituye pinning/inmutabilidad.
 """
 
 import json
-import hashlib
 import os
 import re
 import subprocess
@@ -73,18 +65,6 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     check(tag not in ("latest", "bootstrap-placeholder", "synth-placeholder"), "Tag no ejecutable para migracion")
     check(bool(re.fullmatch(r"sha256:[0-9a-f]{64}", digest)), "Digest esperado invalido")
     check(bool(re.fullmatch(r"[A-Za-z0-9_-]{1,64}", token)), "Client token invalido")
-    p20_fault = os.environ.get("ECS_MIGRATION_P20_FAULT", "")
-    if p20_fault:
-        environment = os.environ.get("ECS_MIGRATION_ENVIRONMENT", "")
-        check(bool(re.fullmatch(r"p20-[a-f0-9]{12}", environment)),
-              "Fault injection solo permitido en ambiente P20")
-        check(cluster == f"sagrilaft-{environment}" and repository == f"sagrilaft-{environment}-backend",
-              "Fault injection fuera del cluster/repository P20 correspondiente")
-        check(bool(re.fullmatch(re.escape(prefix + f"task-definition/sagrilaft-{environment}-migration:")
-                                + r"\d+", definition)),
-              "Fault injection requiere la task definition de migración del mismo P20")
-        check(p20_fault in ("fail-before-ddl", "observer-loss-after-launch"),
-              "Modo de fault injection P20 inválido")
     try:
         timeout = int(os.environ.get("ECS_MIGRATION_TIMEOUT_SECONDS", "900"))
     except ValueError:
@@ -103,11 +83,6 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     containers = taskdef.get("containerDefinitions", [])
     check(len(containers) == 1 and containers[0].get("name") == "migration", "Se requiere un unico contenedor migration")
     container = containers[0]
-    if p20_fault:
-        # RunTask cannot override entryPoint. A shell/custom entrypoint could
-        # execute the ordinary migration before consuming our fixture command.
-        check(not container.get("entryPoint"),
-              "Fixture P20 requiere entryPoint vacío; no se puede sobrescribir con RunTask")
     check(container.get("image") == image, "Imagen de task definition distinta de la esperada")
     env = {item["name"]: item.get("value") for item in container.get("environment", [])}
     check(env.get("RUN_MODE") == "migrate" and env.get("GIT_SHA") == tag, "RUN_MODE/GIT_SHA no corresponden a la migracion")
@@ -119,27 +94,13 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     # Seleccionar campos concretos; nunca imprimir environment, secrets o respuestas AWS completas.
     emit(json.dumps({"event": "migration_request", "clusterArn": cluster_arn,
                      "taskDefinitionArn": definition, "image": image, "expectedDigest": digest,
-                     "clientTokenSha256": hashlib.sha256(token.encode()).hexdigest(),
-                     "logGroup": log_options.get("awslogs-group"),
-                     "logRegion": log_options.get("awslogs-region"),
-                     "logStreamPrefix": log_options.get("awslogs-stream-prefix")}))
-    run_args = ["ecs", "run-task", "--cluster", cluster_arn,
+                     "clientToken": token, "logGroup": log_options.get("awslogs-group"),
+                     "logRegion": log_options.get("awslogs-region")}))
+    response = aws("ecs", "run-task", "--cluster", cluster_arn,
                    "--launch-type", "FARGATE", "--count", "1", "--task-definition", definition,
                    "--client-token", token, "--network-configuration",
                    json.dumps({"awsvpcConfiguration": {"subnets": subnets, "securityGroups": [group],
-                                                       "assignPublicIp": "DISABLED"}})]
-    if p20_fault:
-        # Both subcases must bypass the ordinary command. In particular, losing
-        # the observer must never leave RUN_MODE=migrate/upgrade head running.
-        run_args += ["--overrides", json.dumps({"containerOverrides": [{
-            "name": "migration", "command": ["python", "scripts/p20_fail_before_ddl.py"],
-            "environment": [{"name": "P20_LAB_RUN_ID", "value": os.environ["ECS_MIGRATION_ENVIRONMENT"]},
-                            {"name": "RUN_MODE", "value": "p20-fixture"}],
-        }]})]
-        emit(json.dumps({"event": "p20_migration_fixture_selected", "faultMode": p20_fault,
-                         "command": ["python", "scripts/p20_fail_before_ddl.py"],
-                         "runMode": "p20-fixture", "activationAllowed": False}))
-    response = aws(*run_args)
+                                                       "assignPublicIp": "DISABLED"}}))
     tasks = response.get("tasks", [])
     # Conservar ARNs incluso si AWS devuelve simultáneamente failures.
     for task in tasks:
@@ -149,8 +110,6 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
     check(not response.get("failures") and len(tasks) == 1, "Lanzamiento fallido o incierto: reconciliar el intento; no activar")
     arn = tasks[0].get("taskArn", "")
     check(isinstance(arn, str) and arn.startswith(prefix + "task/"), "Task ARN ausente o inesperado")
-    if p20_fault == "observer-loss-after-launch":
-        raise MigrationError("P20: observador interrumpido tras registrar taskArn; reconciliar, no relanzar")
     deadline = clock() + timeout
     while clock() < deadline:
         result = aws("ecs", "describe-tasks", "--cluster", cluster_arn, "--tasks", arn)
@@ -169,12 +128,6 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
             check(len(runtime) == 1 and runtime[0].get("name") == "migration", "Resultado sin contenedor migration unico")
             runtime = runtime[0]
             check(runtime.get("image") == image and runtime.get("imageDigest") == digest, "Imagen/digest ejecutado distinto o no verificable")
-            if p20_fault:
-                emit(json.dumps({"event": "p20_migration_fixture_stopped", "taskArn": arn,
-                                 "faultMode": p20_fault, "exitCode": runtime.get("exitCode"),
-                                 "schemaVerified": False, "activationAllowed": False}))
-                # Even an unexpected exit 0 is not a real migration success.
-                raise MigrationError("Migracion fallida o resultado inesperado del fixture P20; reconciliar, no activar")
             check(type(runtime.get("exitCode")) is int and runtime["exitCode"] == 0, "Migracion fallida o sin exitCode=0")
             check(task.get("stopCode") == "EssentialContainerExited", "Tarea interrumpida o detenida por causa inesperada")
             emit(json.dumps({"event": "migration_completed", "taskArn": arn, "imageDigest": digest,
