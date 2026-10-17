@@ -8,7 +8,7 @@ fue eliminado tras la migración de AccesoManualService a entidades de dominio.
 import dataclasses
 from typing import Any, Dict, List
 
-from domain.catalogo_correcciones import CAMPOS_CORREGIBLES
+from domain.formulario.catalogo_correcciones import CAMPOS_CORREGIBLES
 from domain.contratos import DocumentoDatos
 from domain.formulario.entidades import FormularioDatos
 

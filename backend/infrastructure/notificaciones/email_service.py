@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from infrastructure.config.configuracion import SmtpConfig
-from domain.catalogo_correcciones import resolver_etiquetas_campos_corregibles
+from domain.formulario.catalogo_correcciones import resolver_etiquetas_campos_corregibles
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from domain.formulario.tipos import EstadoFormulario, TipoContraparte, TipoPersona, TipoSolicitud
-from domain.catalogo_correcciones import validar_campos_corregibles
+from domain.formulario.catalogo_correcciones import validar_campos_corregibles
 from .formularios import AlertaInconsistenciaResponse
 
 from .comunes import a_iso_utc

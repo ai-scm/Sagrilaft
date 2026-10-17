@@ -15,7 +15,7 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
-from domain.catalogo_correcciones import (
+from domain.formulario.catalogo_correcciones import (
     CAMPOS_CORREGIBLES,
     ETIQUETAS_CAMPOS_CORREGIBLES,
 )

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import json
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
-from domain.catalogo_correcciones import resolver_etiquetas_campos_corregibles
+from domain.formulario.catalogo_correcciones import resolver_etiquetas_campos_corregibles
 from domain.excepciones import FormularioNoEncontradoError, SinPermisoError
 from domain.formulario.entidades import FormularioDominio
 from domain.formulario.tipos import EstadoFormulario
