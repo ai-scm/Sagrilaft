@@ -68,7 +68,7 @@ _VERSION_SERVICIO = "2.0.0"
 _ESTADO = 'activo'
 _MODO_IA = 'bedrock'
 # Commit exacto de la imagen corriendo (= el tag pusheado a ECR, ver
-# scripts/build_and_push_ecr_images.py y GIT_SHA en ecs-fargate.ts). En un
+# scripts/despliegue/build_and_push_ecr_images.py y GIT_SHA en ecs-fargate.ts). En un
 # incidente, /health responde con esto — no hace falta adivinar qué versión
 # está desplegada ni depender de que alguien haya recordado subir un tag.
 _GIT_SHA = os.getenv("GIT_SHA", "dev")

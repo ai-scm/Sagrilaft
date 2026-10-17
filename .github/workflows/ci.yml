@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validar plantillas .env (validate_envs.py)
-        run: python3 scripts/validate_envs.py
+        run: python3 scripts/validacion/validate_envs.py
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -79,7 +79,7 @@ jobs:
           KEYCLOAK_PORTAL_URL: ${{ vars.KEYCLOAK_PORTAL_URL }}
           KEYCLOAK_FORMULARIO_URL: ${{ vars.KEYCLOAK_FORMULARIO_URL }}
         run: |
-          python3 scripts/build_and_push_ecr_images.py \
+          python3 scripts/despliegue/build_and_push_ecr_images.py \
             --environment prod --from-environment \
             --account "$AWS_ACCOUNT_ID" --region "$AWS_REGION" \
             --tag "$IMAGE_TAG" --manifest "$RUNNER_TEMP/ecr-manifest.json"
