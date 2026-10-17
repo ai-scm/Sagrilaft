@@ -13,7 +13,8 @@ DRY : _ProveedorSimuladoBase centraliza la normalización y comparación
 
 from typing import List, Optional
 
-from domain.contratos import ProveedorListaCautelaImp, ResultadoBusquedaLista
+from domain.contratos import ResultadoBusquedaLista
+from domain.puertos.proveedor_lista_cautela import ProveedorListaCautelaImp
 from domain.utils.texto import quitar_diacriticos
 
 

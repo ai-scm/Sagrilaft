@@ -18,7 +18,8 @@ riesgo vivían en el router — ahora están correctamente en este servicio.
 
 from typing import List, Optional
 
-from domain.contratos import ProveedorListaCautelaImp, ResultadoBusquedaLista, RespuestaBusquedaLista
+from domain.contratos import ResultadoBusquedaLista, RespuestaBusquedaLista
+from domain.puertos.proveedor_lista_cautela import ProveedorListaCautelaImp
 
 
 # ═══════════════════════════════════════════════════════════════

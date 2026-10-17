@@ -19,7 +19,8 @@ from domain.constantes import (
     TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT,
     TIPO_DOCUMENTO_FORMULARIO_PDF,
 )
-from domain.contratos import DocumentoDatos, IServicioFirmaExterna
+from domain.contratos import DocumentoDatos
+from domain.puertos.firma_externa import IServicioFirmaExterna
 from domain.excepciones import (
     DocumentoNoEncontradoError,
     FirmaNoDisponibleError,
