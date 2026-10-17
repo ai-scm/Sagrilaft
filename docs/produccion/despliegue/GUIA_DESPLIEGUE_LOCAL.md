@@ -37,7 +37,7 @@ permanecer; no se actualizan ni se utilizan para estas releases.
 ```bash
 export SHA_ACTUAL='<SHA_COMPLETO_APROBADO>'
 export CUENTA_AWS='<CUENTA_DEL_CATALOGO>'
-python3 scripts/build_and_push_ecr_images.py \
+python3 scripts/despliegue/build_and_push_ecr_images.py \
   --environment staging --account "$CUENTA_AWS" \
   --env-file .env.staging --tag "$SHA_ACTUAL" \
   --manifest /tmp/ecr-staging-intento-1.json
@@ -53,7 +53,7 @@ Si falla una publicación, conservar el manifiesto parcial. Para reutilizar imá
 acreditadas, revisar esa evidencia y pasarla explícitamente en otro intento:
 
 ```bash
-python3 scripts/build_and_push_ecr_images.py \
+python3 scripts/despliegue/build_and_push_ecr_images.py \
   --environment staging --account "$CUENTA_AWS" \
   --env-file .env.staging --tag "$SHA_ACTUAL" \
   --reuse-manifest /tmp/ecr-staging-intento-1.json \
@@ -104,12 +104,12 @@ otra ejecución de CI.
 <a id="coordinado"></a>
 ### Paso 2: Preparar y revisar el despliegue coordinado
 
-El flujo implementado está en [deploy_release.py](../../../scripts/deploy_release.py).
+El flujo implementado está en [deploy_release.py](../../../scripts/despliegue/deploy_release.py).
 Los comandos directos `deploy:staging`/`deploy:prod` de CDK son operaciones de
 infraestructura: **no ejecutan migraciones ni sustituyen esta barrera**.
 No activar una release que exige otro esquema antes de verificar su migración.
 
-1. Preparar un plan privado a partir del [ejemplo](../../../scripts/deploy_release.example.json):
+1. Preparar un plan privado a partir del [ejemplo](../../../scripts/despliegue/deploy_release.example.json):
    cuenta/ambiente, contexto completo, capacidad, tag anterior y candidato,
    revisiones previa/objetivo, cuatro digests y validación funcional aprobada.
    Por defecto se exige `smoke_command`; staging admite la modalidad manual descrita abajo.
@@ -118,7 +118,7 @@ No activar una release que exige otro esquema antes de verificar su migración.
 2. Con las imágenes publicadas/verificadas, ejecutar solo el preflight:
 
 ```bash
-python3 scripts/deploy_release.py --environment staging \
+python3 scripts/despliegue/deploy_release.py --environment staging \
   --plan /ruta/privada/plan-staging.json \
   --evidence-dir /ruta/privada/evidencia-staging-nueva
 ```
@@ -199,7 +199,7 @@ El responsable registrado revisará cualquier limpieza futura como operación se
 Revisión local de evidencia (sin consultas ni escrituras AWS):
 
 ```bash
-python3 scripts/deploy_release.py --environment staging \
+python3 scripts/despliegue/deploy_release.py --environment staging \
   --plan /ruta/privada/plan-staging.json \
   --evidence-dir /ruta/privada/evidencia-de-la-ejecucion \
   --close-manual

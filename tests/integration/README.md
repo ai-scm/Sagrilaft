@@ -612,14 +612,14 @@ puede ver y operar cada usuario interno:
 `test_migraciones_alembic_postgres.py`
 
 La validación objetivo usa **PostgreSQL 16 local y desechable**. El ejecutor
-[`scripts/test_migrations_pg16.py`](../../scripts/test_migrations_pg16.py) exige
+[`scripts/validacion/test_migrations_pg16.py`](../../scripts/validacion/test_migrations_pg16.py) exige
 binarios 16.x, crea un clúster nuevo en `/tmp`, escucha solo en un socket Unix
 privado (sin TCP) y elimina el clúster al terminar. Cada caso de integración crea
 y elimina además su propia base `sagrilaft_alembic_test_*`. No utiliza AWS, Docker,
 RDS, staging ni datos de una base existente.
 
 ```bash
-venv/bin/python scripts/test_migrations_pg16.py \
+venv/bin/python scripts/validacion/test_migrations_pg16.py \
   --pg-bin /ruta/postgresql-16/bin \
   --report-dir /tmp/validacion-pg16-nueva
 ```
