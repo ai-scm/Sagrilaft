@@ -39,7 +39,7 @@ import uuid
 
 from run_ecs_migration import MigrationError, run_migration
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 INFRA = ROOT / "infra/sagrilaft"
 SERVICES = {"backend": "EcsBackendServiceName", "formulario-publico": "EcsFrontendServiceName",
             "portal-interno": "EcsPortalServiceName", "keycloak": "EcsKeycloakServiceName"}
@@ -217,8 +217,8 @@ def atomic_write(path, content):
             temporary.unlink(missing_ok=True)
 
 
-ORCHESTRATOR_SOURCES = ("scripts/deploy_release.py", "scripts/deploy_release.sh",
-                        "scripts/run_ecs_migration.py")
+ORCHESTRATOR_SOURCES = ("scripts/despliegue/deploy_release.py", "scripts/despliegue/deploy_release.sh",
+                        "scripts/despliegue/run_ecs_migration.py")
 
 
 def record_orchestrator(rt, label="orchestrator", root=ROOT):

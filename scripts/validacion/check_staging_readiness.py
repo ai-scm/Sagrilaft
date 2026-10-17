@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TARGET_ACCOUNT = "874641912777"
 BEDROCK_RUNTIME_CONFIG_KEYS = [
     "BEDROCK_MAX_TOKENS",
@@ -412,7 +412,7 @@ def check_zoho_webhook_hmac_contract() -> Check:
 
 def check_frontend_legal_build_args() -> Check:
     dockerfile = read("frontend/apps/formulario-publico/Dockerfile")
-    build_script = read("scripts/build_and_push_ecr_images.py")
+    build_script = read("scripts/despliegue/build_and_push_ecr_images.py")
     workflow = read(".github/workflows/ci.yml")
 
     required = {

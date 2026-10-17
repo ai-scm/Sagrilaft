@@ -22,7 +22,7 @@ import sys
 import tarfile
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 COMPONENTS = ("backend", "formulario-publico", "portal-interno", "keycloak")
 ACTIVE_LOCK = ContextVar("publication_lock_fd", default=None)
 LOCK_DIRECTORY = Path("/tmp")  # Shared across checkouts; never use a checkout-local lock.
