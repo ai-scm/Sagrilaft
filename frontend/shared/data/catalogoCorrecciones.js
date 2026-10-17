@@ -1,7 +1,7 @@
 /**
  * Catálogo de campos identificables en una solicitud de devolución.
  *
- * Espeja backend/domain/catalogo_correcciones.py — los IDs deben ser idénticos.
+ * Espeja backend/domain/formulario/catalogo_correcciones.py — los IDs deben ser idénticos.
  * Agregar nuevos campos aquí (y en el backend) es la única acción necesaria
  * para extender el sistema a nuevos campos sin tocar componentes.
  *
