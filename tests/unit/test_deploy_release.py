@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "despliegue"))
 import deploy_release as release
 
 
@@ -518,14 +518,14 @@ def test_events_atomic_failure_preserves_existing_history(tmp_path, monkeypatch)
 @pytest.mark.parametrize('dirty', [False, True])
 def test_orchestrator_records_commit_and_exact_sources(tmp_path, monkeypatch, dirty):
     root = tmp_path / 'checkout'
-    (root / 'scripts').mkdir(parents=True)
+    (root / 'scripts' / 'despliegue').mkdir(parents=True)
     for name in release.ORCHESTRATOR_SOURCES:
         (root / name).write_text('source with unicode: validación\n')
     directory = tmp_path / 'evidence'
     directory.mkdir()
     def git(args, **kwargs):
         assert args[0] == 'git'
-        return 'b' * 40 if args[1] == 'rev-parse' else (' M scripts/deploy_release.py' if dirty else '')
+        return 'b' * 40 if args[1] == 'rev-parse' else (' M scripts/despliegue/deploy_release.py' if dirty else '')
     monkeypatch.setattr(release.subprocess, 'check_output', git)
     rt = release.Runtime(plan(), directory)
     release.record_orchestrator(rt, root=root)

@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "despliegue"))
 import build_and_push_ecr_images as publisher
 
 REAL_RUN = subprocess.run
@@ -270,7 +270,7 @@ def test_missing_configuration_fails_before_publication():
 
 def test_workflow_uses_shared_publisher_and_preserves_partial_evidence():
     workflow = (publisher.ROOT / ".github/workflows/ci.yml").read_text()
-    assert "scripts/build_and_push_ecr_images.py" in workflow
+    assert "scripts/despliegue/build_and_push_ecr_images.py" in workflow
     assert ":latest" not in workflow
     assert "docker push" not in workflow and "docker build" not in workflow
     assert "if: always()" in workflow and "actions/upload-artifact@v4" in workflow

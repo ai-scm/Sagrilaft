@@ -9,7 +9,7 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("migration_launcher", ROOT / "scripts/run_ecs_migration.py")
+SPEC = importlib.util.spec_from_file_location("migration_launcher", ROOT / "scripts/despliegue/run_ecs_migration.py")
 launcher = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(launcher)
 PREFIX = "arn:aws:ecs:us-east-1:123456789012:"
@@ -193,7 +193,7 @@ def test_shell_entrypoint_uses_cli_and_propagates_failure_without_leaking_output
     executable.write_text("#!/bin/sh\necho DO-NOT-PRINT >&2\nexit 23\n")
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
-    result = subprocess.run(["bash", str(ROOT / "scripts/run_ecs_migration.sh")], capture_output=True, text=True)
+    result = subprocess.run(["bash", str(ROOT / "scripts/despliegue/run_ecs_migration.sh")], capture_output=True, text=True)
     assert result.returncode != 0
     assert "get-caller-identity" in result.stderr
     assert "DO-NOT-PRINT" not in result.stdout + result.stderr
@@ -208,6 +208,6 @@ def test_shell_entrypoint_success_with_fake_aws(setup, tmp_path, monkeypatch):
                           "print(json.dumps(data[sys.argv[2]]))\n")
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}:{os.environ['PATH']}")
-    result = subprocess.run(["bash", str(ROOT / "scripts/run_ecs_migration.sh")], capture_output=True, text=True)
+    result = subprocess.run(["bash", str(ROOT / "scripts/despliegue/run_ecs_migration.sh")], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout.splitlines()[-1])["event"] == "migration_completed"
