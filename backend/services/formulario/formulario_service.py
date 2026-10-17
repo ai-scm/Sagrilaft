@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional
 
 from domain.auditoria.entidades import ActorTipo, EventoAuditoria, TipoEvento
 from domain.constantes import TIPO_DOCUMENTO_FORMULARIO_PDF
-from domain.contratos import ErrorCampoFormulario, ExtractorIAImp, ResultadoEnvioFormulario
+from domain.contratos import ErrorCampoFormulario, ResultadoEnvioFormulario
+from domain.puertos.extraccion_ia import ExtractorIAImp
 from domain.excepciones import (
     FormularioNoEditableError,
     FormularioNoEncontradoError,

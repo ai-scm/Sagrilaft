@@ -13,7 +13,7 @@ Diseño:
 from fastapi import Depends, HTTPException, Request
 from typing import Optional
 
-from domain.contratos import ExtractorIAImp
+from domain.puertos.extraccion_ia import ExtractorIAImp
 from domain.puertos.almacenamiento import IAlmacenamiento
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.alertas_portal import IAlertasPortal

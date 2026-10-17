@@ -9,7 +9,7 @@ api/dependencies.py, que es el punto de composición de la capa API.
 from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from domain.contratos import ExtractorIAImp
+from domain.puertos.extraccion_ia import ExtractorIAImp
 from domain.puertos.almacenamiento import IAlmacenamiento
 from domain.puertos.auditoria import RepositorioAuditoria
 from domain.puertos.repositorios import (

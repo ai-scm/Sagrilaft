@@ -19,13 +19,9 @@ DRY: La extracción con log y la ejecución del validador están centralizadas
 import logging
 from typing import Any, Dict, List, Tuple
 
-from domain.contratos import (
-    HallazgoValidacion,
-    ExtractorIAImp,
-    ValidadorCruzadoImp,
-    ValidadorDocumentoImp,
-    ResultadoExtraccion,
-)
+from domain.contratos import HallazgoValidacion, ResultadoExtraccion
+from domain.puertos.extraccion_ia import ExtractorIAImp
+from domain.puertos.validadores import ValidadorCruzadoImp, ValidadorDocumentoImp
 
 logger = logging.getLogger(__name__)
 

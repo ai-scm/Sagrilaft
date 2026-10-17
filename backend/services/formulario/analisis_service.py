@@ -6,7 +6,8 @@ documentos adjuntos, y detección de inconsistencias.
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Protocol
 
-from domain.contratos import AlertaInconsistencia, DocumentoDatos, ExtractorIAImp
+from domain.contratos import AlertaInconsistencia, DocumentoDatos
+from domain.puertos.extraccion_ia import ExtractorIAImp
 from domain.formulario.entidades import FormularioDatos
 from domain.puertos.almacenamiento import IAlmacenamiento
 from services.formulario.prellenado import mapear_campos_para_formulario
