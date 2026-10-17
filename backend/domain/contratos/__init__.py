@@ -1,17 +1,14 @@
 """
-Contratos (Protocolos) y tipos de datos compartidos.
-Definen las interfaces que deben cumplir extractores y validadores.
-
-SOLID:
-- I (Segregación de Interfaces): Protocolos pequeños y enfocados.
-- D (Inversión de Dependencias): El código depende de estos protocolos,
-  no de implementaciones concretas.
+DTOs (tipos de datos) compartidos del dominio.
 
 Este paquete es una fachada: cada submódulo agrupa DTOs de un área
-(documentos, validación, acceso, envío de formulario, firma, listas)
-y los Protocolos quedan en `protocolos.py`. Todos los nombres se
-reexportan aquí para mantener compatibles las importaciones existentes
-(`from domain.contratos import X`).
+(documentos, validación, acceso, envío de formulario, firma, listas).
+Todos los nombres se reexportan aquí para mantener compatibles las
+importaciones existentes (`from domain.contratos import X`).
+
+Los Protocols (interfaces de puertos) viven en `domain.puertos` —
+ver `domain/puertos/extraccion_ia.py`, `validadores.py`,
+`firma_externa.py` y `proveedor_lista_cautela.py`.
 """
 
 from __future__ import annotations
@@ -28,13 +25,6 @@ from domain.contratos.envio_formulario import (
 )
 from domain.contratos.firma import SolicitudFirmaCreada
 from domain.contratos.listas import RespuestaBusquedaLista, ResultadoBusquedaLista
-from domain.contratos.protocolos import (
-    ExtractorIAImp,
-    IServicioFirmaExterna,
-    ProveedorListaCautelaImp,
-    ValidadorCruzadoImp,
-    ValidadorDocumentoImp,
-)
 from domain.contratos.validacion import (
     AlertaInconsistencia,
     HallazgoValidacion,
@@ -46,10 +36,7 @@ __all__ = [
     "AlertaInconsistencia",
     "DocumentoDatos",
     "ErrorCampoFormulario",
-    "ExtractorIAImp",
     "HallazgoValidacion",
-    "IServicioFirmaExterna",
-    "ProveedorListaCautelaImp",
     "RespuestaBusquedaLista",
     "ResultadoBusquedaLista",
     "ResultadoComparacion",
@@ -58,6 +45,4 @@ __all__ = [
     "ResultadoExtraccion",
     "SolicitudCreacionAcceso",
     "SolicitudFirmaCreada",
-    "ValidadorCruzadoImp",
-    "ValidadorDocumentoImp",
 ]
