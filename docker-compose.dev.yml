@@ -75,6 +75,11 @@ services:
       # uploads que el contenedor crea internamente. Sin esto, los archivos
       # subidos durante la sesión desaparecerían al reiniciar.
       - ./backend/uploads:/app/uploads
+      # Sesión SSO de AWS del desarrollador (no claves estáticas). Solo se monta
+      # config y la caché de SSO; NO se monta ~/.aws/credentials, que puede tener
+      # claves estáticas. Antes de levantar: `aws sso login --profile <perfil>`.
+      - ~/.aws/config:/home/appuser/.aws/config:ro
+      - ~/.aws/sso:/home/appuser/.aws/sso
 
     # En desarrollo reemplazamos el comando de arranque normal (que incluye
     # comprobaciones de producción) por uno más simple:
@@ -94,6 +99,13 @@ services:
       # La URL de conexión a la base de datos apunta al contenedor postgres
       # (no a AWS). Se construye con las mismas variables del .env.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+      # Credenciales AWS por sesión SSO (sin claves estáticas). Ver volumes arriba.
+      AWS_CONFIG_FILE: /home/appuser/.aws/config
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+      # Perfil SSO a usar en local. Defínelo en .env (AWS_PROFILE=...). Por defecto
+      # "default" (sin credenciales): el backend arranca y la IA queda sin acceso.
+      AWS_PROFILE: ${AWS_PROFILE:-default}
 
       # En desarrollo un solo proceso es suficiente. En producción se usan
       # varios (uno por CPU) para atender más solicitudes simultáneas.

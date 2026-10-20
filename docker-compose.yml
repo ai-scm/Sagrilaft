@@ -57,13 +57,9 @@ services:
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.0.0.0/8}
 
       # ── AWS ───────────────────────────────────────────────────────────────
-      # En AWS NO hace falta definir ACCESS_KEY ni SECRET_ACCESS_KEY:
-      # ECS usa un Task Role que le da permisos automáticamente (más seguro
-      # que guardar credenciales en un archivo). Solo rellenar si corres esto
-      # fuera de AWS (CI, portátil de desarrollo, etc.).
+      # Sin claves estáticas: en AWS (ECS) las credenciales vienen del Task Role.
+      # En local se usa sesión SSO montada desde ~/.aws (ver docker-compose.dev.yml).
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
 
       # ARN del modelo de inteligencia artificial en Amazon Bedrock.
       # Si se deja vacío, el análisis automático de documentos queda desactivado.
