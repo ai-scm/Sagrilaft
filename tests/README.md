@@ -253,7 +253,7 @@ Validación local de esta adaptación: **111 passed** (2026-10-06), ejecutando:
 venv/bin/python -m pytest -q tests/unit/test_deploy_release.py tests/unit/test_run_ecs_migration.py tests/unit/test_migration_guard.py
 ```
 
-Procedimiento y evidencia manual: [guía](../docs/produccion/GUIA_DESPLIEGUE_LOCAL.md#smoke-manual).
+Procedimiento y evidencia manual: [guía](../docs/produccion/despliegue/GUIA_DESPLIEGUE_LOCAL.md#smoke-manual).
 
 Actualización local de escritura atómica y trazabilidad (2026-10-06): **120 passed**
 con el mismo comando anterior. Casos nuevos: reemplazo completo/permisos privados,
