@@ -1,8 +1,8 @@
 # Estado de staging y producción
 
-Última revisión documental: 2026-10-16; actualización de P20 basada en las
-evidencias archivadas del 15 de octubre y referencias acreditadas posteriores
-al registro inicial del 6 de octubre. Función única: resumir la situación
+Última revisión documental: 2026-10-21 (credenciales SMTP/Zoho y release del 20 de
+octubre); el resto se basa en evidencias archivadas del 15–16 de octubre y
+referencias acreditadas posteriores al registro inicial del 6 de octubre. Función única: resumir la situación
 acreditada de los ambientes y enlazar sus evidencias. No contiene un backlog
 ni instrucciones de despliegue. No es una consulta en vivo de AWS.
 
@@ -82,15 +82,16 @@ El [bootstrap del 7 de octubre](../evidencia/bootstrap-prod-4f7543123adea6a7da9e
 registró CREATE_COMPLETE, RDS disponible y cuatro servicios en 0/0/0. Esto
 sustituye la descripción anterior de infraestructura no desplegada. No acredita
 release funcional, migración, activación o smoke productivo posteriores.
-No se revalidó producción en AWS el 14 al actualizar este documento.
+No se revalidó producción en AWS después del 16 de octubre; lo registrado como
+producción es documental.
 
 Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de igualdad, sin valores:
 
 - `SagrilaftStack-prod` en `CREATE_COMPLETE`; los cuatro servicios ECS en 0/0/0. Ninguna tarea activa.
 - `cdk diff` con los argumentos del bootstrap: sin diferencias. Lo desplegado coincide con el código del bootstrap.
 - Secretos de CDK (`app_secret`, `keycloak_admin`, `db_credentials`) sin cambios respecto a su escritura por CloudFormation (7 de octubre). Su fuente vigente es AWS. El 2026-10-19 se eliminaron de `.env.prod` sus claves locales (`SECRET_KEY`, `KEYCLOAK_ADMIN*`, `KEYCLOAK_DB_*`), que ningún script leía.
-- Secretos externos escritos manualmente: `zoho_credentials` (24 de septiembre) y `smtp_credentials` (7 de octubre, 09:05). `.env.prod` **no coincidía** con ninguno de los dos según la verificación del 2026-10-16.
-- **Sincronización de secretos: SMTP y Zoho reconciliados (2026-10-20).** SMTP: la identidad real de producción es `ses-smtp-prod-sagrilaft` (no `sagrilaft-ses-smtpp`, la identificada el 2026-10-16), ya con permisos de envío, y `.env.prod` coincide con el secreto vigente en AWS. Zoho: se confirmó en la consola de Zoho que AWS tiene la credencial de la cuenta oficial de Legal; `.env.prod` y `.env.staging` se corrigieron para coincidir, y los webhooks (borrados) se recrearon con firma HMAC. Ambas condiciones de bloqueo quedan cerradas ([P03](../produccion/PENDIENTES_PRODUCCION.md#p03); [detalle](../produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod)). Falta probar el webhook recreado contra un caso real en staging.
+- Secretos externos escritos manualmente: `zoho_credentials` (24 de septiembre) y `smtp_credentials` (7 de octubre, 09:05). El 2026-10-16 `.env.prod` no coincidía con ninguno; ambos se reconciliaron el 2026-10-20 (viñeta siguiente).
+- **Sincronización de secretos: SMTP y Zoho reconciliados (2026-10-20).** SMTP: la identidad real de producción es `ses-smtp-prod-sagrilaft` (no `sagrilaft-ses-smtpp`, la identificada el 2026-10-16), ya con permisos de envío, y `.env.prod` coincide con el secreto vigente en AWS. Zoho: se confirmó en la consola de Zoho que AWS tiene la credencial de la cuenta oficial de Legal; `.env.prod` y `.env.staging` se corrigieron para coincidir, y los webhooks (borrados) se recrearon con firma HMAC. Ambas condiciones de bloqueo quedan cerradas ([P03](../produccion/PENDIENTES_PRODUCCION.md#p03); [detalle](../produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod)). El webhook recreado se probó con una firma real en staging el mismo día (expediente `SAG-9C58BEF6`, `FIRMADO`); en producción el webhook no se ha probado (P05).
 
 No hay release funcional, migración, activación ni smoke productivo. El SHA vigente para el corte no está fijado todavía; el del bootstrap es `4f7543123adea6a7da9ebbde187760a930fb1b4e`.
 

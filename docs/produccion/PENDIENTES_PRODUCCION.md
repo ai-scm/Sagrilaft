@@ -1,8 +1,8 @@
 # Pendientes para producción — registro único de tareas
 Evidencias originales P20: consultar el [índice del archivo P20](p20/EVIDENCIAS_P20_ARCHIVADAS.md); las rutas entre paréntesis son relativas a su contenido.
 
-Revisión documental: 2026-10-16 (P20 y referencias de staging/bootstrap).
-Los demás pendientes conservan sus evidencias históricas. Función única: registrar tareas, decisiones de cierre y
+Revisión documental: 2026-10-21 (P03: SMTP/Zoho y release de staging del 20 de octubre).
+Los demás pendientes conservan sus evidencias históricas (P20 y staging/bootstrap: 2026-10-16). Función única: registrar tareas, decisiones de cierre y
 criterios de aceptación. Los estados externos se basan en evidencias archivadas y revalidaciones
 fechadas por ejecución; esto no es una auditoría general actual de AWS/GitHub. [Mapa documental](../README.md#funciones).
 
@@ -42,13 +42,13 @@ La autoridad final de Go/No-Go y de autorización de rollback es Andrés Hurtado
 
 **Estado:** 🟡 Parcial.
 
-Estado de credenciales verificado el 2026-10-16 comparando solo igualdad, sin imprimir valores. Ninguna de las dos fuentes (AWS o `.env.prod`) se da por definitiva todavía:
+Estado de credenciales verificado el 2026-10-16 comparando solo igualdad, sin imprimir valores (situación **previa** a la reconciliación del 2026-10-20 descrita más abajo):
 
 - `zoho_credentials`: cargado el 2026-09-24 (cuenta oficial de Legal). Sus cuatro campos **no coinciden** con `.env.prod`.
 - `smtp_credentials`: escrito el 2026-10-07 a las 09:05. El usuario coincide con una clave IAM **activa** de `sagrilaft-ses-smtpp`. `SMTP_USER` y `SMTP_PASSWORD` de `.env.prod` **no coinciden**.
 - `db_credentials`: generado por CDK y asociado a RDS el 2026-10-07 a las 08:13. El usuario coincide con RDS. Las claves `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD` se eliminaron de `.env.prod` el 2026-10-19 porque ningún script local las lee; la fuente vigente es AWS.
 
-Además, el 2026-10-19 se eliminaron de `.env.prod` las claves `SECRET_KEY`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD`: ningún script local las leía y sus valores viven solo en AWS (`app_secret`, `keycloak_admin`, `db_credentials`). Mientras Zoho y SMTP no se concilien en `.env.prod`, la sincronización con `sync_aws_runtime_assets.py --apply` queda bloqueada según la [condición de bloqueo](despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod).
+Además, el 2026-10-19 se eliminaron de `.env.prod` las claves `SECRET_KEY`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD`: ningún script local las leía y sus valores viven solo en AWS (`app_secret`, `keycloak_admin`, `db_credentials`). La sincronización con `sync_aws_runtime_assets.py --apply` estuvo bloqueada por la [condición de bloqueo](despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod) hasta el 2026-10-20, cuando se concilió Zoho y SMTP (ver cierres abajo).
 
 **Cierre SMTP (2026-10-20).** La credencial SMTP de `.env.prod` quedó identificada
 (`ses-smtp-prod-sagrilaft`) y reconciliada con el secreto `sagrilaft/prod/smtp_credentials`
@@ -71,8 +71,6 @@ Misma prueba destapó un bug aparte en el portal interno (el banner de firma no 
 actualizaba sin recargar); corregido y ya desplegado en staging con la release
 `767b3acdc36044869d07980210e2ff212311474e`, confirmado con la misma firma real.
 
-Pendientes técnicos de siempre: S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS.
-
 **Separación de credenciales SMTP por ambiente (confirmado 2026-10-20).** Local y staging
 comparten la misma credencial (usuario IAM `sagrilaft-ses-smtppp`, fuente vigente en
 `sagrilaft/staging/smtp_credentials`). Producción usa una credencial exclusiva y distinta
@@ -80,7 +78,7 @@ comparten la misma credencial (usuario IAM `sagrilaft-ses-smtppp`, fuente vigent
 usuario, `sagrilaft-ses-smtpp` (doble "p"), no está confirmado en uso por ningún ambiente;
 no se elimina hasta confirmarlo.
 
-Pendiente técnico (sin cambios): verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cierre: resultados productivos archivados sin secretos. Consultar [valores](configuracion/checklist-valores-staging-prod.md) y [contrato de configuración](configuracion/MATRIZ_AWS_CONFIG.md).
+Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cierre: resultados productivos archivados sin secretos. Consultar [valores](configuracion/checklist-valores-staging-prod.md) y [contrato de configuración](configuracion/MATRIZ_AWS_CONFIG.md).
 
 <a id="p04"></a>
 ### P04 — Primer despliegue productivo

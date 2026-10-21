@@ -6,11 +6,11 @@ registra progreso mediante casillas: cada resultado se registra en el ID de
 Los ejemplos se ejecutan en Bash desde la raíz del proyecto, salvo los bloques
 que entran explícitamente a `infra/sagrilaft` mediante un subshell.
 
-Secuencia revisada contra los scripts el 2026-10-16. Estado de AWS verificado el mismo día:
+Secuencia revisada contra los scripts el 2026-10-16 (credenciales actualizadas el 2026-10-20). Estado de AWS verificado el 2026-10-16:
 la infraestructura de producción **ya existe** (`SagrilaftStack-prod`, `CREATE_COMPLETE` desde el
 2026-10-07, con `desiredCount=0`). No hay servicios activos ni migración ejecutada; el primer
-corte productivo aún no ha comenzado. La sincronización de secretos está **bloqueada** hasta
-resolver la [incoherencia de `.env.prod`](#bloqueo-env-prod).
+corte productivo aún no ha comenzado. La [incoherencia de `.env.prod`](#bloqueo-env-prod)
+que bloqueaba la sincronización de secretos se resolvió el 2026-10-20.
 Consultar el [estado acreditado](../../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md).
 Para despliegues posteriores usar la [guía rutinaria](GUIA_DESPLIEGUE_LOCAL.md).
 
@@ -122,7 +122,7 @@ activación.
 ## Fase 2 — Configuración e imágenes
 
 Seguimiento de configuración: [P03](../PENDIENTES_PRODUCCION.md#p03).
-Las credenciales externas (Zoho, SMTP) ya están cargadas en AWS; su eventual reescritura
+Las credenciales externas (Zoho, SMTP) ya están cargadas en AWS y conciliadas con `.env.prod`; su eventual reescritura
 depende de la [condición de bloqueo](#bloqueo-env-prod) y del procedimiento de
 [secretos externos](#secretos-externos). DB, app_secret y admin Keycloak los genera CDK y el
 procedimiento nunca los escribe. Verificar S3/SSM y los outputs.
@@ -137,7 +137,7 @@ API key tiene valor real. Con el proveedor deshabilitado, ese último secreto qu
 omitido. Nunca escribe `app_secret`, `db_credentials` ni `keycloak_admin`.
 
 <a id="bloqueo-env-prod"></a>
-**Condición de bloqueo (verificada el 2026-10-16).** `.env.prod` no coincide con los secretos
+**Condición de bloqueo (verificada el 2026-10-16; RESUELTA el 2026-10-20, ver cierres más abajo).** Entonces `.env.prod` no coincidía con los secretos
 vigentes en AWS para Zoho y SMTP. Comparación solo de igualdad, sin valores:
 
 | Elemento | Resultado | Lectura |
@@ -150,9 +150,9 @@ Las claves de base de datos y Keycloak admin (`KEYCLOAK_DB_*`, `KEYCLOAK_ADMIN*`
 se eliminaron de `.env.prod` el 2026-10-19: ningún script local las lee, así que ya no forman
 parte de esta condición. Su fuente vigente es AWS (`db_credentials`, `keycloak_admin`, `app_secret`).
 
-**Consecuencia:** ejecutar `--apply` con el `.env.prod` actual **sobrescribiría** los secretos
+**Consecuencia (histórica; vigente solo si `.env.prod` vuelve a divergir):** ejecutar `--apply` con un `.env.prod` desactualizado **sobrescribiría** los secretos
 correctos de Zoho y SMTP con valores desactualizados, y dejaría SMTP apuntando a una clave
-revocada. **No ejecutar `--apply` hasta cumplir todas estas condiciones:**
+revocada. **Condiciones para ejecutar `--apply` (1 y 2 cumplidas el 2026-10-20; falta revisar el dry-run):**
 
 1. `.env.prod` se corrige con los valores aprobados por el responsable de Zoho y SMTP,
    o se decide explícitamente conservar los valores actuales de AWS.
@@ -160,8 +160,7 @@ revocada. **No ejecutar `--apply` hasta cumplir todas estas condiciones:**
    aprobada, con evidencia registrada en P03.
 3. Se revisa el dry-run completo (paso 4).
 
-Mientras tanto, los secretos de Zoho y SMTP de AWS se consideran la fuente vigente, y el
-script no debe usarse para cambiarlos.
+Los secretos de Zoho y SMTP de AWS siguen siendo la fuente vigente; `.env.prod` ya coincide con ellos.
 
 Requisitos: Fase 1 verificada (los secretos de CDK y `smtp_credentials` ya existen) y
 `.env.prod` privado con `APP_ENV=production`. Las tareas ECS leen los secretos al
