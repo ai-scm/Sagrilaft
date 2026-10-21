@@ -61,7 +61,7 @@ def test_enviar_expediente_validado_a_firma_crea_solicitud_zoho_y_trazabilidad(
     assert formulario.ruta_documento_firmado is None
     assert evento_firma.estado_anterior == EstadoFormulario.VALIDADO.value
     assert evento_firma.estado_nuevo == EstadoFormulario.PENDIENTE_FIRMA.value
-    assert evento_firma.actor_id == "analista.integracion@blend360.com"
+    assert evento_firma.actor_id == "analista.integracion@example.com"
     assert evento_firma.actor_tipo == ActorTipo.OPERADOR
     assert certificado.nombre_archivo == "certificado_sagrilaft.pdf"
     assert certificado.subido_por == ActorTipo.SISTEMA

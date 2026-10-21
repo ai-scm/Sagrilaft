@@ -61,7 +61,7 @@ def test_rechazar_expediente_cierra_flujo_registra_trazabilidad_y_notifica(
     assert acceso_consumido.token_diligenciamiento == acceso["token_diligenciamiento"]
     assert evento_rechazo.estado_anterior == EstadoFormulario.ENVIADO.value
     assert evento_rechazo.estado_nuevo == EstadoFormulario.RECHAZADO.value
-    assert evento_rechazo.actor_id == "analista.integracion@blend360.com"
+    assert evento_rechazo.actor_id == "analista.integracion@example.com"
     assert evento_rechazo.actor_tipo == ActorTipo.OPERADOR
     assert json.loads(evento_rechazo.metadata_json) == {"motivo": motivo_interno}
 

@@ -312,7 +312,7 @@ def usuario_portal():
 
     return UsuarioPortalInterno(
         sub="usuario-integracion",
-        email="analista.integracion@blend360.com",
+        email="analista.integracion@example.com",
         roles=["acceso_clientes", "acceso_proveedores"],
     )
 
@@ -323,7 +323,7 @@ def cambiar_usuario_portal():
 
     def _cambiar(
         roles: list[str],
-        email: str = "analista.integracion@blend360.com",
+        email: str = "analista.integracion@example.com",
     ) -> UsuarioPortalInterno:
         usuario = UsuarioPortalInterno(
             sub=f"usuario-integracion-{len(roles)}",

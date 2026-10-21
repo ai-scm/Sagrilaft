@@ -110,13 +110,13 @@ def test_cerrar_expediente_con_reporte_final_guarda_evidencia_y_trazabilidad(
     assert reporte.content_type == "application/pdf"
     assert reporte.tamano == len(reporte_final)
     assert reporte.hash_sha256 == hashlib.sha256(reporte_final).hexdigest()
-    assert reporte.subido_por == "analista.integracion@blend360.com"
+    assert reporte.subido_por == "analista.integracion@example.com"
     assert reporte.version_numero == 1
     assert reporte.version_anterior_id is None
     assert dependencias_dobles["storage"].existe(reporte.ruta_archivo)
     assert evento_reporte.estado_anterior == EstadoFormulario.FIRMADO.value
     assert evento_reporte.estado_nuevo == EstadoFormulario.CERRADO.value
-    assert evento_reporte.actor_id == "analista.integracion@blend360.com"
+    assert evento_reporte.actor_id == "analista.integracion@example.com"
     assert evento_reporte.actor_tipo == ActorTipo.OPERADOR
     metadata = json.loads(evento_reporte.metadata_json)
     assert metadata == {
@@ -201,7 +201,7 @@ def test_cerrar_expediente_sin_reporte_final_por_no_continuacion_dialogos(
     assert reportes == []
     assert evento_cierre.estado_anterior == EstadoFormulario.FIRMADO.value
     assert evento_cierre.estado_nuevo == EstadoFormulario.CERRADO.value
-    assert evento_cierre.actor_id == "analista.integracion@blend360.com"
+    assert evento_cierre.actor_id == "analista.integracion@example.com"
     assert evento_cierre.actor_tipo == ActorTipo.OPERADOR
     assert json.loads(evento_cierre.metadata_json) == {
         "causal_cierre": CAUSAL_CIERRE_NO_CONTINUACION_DIALOGOS,

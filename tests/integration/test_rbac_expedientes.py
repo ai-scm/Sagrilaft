@@ -40,7 +40,7 @@ def test_rbac_filtra_y_bloquea_expedientes_por_rol_de_contraparte(
         correo_destinatario="representante@proveedor.com",
     )
 
-    cambiar_usuario_portal(["acceso_clientes"], "analista.clientes@blend360.com")
+    cambiar_usuario_portal(["acceso_clientes"], "analista.clientes@example.com")
 
     assert _ids_listados(cliente_api) == {acceso_cliente["formulario_id"]}
 
@@ -78,7 +78,7 @@ def test_rbac_filtra_y_bloquea_expedientes_por_rol_de_contraparte(
     assert proveedor.estado == EstadoFormulario.ENVIADO.value
     assert eventos_aprobacion_proveedor == []
 
-    cambiar_usuario_portal(["acceso_proveedores"], "analista.proveedores@blend360.com")
+    cambiar_usuario_portal(["acceso_proveedores"], "analista.proveedores@example.com")
 
     assert _ids_listados(cliente_api) == {acceso_proveedor["formulario_id"]}
     respuesta_detalle_cliente_bloqueado = cliente_api.get(
@@ -88,7 +88,7 @@ def test_rbac_filtra_y_bloquea_expedientes_por_rol_de_contraparte(
 
     cambiar_usuario_portal(
         ["acceso_clientes", "acceso_proveedores"],
-        "analista.integral@blend360.com",
+        "analista.integral@example.com",
     )
 
     assert _ids_listados(cliente_api) == {
@@ -109,7 +109,7 @@ def test_rbac_usuario_sin_roles_no_puede_listar_expedientes(
     cambiar_usuario_portal,
 ):
     radicar_formulario_juridico_con_documentos(cliente_api)
-    cambiar_usuario_portal([], "analista.sin.roles@blend360.com")
+    cambiar_usuario_portal([], "analista.sin.roles@example.com")
 
     respuesta = cliente_api.get("/api/expedientes/")
 
@@ -141,7 +141,7 @@ def test_rbac_filtra_y_bloquea_accesos_manuales_por_rol_de_contraparte(
     )
     ultimo_envio_proveedor = acceso_proveedor_db.ultimo_envio_correo
 
-    cambiar_usuario_portal(["acceso_clientes"], "analista.clientes@blend360.com")
+    cambiar_usuario_portal(["acceso_clientes"], "analista.clientes@example.com")
 
     accesos_cliente = _accesos_listados(cliente_api)
     assert {acceso["formulario_id"] for acceso in accesos_cliente} == {
@@ -178,7 +178,7 @@ def test_rbac_filtra_y_bloquea_accesos_manuales_por_rol_de_contraparte(
     )
     assert proveedor_sin_reenvio.ultimo_envio_correo == ultimo_envio_proveedor
 
-    cambiar_usuario_portal(["acceso_proveedores"], "analista.proveedores@blend360.com")
+    cambiar_usuario_portal(["acceso_proveedores"], "analista.proveedores@example.com")
 
     accesos_proveedor = _accesos_listados(cliente_api)
     assert {acceso["formulario_id"] for acceso in accesos_proveedor} == {
@@ -187,7 +187,7 @@ def test_rbac_filtra_y_bloquea_accesos_manuales_por_rol_de_contraparte(
 
     cambiar_usuario_portal(
         ["acceso_clientes", "acceso_proveedores"],
-        "analista.integral@blend360.com",
+        "analista.integral@example.com",
     )
 
     assert {acceso["formulario_id"] for acceso in _accesos_listados(cliente_api)} == {
@@ -201,7 +201,7 @@ def test_rbac_usuario_sin_roles_no_puede_listar_accesos_manuales(
     cambiar_usuario_portal,
 ):
     crear_acceso_manual(cliente_api)
-    cambiar_usuario_portal([], "analista.sin.roles@blend360.com")
+    cambiar_usuario_portal([], "analista.sin.roles@example.com")
 
     respuesta = cliente_api.get("/api/accesos-manuales/")
 

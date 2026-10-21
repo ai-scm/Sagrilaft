@@ -64,7 +64,7 @@ def test_devolver_expediente_reactiva_acceso_notifica_y_expone_correccion(
     assert acceso_reactivado.token_diligenciamiento != acceso["token_diligenciamiento"]
     assert evento_devolucion.estado_anterior == EstadoFormulario.ENVIADO.value
     assert evento_devolucion.estado_nuevo == EstadoFormulario.EN_CORRECCION.value
-    assert evento_devolucion.actor_id == "analista.integracion@blend360.com"
+    assert evento_devolucion.actor_id == "analista.integracion@example.com"
     assert evento_devolucion.actor_tipo == ActorTipo.OPERADOR
     metadata_devolucion = json.loads(evento_devolucion.metadata_json)
     assert metadata_devolucion["numero_correccion"] == 1

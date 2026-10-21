@@ -40,7 +40,7 @@ def test_aprobar_expediente_cambia_estado_registra_auditoria_y_no_alerta(
     assert formulario.estado == EstadoFormulario.VALIDADO.value
     assert evento_aprobacion.estado_anterior == EstadoFormulario.ENVIADO.value
     assert evento_aprobacion.estado_nuevo == EstadoFormulario.VALIDADO.value
-    assert evento_aprobacion.actor_id == "analista.integracion@blend360.com"
+    assert evento_aprobacion.actor_id == "analista.integracion@example.com"
     assert evento_aprobacion.actor_tipo == ActorTipo.OPERADOR
     assert [evento["tipo"] for evento in dependencias_dobles["alertas_portal"].eventos] == [
         TipoAlerta.FORMULARIO_RECIBIDO
