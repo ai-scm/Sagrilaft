@@ -16,8 +16,8 @@ env:
   # Debe coincidir con DEFAULT_REGION en infra/sagrilaft/lib/deployment-constants.ts.
   # YAML no puede importar esa constante; si cambia la región, actualizar aquí también.
   AWS_REGION: us-east-1
-  # Debe coincidir con TARGET_ACCOUNT del catálogo de infraestructura.
-  AWS_ACCOUNT_ID: "874641912777"
+  # Variable de repositorio (Settings > Secrets and variables > Actions > Variables).
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
 
 jobs:
   test:
@@ -79,6 +79,7 @@ jobs:
           KEYCLOAK_PORTAL_URL: ${{ vars.KEYCLOAK_PORTAL_URL }}
           KEYCLOAK_FORMULARIO_URL: ${{ vars.KEYCLOAK_FORMULARIO_URL }}
         run: |
+          test -n "$AWS_ACCOUNT_ID" || { echo 'Falta la variable vars.AWS_ACCOUNT_ID'; exit 1; }
           python3 scripts/despliegue/build_and_push_ecr_images.py \
             --environment prod --from-environment \
             --account "$AWS_ACCOUNT_ID" --region "$AWS_REGION" \

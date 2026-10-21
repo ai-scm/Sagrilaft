@@ -43,7 +43,15 @@ jobs:
       - name: Run CDK Diff
         id: diff
         working-directory: infra/sagrilaft
+        env:
+          CUENTA_AWS: ${{ vars.AWS_ACCOUNT_ID }}
+          HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID }}
+          CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN }}
+          ALERTAS_STAGING: ${{ secrets.ALERTAS_STAGING }}
         run: |
+          for v in CUENTA_AWS HOSTED_ZONE_ID CERTIFICATE_ARN ALERTAS_STAGING; do
+            if [ -z "${!v}" ]; then echo "Falta $v (variable o secreto de GitHub)"; exit 1; fi
+          done
           # Se ejecuta con --no-color para que el diff en Markdown se lea limpio.
           # Usamos || true porque cdk diff retorna exit code 1 si hay diferencias,
           # y no queremos que el pipeline aborte aquí.
