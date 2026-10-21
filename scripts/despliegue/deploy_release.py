@@ -277,8 +277,10 @@ class Runtime:
         args = [str(INFRA / "node_modules/.bin/cdk"), "synth", self.stack, "--output", str(path), "--lookups", "false"]
         for key, value in context.items():
             args += ["-c", f"{key}={str(value).lower() if isinstance(value, bool) else value}"]
+        # app.ts exige CUENTA_AWS para staging/prod; se toma de la cuenta ya validada del plan.
+        env = {**os.environ, "CUENTA_AWS": str(self.plan["account"])}
         with (self.directory / f"{phase}.log").open("w") as log:
-            subprocess.run(args, cwd=INFRA, stdout=log, stderr=log, check=True)
+            subprocess.run(args, cwd=INFRA, stdout=log, stderr=log, check=True, env=env)
         return json.loads((path / f"{self.stack}.template.json").read_text())
 
     def deploy(self, phase):
