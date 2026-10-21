@@ -48,9 +48,9 @@ export SHA_ACTUAL='<SHA_APROBADO>'
 export IMAGE_TAG="$SHA_ACTUAL"
 export BEDROCK_MODEL_ID='<MODELO_DEL_CATALOGO>'
 export ALERTAS_CORTE='<LISTA_DE_DESTINATARIOS_DEL_CATALOGO>'
-export CUENTA_AWS='874641912777'
+export CUENTA_AWS='<CUENTA_AWS>'
 export AWS_REGION='us-east-1'
-export AWS_PROFILE='PS-PowerUserAccess-874641912777'
+export AWS_PROFILE='PS-PowerUserAccess-<CUENTA_AWS>'
 CONTEXTO_PROD=(
   -c zohoSecretYaExiste=true
   -c proveedorListasCautela=deshabilitado
@@ -100,10 +100,10 @@ argumentos que el bootstrap, sin desplegar:
 ```bash
 (cd infra/sagrilaft && cdk diff --no-color \
   -c environment=prod -c account="$CUENTA_AWS" -c region="$AWS_REGION" \
-  -c hostedZoneName=ia.blend360.com -c hostedZoneId=Z10446292T6I6L9P7R8AQ \
+  -c hostedZoneName=ia.blend360.com -c hostedZoneId=<HOSTED_ZONE_ID> \
   -c domainName=forms-sagrilaft.ia.blend360.com -c portalDomainName=sagrilaft.ia.blend360.com \
   -c keycloakDomainName=login-sagrilaft.ia.blend360.com \
-  -c certificateArn=arn:aws:acm:us-east-1:874641912777:certificate/ca472ae9-a0bf-49ec-8203-d78dce36a364 \
+  -c certificateArn=<ARN_CERTIFICADO_ACM> \
   -c imageTag=bootstrap-placeholder -c desiredCount=0 -c bedrockModelId=amazon.nova-pro-v1:0 \
   -c habilitarNatEgress=true "${CONTEXTO_PROD[@]}")
 ```
@@ -185,9 +185,9 @@ procedimiento (pasos 1-7 de la Fase 2) antes de ejecutarlo. Detalle en
 
 **Verificación real (2026-10-20).** El `refresh_token` de `sagrilaft/staging/zoho_credentials` y
 `sagrilaft/prod/zoho_credentials` autentica contra Zoho: HTTP 200 y `access_token` recibido
-en ambos. Pendiente: que el webhook recreado entregue una firma HMAC válida en un caso real
-de staging (`200`, no `403`). Esa prueba requiere que un firmante complete la firma desde su
-correo; no se ha ejecutado todavía.
+en ambos. El webhook recreado se probó con una firma real en staging: expediente `SAG-9C58BEF6`,
+cuatro entregas `POST /api/webhooks/zoho-sign` con `200 OK`, expediente pasó a `FIRMADO` sin
+intervención manual. Queda cerrado.
 
 **Línea base esperada (2026-10-16).** Antes de cualquier escritura, los secretos de CDK y los
 externos deben tener estas fechas de último cambio:
