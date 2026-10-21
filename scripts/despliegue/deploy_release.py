@@ -106,9 +106,12 @@ def strip_metadata(value):
     return value
 
 
-# Excepción aprobada para staging: ocho rutas y pares completos, no reglas Unicode.
-# Solo afecta a copias de comparación; nunca a assemblies ni recursos AWS.
-STAGING_UNICODE_PAIRS = (
+# Excepción aprobada para staging y prod: ocho rutas y pares completos, no reglas Unicode.
+# GetTemplate devuelve `?` donde el código sintetizado conserva tildes; se verificó el
+# mismo comportamiento en ambos stacks. Solo afecta a copias de comparación; nunca a
+# assemblies ni recursos AWS. Cualquier otro ambiente, ruta o texto sigue siendo estricto.
+UNICODE_EQUIVALENCE_ENVIRONMENTS = ("staging", "prod")
+APPROVED_UNICODE_PAIRS = (
     (('Resources', 'EcrBackendRepo0C255C53', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
     (('Resources', 'EcrFormularioPublicoRepo71B2173B', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
     (('Resources', 'EcrPortalInternoRepo64131791', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
@@ -123,9 +126,9 @@ STAGING_UNICODE_PAIRS = (
 def comparison_template(value, environment=None, *, preserve_metadata=False):
     """Equivalencias exactas, conservando el criterio de metadata de cada comprobación."""
     result = copy.deepcopy(value if preserve_metadata else strip_metadata(value))
-    if environment != "staging":
+    if environment not in UNICODE_EQUIVALENCE_ENVIRONMENTS:
         return result
-    for path, original, observed in STAGING_UNICODE_PAIRS:
+    for path, original, observed in APPROVED_UNICODE_PAIRS:
         cursor = result
         try:
             for key in path[:-1]:
@@ -218,7 +221,7 @@ def atomic_write(path, content):
 
 
 ORCHESTRATOR_SOURCES = ("scripts/despliegue/deploy_release.py", "scripts/despliegue/deploy_release.sh",
-                        "scripts/despliegue/run_ecs_migration.py")
+                        "scripts/despliegue/run_ecs_migration.py", "scripts/despliegue/smoke_readonly.py")
 
 
 def record_orchestrator(rt, label="orchestrator", root=ROOT):

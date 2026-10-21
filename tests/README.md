@@ -240,6 +240,11 @@ Documentación:
 
 ## Validación manual del despliegue de staging
 
+`tests/unit/test_smoke_readonly.py` verifica sin red el smoke de solo lectura de
+producción/staging (`scripts/despliegue/smoke_readonly.py`): solo `GET`, HSTS, commit
+candidato, base de datos, OIDC, reintentos y validación de argumentos. Un cliente falso
+sustituye a `http.client`; la comprobación real contra un ambiente es manual.
+
 `tests/unit/test_deploy_release.py` verifica el modo manual sin AWS: preflight sin
 mutaciones, salida 3 con lock conservado, revisión local de evidencia, cierre sin
 repetir despliegue/migración y rechazo de evidencia incompleta, ajena o cambiada,

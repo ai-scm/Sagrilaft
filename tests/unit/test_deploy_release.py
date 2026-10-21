@@ -551,33 +551,76 @@ def unicode_template(path, value):
     return result
 
 
-@pytest.mark.parametrize('path,original,observed', release.STAGING_UNICODE_PAIRS)
-def test_only_exact_approved_unicode_pair_is_equivalent(path, original, observed):
+@pytest.mark.parametrize('env', ['staging', 'prod'])
+@pytest.mark.parametrize('path,original,observed', release.APPROVED_UNICODE_PAIRS)
+def test_only_exact_approved_unicode_pair_is_equivalent(path, original, observed, env):
     expected = unicode_template(path, original)
     actual = unicode_template(path, observed)
     snapshot = copy.deepcopy(actual)
-    assert release.comparison_template(actual, 'staging') == release.comparison_template(expected, 'staging')
+    assert release.comparison_template(actual, env) == release.comparison_template(expected, env)
     assert actual == snapshot  # Nunca alterar el artefacto recibido.
-    assert release.comparison_template(actual, 'prod') != release.comparison_template(expected, 'prod')
     changed = unicode_template(path, observed + ' CAMBIO')
-    assert release.comparison_template(changed, 'staging') != release.comparison_template(expected, 'staging')
+    assert release.comparison_template(changed, env) != release.comparison_template(expected, env)
     other_path = ('OtherResource', *path[1:])
-    assert release.comparison_template(unicode_template(other_path, observed), 'staging') != release.comparison_template(unicode_template(other_path, original), 'staging')
+    assert release.comparison_template(unicode_template(other_path, observed), env) != release.comparison_template(unicode_template(other_path, original), env)
 
 
-def test_unicode_exception_does_not_hide_retention_or_image_changes():
-    path, original, observed = release.STAGING_UNICODE_PAIRS[0]
+@pytest.mark.parametrize('env', [None, 'dev', 'production', 'Prod'])
+@pytest.mark.parametrize('path,original,observed', release.APPROVED_UNICODE_PAIRS)
+def test_unicode_equivalence_is_limited_to_staging_and_prod(path, original, observed, env):
+    assert release.UNICODE_EQUIVALENCE_ENVIRONMENTS == ('staging', 'prod')
+    expected = unicode_template(path, original)
+    actual = unicode_template(path, observed)
+    assert release.comparison_template(actual, env) != release.comparison_template(expected, env)
+
+
+@pytest.mark.parametrize('env', ['staging', 'prod'])
+def test_unicode_exception_does_not_hide_retention_or_image_changes(env):
+    path, original, observed = release.APPROVED_UNICODE_PAIRS[0]
     expected = unicode_template(path, original)
     actual = unicode_template(path, observed.replace('30', '31'))
-    assert release.comparison_template(actual, 'staging') != release.comparison_template(expected, 'staging')
+    assert release.comparison_template(actual, env) != release.comparison_template(expected, env)
     before = template()
     after = template(migration_tag='new')
     before['Resources'].update(unicode_template(path, original)['Resources'])
     after['Resources'].update(unicode_template(path, observed)['Resources'])
-    release.assert_transition(before, after, 'prepare', environment='staging')
+    release.assert_transition(before, after, 'prepare', environment=env)
     after['Resources']['backend']['Properties']['ContainerDefinitions'][0]['Image'] = 'unauthorized'
     with pytest.raises(release.MigrationError):
-        release.assert_transition(before, after, 'prepare', environment='staging')
+        release.assert_transition(before, after, 'prepare', environment=env)
+
+
+def merge_templates(a, b):
+    if isinstance(a, dict) and isinstance(b, dict):
+        return {k: merge_templates(a[k], b[k]) if k in a and k in b else a.get(k, b.get(k)) for k in {*a, *b}}
+    if isinstance(a, list) and isinstance(b, list):
+        size = max(len(a), len(b))
+        return [merge_templates(a[i] if i < len(a) else None, b[i] if i < len(b) else None) for i in range(size)]
+    return b if a is None else a
+
+
+@pytest.mark.parametrize('env', ['staging', 'prod'])
+def test_all_approved_pairs_together_match_the_deployed_template(env):
+    # Hallazgo del 2026-10-21: GetTemplate sustituye las tildes por `?` en las ocho rutas.
+    # Con las ocho a la vez, la plantilla desplegada debe equivaler a la sintetizada; sin
+    # la equivalencia (ambiente desconocido) el preflight las rechazaría.
+    synthesized, deployed = {}, {}
+    for path, original, observed in release.APPROVED_UNICODE_PAIRS:
+        synthesized = merge_templates(synthesized, unicode_template(path, original))
+        deployed = merge_templates(deployed, unicode_template(path, observed))
+    assert len(release.APPROVED_UNICODE_PAIRS) == 8
+    assert release.comparison_template(deployed, env) == release.comparison_template(synthesized, env)
+    assert release.comparison_template(deployed, None) != release.comparison_template(synthesized, None)
+
+
+def test_prod_preflight_does_not_hide_other_changes_next_to_unicode_pairs():
+    synthesized, deployed = template(), template()
+    for path, original, observed in release.APPROVED_UNICODE_PAIRS:
+        synthesized = merge_templates(synthesized, unicode_template(path, original))
+        deployed = merge_templates(deployed, unicode_template(path, observed))
+    assert release.comparison_template(deployed, 'prod') == release.comparison_template(synthesized, 'prod')
+    deployed['Resources']['db']['Properties']['BackupRetentionPeriod'] = 1
+    assert release.comparison_template(deployed, 'prod') != release.comparison_template(synthesized, 'prod')
 
 
 @pytest.mark.parametrize('env', ['staging', 'prod', None])
@@ -613,11 +656,12 @@ def test_metadata_change_after_lock_blocks_preparation(runtime, kind):
     assert runtime.locked and runtime.deployments == [] and runtime.migration_calls == 0
 
 
-@pytest.mark.parametrize('path,original,observed', release.STAGING_UNICODE_PAIRS)
-def test_strict_baseline_accepts_only_approved_unicode_preserving_metadata(path, original, observed):
+@pytest.mark.parametrize('env', ['staging', 'prod'])
+@pytest.mark.parametrize('path,original,observed', release.APPROVED_UNICODE_PAIRS)
+def test_strict_baseline_accepts_only_approved_unicode_preserving_metadata(path, original, observed, env):
     a = unicode_template(path, original)
     b = unicode_template(path, observed)
     a['Metadata'] = b['Metadata'] = {'same': True}
-    assert release.comparison_template(a, 'staging', preserve_metadata=True) == release.comparison_template(b, 'staging', preserve_metadata=True)
+    assert release.comparison_template(a, env, preserve_metadata=True) == release.comparison_template(b, env, preserve_metadata=True)
     b['Metadata'] = {'same': False}
-    assert release.comparison_template(a, 'staging', preserve_metadata=True) != release.comparison_template(b, 'staging', preserve_metadata=True)
+    assert release.comparison_template(a, env, preserve_metadata=True) != release.comparison_template(b, env, preserve_metadata=True)
