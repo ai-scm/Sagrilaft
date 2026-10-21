@@ -85,7 +85,7 @@ Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cie
 
 **Estado:** 🟡 Parcial.
 
-El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). Los cuatro servicios permanecen en `desiredCount=0`. Siguen pendientes la carga/verificación de SMTP (P03), confirmación de las once suscripciones y validación de alarma basada en métrica real (P06), publicación de las cuatro imágenes, migración verificada, activación coordinada, validaciones funcionales y cierre productivo. La acción de alarma hacia SNS y la entrega temporal de `ALARM`/`OK` se probaron de forma controlada; ver [P06](#p06). Cierre de P04: completar el corte según el [procedimiento único](despliegue/CHECKLIST_CORTE_PRODUCCION.md), con CloudFormation, migración, servicios sanos y commit/digests coincidentes.
+El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). Los cuatro servicios permanecen en `desiredCount=0`. Siguen pendientes la carga/verificación de SMTP (P03), la recuperación de las suscripciones SNS y la validación de alarma basada en métrica real (P06), publicación de las cuatro imágenes, migración verificada, activación coordinada, validaciones funcionales y cierre productivo. La acción de alarma hacia SNS y la entrega temporal de `ALARM`/`OK` se probaron de forma controlada; ver [P06](#p06). Cierre de P04: completar el corte según el [procedimiento único](despliegue/CHECKLIST_CORTE_PRODUCCION.md), con CloudFormation, migración, servicios sanos y commit/digests coincidentes.
 
 <a id="p05"></a>
 ### P05 — Firma automática en producción
@@ -99,7 +99,22 @@ Cuenta/OAuth/webhook preparados y probados en staging. Falta un expediente produ
 
 **Estado:** 🟡 Parcial.
 
-El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: se forzó temporalmente `ALARM`, CloudWatch publicó a SNS, el operador confirmó la recepción del aviso `ALARM` y de recuperación `OK`, y la suscripción temporal se eliminó. La alarma quedó en `OK`. No se activó ECS, no se publicaron imágenes ni se ejecutaron migraciones. La prueba valida la ruta de acción CloudWatch→SNS→correo, pero no la evaluación del umbral desde métricas reales. La verificación posterior confirmó que las once suscripciones definitivas siguen en `PendingConfirmation`; ninguna recibió la prueba. P06 permanece parcial hasta confirmar las once y verificar una alarma causada por una condición métrica real, con recepción en menos de cinco minutos. [Evidencia de la prueba temporal](../evidencia/sns-prueba-temporal-prod-20261007.json). [Procedimiento](../operacion/RUNBOOK_OPERATIVO.md#alarmas). [Evidencia de creación](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md).
+El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: se forzó temporalmente `ALARM`, CloudWatch publicó a SNS, el operador confirmó la recepción del aviso `ALARM` y de recuperación `OK`, y la suscripción temporal se eliminó. La alarma quedó en `OK`. No se activó ECS, no se publicaron imágenes ni se ejecutaron migraciones. La prueba valida la ruta de acción CloudWatch→SNS→correo, pero no la evaluación del umbral desde métricas reales. La verificación posterior confirmó que las once suscripciones definitivas seguían en `PendingConfirmation`; ninguna recibió la prueba.
+
+**Actualización 2026-10-21 (estado real, sin cambios en AWS fuera del despliegue descrito):**
+- `SagrilaftStack-prod` se actualizó con 12 correos en `snsAlertasSub`. La única suscripción nueva es `Bryan.Ariza@blend360.com`, **confirmada** en SNS. Las alarmas de producción están en `OK`.
+- **Drift:** CloudFormation conserva las once suscripciones originales, pero SNS no tiene ninguna. Probablemente caducaron sin confirmar. Un despliegue no las recrea.
+- **Decisión del 2026-10-21 (responsable técnico):** mientras no se autorice a los otros once, la lista de alertas de producción es solo `Bryan.Ariza@blend360.com`, tanto en SNS como en SES. No se crean suscripciones ni se envían invitaciones a los once. **Aplicación pendiente de despliegue:** hoy SNS ya tiene solo tu suscripción, pero `ALERTAS_EMAIL_DESTINATARIO` (SES) sigue con 12 correos y CloudFormation conserva los once recursos de suscripción. Se alinea con un `cdk deploy` con `snsAlertasSub=Bryan.Ariza@blend360.com`: el diff de solo lectura muestra 11 `destroy` de suscripciones y el cambio del parámetro SSM, sin otros recursos. Sin cambios de código; las 26 pruebas de infraestructura pasan. Riesgo no probado: que CloudFormation pueda eliminar una suscripción cuyo ARN ya no existe (si falla, el stack revierte).
+- **Pendiente, sin autorización:** los once destinatarios originales quedan fuera de la lista vigente. Reincorporarlos requiere autorización explícita, volver a ponerlos en `snsAlertasSub` y confirmar cada invitación.
+- **Límite de la validación actual:** las alarmas de servidor y CPU/memoria dependen de métricas del servicio ECS, que sigue en `desiredCount=0`. Mientras no haya tareas, no pueden cruzar un umbral real.
+
+**Qué falta para cerrar P06:**
+1. Desplegar la alineación decidida (lista solo con Bryan) y verificar CloudFormation, SNS y SSM. Análisis en la [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md#análisis-de-impacto-del-drift-solo-lectura-2026-10-21). Cuando se autorice a los otros once, reincorporarlos en `snsAlertasSub` y confirmar cada invitación; P06 no cierra sin ellos.
+2. Activar los servicios ECS (depende de [P04](#p04): imágenes, migración y activación).
+3. Provocar una alarma por métrica real con los servicios activos y verificar que el aviso llegue a la lista definitiva en menos de cinco minutos.
+4. Registrar cada paso en la evidencia de la fecha correspondiente.
+
+[Evidencia de la actualización de hoy](../evidencia/sns-alertas-prod-20261021/README.md). [Evidencia de la prueba temporal](../evidencia/sns-prueba-temporal-prod-20261007.json). [Procedimiento](../operacion/RUNBOOK_OPERATIVO.md#alarmas). [Evidencia de creación](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md).
 
 <a id="p07"></a>
 ### P07 — Smoke funcional y correo productivos

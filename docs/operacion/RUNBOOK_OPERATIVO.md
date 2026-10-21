@@ -66,11 +66,16 @@ evaluación de un umbral a partir de métricas reales. La evidencia está en
 ### Procedimiento de verificación productiva — [P06](../produccion/PENDIENTES_PRODUCCION.md#p06)
 
 - La prueba controlada de `SetAlarmState` valida la transición de estado y la
-  acción SNS; no acredita que una métrica real cruce el umbral. Las once
-  suscripciones definitivas de producción siguen pendientes de confirmación;
-  durante la prueba solo estuvo confirmada la suscripción temporal, que ya se
-  retiró. Ninguna de las once recibió los mensajes de prueba.
-- Para cerrar P06, una vez confirmadas las once suscripciones y con los
+  acción SNS; no acredita que una métrica real cruce el umbral. Durante la
+  prueba solo estuvo confirmada la suscripción temporal, que ya se retiró;
+  ninguna de las once definitivas recibió los mensajes.
+- Estado al 2026-10-21: la suscripción de `Bryan.Ariza@blend360.com` está
+  confirmada. Las once originales no existen en SNS aunque CloudFormation las
+  conserve (drift); no se les ha enviado invitación. Decisión del mismo día:
+  la lista efectiva es solo ese correo hasta autorizar a los otros once
+  (alineación pendiente de despliegue). Ver
+  [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md).
+- Para cerrar P06, con las suscripciones autorizadas confirmadas y los
   servicios activos, provocar una condición métrica aprobada que cruce un
   umbral real y verificar que el aviso llegue a la lista definitiva en menos
   de cinco minutos. No usar `SetAlarmState` como sustituto de esa validación.

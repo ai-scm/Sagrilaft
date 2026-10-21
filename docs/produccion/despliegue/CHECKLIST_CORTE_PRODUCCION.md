@@ -32,9 +32,14 @@ que HEAD es la release). Preparar SMTP para cargarlo después del bootstrap.
 El riesgo aceptado de la RDS de producción (clase, una sola AZ, retención de
 backups) y sus límites están en [P02](P02_GO_NO_GO_ROLLBACK.md#riesgo-rds-aceptado-para-el-primer-corte);
 el ensayo de restauración pendiente está en [P10](../PENDIENTES_PRODUCCION.md#p10).
-La lista SNS vigente del catálogo fue confirmada para producción. Después del
-bootstrap, cada destinatario debe confirmar su suscripción; P06 no cierra hasta
-verificar las once confirmaciones y una alarma de extremo a extremo.
+La lista SNS vigente del catálogo fue confirmada para producción. Estado al 2026-10-21: solo
+`Bryan.Ariza@blend360.com` tiene suscripción confirmada; las once originales no existen en SNS
+(drift con CloudFormation) y no se les ha enviado invitación. P06 no cierra hasta recuperar
+las suscripciones autorizadas, verificar sus confirmaciones y probar una alarma de extremo a
+extremo ([detalle](../PENDIENTES_PRODUCCION.md#p06)).
+Decisión del 2026-10-21: hasta que se autorice a los otros once, `ALERTAS_CORTE` debe contener solo
+`Bryan.Ariza@blend360.com`; la lista completa del catálogo no se usa todavía. Reincorporar a los
+once exige autorización y un nuevo despliegue, que enviará sus invitaciones.
 
 <a id="contexto"></a>
 ## Contexto común de CDK

@@ -191,6 +191,8 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 
 `ALERTAS_EMAIL_DESTINATARIO` acepta varios correos separados por coma. La lista de producción no se publica en el repositorio: se pasa en el contexto de corte como `snsAlertasSub` y queda en SSM. Solicitarla al responsable de cumplimiento.
 
+**Vigente desde la decisión del 2026-10-21:** hasta autorizar a los once destinatarios originales, la lista efectiva es solo `Bryan.Ariza@blend360.com`. La lista completa sigue siendo la prevista, pero no se aplica. Ver [P06](../PENDIENTES_PRODUCCION.md#p06).
+
 ## Clientes OAuth Zoho
 
 Data center confirmado: USA (`accounts.zoho.com`, `sign.zoho.com`,
