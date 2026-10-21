@@ -31,7 +31,7 @@ Protecciones:
 
 Requisitos de sesión: `AWS_PROFILE` debe apuntar a la cuenta objetivo. El perfil `default`
 no tiene credenciales y el script no acepta `--profile`. En producción:
-`export AWS_PROFILE=PS-PowerUserAccess-874641912777`.
+`export AWS_PROFILE=PS-PowerUserAccess-<CUENTA_AWS>`.
 
 Orden en el primer corte (procedimiento completo en el [checklist de corte](../../docs/produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#secretos-externos)):
 
