@@ -34,7 +34,7 @@ backups) y sus límites están en [P02](P02_GO_NO_GO_ROLLBACK.md#riesgo-rds-acep
 el ensayo de restauración pendiente está en [P10](../PENDIENTES_PRODUCCION.md#p10).
 La lista SNS vigente del catálogo fue confirmada para producción. Estado al 2026-10-21: solo
 `Bryan.Ariza@blend360.com` tiene suscripción confirmada; las once originales no existen en SNS
-(drift con CloudFormation) y no se les ha enviado invitación. P06 no cierra hasta recuperar
+(drift con CloudFormation, ya corregido el mismo día) y no se les ha enviado invitación. P06 no cierra hasta recuperar
 las suscripciones autorizadas, verificar sus confirmaciones y probar una alarma de extremo a
 extremo ([detalle](../PENDIENTES_PRODUCCION.md#p06)).
 Decisión del 2026-10-21: hasta que se autorice a los otros once, `ALERTAS_CORTE` debe contener solo
@@ -325,6 +325,8 @@ definition no ejecuta Alembic. El lanzador actual sí espera y valida resultado,
 imagen y digest; el contenedor y el orquestador verifican la revisión de esquema.
 No usar el antiguo comando sin imagen/digest/token esperados ni duplicar aquí
 la implementación manual de espera. La guía define el contrato coordinado.
+
+**Antes del preflight de producción** los dos bloqueos registrados en [P04](../PENDIENTES_PRODUCCION.md#p04) (comparación de plantillas con tildes y `smoke_command` automático) tienen corrección en la rama `feature/preflight-prod-y-smoke`; el preflight de producción debe ejecutarse desde un commit que la incluya. El plan de producción usa `smoke_command` con [smoke_readonly.py](../../../scripts/despliegue/smoke_readonly.py); el modo manual solo existe para staging.
 
 El primer corte productivo no está ejecutado. Validación del flujo y recuperación:
 [P20](../PENDIENTES_PRODUCCION.md#p20); ejecución productiva: [P04](../PENDIENTES_PRODUCCION.md#p04).

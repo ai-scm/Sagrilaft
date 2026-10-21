@@ -70,10 +70,11 @@ evaluación de un umbral a partir de métricas reales. La evidencia está en
   prueba solo estuvo confirmada la suscripción temporal, que ya se retiró;
   ninguna de las once definitivas recibió los mensajes.
 - Estado al 2026-10-21: la suscripción de `Bryan.Ariza@blend360.com` está
-  confirmada. Las once originales no existen en SNS aunque CloudFormation las
-  conserve (drift); no se les ha enviado invitación. Decisión del mismo día:
-  la lista efectiva es solo ese correo hasta autorizar a los otros once
-  (alineación pendiente de despliegue). Ver
+  confirmada. Las once originales no existían en SNS aunque CloudFormation las
+  conservara (drift); no se les envió invitación. Decisión del mismo día: la
+  lista efectiva es solo ese correo hasta autorizar a los otros once, y quedó
+  aplicada y verificada en un despliegue posterior (CloudFormation, SNS y SSM
+  alineados). Ver
   [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md).
 - Para cerrar P06, con las suscripciones autorizadas confirmadas y los
   servicios activos, provocar una condición métrica aprobada que cruce un

@@ -113,6 +113,10 @@ No activar una release que exige otro esquema antes de verificar su migración.
    cuenta/ambiente, contexto completo, capacidad, tag anterior y candidato,
    revisiones previa/objetivo, cuatro digests y validación funcional aprobada.
    Por defecto se exige `smoke_command`; staging admite la modalidad manual descrita abajo.
+   Producción exige el smoke automático: usar [smoke_readonly.py](../../../scripts/despliegue/smoke_readonly.py)
+   (solo `GET`; véase su [README](../../../scripts/despliegue/README.md)) con los dominios y el SHA
+   del plan. Verifica redirección, HSTS, `/health` con el commit candidato y OIDC de Keycloak;
+   no sustituye P05 ni P07.
    `compatible` exige que el código anterior pueda leer y escribir después de migrar.
    `bootstrap` exige un stack ya existente con cero tareas; el orquestador no lo crea.
 2. Con las imágenes publicadas/verificadas, ejecutar solo el preflight:
@@ -140,13 +144,14 @@ Se requiere un único escritor por directorio de evidencia.
 
 Revisar las plantillas preparadas y la evidencia antes de autorizar otra fase.
 Rechaza cambios ajenos a las transiciones admitidas: separarlos, no omitir el control.
-Excepción aprobada solo para staging: `STAGING_UNICODE_PAIRS` en el orquestador
+Excepción aprobada para staging y prod: `APPROVED_UNICODE_PAIRS` en el orquestador
 admite ocho pares completos de texto en rutas exactas (cuatro descripciones de
 LifecyclePolicyText ECR, tres AlarmDescription y el fragmento del título del
-dashboard). GetTemplate devuelve `?` donde los recursos directos conservan tildes.
+dashboard). GetTemplate devuelve `?` donde los recursos directos conservan tildes;
+se verificó el mismo comportamiento en `SagrilaftStack-prod` el 2026-10-21.
 La equivalencia solo se aplica a copias para comparación: no cambia las assemblies,
 no omite propiedades ni normaliza Unicode de forma general. Cualquier otro texto,
-ruta, retención o imagen sigue sujeto a comparación estricta. No se aplica a prod.
+ruta, retención, imagen o ambiente sigue sujeto a comparación estricta.
 
 
 3. Solo con autorización de ejecución, el mismo flujo con `--execute` adquiere el
