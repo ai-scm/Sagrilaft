@@ -78,6 +78,17 @@ comparten la misma credencial (usuario IAM `sagrilaft-ses-smtppp`, fuente vigent
 usuario, `sagrilaft-ses-smtpp` (doble "p"), no está confirmado en uso por ningún ambiente;
 no se elimina hasta confirmarlo.
 
+**Cierre de la Fase 2 del corte, sin `--apply` (2026-10-21).** Con el SHA `6897920dec80b02171c83e3446d8f6afce14512d` y árbol limpio, cuenta `874641912777` y región `us-east-1`, se ejecutó solo lectura:
+- Instantánea previa (`audit_aws_secrets_safe.py`): los tres secretos de CDK (`app_secret`, `keycloak_admin`, `db_credentials`) conservan su fecha de la línea base (2026-10-07). `zoho_credentials` conserva 2026-09-24 y `smtp_credentials` 2026-10-20 13:41, el cambio registrado arriba. `sagrilaft_listas_cautela_credentials` tiene `api_key` vacía, sin uso con el proveedor deshabilitado.
+- Dry-run de `sync_aws_runtime_assets.py`: sin `ERROR`; Zoho (cuatro campos) y SMTP (dos campos) figuran como "se actualizaría", listas de cautela como omitido, los tres secretos de CDK como no escritos y los cuatro repositorios ECR como existentes.
+- Coherencia de valores: los seis campos de `.env.prod` (cuatro de Zoho y dos de SMTP) coinciden con AWS por huella SHA-256 (comparación de igualdad, sin imprimir valores).
+
+**Decisión: no ejecutar `--apply`.** Escribiría exactamente los mismos valores que ya tiene AWS, solo cambiaría la fecha de versión de dos secretos y añadiría una escritura sin beneficio. Esto es coherente con el diseño verificado el mismo día: CDK no lee `.env.prod`; las tareas ECS reciben los secretos por referencia a Secrets Manager (la plantilla desplegada no contiene ninguna variable sensible en claro); `db_credentials`, `app_secret` y `keycloak_admin` los genera CDK una vez; `zoho_credentials` se importa (`zohoSecretYaExiste=true`) y CloudFormation no lo gestiona; `smtp_credentials` y `listas_cautela` los crea CDK con un valor vacío fijo, que CloudFormation solo reescribiría si ese valor cambiara en el código (dos despliegues del 2026-10-21 no modificaron `smtp_credentials`) y que el preflight rechazaría como "Cambio ajeno a la release".
+
+Riesgos conocidos, sin cambios de código: el valor vacío fijo de `smtp_credentials` y `listas_cautela` es una trampa si alguien lo edita; los cinco secretos de CDK tienen `DeletionPolicy` y `UpdateReplacePolicy` en `Delete`; `zohoSecretYaExiste=true` debe pasarse siempre en `diff` y `deploy`.
+
+Evidencia (fuera del repositorio, sin valores): `~/evidencia-secretos-prod-6897920dec80b02171c83e3446d8f6afce14512d/antes.json` y `dry-run.txt`.
+
 Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cierre: resultados productivos archivados sin secretos. Consultar [valores](configuracion/checklist-valores-staging-prod.md) y [contrato de configuración](configuracion/MATRIZ_AWS_CONFIG.md).
 
 <a id="p04"></a>
