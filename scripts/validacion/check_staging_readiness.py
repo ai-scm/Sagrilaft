@@ -16,7 +16,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_ACCOUNT = "874641912777"
 BEDROCK_RUNTIME_CONFIG_KEYS = [
     "BEDROCK_MAX_TOKENS",
     "BEDROCK_TEMPERATURE",
@@ -27,7 +26,6 @@ BEDROCK_RUNTIME_CONFIG_KEYS = [
     "BEDROCK_DEFAULT_CONFIDENCE",
     "BEDROCK_RESPONSE_LOG_CHARS",
 ]
-HOSTED_ZONE_ID = "Z10446292T6I6L9P7R8AQ"
 EXPECTED_DOMAINS = {
     "forms-sagrilaft.ia.blend360.com",
     "sagrilaft.ia.blend360.com",
@@ -208,7 +206,7 @@ def check_keycloak_build_args() -> Check:
 
 def check_cdk_context() -> Check:
     context = json.loads(read("infra/sagrilaft/cdk.json")).get("context", {})
-    required = ["environment", "region", "hostedZoneName", "hostedZoneId", "domainName", "portalDomainName", "keycloakDomainName"]
+    required = ["environment", "region", "hostedZoneName", "domainName", "portalDomainName", "keycloakDomainName"]
     missing = [key for key in required if key not in context]
     return Check("cdk-context", not missing, f"missing={missing}" if missing else "required context keys exist")
 
@@ -287,7 +285,7 @@ def check_phase0_domain_contract() -> Check:
     missing_domains = sorted(domain for domain in EXPECTED_DOMAINS if domain not in all_text)
     hosted_zone_missing = [
         path for path, content in files.items()
-        if path in {"infra/sagrilaft/package.json", "infra/sagrilaft/cdk.json"} and HOSTED_ZONE_ID not in content
+        if path == "infra/sagrilaft/package.json" and "${HOSTED_ZONE_ID:?" not in content
     ]
     ok = not missing_domains and not hosted_zone_missing
     detail = (

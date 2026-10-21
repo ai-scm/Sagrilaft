@@ -30,7 +30,7 @@ import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-consta
 // Para desplegar con los dominios reales:
 //   npx cdk deploy \
 //     -c hostedZoneName=ia.blend360.com \
-//     -c hostedZoneId=Z10446292T6I6L9P7R8AQ \
+//     -c hostedZoneId=<HOSTED_ZONE_ID> \
 //     -c domainName=forms-sagrilaft.ia.blend360.com \
 //     -c portalDomainName=sagrilaft.ia.blend360.com \
 //     -c keycloakDomainName=login-sagrilaft.ia.blend360.com \
@@ -52,7 +52,8 @@ import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-consta
 // crearla — solo se importa (falla con "AlreadyExists" si se intenta crear).
 // ─────────────────────────────────────────────────────────────────────────────
 const DEFAULT_HOSTED_ZONE = 'ia.blend360.com';
-const DEFAULT_HOSTED_ZONE_ID = 'Z10446292T6I6L9P7R8AQ';
+// Sin valor real por defecto: los scripts de despliegue pasan -c hostedZoneId.
+const DEFAULT_HOSTED_ZONE_ID = 'REPLACE_HOSTED_ZONE_ID';
 const DEFAULT_DOMINIO = 'forms-sagrilaft.ia.blend360.com';
 const DEFAULT_DOMINIO_PORTAL = 'sagrilaft.ia.blend360.com';
 const DEFAULT_DOMINIO_KEYCLOAK = 'login-sagrilaft.ia.blend360.com';
@@ -75,12 +76,14 @@ export class SagrilaftStack extends cdk.Stack {
       this.node.tryGetContext('zohoSecretYaExiste') ?? 'false',
     ).toLowerCase() === 'true';
     const defaultSesEmailOrigen = `no-reply-sagrilaft@${hostedZoneName}`;
-    const defaultAlertasEmailDestino = [
-      'Bryan.Ariza@blend360.com',
-    ].join(',');
+    // Sin destinatario por defecto: los scripts pasan -c snsAlertasSub (ALERTAS_STAGING / ALERTAS_CORTE).
+    const defaultAlertasEmailDestino = '';
     const sesEmailOrigen = String(this.node.tryGetContext('sesEmailOrigen') ?? defaultSesEmailOrigen);
     const smtpReplyTo = String(this.node.tryGetContext('smtpReplyTo') ?? 'legal@blend360.com');
     const snsAlertasSub = String(this.node.tryGetContext('snsAlertasSub') ?? defaultAlertasEmailDestino);
+    if (['staging', 'prod'].includes(ambiente) && snsAlertasSub.trim() === '') {
+      throw new Error('snsAlertasSub es obligatorio en staging/prod: sin destinatario las alertas no llegan.');
+    }
     const imageTag = String(this.node.tryGetContext('imageTag') ?? '');
     // Omitirlo conserva bootstrap y despliegues existentes. Un override permite
     // preparar la migración sin cambiar las imágenes de los servicios.

@@ -9,6 +9,10 @@ const account = String(app.node.tryGetContext('account') ?? process.env.CDK_DEFA
 const region = String(app.node.tryGetContext('region') ?? process.env.CDK_DEFAULT_REGION ?? DEFAULT_REGION);
 const protectedEnvironments = new Set(['staging', 'prod']);
 
+if (protectedEnvironments.has(environment) && !TARGET_ACCOUNT) {
+  throw new Error(`Define CUENTA_AWS (cuenta objetivo) para ${environment}.`);
+}
+
 if (protectedEnvironments.has(environment) && account !== TARGET_ACCOUNT) {
   throw new Error(
     `Cuenta AWS bloqueada para ${environment}: se recibio ${account || 'sin cuenta'}; ` +

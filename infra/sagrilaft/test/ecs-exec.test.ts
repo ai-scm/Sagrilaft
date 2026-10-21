@@ -17,6 +17,7 @@ function synth(environment: 'staging' | 'prod') {
     environment,
     imageTag: 'ecs-exec-test',
     proveedorListasCautela: 'deshabilitado',
+    snsAlertasSub: 'pruebas@example.com',
   } });
   const stack = new SagrilaftStack(app, 'TestStack', {
     env: { account: '123456789012', region: 'us-east-1' },

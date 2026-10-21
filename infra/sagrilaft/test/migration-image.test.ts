@@ -10,6 +10,7 @@ function synth(context: Record<string, unknown> = {}) {
     environment: 'staging',
     imageTag: 'release-old',
     proveedorListasCautela: 'deshabilitado',
+    snsAlertasSub: 'pruebas@example.com',
     ...context,
   } });
   const stack = new SagrilaftStack(app, 'TestStack', {
