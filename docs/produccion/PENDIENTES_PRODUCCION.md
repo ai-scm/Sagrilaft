@@ -186,8 +186,12 @@ son correctos; el riesgo es de fuerza bruta contra el usuario administrador. Est
   staging:** tras bajar el límite a 10 para la prueba, las peticiones a `/admin` recibieron `403` y el WAF
   registró `BlockedRequests` y muestras `BLOCK` con la IP de origen. Las primeras pruebas con límite 200 no
   mostraron bloqueo porque la evaluación de la ventana deslizante del WAF tarda en acumular el conteo. El
-  límite se restauró a 200 y se verificó en AWS; portal y formulario de staging sin cambios. **Producción no
-  desplegada.**
+  límite se restauró a 200 y se verificó en AWS; portal y formulario de staging sin cambios.
+  **Desplegada en producción el 2026-10-24** (`cdk deploy` con los mismos argumentos del diff revisado; solo
+  cambió el WebACL, `UPDATE_COMPLETE`). Regla verificada en vivo (prioridad 4, límite 200, acción `Block`).
+  Servicios ECS sin cambios (`desired=1 running=1`); formulario, portal y consola admin responden `200` con
+  tráfico normal. No se forzó bloqueo en producción: el mecanismo ya quedó verificado en staging.
+  **P08 completo** (HSTS verificado y exposición de la consola admin mitigada).
 
 ## 2. Operación posterior
 

@@ -95,8 +95,9 @@ No se ha abierto a usuarios; faltan P05, P06, P07 y el Go final de Andrés Hurta
 **Seguridad de acceso (2026-10-24).** La consola admin de Keycloak (`/admin/master/console/`) es
 alcanzable desde internet. La protección de fuerza bruta se configuró manualmente en los realms `master`
 y `sagrilaft` (reportado por el responsable, no verificado por el asistente). El WAF tiene una regla
-nueva para `/admin` y `/realms/master`, desplegada en **staging** el 2026-10-24 y verificada con bloqueo
-real (`403` y métricas del WAF); **producción no desplegada**. Detalle en
+nueva para `/admin` y `/realms/master`, desplegada en **staging** y en **producción** el 2026-10-24.
+En staging se verificó el bloqueo real (`403` y métricas del WAF); en producción se verificó la regla
+en vivo y que el resto del servicio no cambió. Detalle en
 [P08](../produccion/PENDIENTES_PRODUCCION.md#p08).
 
 Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de igualdad, sin valores:
