@@ -129,6 +129,50 @@ export class CortafuegosWeb extends Construct {
             sampledRequestsEnabled: true,
           },
         },
+        // Regla 4: límite específico para la consola admin de Keycloak.
+        // Cubre la carga de la consola (/admin) y el POST de credenciales
+        // (/realms/master/login-actions/authenticate), que no empieza por /admin.
+        // Más estricto que el global (2000/5 min) porque es el único punto donde
+        // un atacante podría probar contraseñas contra un usuario administrador.
+        {
+          name: 'LimiteTasaAdminKeycloak',
+          priority: 4,
+          action: { block: {} },
+          statement: {
+            rateBasedStatement: {
+              limit: 200,
+              aggregateKeyType: 'IP',
+              evaluationWindowSec: 300,
+              scopeDownStatement: {
+                orStatement: {
+                  statements: [
+                    {
+                      byteMatchStatement: {
+                        searchString: '/admin',
+                        fieldToMatch: { uriPath: {} },
+                        textTransformations: [{ priority: 0, type: 'NONE' }],
+                        positionalConstraint: 'STARTS_WITH',
+                      },
+                    },
+                    {
+                      byteMatchStatement: {
+                        searchString: '/realms/master',
+                        fieldToMatch: { uriPath: {} },
+                        textTransformations: [{ priority: 0, type: 'NONE' }],
+                        positionalConstraint: 'STARTS_WITH',
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'LimiteTasaAdminKeycloakMetrica',
+            sampledRequestsEnabled: true,
+          },
+        },
       ],
     });
 
