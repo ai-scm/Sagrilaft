@@ -77,13 +77,27 @@ previa a una ejecución. El cambio ECR no modificó ese esquema ni la release ac
 
 ## Producción
 
-**Infraestructura base creada; corte funcional y apertura no acreditados.**
+**Migración y activación completadas y verificadas (2026-10-21); apertura a usuarios aún no acreditada.**
 El [bootstrap del 7 de octubre](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md)
-registró CREATE_COMPLETE, RDS disponible y cuatro servicios en 0/0/0. Esto
-sustituye la descripción anterior de infraestructura no desplegada. No acredita
-release funcional, migración, activación o smoke productivo posteriores.
-No se revalidó producción en AWS después del 16 de octubre; lo registrado como
-producción es documental.
+registró CREATE_COMPLETE, RDS disponible y cuatro servicios en 0/0/0.
+
+**Actualización del 2026-10-21 (primer corte).** Con el SHA `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`,
+`deploy_release.py --execute` migró la base (revisión Alembic de `[]` a `f8a9b0c1d2e3`, verificada)
+y activó los cuatro servicios (`desired=1 running=1`, digests aprobados coincidentes). CloudFormation
+terminó en `UPDATE_COMPLETE`. El cliente `cdk deploy` falló después por un error de red
+(`ECONNRESET`), no por un fallo real; el orquestador se detuvo antes de sus propias verificaciones
+y **el lock de S3 sigue tomado, sin reconciliar**. La verificación se hizo de forma independiente:
+CloudFormation, los 4 servicios ECS, los target groups del ALB y un smoke externo manual
+(12/12 comprobaciones: HTTPS, HSTS, redirección, `/health` y OIDC) confirman que producción está
+activa y saludable. [Evidencia completa](../evidencia/primer-corte-prod-20261021/README.md).
+No se ha abierto a usuarios; faltan P05, P06, P07 y el Go final de Andrés Hurtado.
+
+**Seguridad de acceso (2026-10-24).** La consola admin de Keycloak (`/admin/master/console/`) es
+alcanzable desde internet. La protección de fuerza bruta se configuró manualmente en los realms `master`
+y `sagrilaft` (reportado por el responsable, no verificado por el asistente). El WAF tiene una regla
+nueva para `/admin` y `/realms/master`, desplegada en **staging** el 2026-10-24 y verificada con bloqueo
+real (`403` y métricas del WAF); **producción no desplegada**. Detalle en
+[P08](../produccion/PENDIENTES_PRODUCCION.md#p08).
 
 Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de igualdad, sin valores:
 
@@ -95,7 +109,9 @@ Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de iguald
 
 **Actualización del 2026-10-21 (SNS de alertas).** `SagrilaftStack-prod` se actualizó a `UPDATE_COMPLETE` con el código `2b0b844e66d8efafcd89fd815a179a6cf14a04dc`: se agregó la suscripción de `Bryan.Ariza@blend360.com` (confirmada) y se actualizó el parámetro `ALERTAS_EMAIL_DESTINATARIO` a 12 correos. Las alarmas de producción están en `OK`. Las once suscripciones originales siguen en CloudFormation pero no existen en SNS (drift); no se ha enviado invitación a esos destinatarios. Decisión del mismo día: la lista de alertas queda solo con `Bryan.Ariza@blend360.com` (SNS y SES) hasta autorizar a los otros once. Esa decisión se aplicó en un segundo `cdk deploy` (`UPDATE_COMPLETE`, 12:24 UTC): los once recursos obsoletos se eliminaron de CloudFormation sin errores, SSM quedó con un solo correo y los servicios siguen en 0/0/0. El SHA del repositorio en ese momento era `a1b1a5cda6635d681c1785d64ea84a2198d10963`. Detalle: [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md) y [P06](../produccion/PENDIENTES_PRODUCCION.md#p06).
 
-No hay release funcional, migración, activación ni smoke productivo. Los cuatro servicios siguen en `desiredCount=0`. El SHA vigente para el corte no está fijado todavía; el del bootstrap es `4f7543123adea6a7da9ebbde187760a930fb1b4e`.
+Release, migración, activación y smoke productivos: ver la actualización del 2026-10-21 arriba.
+El SHA vigente del corte es `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`; el del bootstrap original
+fue `4f7543123adea6a7da9ebbde187760a930fb1b4e`.
 
 El catálogo de valores/configuración es
 [checklist-valores-staging-prod.md](../produccion/configuracion/checklist-valores-staging-prod.md).

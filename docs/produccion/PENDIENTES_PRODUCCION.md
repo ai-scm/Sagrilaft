@@ -94,17 +94,36 @@ Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cie
 <a id="p04"></a>
 ### P04 — Primer despliegue productivo
 
-**Estado:** 🟡 Parcial.
+**Estado:** 🟡 Parcial; migración y activación completadas y verificadas; falta reconciliar el lock de S3 y cerrar el cierre formal.
 
-El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). Los cuatro servicios permanecen en `desiredCount=0`. SMTP y Zoho ya están conciliados (P03, 2026-10-20) y el drift de SNS está corregido (P06, 2026-10-21). Siguen pendientes la validación de alarma basada en métrica real (P06), la sincronización de secretos con el procedimiento de la Fase 2, publicación de las cuatro imágenes, migración verificada, activación coordinada, validaciones funcionales y cierre productivo. La acción de alarma hacia SNS y la entrega temporal de `ALARM`/`OK` se probaron de forma controlada; ver [P06](#p06). Cierre de P04: completar el corte según el [procedimiento único](despliegue/CHECKLIST_CORTE_PRODUCCION.md), con CloudFormation, migración, servicios sanos y commit/digests coincidentes.
+El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). SMTP y Zoho ya están conciliados (P03, 2026-10-20) y el drift de SNS está corregido (2026-10-21, ver [P06](#p06)).
 
-**Bloqueos identificados el 2026-10-21 antes de publicar imágenes (revisión de solo lectura; sin cambios en AWS):**
-1. **Preflight de producción rechazaría la plantilla desplegada.** `GetTemplate` de `SagrilaftStack-prod` devuelve `?` donde el código tiene tildes (verificado). La equivalencia aprobada de `STAGING_UNICODE_PAIRS` en `deploy_release.py` solo se aplica a staging. Reproducción local con la misma función de comparación: producción da **8 rutas distintas** (4 políticas de ciclo de vida ECR, 3 descripciones de alarma y el título del dashboard) y staging 0. **Resuelto en la rama `feature/preflight-prod-y-smoke` (2026-10-21), pendiente de revisión y merge:** `deploy_release.py` aplica ahora esa misma equivalencia exacta a producción (`APPROVED_UNICODE_PAIRS`, solo `staging` y `prod`; cualquier otro ambiente, texto o ruta sigue estricto). Comprobado contra el stack real: la plantilla desplegada de producción coincide con la sintetizada (`prod: igual`) y sin la equivalencia no (`DISTINTA`). 52 pruebas nuevas.
-2. **No existía un `smoke_command` aprobado.** El modo de validación manual solo está habilitado para staging y producción exige un smoke automático.
-**Resuelto en la misma rama, pendiente de revisión y merge:** `scripts/despliegue/smoke_readonly.py`, de solo `GET`: redirección HTTP→HTTPS, respuesta HTTPS y HSTS en los tres dominios, `/health` del formulario y del portal (commit candidato y base de datos) y documento OIDC de Keycloak. Probado contra staging real (12 comprobaciones, pasa con el SHA desplegado `767b3ac…` y falla con otro SHA); 48 pruebas unitarias. Su hash queda en la evidencia del orquestador (`ORCHESTRATOR_SOURCES`). No sustituye P05 ni P07. Al ejecutarlo en staging se observó HSTS presente en los tres dominios, de modo que la observación original de P08 sobre staging ya no se reproduce; P08 sigue abierto para producción.
-3. **Aún sin ejecutar** de la Fase 2 del checklist: instantánea previa, dry-run y `--apply` de `sync_aws_runtime_assets.py`, y su comparación posterior. Tampoco existen el plan privado de producción ni el manifiesto de imágenes.
+**Bloqueos del 2026-10-21, resueltos antes de publicar imágenes:**
+1. **Preflight de producción.** `GetTemplate` de `SagrilaftStack-prod` devolvía `?` donde el código tiene tildes; la equivalencia `STAGING_UNICODE_PAIRS` de `deploy_release.py` solo cubría staging. **Resuelto y fusionado a `main`** (commit `5de2035`, dentro de `6897920`): ahora `APPROVED_UNICODE_PAIRS` cubre `staging` y `prod`; cualquier otro ambiente, texto o ruta sigue estricto. 52 pruebas nuevas.
+2. **`smoke_command` automático.** No existía ninguno para producción (el modo manual es solo de staging). **Resuelto y fusionado**: [scripts/despliegue/smoke_readonly.py](../../scripts/despliegue/smoke_readonly.py), de solo `GET`. 48 pruebas unitarias.
+3. Fase 2 (secretos): **cerrada sin `--apply`** el mismo día, ver más abajo.
 
-Verificado el mismo día y sin hallazgos: cuenta y región, cuatro repositorios ECR de producción `IMMUTABLE` y vacíos, Python 3.12, Docker disponible, `.env.prod` presente con permisos `600`, los 95 tests de `test_deploy_release.py` pasan.
+**Publicación de imágenes (2026-10-21).** Las cuatro imágenes del SHA `f8d9dcf06dcfee43d6b885827444ffcee9f2007b` quedaron publicadas y verificadas en ECR (manifiesto `complete: true`, digests coincidentes, los 4 repositorios `IMMUTABLE`). Verificado también: cuenta y región, Python 3.12, Docker disponible, `.env.prod` con permisos `600`.
+
+**Migración y activación (2026-10-21, ejecutadas con `deploy_release.py --execute`):**
+- **Migración:** tarea ECS verificada con `exitCode=0`; revisión Alembic pasó de `[]` a `f8a9b0c1d2e3`, la esperada.
+- **Activación:** CloudFormation terminó en `UPDATE_COMPLETE`; los 4 servicios en `ACTIVE`, `desired=1 running=1`, con los digests aprobados. Target groups del ALB, los 4 `healthy`. Smoke externo manual, 12/12 comprobaciones (HTTPS, HSTS, redirección, `/health` con commit y base de datos, OIDC de Keycloak).
+- **Incidente sin impacto en AWS:** el cliente `cdk deploy` falló con `TimeoutError: read ECONNRESET` justo después de que CloudFormation completara. El orquestador se detuvo antes de sus propias verificaciones (no llegó a `services()` ni al smoke automático) y **conserva el lock de S3** sin liberar. La verificación posterior fue manual, independiente del orquestador. [Evidencia completa](../evidencia/primer-corte-prod-20261021/README.md).
+
+**Lock de S3 reconciliado y liberado (2026-10-24).** Verificación manual previa, replicando las
+mismas funciones del orquestador (`comparison_template`, `services()`): cuenta activa, stack
+`UPDATE_COMPLETE` sin cambios desde la activación, plantilla desplegada idéntica a la `activate`
+aprobada, los 4 servicios con digests/estado correctos, y `planHash` de `lock.json` coincidente
+con el evento `plan_validated` del mismo intento. Sin inconsistencias. Borrado condicional
+(`delete-object --if-match` con el ETag exacto), confirmado con `404` posterior. No existe hoy
+una herramienta automática de reconciliación para producción (solo para `smoke_mode=manual`,
+exclusivo de staging); se hizo a mano, con el mismo rigor. Evidencia:
+`execute-1/lock-reconciliation-20261024.json` (fuera del repositorio).
+
+**Pendiente para cerrar P04:**
+1. ~~Reconciliar y liberar el lock de S3~~ (hecho el 2026-10-24).
+2. Registrar el cierre formal (tag/notas de release, según la [guía](despliegue/GUIA_DESPLIEGUE_LOCAL.md#release)).
+3. Verificar S3/SSM, DNS/TLS y Bedrock desde ECS (pendiente técnico de siempre, sin cambios).
 
 <a id="p05"></a>
 ### P05 — Firma automática en producción
@@ -125,12 +144,12 @@ El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: 
 - **Drift:** CloudFormation conserva las once suscripciones originales, pero SNS no tiene ninguna. Probablemente caducaron sin confirmar. Un despliegue no las recrea.
 - **Decisión del 2026-10-21 (responsable técnico):** mientras no se autorice a los otros once, la lista de alertas de producción es solo `Bryan.Ariza@blend360.com`, tanto en SNS como en SES. No se crean suscripciones ni se envían invitaciones a los once. **Aplicada el 2026-10-21 (alineación completada):** `cdk deploy` con `snsAlertasSub=Bryan.Ariza@blend360.com` y el diff revisado (11 `destroy` de suscripciones y el cambio del parámetro SSM, sin otros recursos). Resultado: `UPDATE_COMPLETE`, los 11 recursos en `DELETE_COMPLETE` (CloudFormation respondió "Resource does not exist" y lo trató como eliminación correcta, sin `DELETE_FAILED`), un solo recurso de suscripción en el stack, SNS solo con `Bryan.Ariza@blend360.com` y `ALERTAS_EMAIL_DESTINATARIO` en versión 3 con ese único correo. Los cuatro servicios ECS siguen en 0/0/0 y las alarmas en `OK`. Sin cambios de código; las 26 pruebas de infraestructura pasan. [Evidencia](../evidencia/sns-alertas-prod-20261021/README.md).
 - **Pendiente, sin autorización:** los once destinatarios originales quedan fuera de la lista vigente. Reincorporarlos requiere autorización explícita, volver a ponerlos en `snsAlertasSub` y confirmar cada invitación.
-- **Límite de la validación actual:** las alarmas de servidor y CPU/memoria dependen de métricas del servicio ECS, que sigue en `desiredCount=0`. Mientras no haya tareas, no pueden cruzar un umbral real.
+- **Límite que ya se levantó:** las alarmas de servidor y CPU/memoria dependían de métricas del servicio ECS, que estaba en `desiredCount=0`. **Los 4 servicios están activos desde el 2026-10-21** ([P04](#p04)), así que ya pueden generar métricas reales.
 
 **Qué falta para cerrar P06:**
 1. ~~Alinear el drift~~ (hecho el 2026-10-21). Cuando se autorice a los otros once, reincorporarlos en `snsAlertasSub`, redesplegar y confirmar cada invitación; P06 no cierra sin ellos.
-2. Activar los servicios ECS (depende de [P04](#p04): imágenes, migración y activación).
-3. Provocar una alarma por métrica real con los servicios activos y verificar que el aviso llegue a la lista definitiva en menos de cinco minutos.
+2. ~~Activar los servicios ECS~~ (hecho el 2026-10-21, ver [P04](#p04)).
+3. Provocar una alarma por métrica real con los servicios activos y verificar que el aviso llegue a la lista definitiva (hoy, solo `Bryan.Ariza@blend360.com`) en menos de cinco minutos. Pendiente de ejecutar.
 4. Registrar cada paso en la evidencia de la fecha correspondiente.
 
 [Evidencia de la actualización de hoy](../evidencia/sns-alertas-prod-20261021/README.md). [Evidencia de la prueba temporal](../evidencia/sns-prueba-temporal-prod-20261007.json). [Procedimiento](../operacion/RUNBOOK_OPERATIVO.md#alarmas). [Evidencia de creación](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md).
@@ -142,13 +161,33 @@ El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: 
 
 Crear un acceso real, recibir el correo y recorrer guardado, adjuntos/IA, descarga S3, radicación, revisión y cierre; verificar autenticación/roles y ausencia de errores. Reutilizar el [recorrido E2E](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md) como referencia y archivar una ejecución separada de producción. Firma y alarma se cierran en P05/P06, sin repetir tareas.
 
+**Prerrequisito nuevo (2026-10-21):** el realm de Keycloak importado no trae ningún usuario (solo el cliente `sagrilaft-portal` y los roles `acceso_clientes`/`acceso_proveedores`). Antes de poder ejecutar P07 hace falta crear manualmente los primeros usuarios internos desde la consola de administración (`https://login-sagrilaft.ia.blend360.com`, con `keycloak_admin` de Secrets Manager) y asignarles su rol. No hecho todavía.
+
 <a id="p08"></a>
 ### P08 — Observación HSTS
 
-**Estado:** 🟡 Parcial.
+**Estado:** 🟢 Verificado en producción (2026-10-21).
 
-Staging reportó HSTS desactivado. El bootstrap productivo aplicó en el listener HTTPS del ALB `Strict-Transport-Security: max-age=31536000`, sin `includeSubDomains` ni `preload`; se verificó el atributo del listener por AWS API. P08 sigue abierto hasta comprobar por HTTPS el encabezado en los tres dominios y confirmar la redirección HTTP→HTTPS después de activar servicios. HTTPS configurado no sustituye esa evidencia funcional. [Bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). [Observación original](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
+Staging reportó HSTS desactivado; esa observación ya no se reproduce (se confirmó HSTS presente en los tres dominios de staging al probar `smoke_readonly.py`). El bootstrap productivo aplicó en el listener HTTPS del ALB `Strict-Transport-Security: max-age=31536000`. Tras activar los 4 servicios, el smoke externo manual confirmó, en los tres dominios de producción: redirección HTTP→HTTPS, respuesta HTTPS correcta y encabezado HSTS presente. [Evidencia](../evidencia/primer-corte-prod-20261021/README.md). [Bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). [Observación original en staging](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
 
+**Hallazgo relacionado (2026-10-24), exposición de la consola admin de Keycloak.** La URL
+`https://login-sagrilaft.ia.blend360.com/admin/master/console/` es alcanzable desde internet. TLS y HSTS
+son correctos; el riesgo es de fuerza bruta contra el usuario administrador. Estado:
+- **Protección de fuerza bruta en Keycloak:** configurada manualmente por el responsable técnico en los realms
+  `master` y `sagrilaft` (máx. 5 fallos, espera 1 min con tope de 15, reinicio a las 12 h, bloqueo permanente
+  desactivado). **Reportada, no verificada por el asistente:** no hay configuración de esta protección en el
+  repositorio (el realm importado no la define), así que un reimport del realm la sobrescribiría. Pendiente
+  exportar la configuración a un archivo controlado o documentar su reaplicación.
+- **WAF, regla `LimiteTasaAdminKeycloak`** (`infra/sagrilaft/lib/constructs/cortafuegos-web.ts`, prioridad 4):
+  200 peticiones por IP en 5 min para `/admin` y `/realms/master`. Cambio aplicado en el código y con
+  6 pruebas nuevas; 32 pruebas de infraestructura pasan. `cdk diff` de producción: solo cambia el WebACL
+  (regla añadida). **Desplegada en staging el 2026-10-24** (`cdk deploy` con los valores reales de staging:
+  imagen `767b3ac…`, NAT apagado, `zohoSecretYaExiste=false`; solo cambió el WebACL). **Bloqueo verificado en
+  staging:** tras bajar el límite a 10 para la prueba, las peticiones a `/admin` recibieron `403` y el WAF
+  registró `BlockedRequests` y muestras `BLOCK` con la IP de origen. Las primeras pruebas con límite 200 no
+  mostraron bloqueo porque la evaluación de la ventana deslizante del WAF tarda en acumular el conteo. El
+  límite se restauró a 200 y se verificó en AWS; portal y formulario de staging sin cambios. **Producción no
+  desplegada.**
 
 ## 2. Operación posterior
 

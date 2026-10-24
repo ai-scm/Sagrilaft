@@ -326,12 +326,29 @@ imagen y digest; el contenedor y el orquestador verifican la revisión de esquem
 No usar el antiguo comando sin imagen/digest/token esperados ni duplicar aquí
 la implementación manual de espera. La guía define el contrato coordinado.
 
-**Antes del preflight de producción** los dos bloqueos registrados en [P04](../PENDIENTES_PRODUCCION.md#p04) (comparación de plantillas con tildes y `smoke_command` automático) tienen corrección en la rama `feature/preflight-prod-y-smoke`; el preflight de producción debe ejecutarse desde un commit que la incluya. El plan de producción usa `smoke_command` con [smoke_readonly.py](../../../scripts/despliegue/smoke_readonly.py); el modo manual solo existe para staging.
+Los dos bloqueos que impedían el preflight de producción (comparación de plantillas con tildes
+y `smoke_command` automático) ya están resueltos y fusionados a `main`. El plan de producción
+usa `smoke_command` con [smoke_readonly.py](../../../scripts/despliegue/smoke_readonly.py); el
+modo manual solo existe para staging.
 
-El primer corte productivo no está ejecutado. Validación del flujo y recuperación:
-[P20](../PENDIENTES_PRODUCCION.md#p20); ejecución productiva: [P04](../PENDIENTES_PRODUCCION.md#p04).
+**El primer corte productivo se ejecutó el 2026-10-21** (SHA `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`):
+migración y activación verificadas, los 4 servicios activos. El lock de S3, que el orquestador
+conservó porque su propio cliente `cdk deploy` falló por un error de red después de que
+CloudFormation ya había completado el cambio, **se reconcilió y liberó el 2026-10-24** (verificación
+manual sin inconsistencias, borrado condicional por ETag). [Evidencia](../../evidencia/primer-corte-prod-20261021/README.md).
+Validación del flujo y recuperación: [P20](../PENDIENTES_PRODUCCION.md#p20); seguimiento:
+[P04](../PENDIENTES_PRODUCCION.md#p04).
 
 ## Fase 6 — Validación antes de abrir a usuarios
+
+**Usuarios y roles internos de Keycloak.** El realm importado
+(`keycloak/realm-sagrilaft.json`) define el cliente `sagrilaft-portal` y los roles
+`acceso_clientes`/`acceso_proveedores`, pero no trae ningún usuario. La única cuenta
+que nace con la activación es `keycloak_admin` (Secrets Manager), que administra la
+consola de Keycloak, no el portal. Antes de P07, el responsable técnico crea
+manualmente desde esa consola (`https://login-sagrilaft.ia.blend360.com`) los
+primeros usuarios internos y les asigna el rol que corresponda. No bloqueó la
+activación de los servicios (fases 3–5, ya completada); sí es requisito para ejecutar P07.
 
 Ejecutar los criterios del registro único y adjuntar evidencia productiva:
 
