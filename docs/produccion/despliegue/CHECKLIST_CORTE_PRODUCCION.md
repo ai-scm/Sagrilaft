@@ -349,6 +349,10 @@ consola de Keycloak, no el portal. Antes de P07, el responsable técnico crea
 manualmente desde esa consola (`https://login-sagrilaft.ia.blend360.com`) los
 primeros usuarios internos y les asigna el rol que corresponda. No bloqueó la
 activación de los servicios (fases 3–5, ya completada); sí es requisito para ejecutar P07.
+**Hecho el 2026-10-27** según informó el responsable técnico (no verificado en Keycloak por el
+asistente). Si se crea un usuario o se cambia una contraseña admin a mano, actualizar también el
+secreto que corresponda: una contraseña cambiada solo en Keycloak no se refleja en Secrets Manager
+y Keycloak no la resincroniza al reiniciar (ver [P07](../PENDIENTES_PRODUCCION.md#p07)).
 
 Ejecutar los criterios del registro único y adjuntar evidencia productiva:
 
