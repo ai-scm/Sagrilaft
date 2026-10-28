@@ -28,11 +28,18 @@ RUN npm run build:publico
 # ── Etapa 2: servir los archivos con Nginx ────────────────────────────────
 FROM nginx:alpine
 
+RUN sed -i 's/listen\s*80;/listen 8080;/' /etc/nginx/conf.d/default.conf \
+    && sed -i '/^user/d' /etc/nginx/nginx.conf \
+    && sed -i 's|/var/run/nginx.pid|/tmp/nginx.pid|' /etc/nginx/nginx.conf \
+    && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
+
 # Copiar archivos compilados
 COPY --from=builder --chown=nginx:nginx /app/apps/formulario-publico/dist /usr/share/nginx/html
 
 # Copiar configuración de Nginx
 COPY --chown=nginx:nginx apps/formulario-publico/nginx.conf /etc/nginx/conf.d/default.conf
+
+USER nginx
 
 EXPOSE 8080
 
