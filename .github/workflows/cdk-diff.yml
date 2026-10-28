@@ -53,13 +53,18 @@ jobs:
             if [ -z "${!v}" ]; then echo "Falta $v (variable o secreto de GitHub)"; exit 1; fi
           done
           # Se ejecuta con --no-color para que el diff en Markdown se lea limpio.
-          # Usamos || true porque cdk diff retorna exit code 1 si hay diferencias,
-          # y no queremos que el pipeline aborte aquí.
-          npm run diff:staging -- --no-color > cdk_diff.log 2>&1 || true
-          
+          # diff:staging NO pasa --fail, así que cdk diff devuelve 0 aunque haya
+          # diferencias de infraestructura; un código distinto de 0 aquí es un error
+          # real (fallo de síntesis, credenciales, contexto faltante), no un diff normal.
+          # Se captura el código para fallar el job más abajo, después de comentar en el PR.
+          set +e
+          npm run diff:staging -- --no-color > cdk_diff.log 2>&1
+          echo "diff_exit_code=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
           # Imprimimos el diff en la consola de GitHub Actions para depuración manual
           cat cdk_diff.log
-          
+
           # Pasamos el output a una variable multi-línea de GitHub.
           # Limitamos a 60,000 caracteres para evitar romper el límite de GitHub para comentarios (65536).
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
@@ -92,3 +97,10 @@ jobs:
               repo: context.repo.repo,
               body: body
             })
+
+      - name: Fallar si cdk diff tuvo un error real
+        if: steps.diff.outputs.diff_exit_code != '0'
+        run: |
+          echo "cdk diff terminó con código ${{ steps.diff.outputs.diff_exit_code }}."
+          echo "Esto no es un diff normal con cambios: con diff:staging, cdk diff solo falla ante un error real (ver el log arriba o el comentario del PR)."
+          exit 1
