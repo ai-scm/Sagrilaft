@@ -1,5 +1,6 @@
 # ── Etapa 1: compilar la aplicación React ─────────────────────────────────
-FROM node:22-bookworm-slim AS builder
+# Pineada por digest para build inmutable (ver backend/Dockerfile).
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS builder
 
 WORKDIR /app
 
@@ -27,7 +28,8 @@ RUN npm run build:portal
 
 
 # ── Etapa 2: servir los archivos con Nginx ────────────────────────────────
-FROM nginx:alpine
+# Pineada por digest para build inmutable (ver backend/Dockerfile).
+FROM nginx:alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
 
 RUN sed -i 's/listen\s*80;/listen 8080;/' /etc/nginx/conf.d/default.conf \
     && sed -i '/^user/d' /etc/nginx/nginx.conf \

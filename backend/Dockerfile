@@ -1,9 +1,13 @@
 # La imagen base es el punto de partida — como elegir el sistema operativo
 # de una máquina nueva. python:3.12-slim incluye Python preinstalado en una
 # versión recortada de Linux, sin herramientas que no necesitamos.
+# Pineada por digest (sha256) para que el build sea inmutable: el tag
+# "3.12-slim" es flotante y puede cambiar de versión de Debian entre
+# builds sin aviso. Para actualizar, verificar vulnerabilidades (ej. con
+# trivy) y refrescar el digest con: docker pull python:3.12-slim
 # Si el equipo migra a Python 3.13, cambiar "3.12.17-slim" aquí y probar
 # que las dependencias de requirements.txt sigan funcionando.
-FROM python:3.12-slim AS base
+FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS base
 
 # Dos ajustes de comportamiento de Python:
 # - PYTHONUNBUFFERED: los mensajes del servidor aparecen en CloudWatch
