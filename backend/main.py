@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from infrastructure.config.configuracion import load_config
+from infrastructure.config.configuracion import entorno_actual, entorno_es_productivo, load_config
 from infrastructure.storage.backend import crear_storage
 from api.limitador import limitador
 from domain.excepciones import (
@@ -250,12 +250,24 @@ def _configurar_middlewares(app: FastAPI) -> None:
     )
 
 
+def _rutas_documentacion_api() -> dict:
+    """/docs, /redoc y /openapi.json: solo fuera de staging/production.
+
+    En producción quedaban expuestos sin autenticación; en development
+    siguen disponibles para trabajo local.
+    """
+    if entorno_es_productivo(entorno_actual()):
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
 def _crear_app() -> FastAPI:
     app = FastAPI(
         title=_NOMBRE_SERVICIO,
         description="API para el Sistema de Autocontrol de Riesgo de Lavado de Activos y Financiación del Terrorismo",
         version=_VERSION_SERVICIO,
         lifespan=lifespan,
+        **_rutas_documentacion_api(),
     )
 
     def _handler_rate_limit(req: Request, exc: RateLimitExceeded) -> JSONResponse:

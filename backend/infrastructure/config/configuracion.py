@@ -31,6 +31,15 @@ def entorno_actual() -> str:
     return valor.lower()
 
 
+def entorno_es_productivo(entorno: str) -> bool:
+    """True en staging y production: los dos entornos con datos y tráfico reales.
+
+    Única fuente de verdad del criterio, reutilizada por load_config() (exige
+    STORAGE_BACKEND=s3) y por main.py (oculta /docs, /redoc y /openapi.json).
+    """
+    return entorno in {"production", "staging"}
+
+
 def _region_aws_por_defecto() -> str:
     """Región AWS: única fuente de verdad para el default 'us-east-1'.
 
@@ -329,7 +338,7 @@ def load_config() -> AppConfig:
 
     storage_backend = cfg.storage_backend.lower()
 
-    if cfg.entorno in {"production", "staging"}:
+    if entorno_es_productivo(cfg.entorno):
         if storage_backend != "s3":
             raise RuntimeError(
                 f"STORAGE_BACKEND={cfg.storage_backend!r} no permitido en APP_ENV={cfg.entorno}. "
