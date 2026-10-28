@@ -94,7 +94,7 @@ Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cie
 <a id="p04"></a>
 ### P04 — Primer despliegue productivo
 
-**Estado:** 🟡 Parcial; migración y activación completadas y verificadas; falta reconciliar el lock de S3 y cerrar el cierre formal.
+**Estado:** 🟡 Parcial; migración y activación completadas y verificadas; lock de S3 liberado (2026-10-24); falta el cierre formal.
 
 El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). SMTP y Zoho ya están conciliados (P03, 2026-10-20) y el drift de SNS está corregido (2026-10-21, ver [P06](#p06)).
 
@@ -123,7 +123,11 @@ exclusivo de staging); se hizo a mano, con el mismo rigor. Evidencia:
 **Pendiente para cerrar P04:**
 1. ~~Reconciliar y liberar el lock de S3~~ (hecho el 2026-10-24).
 2. Registrar el cierre formal (tag/notas de release, según la [guía](despliegue/GUIA_DESPLIEGUE_LOCAL.md#release)).
-3. Verificar S3/SSM, DNS/TLS y Bedrock desde ECS (pendiente técnico de siempre, sin cambios).
+3. **Verificar S3/SSM, DNS/TLS y Bedrock (2026-10-27, desde dentro del contenedor `backend`, con el rol IAM de la tarea, vía `ecs execute-command` + `boto3`):**
+   - DNS/TLS: ✅ ambos dominios resuelven; certificado válido.
+   - SSM: ✅ `get_parameter` responde (~16s) con el valor correcto; los parámetros de configuración son consistentes.
+   - S3: ✅ `list_objects_v2` responde; bucket existe, coincide con `S3_BUCKET`, vacío (0 objetos, esperado sin P07 ejecutado).
+   - Bedrock: en el primer intento, `invoke_model` no respondió en 21 minutos (timeout de inactividad de la sesión, sin error de permisos). Se repitió la prueba dos veces más: ✅ respuesta real del modelo en 0.82s y consistente. **Conclusión: no es un bloqueante.** El cuelgue inicial fue un evento aislado; Bedrock funciona de forma estable desde el rol de la tarea.
 
 <a id="p05"></a>
 ### P05 — Firma automática en producción
@@ -161,7 +165,7 @@ El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: 
 
 Crear un acceso real, recibir el correo y recorrer guardado, adjuntos/IA, descarga S3, radicación, revisión y cierre; verificar autenticación/roles y ausencia de errores. Reutilizar el [recorrido E2E](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md) como referencia y archivar una ejecución separada de producción. Firma y alarma se cierran en P05/P06, sin repetir tareas.
 
-**Prerrequisito de usuarios (2026-10-21, cumplido el 2026-10-27):** el realm de Keycloak importado no trae ningún usuario (solo el cliente `sagrilaft-portal` y los roles `acceso_clientes`/`acceso_proveedores`), así que había que crearlos a mano desde la consola de administración (`https://login-sagrilaft.ia.blend360.com`). **El 2026-10-27 el responsable técnico informó que los usuarios internos ya están creados en producción**, configurados a mano en lugar de importarlos desde staging (el export parcial de la consola no incluye usuarios). *Reportado, no verificado por el asistente:* no se revisó en Keycloak cuántos usuarios hay, qué rol tiene cada uno ni si hay grupos. **Abierto:** confirmar que la contraseña del secreto `sagrilaft/prod/keycloak_admin` coincide con la que realmente entra a la consola; el 2026-10-27 en staging no coincidía (alguien la cambió directo en Keycloak sin actualizar el secreto), y en producción no se ha comprobado. Con los usuarios creados, P07 ya puede ejecutarse.
+**Prerrequisito de usuarios (2026-10-21, cumplido el 2026-10-27):** el realm de Keycloak importado no trae ningún usuario (solo el cliente `sagrilaft-portal` y los roles `acceso_clientes`/`acceso_proveedores`), así que había que crearlos a mano desde la consola de administración de producción. **El 2026-10-27 el responsable técnico informó que los usuarios internos ya están creados en producción**, configurados a mano en lugar de importarlos desde staging (el export parcial de la consola no incluye usuarios). **Revisión de inventario (2026-10-27, en la consola de producción de Keycloak, solo lectura):** el realm `sagrilaft` tiene los usuarios internos esperados y los roles y grupos de acceso están configurados. No se modificó ningún usuario, grupo ni asignación. Los correos y nombres de usuario no se registran en este documento. El código lee roles de realm desde `realm_access.roles` ([autenticacion.py](../../backend/api/middleware/autenticacion.py#L212)), así que el acceso depende de que los grupos aporten esos roles al token. **Verificado el 2026-10-27 (Fase 2, pasos 1 y 2):** con la herramienta de evaluación de tokens de Keycloak, un usuario de cada grupo recibe en `realm_access.roles` exactamente el rol de su membresía. **Pendiente en staging:** alinear el secreto de administración de Keycloak con su valor real. Con los usuarios y roles verificados, P07 ya puede ejecutarse.
 
 <a id="p08"></a>
 ### P08 — Observación HSTS
@@ -215,16 +219,21 @@ Para el primer corte se aceptó el riesgo de RDS descrito en [P02](despliegue/P0
 <a id="p11"></a>
 ### P11 — OIDC y build/push automático
 
-**Estado:** ⚪ Estado externo actual sin confirmar; no bloquea deploy manual.
+**Estado:** 🟡 Parcial; OIDC configurado y funcionando, pero con un riesgo de seguridad abierto en el rol.
 
-El 2026-09-29 se registró `Credentials could not be loaded` y ausencia de `AWS_ROLE_TO_ASSUME` en `gh variable list`. Comprobar rol/variable actuales, configurarlos si faltan y acreditar build/push. [Workflow](../../.github/workflows/ci.yml).
+**Verificado el 2026-10-28:** la variable `AWS_ROLE_TO_ASSUME` existe y apunta a un rol de despliegue por OIDC (configurada 2026-10-21) y el proveedor OIDC de GitHub existe en la cuenta (`token.actions.githubusercontent.com`). El workflow de build/push ya corre con esto, sin llaves estáticas.
+
+**Hallazgo de seguridad (2026-10-28):** el rol de despliegue OIDC es genérico y compartido con otros repositorios de la organización, no dedicado a este proyecto. Su confianza es más amplia de lo necesario y tiene permisos de administración de servicios que este proyecto no usa. El riesgo es que un workflow de otro repositorio lo asuma con permisos excesivos.
+
+**Pendiente de corrección:** crear un rol dedicado a SAGRILAFT, con confianza limitada a este repositorio y permisos mínimos para publicar imágenes, y migrar `AWS_ROLE_TO_ASSUME` a ese rol. No bloquea el deploy manual, pero es una brecha de seguridad real en la cuenta compartida. [Workflow](../../.github/workflows/ci.yml).
 
 <a id="p12"></a>
 ### P12 — Protección de main
 
-**Estado:** ⚪ Estado externo actual sin confirmar.
+**Estado:** 🔴 Confirmado sin protección (2026-10-28).
 
-El intento registrado sobre `branches/main/protection` devolvió 404 con acceso WRITE. Comprobar si `Run Backend Tests` es obligatorio; si falta, un administrador debe aplicar la regla. Cierre: configuración de protección verificada. El gate implementado no prueba protección activa.
+`GET branches/main/protection` y `GET rulesets` devuelven 404 / lista vacía: **`main` no tiene ninguna regla de protección**, ni clásica ni por ruleset.
+**Pendiente:** un administrador del repositorio debe activar branch protection en `main` exigiendo PR + al menos 1 revisión y el check `Run Backend Tests` en verde antes de mergear. Hasta entonces, los cambios pueden llegar a `main` sin revisión.
 
 <a id="p13"></a>
 ### P13 — Ejecución fiable de CDK Diff
