@@ -22,9 +22,11 @@ import sys
 import time
 
 import httpx
+import jwt
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jwt import PyJWKSet
+from jwt.exceptions import PyJWTError
 
 from infrastructure.config.configuracion import KeycloakConfig, entorno_actual
 from domain.utils.seguridad import sanitizar_log
@@ -154,14 +156,17 @@ async def _decodificar_jwt(token: str, config: KeycloakConfig, request: Request)
     
     jwks = await _obtener_jwks(config)
     try:
+        jwk_set = PyJWKSet.from_dict(jwks)
+        kid = jwt.get_unverified_header(token).get("kid")
+        clave = jwk_set[kid]
         payload = jwt.decode(
             token,
-            jwks,
+            clave.key,
             algorithms=["RS256"],
             issuer=config.issuer,
             audience=config.client_id,
         )
-    except JWTError as exc:
+    except (PyJWTError, KeyError) as exc:
         _registrar_fallo_ip(ip)
         # A09:2025 - CWE-778: logs con contexto suficiente para analisis forense
         _log.warning(
