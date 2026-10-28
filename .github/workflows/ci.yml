@@ -20,6 +20,21 @@ env:
   AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
 
 jobs:
+  gitleaks:
+    name: Escaneo de secretos (gitleaks)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # historial completo: gitleaks revisa todos los commits, no solo el último
+
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source="/repo" --redact -v
+
   test:
     name: Run Backend Tests
     runs-on: ubuntu-latest
@@ -39,12 +54,21 @@ jobs:
       - name: Run pytest
         run: python -m pytest -q
 
+      - name: Auditoría de dependencias (pip-audit, informativo)
+        # No bloquea el pipeline: hoy hay vulnerabilidades conocidas sin corrección
+        # disponible en algunas dependencias. Se deja en modo reporte hasta que se
+        # decida un plan de actualización; revisar el resumen del job para el detalle.
+        continue-on-error: true
+        run: |
+          pip install -q pip-audit
+          pip-audit -r backend/requirements.txt | tee -a "$GITHUB_STEP_SUMMARY"
+
   build-and-push:
     name: Build and Push ECS Images
     concurrency:
       group: ecr-prod-${{ github.sha }}
       cancel-in-progress: false
-    needs: test
+    needs: [test, gitleaks]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
