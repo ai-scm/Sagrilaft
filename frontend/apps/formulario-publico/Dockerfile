@@ -32,7 +32,7 @@ FROM nginx:alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e1
 
 RUN sed -i 's/listen\s*80;/listen 8080;/' /etc/nginx/conf.d/default.conf \
     && sed -i '/^user/d' /etc/nginx/nginx.conf \
-    && sed -i 's|/var/run/nginx.pid|/tmp/nginx.pid|' /etc/nginx/nginx.conf \
+    && sed -i 's|^pid .*;|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf \
     && chown -R nginx:nginx /var/cache/nginx /var/log/nginx /etc/nginx/conf.d
 
 # Copiar archivos compilados
