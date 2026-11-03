@@ -1,0 +1,24 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadSagrilaftBuildConfiguration",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameters",
+      "Resource": [
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/APP_ENV",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/FRONTEND_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/PORTAL_INTERNO_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/KEYCLOAK_ISSUER_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/KEYCLOAK_REALM",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/staging/config/KEYCLOAK_CLIENT_ID",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/APP_ENV",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/FRONTEND_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/PORTAL_INTERNO_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/KEYCLOAK_ISSUER_URL",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/KEYCLOAK_REALM",
+        "arn:aws:ssm:<AWS_REGION>:<AWS_ACCOUNT_ID>:parameter/sagrilaft/prod/config/KEYCLOAK_CLIENT_ID"
+      ]
+    }
+  ]
+}

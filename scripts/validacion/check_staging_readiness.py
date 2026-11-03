@@ -194,13 +194,14 @@ def check_migration_task() -> Check:
 def check_keycloak_build_args() -> Check:
     dockerfile = read("keycloak/Dockerfile")
     workflow = read(".github/workflows/ci.yml")
+    build_script = read("scripts/despliegue/build_and_push_ecr_images.py")
     ok = all(
         item in dockerfile
         for item in ["ARG KEYCLOAK_PORTAL_URL", "ARG KEYCLOAK_FORMULARIO_URL", "realm-sagrilaft.template.json"]
     ) and all(
-        item in workflow
+        item in build_script
         for item in ["KEYCLOAK_PORTAL_URL", "KEYCLOAK_FORMULARIO_URL"]
-    )
+    ) and "--from-ssm" in workflow
     return Check("keycloak-build-args", ok, "Keycloak realm URLs are build-time parameters" if ok else "Keycloak build args missing")
 
 
@@ -418,8 +419,9 @@ def check_frontend_legal_build_args() -> Check:
         "Dockerfile recibe VITE_CORREO_DATOS": "ARG VITE_CORREO_DATOS" in dockerfile and "ENV VITE_CORREO_DATOS=" in dockerfile,
         "script local pasa razon social": "VITE_RAZON_SOCIAL" in build_script,
         "script local pasa correo datos": "VITE_CORREO_DATOS" in build_script,
-        "CI pasa razon social": "vars.VITE_RAZON_SOCIAL" in workflow,
-        "CI pasa correo datos": "vars.VITE_CORREO_DATOS" in workflow,
+        "CI usa configuración SSM": "--from-ssm" in workflow,
+        "razon social confirmada": '"HIGH TECH SOFTWARE S.A.S"' in build_script,
+        "correo de datos confirmado": '"administrativocol@blend360.com"' in build_script,
     }
     failed = [name for name, ok in required.items() if not ok]
     return Check(

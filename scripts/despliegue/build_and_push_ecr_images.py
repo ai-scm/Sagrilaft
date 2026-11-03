@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPONENTS = ("backend", "formulario-publico", "portal-interno", "keycloak")
@@ -193,6 +194,42 @@ class Ecr:
                 f"Repositorio {repo} no es IMMUTABLE; aplicar esa política por separado")
 
 
+def build_config_from_ssm(environment, account, region, api=None):
+    """Read public build inputs from the selected stack, after checking the account."""
+    api = api or Ecr(region)
+    require(api.call("sts", "get-caller-identity").get("Account") == account,
+            "Cuenta activa distinta de --account")
+    keys = ("APP_ENV", "FRONTEND_URL", "PORTAL_INTERNO_URL", "KEYCLOAK_ISSUER_URL",
+            "KEYCLOAK_REALM", "KEYCLOAK_CLIENT_ID")
+    names = [f"/sagrilaft/{environment}/config/{key}" for key in keys]
+    response = api.call("ssm", "get-parameters", "--names", *names)
+    parameters = response.get("Parameters", [])
+    require(not response.get("InvalidParameters") and len(parameters) == len(names),
+            "Faltan parámetros SSM para el build")
+    values = {p["Name"]: p["Value"] for p in parameters}
+    require(set(values) == set(names), "Parámetros SSM inesperados")
+    cfg = {key: values[name] for key, name in zip(keys, names)}
+    require(all(isinstance(value, str) and value.strip() and not any(c in value for c in "\r\n")
+                for value in cfg.values()), "Parámetros SSM vacíos o inválidos")
+    require(cfg["APP_ENV"] == ("production" if environment == "prod" else "staging"),
+            "APP_ENV SSM no corresponde al ambiente solicitado")
+    origins = [v.strip() for v in cfg["FRONTEND_URL"].split(",")]
+    urls = origins + [cfg["PORTAL_INTERNO_URL"], cfg["KEYCLOAK_ISSUER_URL"]]
+    require(all(urlsplit(u).scheme == "https" and urlsplit(u).netloc and not urlsplit(u).username
+                and not urlsplit(u).password and not urlsplit(u).query and not urlsplit(u).fragment
+                for u in urls), "URL de build SSM inválida")
+    require(cfg["PORTAL_INTERNO_URL"] in origins and origins[0] != cfg["PORTAL_INTERNO_URL"],
+            "FRONTEND_URL debe iniciar con el formulario e incluir el portal")
+    return {
+        "VITE_BACKEND_URL": "",
+        "VITE_PORTAL_INTERNO_URL": cfg["PORTAL_INTERNO_URL"],
+        "VITE_KEYCLOAK_URL": cfg["KEYCLOAK_ISSUER_URL"],
+        "VITE_KEYCLOAK_REALM": cfg["KEYCLOAK_REALM"],
+        "VITE_KEYCLOAK_CLIENT_ID": cfg["KEYCLOAK_CLIENT_ID"],
+        "FRONTEND_URL": ",".join(origins),
+    }
+
+
 def save_manifest(path, manifest):
     with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=".manifest-", delete=False) as stream:
         temporary = Path(stream.name)
@@ -286,6 +323,7 @@ def main():
     config = parser.add_mutually_exclusive_group()
     config.add_argument("--env-file", type=Path)
     config.add_argument("--from-environment", action="store_true", help="Leer configuración del proceso (CI)")
+    config.add_argument("--from-ssm", action="store_true", help="Leer configuración de build del SSM del ambiente")
     parser.add_argument("--environment", choices=("staging", "prod"), required=True)
     parser.add_argument("--account", required=True, help="Cuenta AWS esperada")
     parser.add_argument("--region")
@@ -296,9 +334,11 @@ def main():
     os.umask(0o077)
     try:
         tag = validate_source(args.tag)
-        env = dict(os.environ) if args.from_environment else parse_env(args.env_file or ROOT / f".env.{args.environment}")
+        env = dict(os.environ) if args.from_environment or args.from_ssm else parse_env(args.env_file or ROOT / f".env.{args.environment}")
         region = args.region or env.get("AWS_REGION") or "us-east-1"
         require(bool(re.fullmatch(r"\d{12}", args.account)) and bool(re.fullmatch(r"[a-z0-9-]+", region)), "Cuenta/región inválidas")
+        if args.from_ssm:
+            env = build_config_from_ssm(args.environment, args.account, region)
         options = builds(env)
         approved = json.loads(args.reuse_manifest.read_text()) if args.reuse_manifest else None
         publish(args.environment, args.account, region, tag, options, args.manifest, approved)

@@ -256,6 +256,8 @@ Se registraron WebsiteURL/UseCaseDescription de otro proyecto y ticket interno a
 
 Contratar proveedor, obtener URL/credenciales y validar integración real cuando se active. La decisión de arrancar deshabilitado ya está tomada; no equivale a contratarlo. [Procedimiento de activación](../integraciones/integracion_tusdatos_swagger.md#activacion).
 
+**Pendiente de confirmar:** si existe la aprobación de Cumplimiento para operar temporalmente sin proveedor de listas. La plantilla local refleja `deshabilitado`; no modifica la configuración efectiva de producción.
+
 <a id="p16"></a>
 ### P16 — Borradores Zoho huérfanos
 

@@ -4,15 +4,14 @@ Función única: referencia por variable de los archivos `.env`, `.env.dev.examp
 `.env.staging(.example)` y `.env.prod(.example)`: significado, consumo, origen,
 diferencias por ambiente, obligatoriedad y sensibilidad.
 
-Elaborado el 2026-10-16 a partir del código (`backend/infrastructure/config/configuracion.py`,
+Elaborado el 2026-10-16 y actualizado con los cambios locales del 2026-11-03 a partir del código (`backend/infrastructure/config/configuracion.py`,
 `backend/entrypoint.sh`, `docker-compose*.yml`, `infra/sagrilaft/lib/**`, `scripts/**`,
 `frontend/**`). **No contiene valores secretos** (ni contraseñas, tokens, claves, IDs de
 cliente OAuth ni IDs de acceso AWS). Los valores concretos no sensibles por ambiente
 siguen en [Valores por ambiente](checklist-valores-staging-prod.md) y el contrato de
 Secrets Manager/SSM en la [Matriz AWS](MATRIZ_AWS_CONFIG.md).
 
-Todo lo que aquí se afirma sale del código; lo que no pudo comprobarse se marca como
-**(no verificado)**.
+Las observaciones de AWS y de archivos locales corresponden a la fecha de la consulta; no garantizan el estado actual. Los cambios preparados en el repositorio requieren despliegue para surtir efecto en AWS.
 
 ## 1. Cómo se usa cada archivo (léase antes)
 
@@ -52,7 +51,7 @@ personal o de infraestructura; — no sensible).
 | `AWS_REGION` | Región AWS para Bedrock, S3 y SES. | `AWSConfig`, `S3Config`, scripts de despliegue, CI | Dev: `.env`. AWS: constante CDK (`us-east-1`) | Opc. (default `us-east-1`) | — |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | **Eliminadas en los tres ambientes (2026-10-20).** Ya no existen en `.env`, `docker-compose.yml` ni en staging/prod. | — | — | Prohibidas en los tres ambientes (`validate_envs.py`, `check_staging_readiness.py`) | — |
 | `AWS_PROFILE` | Perfil de AWS CLI/SSO que usa el backend en local. Reemplaza las claves estáticas. | `boto3` (cadena de credenciales por defecto) | Dev: `.env` (`PS-PowerUserAccess-<CUENTA_AWS>` al 2026-10-20). AWS: no aplica (Task Role) | Opc. en dev (default `default`, sin credenciales → IA deshabilitada). No existe en staging/prod | ⚠️ (nombre de perfil con ID de cuenta) |
-| `UVICORN_WORKERS` | Número de procesos Uvicorn. | `backend/entrypoint.sh` (`--workers`) | Dev: compose lo fija en `1` (`docker-compose.dev.yml:100`). AWS: CDK fija `4` | Opc. (default 4) | — |
+| `UVICORN_WORKERS` | Número de procesos Uvicorn. | `backend/entrypoint.sh` (`--workers`) | Dev: compose fija `1`. CDK local prepara `2` en staging y `4` en producción; lo consultado en AWS era `4` en ambos. | Opc. (default 4) | — |
 | `TRUSTED_PROXY_IPS` | IPs/CIDR de proxies de confianza para `X-Forwarded-*`. | `entrypoint.sh` (`--forwarded-allow-ips`) | Dev: compose fija `172.0.0.0/8`. AWS: CDK fija `172.0.0.0/8` | Opc. (default del script `127.0.0.1`; compose base `172.0.0.0/8`) | ⚠️ |
 | `SECRET_KEY` | Clave HMAC-SHA256 para firmar reportes de auditoría. | `AppConfig.secret_key` (`os.environ["SECRET_KEY"]`); compose base la exige | Dev: `.env`. `.env.prod`: eliminada el 2026-10-19 (sin consumidor local). AWS: secreto `app_secret.secret_key` (CDK lo genera de 64 caracteres) | **Obl.** (sin default; `KeyError` si falta) | 🔒 |
 | `MAX_UPLOAD_SIZE_MB` | Tope de tamaño de archivos subidos. | `AppConfig.max_upload_mb` | AWS: CDK fija `15` en `ecs-fargate.ts`. Dev: **no se inyecta** (ver §9.1, hallazgo 7) | Opc. (default 15) | — |
@@ -110,7 +109,7 @@ definición; nunca deben contener secretos.
 | `ZOHO_CLIENT_ID` | Client ID OAuth de Zoho. | `ZohoSignConfig.validar()` | Zoho API Console. AWS: secreto `zoho_credentials.client_id` (subido con `sync_aws_runtime_assets.py`) | **Obl.** (falla `validar()`) | 🔒 (tratar como credencial) |
 | `ZOHO_CLIENT_SECRET` | Secret OAuth. | ídem | secreto `zoho_credentials.client_secret` | **Obl.** | 🔒 |
 | `ZOHO_REFRESH_TOKEN` | Refresh token OAuth. | ídem | secreto `zoho_credentials.refresh_token` | **Obl.** | 🔒 |
-| `ZOHO_REDIRECT_URI` | URI de callback OAuth registrada en Zoho. | `ZohoSignConfig` | Dev: `.env`. AWS: SSM (`https://{dominioPortal}/oauth/zoho/callback`) | **Obl.** (falla `validar()`) | — |
+| `ZOHO_REDIRECT_URI` | URI enviada al renovar el token OAuth. Su registro y necesidad deben verificarse en Zoho; la ruta configurada no implica que exista un callback en la aplicación. | `ZohoSignConfig`, `zoho_sign_service.py` | Dev: `.env`. AWS: SSM | **Obl.** (falla `validar()`) | — |
 | `ZOHO_WEBHOOK_SECRET` | Secreto HMAC del webhook de Zoho. | `FirmaService` (valida firma del webhook), `routers/webhooks.py` | secreto `zoho_credentials.webhook_secret` | Opc. al arrancar; el webhook falla con `RuntimeError` si falta | 🔒 |
 | `ZOHO_WEBHOOK_SIGNATURE_HEADER` | Nombre del header con la firma. | `ZohoSignConfig` | CDK `X-ZS-WEBHOOK-SIGNATURE` | Opc. (ese valor) | — |
 | `ZOHO_SIGN_TESTING` | `true` = modo sandbox de Zoho (no consume créditos). | `ZohoSignConfig.modo_prueba` | CDK: `false` solo en `prod`; `true` en el resto. Dev: compose default `true` | Opc. (default código `false`) | — |
@@ -136,12 +135,12 @@ definición; nunca deben contener secretos.
 | `SMTP_USER` | Usuario SMTP de SES. | `SmtpConfig`; `sync_aws_runtime_assets.py` | AWS: secreto `smtp_credentials.username` | Opc. en código; **Obl. para el sync** | 🔒 |
 | `SMTP_PASSWORD` | Contraseña SMTP de SES. | ídem | secreto `smtp_credentials.password` | ídem | 🔒 |
 | `SMTP_FROM` | Remitente visible para contrapartes. | `SmtpConfig.remitente` | AWS: SSM (= `sesEmailOrigen`, contexto CDK) | Opc. (vacío) | ⚠️ |
-| `SMTP_REPLY_TO` | Dirección de respuesta. | `SmtpConfig.responder_a` | AWS: SSM (contexto `smtpReplyTo`) | Opc. (vacío). **No la inyecta compose** (§9.1, hallazgo 7) | ⚠️ |
+| `SMTP_REPLY_TO` | Dirección de respuesta. | `SmtpConfig.responder_a` | SSM; CDK local la inyecta en ECS y compose la pasa al contenedor. Cambios locales aún sin desplegar. | Opc. (vacío) | ⚠️ |
 | `SES_EMAIL_ORIGEN` | Remitente verificado en SES para alertas internas HTML. | `SesConfig` | AWS: SSM | Opc.; `configurado` exige también `SES_NOTIFICACIONES_ENABLED=true` | ⚠️ |
 | `SES_NOTIFICACIONES_ENABLED` | Interruptor de alertas por SES. | `SesConfig.habilitado` | CDK `true`. Compose default `false` | Opc. (`false`) | — |
 | `ALERTAS_EMAIL_DESTINATARIO` | Destinatario(s) internos de alertas (lista separada por comas). | `infrastructure/notificaciones/ses_alertas.py:137` | AWS: SSM (contexto `snsAlertasSub`) | Opc.; si está vacía no se envía ("sin destinatarios") | ⚠️ (datos personales) |
 | `SNS_NOTIFICACIONES_ENABLED` | Interruptor del adaptador SNS (hoy apagado; SES es el canal). | `SnsConfig.habilitado` | CDK `false` | Opc. (`false`) | — |
-| `SNS_TOPIC_ARN` | ARN del topic SNS de alertas. | `SnsConfig.topic_arn` | AWS: CDK lo inyecta (`ecs-fargate.ts:361`). Dev: comentada | Opc. | ⚠️ (ARN con ID de cuenta) |
+| `SNS_TOPIC_ARN` | ARN del topic SNS de alertas. **Administrada por CDK**: ninguna persona la configura; `validate_envs.py` la trata como opcional en los tres entornos (`CDK_MANAGED_KEYS`), no como requerida. | `SnsConfig.topic_arn` | AWS: CDK lo inyecta (`ecs-fargate.ts:361`). Dev: comentada | Opc. (CDK-managed) | ⚠️ (ARN con ID de cuenta) |
 
 ### 5.4 Listas de cautela (Tusdatos)
 
@@ -156,7 +155,7 @@ definición; nunca deben contener secretos.
 | Variable | Qué es | Dónde se usa | Origen | Obligatoriedad / default | Sens. |
 |---|---|---|---|---|---|
 | `STORAGE_BACKEND` | `local` (volumen) o `s3`. En staging/prod **solo `s3`** (falla en `load_config` y en `entrypoint.sh`). | `AppConfig.storage_backend` | Dev: `.env`/compose (`local`). AWS: CDK `s3` | Opc. (default `local`) | — |
-| `S3_BUCKET` | Bucket de archivos. | `S3Config`, `entrypoint.sh` | AWS: nombre del bucket creado por CDK (SSM) | **Obl. si `s3` en staging/prod**; en dev puede ir vacía | ⚠️ (identifica infraestructura) |
+| `S3_BUCKET` | Bucket de archivos. En AWS CDK lo publica en SSM; compose lo usa si se configura S3 en local. `check_staging_readiness.py` exige su declaración en las plantillas. | `S3Config`, `entrypoint.sh`, compose y validación | AWS: CDK/SSM; local: `.env` | Necesario cuando se usa S3; opcional en `validate_envs.py` | ⚠️ |
 | `KEYCLOAK_URL` | URL interna con la que el backend busca las claves JWKS (en AWS: DNS interno Cloud Map). | `KeycloakConfig.url`, `jwks_uri` | Dev: `.env`. AWS: SSM (`http://keycloak.sagrilaft-{env}.local:8080`) | Opc.; vacía ⇒ integración inactiva | — |
 | `KEYCLOAK_REALM` | Realm. | `KeycloakConfig` | CDK `sagrilaft` | Opc. (`sagrilaft`) | — |
 | `KEYCLOAK_CLIENT_ID` | Client ID del portal. | `KeycloakConfig` | CDK `sagrilaft-portal` | Opc. (vacío); `configurado` lo exige | — |
@@ -164,7 +163,7 @@ definición; nunca deben contener secretos.
 | `KEYCLOAK_HOSTNAME` | Hostname público de Keycloak (`KC_HOSTNAME`). | compose; `ecs-fargate.ts` | AWS: SSM | Opc. | — |
 | `KEYCLOAK_ADMIN` | Usuario admin de la consola. | compose | AWS: secreto `keycloak_admin.username` (CDK, no escrito desde `.env`). `.env.prod`: eliminada el 2026-10-19 | Opc. (`admin`) | ⚠️ |
 | `KEYCLOAK_ADMIN_PASSWORD` | Contraseña admin. | compose (obligatoria) | AWS: secreto `keycloak_admin.password`, generado por CDK (32 caracteres). eliminada de `.env.prod` el 2026-10-19; `.env.*` no es su fuente | **Obl.** en compose | 🔒 |
-| `KEYCLOAK_DB_URL` | JDBC de la BD de Keycloak. | compose base (`KC_DB_URL`) | AWS: CDK (`ecs-fargate.ts:360`) | Opc. | ⚠️ |
+| `KEYCLOAK_DB_URL` | JDBC de Keycloak. Compose base lo lee; el archivo de desarrollo lo reemplaza con un valor fijo. | compose base (`KC_DB_URL`) | AWS: CDK (`ecs-fargate.ts`) | Opc. | ⚠️ |
 | `KEYCLOAK_DB_USER` | Usuario BD de Keycloak. | compose base | AWS: secreto `db_credentials.username`, generado por CDK. eliminada de `.env.prod` el 2026-10-19; `.env.*` no es su fuente | Obl. en compose | 🔒 |
 | `KEYCLOAK_DB_PASSWORD` | Contraseña BD de Keycloak. | ídem | AWS: secreto `db_credentials.password`, generado por CDK y usado por RDS. eliminada de `.env.prod` el 2026-10-19; `.env.*` no es su fuente | Obl. en compose | 🔒 |
 
@@ -180,17 +179,17 @@ prod `*sagrilaft.ia.blend360.com`.
 | `STORAGE_BACKEND` | `local` | `s3` | `s3` |
 | `S3_BUCKET` | vacío | bucket CDK de staging | bucket CDK de prod (**vacío** en `.env.prod`) |
 | `FRONTEND_URL` | `http://localhost:5173` (`.env`: `…:5173,…:5174`) | formulario (real: formulario + portal) | formulario (real: formulario + portal) |
-| `VITE_BACKEND_URL` | `http://localhost:8000` (`.env`: `http://backend:8000`) | ejemplo: URL del portal; **real: vacío** | ejemplo: URL del portal; **real: vacío** |
-| `KEYCLOAK_URL` | `http://localhost:8080` (`.env`: `http://keycloak:8080`) | ejemplo: URL pública; real: DNS interno | ejemplo: URL pública; real: DNS interno |
+| `VITE_BACKEND_URL` | `http://localhost:8000` | ejemplo y real: vacío (mismo origen) | ejemplo y real: vacío (mismo origen) |
+| `KEYCLOAK_URL` | `http://localhost:8080` (`.env`: `http://keycloak:8080`) | ejemplo y real: DNS interno | ejemplo y real: DNS interno |
 | `ZOHO_SIGN_TESTING` | `true` | ejemplo `true`; **real `false`** | `false` |
-| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (`.env`: `deshabilitado`) | ejemplo `dummy`; real `sagrilaft`; CDK default `dummy`; checklist `deshabilitado` | ejemplo `sagrilaft`; real `deshabilitado` |
-| `SNS_NOTIFICACIONES_ENABLED` | `false` | ejemplo `true`; real `false` | ejemplo `true`; real `false` |
+| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (`.env`: `deshabilitado`) | ejemplo y archivo local: `dummy`; CDK local: `dummy` | ejemplo y archivo local: `deshabilitado`; CDK local: `deshabilitado` |
+| `SNS_NOTIFICACIONES_ENABLED` | `false` | ejemplo y real `false` | ejemplo y real `false` |
 | `SES_NOTIFICACIONES_ENABLED` | `false` | `true` | `true` |
-| `SMTP_FROM` / `SES_EMAIL_ORIGEN` | `no-responder@localhost` / vacío | ejemplo: `no-reply-sagrilaft@…`; real: correo personal | `no-reply-sagrilaft@ia.blend360.com` |
-| `SMTP_REPLY_TO` | vacío | `legal@…` | `legal@…` |
-| `UVICORN_WORKERS` | `1` (`.env`: 4; compose dev fija 1) | `2` (CDK fija 4) | `4` |
+| `SMTP_FROM` / `SES_EMAIL_ORIGEN` | `no-responder@localhost` / vacío | ejemplo: no-reply; archivo local: SMTP no-reply y SES correo personal | no-reply |
+| `SMTP_REPLY_TO` | vacío | ejemplo: `legal@…`; ausente del archivo local consultado | ejemplo: `legal@…`; ausente del archivo local consultado |
+| `UVICORN_WORKERS` | `1` (`.env`: 4; compose dev fija 1) | CDK local `2`; AWS consultado `4` | CDK local y AWS consultado `4` |
 | `TRUSTED_PROXY_IPS` | vacío (compose fija `172.0.0.0/8`) | `REPLACE_*` en ejemplo; real `172.0.0.0/8` | ídem |
-| `BEDROCK_MODEL_ID` | real (2026-10-20): `us.amazon.nova-pro-v1:0`, cuenta <CUENTA_AWS> | `REPLACE_*`; decidido: `amazon.nova-pro-v1:0` (`.env.staging` pendiente de alinear) | `REPLACE_*`; real: `amazon.nova-pro-v1:0` |
+| `BEDROCK_MODEL_ID` | opcional en local | ejemplo: marcador; `.env.staging`: perfil de inferencia; decisión: identificador directo | ejemplo: marcador; `.env.prod`: identificador directo |
 | `PORTAL_AUTH_DISABLED` | `false` | `false` | `false` |
 | `AWS_ACCESS_KEY_ID`/`SECRET` | eliminadas (2026-10-20) | prohibidas | prohibidas |
 | `AWS_PROFILE` | `PS-PowerUserAccess-<CUENTA_AWS>` (SSO, 2026-10-20) | no aplica | no aplica |
@@ -222,8 +221,8 @@ salvo los dominios `VITE_*_URL`.
 
 ## 9. Inconsistencias encontradas
 
-Comparación `.env` ↔ `.env.dev.example`, `.env.staging` ↔ `.env.staging.example`,
-`.env.prod` ↔ `.env.prod.example` (79 claves distintas en total).
+La comparación de claves siguiente conserva hallazgos de la auditoría inicial;
+los archivos locales pueden haber cambiado. Las diferencias revisadas aparecen en §9.2.
 
 ### 9.1 Faltantes y diferencias de claves
 
@@ -234,48 +233,21 @@ Comparación `.env` ↔ `.env.dev.example`, `.env.staging` ↔ `.env.staging.exa
 | 3 | `.env.staging` y `.env.prod` (45 claves) no tienen 23 claves del ejemplo: 8 `BEDROCK_*`, 11 `ZOHO_*` de tiempos, `MAX_UPLOAD_SIZE_MB`, `PORTAL_AUTH_DISABLED`, `SMTP_REPLY_TO`. Los valores de runtime no salen de estos archivos (§1), así que el impacto es solo documental. |
 | 4 | **Corregido.** `sync_aws_runtime_assets.py` ahora escribe `SAGRILAFT_API_KEY` en `sagrilaft_listas_cautela_credentials` si tiene valor real y el secreto ya existe (CDK lo crea). Con `--apply` y cuenta verificada. Antes no lo sincronizaba. |
 | 5 | **Corregido.** La versión anterior de `sync_aws_runtime_assets.py` sobrescribía `app_secret`, `db_credentials` y `keycloak_admin` con valores de `.env.prod`, lo que podía desincronizar la contraseña de RDS y la de Keycloak. Ahora esos tres secretos son administrados por CDK y el script nunca los escribe. |
-| 6 | `.env.dev.example` deja `JWKS_CACHE_TTL_SECONDS=` y `TRUSTED_PROXY_IPS=` vacías. `autenticacion.py:84` hace `int(os.getenv(..., "300"))`: si la variable llegara vacía al proceso, `int("")` lanzaría `ValueError`. Hoy compose no la inyecta, por lo que no ocurre; conviene eliminarla de la plantilla o dejar `300`. |
-| 7 | Variables definidas pero que **compose no inyecta al contenedor** (en dev no tienen efecto aunque se cambien en `.env`): `JWKS_CACHE_TTL_SECONDS`, `MAX_UPLOAD_SIZE_MB`, `SMTP_REPLY_TO`, `SNS_*`, `VITE_RAZON_SOCIAL`, `VITE_CORREO_DATOS`. |
-| 8 | `VITE_RAZON_SOCIAL` y `VITE_CORREO_DATOS` los lee también el backend (`exportacion_pdf.py`), pero ni compose ni CDK se los pasan: el PDF usa los defaults del código, p. ej. `HIGH TECH SOFTWARE S.A.S.` (con punto final) frente a `HIGH TECH SOFTWARE S.A.S` de los `.env`. |
+| 6 | **Corregido en la plantilla:** `JWKS_CACHE_TTL_SECONDS=300` evita convertir una cadena vacía a entero si se inyecta. Compose todavía no la pasa al backend. |
+| 7 | Variables definidas pero que **compose no inyecta al contenedor** (en dev no tienen efecto aunque se cambien en `.env`): `JWKS_CACHE_TTL_SECONDS`, `MAX_UPLOAD_SIZE_MB`, `SNS_*`, `VITE_RAZON_SOCIAL`, `VITE_CORREO_DATOS`. `SMTP_REPLY_TO` sí se pasa con el cambio local. |
+| 8 | El PDF usa los valores legales predeterminados del backend, pues compose y CDK no le inyectan `VITE_RAZON_SOCIAL` ni `VITE_CORREO_DATOS`. Los defaults del PDF y frontend ya coinciden con los datos confirmados. |
 | 9 | `PORT_PUBLICO`/`PORT_PORTAL`: `.env` usa 80/81, `.env.dev.example` 5173/5174, default de compose 80/81; y `docker-compose.dev.yml` publica 5173/5174 por su cuenta. El efecto real combinando ambos compose **(no verificado)**. |
 | 10 | `.env` apunta a `DATABASE_URL` con host `postgres`, el ejemplo a `localhost`; compose dev ignora ambos y recompone la URL (§3). |
 | 11 | **Cambio 2026-10-19.** Se eliminaron de `.env.prod` `SECRET_KEY`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD`, porque ningún script local las leía (solo `docker-compose` de dev y las plantillas `.example`, que no cambian). Sus valores viven en AWS (`app_secret`, `keycloak_admin`, `db_credentials`). Las plantillas `.example` siguen declarándolas, así que `validate_envs.py` sigue aprobando; `.env.prod` ya no las contiene, y eso aparece como faltante si se compara con el ejemplo. |
 
-### 9.2 Diferencias real ↔ ejemplo en staging/prod
+### 9.2 Diferencias y decisiones pendientes en staging/prod
 
-- `PROVEEDOR_LISTAS_CAUTELA`: staging real `sagrilaft`, ejemplo `dummy`, CDK `dummy`,
-  checklist `deshabilitado`; prod real `deshabilitado`, ejemplo `sagrilaft`. Cuatro fuentes,
-  tres valores distintos en staging.
-- `ZOHO_SIGN_TESTING`: staging real `false`, ejemplo `true` y CDK `true`; el checklist y
-  los criterios confirmados dicen sandbox en staging. Si `.env.staging` se usara como
-  fuente, staging consumiría créditos reales de Zoho.
-- `BEDROCK_MODEL_ID`: los tres ambientes usan `amazon.nova-pro-v1:0` (verificado 2026-10-20
-  contra SSM real de staging y prod, y con invocación real desde local). Claude Sonnet 4.6
-  tiene mayor precisión al extraer datos de documentos, pero no se usa en ningún ambiente:
-  en local falla por permisos de AWS Marketplace del rol disponible; en staging/prod nunca
-  se evaluó cambiarlo. El cambio a `nova-pro-v1:0` en staging no fue una migración
-  deliberada: fue efecto colateral de un despliegue hecho por otro motivo (activar el NAT
-  Gateway) que usa ese valor como default en `infra/sagrilaft/package.json`. `.env.staging`
-  ya se corrigió para reflejar el valor real.
-- `KEYCLOAK_URL`: el ejemplo usa la URL pública HTTPS; el real y el CDK usan el DNS
-  interno `http://keycloak.sagrilaft-{env}.local:8080`. El ejemplo es el incorrecto.
-- `VITE_BACKEND_URL`: ejemplo = URL del portal; real = vacío. El checklist indica vacío.
-- `SNS_NOTIFICACIONES_ENABLED`: ejemplo `true`; real y CDK `false`.
-- `SMTP_FROM`/`SES_EMAIL_ORIGEN` en `.env.staging` usan un correo personal en vez de
-  `no-reply-sagrilaft@…`.
-- `.env.prod` aún tiene `S3_BUCKET=` vacío y `SAGRILAFT_API_URL`/`SAGRILAFT_API_KEY`
-  con marcador `REPLACE_*`. `.env.staging` conserva `REPLACE_STAGING_SAGRILAFT_API_*` aun con
-  `PROVEEDOR_LISTAS_CAUTELA=sagrilaft`: con ese proveedor, `load_config()` aborta
-  (`SAGRILAFT_API_URL`/`KEY` requeridas).
-- `.env.prod` tiene un comentario "VERIFICAR PARA QUE ES ESTA" sobre `APP_ENV`
-  (es la variable de ambiente, ver §2) y cabeceras obsoletas
-  ("Reemplazar todos los `REPLACE_*`", "NUNCA subas este archivo").
-- `.env.staging`/`.env.prod` mantienen el comentario de `PROVEEDOR_LISTAS_CAUTELA`
-  "NUNCA usar dummy… sagrilaft", incoherente con el valor `deshabilitado` de `.env.prod`.
-- El validador `validate_envs.py` aprueba los tres ambientes porque solo mira la presencia
-  de claves: no detecta nada de lo anterior. Además marca `MAX_UPLOAD_SIZE_MB`,
-  `PORTAL_AUTH_DISABLED`, `PROVEEDOR_LISTAS_CAUTELA`, `SAGRILAFT_API_*` como "extras"
-  (no están en su lista esperada).
+- Listas de cautela: las plantillas, los archivos locales consultados y los defaults de CDK locales reflejan `dummy` en staging y `deshabilitado` en producción. Aún hay que verificar la configuración efectiva antes de desplegar.
+- Zoho: el `.env.staging` consultado tenía `ZOHO_SIGN_TESTING=false`; la decisión es `true` en staging y `false` en producción. El archivo local no configura por sí solo ECS.
+- Bedrock: se decidió `amazon.nova-pro-v1:0` en ambos ambientes. El `.env.staging` consultado contiene un perfil de inferencia; debe conciliarse sin asumir que es el valor efectivo de ECS.
+- Remitente: en el `.env.staging` consultado `SMTP_FROM` ya usa no-reply y `SES_EMAIL_ORIGEN` contiene otro correo. La decisión es utilizar no-reply para las rutas de SAGRILAFT; verificar SSM y tareas antes de aplicar cambios.
+- Las plantillas usan DNS interno para `KEYCLOAK_URL`, `VITE_BACKEND_URL` vacío y `SNS_NOTIFICACIONES_ENABLED=false`. Estos cambios son de referencia; no actualizan AWS.
+- `validate_envs.py` comprueba presencia de claves en plantillas, no sus valores ni la configuración efectiva de AWS.
 
 ### 9.3 Otras inconsistencias de configuración
 
@@ -287,8 +259,7 @@ Comparación `.env` ↔ `.env.dev.example`, `.env.staging` ↔ `.env.staging.exa
 - `docker-compose.yml` base default `PROVEEDOR_LISTAS_CAUTELA=dummy` y
   `TRUSTED_PROXY_IPS=172.0.0.0/8` vs default del `entrypoint.sh` `127.0.0.1`.
 - Variables fuera de los `.env` que influyen: `UPLOAD_DIR`, `DATABASE_HOST`,
-  `KEYCLOAK_FORMULARIO_URL`, `KEYCLOAK_PORTAL_URL` (build de Keycloak; se leen de `.env.*` o
-  `vars.*` de GitHub Actions). No están en los `.example`.
+  `KEYCLOAK_FORMULARIO_URL`, `KEYCLOAK_PORTAL_URL` (build de Keycloak; el publicador puede derivarlas de las URL de formulario y portal, incluso cuando lee SSM). No están en los `.example`.
 
 ## 10. Estado de la documentación previa
 
@@ -298,5 +269,117 @@ Comparación `.env` ↔ `.env.dev.example`, `.env.staging` ↔ `.env.staging.exa
 | [Valores por ambiente](checklist-valores-staging-prod.md) | Valores no sensibles preparados. | Revisión del 2026-10-06; difiere de los `.env` reales (§9.2). |
 | Este documento | Referencia por variable. | Mantener sincronizado con `configuracion.py` y `config-parameters.ts`. |
 
-Al agregar una variable: declararla en `configuracion.py` (o consumidor), añadirla a los
-tres `.example` y a `validate_envs.py`, inyectarla en compose y CDK, y registrarla aquí.
+Al agregar una variable, documentar su consumidor y fuente; actualizar configuración, plantillas, validación e inyección solo en los ambientes donde corresponda.
+
+
+---
+
+# Configuración: decisiones y preparación de implementación
+
+Estado: cambios locales preparados para revisión. No se han desplegado ni se han
+modificado AWS, GitHub o la configuración de Keycloak. Las pruebas de correo
+reales y la publicación de imágenes requieren autorización posterior.
+
+## Decisiones
+
+| Tema | Decisión |
+|---|---|
+| Listas de cautela | Staging `dummy`; producción `deshabilitado`. Preparar el proveedor real primero en staging cuando existan credenciales. |
+| Zoho | Staging modo pruebas; producción modo real. Las credenciales OAuth compartidas siguen pendientes de revisión. |
+| Bedrock | Identificador directo `amazon.nova-pro-v1:0` en ambos ambientes. |
+| Workers | Staging 2; producción conserva 4, pendiente comparación de carga. |
+| Alarmas de staging | Notificar activación y recuperación de las tres alarmas al tema SNS del stack. |
+| Correo | Remitente no-reply; `Reply-To` `legal@blend360.com` en SMTP y SES. Zoho Sign administra los correos de firma por separado. |
+| Expedientes | Conservar el destinatario temporal actual hasta que se confirmen las 11 personas y se autorice su actualización. |
+| Datos legales | `HIGH TECH SOFTWARE S.A.S` y `administrativocol@blend360.com`; este correo es independiente del `Reply-To`. |
+| Parámetro `PORTAL_URL` | Conservar. No se ha descartado un consumidor externo. |
+| Builds GitHub | Ambientes `staging` y `production`; parámetros de infraestructura desde SSM del ambiente. |
+
+## Keycloak efectivo, consulta de solo lectura
+
+El cliente `sagrilaft-portal` existe y está habilitado en ambos ambientes como
+cliente público OIDC, con flujo estándar activo y flujos directo e implícito
+desactivados. Las redirecciones permiten el portal (raíz y rutas) y las rutas
+del formulario del ambiente; `Web Origins` contiene los orígenes exactos de
+ambos. Coinciden con SSM y con los dominios actuales. El frontend solicita PKCE
+`S256`; el atributo de obligatoriedad PKCE no estaba definido explícitamente
+en el cliente. No se ha probado un inicio de sesión interactivo ni cambiado el
+cliente. `clientAuthenticatorType` figura como `client-secret` en la respuesta
+administrativa, mientras `publicClient=true`; no se infiere por ese campo aislado
+que el navegador deba tener una credencial.
+
+## Cambios locales y dependencias
+
+- El cambio local prepara la inyección de `SMTP_REPLY_TO` desde SSM; SMTP lo añade
+  al MIME y SES lo transmite como `ReplyToAddresses`. Compose lo pasa si existe.
+- CDK prepara 2 workers en staging, proveedor dummy por defecto en staging y
+  deshabilitado por defecto en producción. `deploy:staging` ya no fuerza el
+  proveedor deshabilitado. Los planes de release pasan el contexto explícito y
+  deben incluir el valor acordado: los valores de contexto prevalecen.
+- Los jobs del workflow seleccionan `staging` o `production`; push a main
+  conserva la publicación de producción y `workflow_dispatch` permite elegir.
+  El nombre `production` se traduce a `prod` para AWS. Es publicación de
+  imágenes, no despliegue. Las imágenes y tags existentes son inmutables.
+- El publicador comprueba la cuenta, lee seis parámetros SSM no secretos y
+  construye los argumentos sin duplicar las URL en GitHub. Los valores legales
+  confirmados son defaults explícitos del publicador. El PDF y el frontend
+  comparten el texto confirmado como default, pero su configuración sigue en
+  código distinto; esto no constituye una fuente técnica única para ese texto.
+- El rol GitHub inspeccionado no tiene una autorización identificada para
+  `ssm:GetParameters` sobre los parámetros del proyecto. La simulación IAM fue
+  denegada; la lectura de políticas mostró permiso SSM limitado a parámetros
+  públicos de ECS. La plantilla `infra/sagrilaft/policies/github-build-ssm.template.json`
+  describe el permiso mínimo propuesto; sustituir marcadores y revisar límites,
+  políticas de sesión y SCP antes de autorizar su aplicación.
+- Los ambientes de GitHub aún no existen. Esto no impide preparar ni hacer
+  commits locales; antes de integrar o ejecutar el workflow que publica imágenes
+  hay que crearlos y revisar sus restricciones y los permisos SSM. El patrón actual de confianza OIDC
+  del rol coincide con ambos sujetos de ambiente, pero es amplio (`repo:ai-scm/*`);
+  conviene evaluar su alcance sin asumir que los demás permisos son suficientes.
+- `deploy_release.py` solo admite transiciones de imagen/SHA en su modo normal;
+  rechazará los cambios de parámetros, alarmas y Task Definitions de este plan.
+  No se ha relajado esa protección. Se requiere un procedimiento de cambio
+  de infraestructura con diff aprobado, compatible con el despliegue y reversión,
+  antes de aplicar estas modificaciones.
+- Las copias locales `.env.staging`/`.env.prod` y el flujo de
+  carga de credenciales siguen pendientes de limpieza. No retirar las entradas
+  mientras el sincronizador y las validaciones aún las requieran.
+
+### Recuperación de una publicación interrumpida
+
+El workflow guarda el manifiesto parcial como artefacto identificado por SHA,
+ejecución e intento. Un reintento normal no reutiliza esa evidencia y se detiene
+si encuentra tags inmutables existentes. Para recuperarlo, una persona autorizada
+debe descargar el artefacto de esa ejecución, revisar su ambiente, cuenta,
+región, SHA, configuraciones y digests contra ECR y aprobar expresamente su
+reutilización. Con el mismo commit limpio y los permisos necesarios, el publicador
+permite pasar ese archivo mediante `--reuse-manifest`, junto con `--manifest` para
+un archivo nuevo fuera del repositorio. El publicador valida la evidencia y no
+sobrescribe tags. Esta recuperación requiere acceso AWS y no se ha ejecutado;
+la operación y el despliegue requieren aprobación independiente.
+
+## Comprobaciones para una ejecución futura
+
+1. Revisar los diffs local y CloudFormation por separado, con el contexto
+   completo real, sin alterar el destinatario SNS ni `ALERTAS_EMAIL_DESTINATARIO`.
+2. Aprobar ambientes GitHub, permisos mínimos y el procedimiento de despliegue.
+3. Aplicar primero staging y renovar tareas para recibir los parámetros.
+4. Probar correo SMTP y SES únicamente con destinatarios autorizados; validar
+   encabezados `From` y `Reply-To`, alarma y recuperación. No enviar a las 11
+   personas antes de su confirmación.
+5. Comparar 2 y 4 workers en staging y validar login interactivo y flujos de
+   Keycloak con cuentas de prueba; revisar después el cambio de producción.
+6. Con evidencia y aprobación separada, proceder en producción. No eliminar
+   `PORTAL_URL` ni modificar destinatarios de expedientes en esta ejecución.
+
+## Comparación local con los stacks consultados
+
+Se sintetizó CDK en directorios temporales usando los valores y etiquetas
+observados al consultar AWS. La comparación estructural, sin metadata, no es
+un Change Set ni garantiza ausencia de drift o reemplazos. Antes de aplicar se
+debe repetir con el contexto y la release exactos y revisar el Change Set.
+
+La comparación anterior identificó cambios en alarmas, parámetros, Task
+Definitions y políticas de ejecución. Repetirla con los valores y el código
+vigentes; revisar especialmente el permiso de lectura de `SMTP_REPLY_TO`, IAM
+y posibles reemplazos antes de autorizar un despliegue.

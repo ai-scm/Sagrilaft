@@ -7,6 +7,13 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Ambiente para publicar imágenes
+        type: choice
+        options: [staging, production]
+        required: true
 
 permissions:
   contents: read
@@ -31,8 +38,12 @@ jobs:
           fetch-depth: 0  # historial completo: gitleaks revisa todos los commits, no solo el último
 
       - name: Gitleaks
+        # Imagen fijada por versión y digest (v8.30.1, verificado en Docker Hub)
+        # en lugar de la etiqueta mutable, para que el CI no cambie de
+        # comportamiento sin aviso. Para actualizar: revisar
+        # hub.docker.com/r/zricethezav/gitleaks/tags y reemplazar tag + digest juntos.
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             detect --source="/repo" --redact -v
 
   test:
@@ -65,11 +76,12 @@ jobs:
 
   build-and-push:
     name: Build and Push ECS Images
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     concurrency:
-      group: ecr-prod-${{ github.sha }}
+      group: ecr-${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}-${{ github.sha }}
       cancel-in-progress: false
     needs: [test, gitleaks]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -93,19 +105,18 @@ jobs:
       - name: Publish immutable SHA images
         env:
           IMAGE_TAG: ${{ github.sha }}
-          VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
-          VITE_PORTAL_INTERNO_URL: ${{ vars.VITE_PORTAL_INTERNO_URL }}
-          VITE_RAZON_SOCIAL: ${{ vars.VITE_RAZON_SOCIAL }}
-          VITE_CORREO_DATOS: ${{ vars.VITE_CORREO_DATOS }}
-          VITE_KEYCLOAK_URL: ${{ vars.VITE_KEYCLOAK_URL }}
-          VITE_KEYCLOAK_REALM: ${{ vars.VITE_KEYCLOAK_REALM }}
-          VITE_KEYCLOAK_CLIENT_ID: ${{ vars.VITE_KEYCLOAK_CLIENT_ID }}
-          KEYCLOAK_PORTAL_URL: ${{ vars.KEYCLOAK_PORTAL_URL }}
-          KEYCLOAK_FORMULARIO_URL: ${{ vars.KEYCLOAK_FORMULARIO_URL }}
+          BUILD_ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
         run: |
           test -n "$AWS_ACCOUNT_ID" || { echo 'Falta la variable vars.AWS_ACCOUNT_ID'; exit 1; }
+          case "$BUILD_ENVIRONMENT" in
+            staging) aws_environment=staging ;;
+            production)
+              test "$GITHUB_REF" = refs/heads/main || { echo 'Producción requiere main'; exit 1; }
+              aws_environment=prod ;;
+            *) echo 'Ambiente inválido'; exit 1 ;;
+          esac
           python3 scripts/despliegue/build_and_push_ecr_images.py \
-            --environment prod --from-environment \
+            --environment "$aws_environment" --from-ssm \
             --account "$AWS_ACCOUNT_ID" --region "$AWS_REGION" \
             --tag "$IMAGE_TAG" --manifest "$RUNNER_TEMP/ecr-manifest.json"
 

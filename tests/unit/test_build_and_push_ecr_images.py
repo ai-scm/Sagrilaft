@@ -47,6 +47,56 @@ class FakeEcr:
         return self.images.get(repo)
 
 
+def test_ssm_build_config_uses_selected_environment_and_account():
+    class ConfigApi:
+        def call(self, service, operation, *args):
+            if service == "sts":
+                return {"Account": ACCOUNT}
+            assert (service, operation, args[0]) == ("ssm", "get-parameters", "--names")
+            values = {"APP_ENV": "staging", "FRONTEND_URL": "https://form.test,https://portal.test",
+                      "PORTAL_INTERNO_URL": "https://portal.test", "KEYCLOAK_ISSUER_URL": "https://auth.test",
+                      "KEYCLOAK_REALM": "sagrilaft", "KEYCLOAK_CLIENT_ID": "sagrilaft-portal"}
+            assert all(name.startswith("/sagrilaft/staging/config/") for name in args[1:])
+            return {"Parameters": [{"Name": name, "Value": values[name.rsplit("/", 1)[-1]]}
+                                   for name in args[1:]]}
+    result = publisher.build_config_from_ssm("staging", ACCOUNT, REGION, ConfigApi())
+    assert result["VITE_BACKEND_URL"] == ""
+    assert result["VITE_KEYCLOAK_URL"] == "https://auth.test"
+    args = publisher.builds(result)
+    assert "KEYCLOAK_FORMULARIO_URL=https://form.test" in args["keycloak"]
+
+
+def test_ssm_build_config_rejects_wrong_account_before_reading_parameters():
+    class ConfigApi:
+        def call(self, service, operation, *args):
+            assert (service, operation) == ("sts", "get-caller-identity")
+            return {"Account": "000000000000"}
+    with pytest.raises(publisher.PrecondicionError, match="Cuenta activa"):
+        publisher.build_config_from_ssm("staging", ACCOUNT, REGION, ConfigApi())
+
+
+@pytest.mark.parametrize("problem", ["missing", "wrong_environment", "wrong_portal"])
+def test_ssm_build_config_rejects_incomplete_or_inconsistent_inputs(problem):
+    class ConfigApi:
+        def call(self, service, operation, *args):
+            if service == "sts":
+                return {"Account": ACCOUNT}
+            values = {"APP_ENV": "production", "FRONTEND_URL": "https://form.test,https://portal.test",
+                      "PORTAL_INTERNO_URL": "https://portal.test", "KEYCLOAK_ISSUER_URL": "https://auth.test",
+                      "KEYCLOAK_REALM": "sagrilaft", "KEYCLOAK_CLIENT_ID": "sagrilaft-portal"}
+            if problem == "wrong_environment":
+                values["APP_ENV"] = "staging"
+            if problem == "wrong_portal":
+                values["PORTAL_INTERNO_URL"] = "https://another.test"
+            names = list(args[1:])
+            if problem == "missing":
+                names.pop()
+            return {"Parameters": [{"Name": name, "Value": values[name.rsplit("/", 1)[-1]]}
+                                   for name in names]}
+    with pytest.raises(publisher.PrecondicionError):
+        publisher.build_config_from_ssm("prod", ACCOUNT, REGION, ConfigApi())
+
+
 @pytest.fixture
 def rig(tmp_path, monkeypatch):
     monkeypatch.setattr(publisher, "LOCK_DIRECTORY", tmp_path)
