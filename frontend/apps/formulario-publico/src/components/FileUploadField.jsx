@@ -1,5 +1,6 @@
 import { HelpIcon } from './HelpPanel';
 import textosAyudaCampos from '../data/helpTexts';
+import { useCorreccion } from '../context/CorreccionContext';
 
 /**
  * Campo de carga de archivo con drag-and-drop y estado de uploading.
@@ -12,6 +13,10 @@ export default function FileUploadField({
   const doc = documentos[tipoDoc];
   const helpKey = `doc_${tipoDoc}`;
   const tieneAyuda = !!textosAyudaCampos[helpKey];
+
+  const { camposPendientes, camposCorregidos } = useCorreccion();
+  const correccionPendiente  = camposPendientes.has(helpKey);
+  const correccionCompletada = camposCorregidos.has(helpKey);
 
   const fileName = doc?.nombre_archivo ?? doc?.name ?? null;
   const fileSize = doc?.tamano ?? doc?.size ?? null;
@@ -42,10 +47,25 @@ export default function FileUploadField({
     input.click();
   };
 
+  const clasesGrupo = [
+    correccionPendiente  ? 'correccion-pendiente'  : '',
+    correccionCompletada ? 'correccion-completada' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div style={{ marginBottom: '16px' }}>
+    <div className={clasesGrupo} style={{ marginBottom: '16px' }}>
       <label className="form-label">
         {label}
+        {correccionPendiente && (
+          <span className="correccion-mark" title="Este campo requiere corrección" aria-label="Requiere corrección">
+            ✎
+          </span>
+        )}
+        {correccionCompletada && (
+          <span className="correccion-ok-mark" title="Corrección completada" aria-label="Corregido">
+            ✓
+          </span>
+        )}
         {tieneAyuda && <HelpIcon fieldKey={helpKey} onOpenHelp={onOpenHelp} />}
         {hint && (
           <span style={{ fontWeight: '400', color: 'var(--warning)', fontSize: '0.75rem', marginLeft: '8px' }}>
@@ -94,6 +114,12 @@ export default function FileUploadField({
         </div>
       )}
 
+      {correccionPendiente && !error && (
+        <div className="correccion-aviso">Este campo requiere corrección</div>
+      )}
+      {correccionCompletada && (
+        <div className="correccion-aviso correccion-aviso--ok">Corrección completada</div>
+      )}
       {error && <div className="field-error">{error}</div>}
     </div>
   );

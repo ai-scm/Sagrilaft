@@ -1,11 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import FileUploadField from './FileUploadField';
+import { CorreccionContext } from '../context/CorreccionContext';
 
 // Mock HelpIcon since it imports texts that might be complex
 vi.mock('./HelpPanel', () => ({
   HelpIcon: () => <span data-testid="help-icon" />
 }));
+
+function renderConCorreccion(props, { pendientes = new Set(), corregidos = new Set() } = {}) {
+  return render(
+    <CorreccionContext.Provider value={{ camposPendientes: pendientes, camposCorregidos: corregidos }}>
+      <FileUploadField {...props} />
+    </CorreccionContext.Provider>
+  );
+}
 
 describe('FileUploadField', () => {
   const defaultProps = {
@@ -141,5 +150,22 @@ describe('FileUploadField', () => {
 
     expect(defaultProps.onFileChange).not.toHaveBeenCalled();
     expect(dropzone).not.toHaveClass('dragover');
+  });
+
+  it('shows "Este campo requiere corrección" when the document is marked as pending', () => {
+    renderConCorreccion(defaultProps, { pendientes: new Set(['doc_cedula']) });
+    expect(screen.getByText('Este campo requiere corrección')).toBeInTheDocument();
+    expect(screen.getByTitle('Este campo requiere corrección')).toBeInTheDocument();
+  });
+
+  it('shows "Corrección completada" when the document was already re-uploaded', () => {
+    renderConCorreccion(defaultProps, { corregidos: new Set(['doc_cedula']) });
+    expect(screen.getByText('Corrección completada')).toBeInTheDocument();
+    expect(screen.queryByText('Este campo requiere corrección')).not.toBeInTheDocument();
+  });
+
+  it('does not show correction labels for an unrelated document', () => {
+    renderConCorreccion(defaultProps, { pendientes: new Set(['doc_rut']) });
+    expect(screen.queryByText('Este campo requiere corrección')).not.toBeInTheDocument();
   });
 });

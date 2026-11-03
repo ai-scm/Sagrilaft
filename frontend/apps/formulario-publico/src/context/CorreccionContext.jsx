@@ -30,7 +30,7 @@
 import { createContext, useContext, useCallback } from 'react';
 import { useCorreccionPendiente, useEstadoCorreccionGlobal } from '../hooks/correccion';
 
-const CorreccionContext = createContext({
+export const CorreccionContext = createContext({
   activa:                         false,
   especificaciones:               '',
   camposIdentificados:            new Set(),
