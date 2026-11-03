@@ -32,7 +32,7 @@ _CAMPOS_FINANCIEROS: List[Tuple[str, str]] = [
     ("Patrimonio",          "patrimonio"),
 ]
 
-_RAZON_SOCIAL_EMPRESA = os.getenv("VITE_RAZON_SOCIAL", "HIGH TECH SOFTWARE S.A.S.")
+_RAZON_SOCIAL_EMPRESA = os.getenv("VITE_RAZON_SOCIAL", "HIGH TECH SOFTWARE S.A.S")
 _CORREO_DATOS_PERSONALES = os.getenv("VITE_CORREO_DATOS", "administrativocol@blend360.com")
 
 

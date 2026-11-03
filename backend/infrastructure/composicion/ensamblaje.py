@@ -88,6 +88,7 @@ def crear_alertas_portal(config: AppConfig):
             ses_config=config.ses,
             aws_config=config.aws,
             url_portal_interno=config.portal_interno_url,
+            responder_a=config.smtp.responder_a,
         )
         logger.info(
             "Alertas SES habilitadas (origen=%s, portal_url=%s)",

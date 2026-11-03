@@ -47,11 +47,13 @@ class SesAlertasPortal:
         ses_config: SesConfig,
         aws_config: AWSConfig,
         url_portal_interno: str,
+        responder_a: str = "",
     ) -> None:
         import boto3
         from botocore.config import Config
 
         self._email_origen = ses_config.email_origen
+        self._responder_a = responder_a
         # Obligatorio: AppConfig.portal_interno_url es la única fuente de
         # verdad (ver infrastructure/configuracion.py) — este adaptador ya
         # no define su propio default.
@@ -144,6 +146,7 @@ class SesAlertasPortal:
             respuesta = self._cliente.send_email(
                 Source=self._email_origen,
                 Destination={"ToAddresses": destinatarios},
+                **({"ReplyToAddresses": [self._responder_a]} if self._responder_a else {}),
                 Message={
                     "Subject": {"Data": obtener_asunto_correo(tipo)},
                     "Body": {
