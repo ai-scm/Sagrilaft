@@ -188,6 +188,21 @@ class ZohoSignAutenticacionError(Exception):
         super().__init__(mensaje)
 
 
+class ZohoSignSinCreditosError(Exception):
+    """
+    Excepcion de dominio: ZohoSign rechazó el envío porque la cuenta no tiene
+    créditos o plan activo para enviar documentos vía API (HTTP 400, code 12000).
+
+    Distinta de ZohoSignAutenticacionError: las credenciales son correctas, el
+    problema es comercial, no técnico. La acción correcta es que el
+    responsable de la cuenta de ZohoSign compre créditos o active un plan con
+    soporte de API — reintentar o revisar credenciales no soluciona nada.
+    """
+
+    def __init__(self, mensaje: str) -> None:
+        super().__init__(mensaje)
+
+
 class ZohoSignSolicitudNoCancelableError(Exception):
     """
     Excepcion de dominio: ZohoSign rechazó el recall (cancelación) de una

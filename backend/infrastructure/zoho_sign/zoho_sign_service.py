@@ -20,6 +20,7 @@ from domain.contratos import SolicitudFirmaCreada
 from domain.excepciones import (
     ZohoSignAutenticacionError,
     ZohoSignIndisponibleError,
+    ZohoSignSinCreditosError,
     ZohoSignSolicitudNoCancelableError,
 )
 from infrastructure.config.configuracion import ZohoSignConfig
@@ -36,6 +37,7 @@ _MILISEGUNDOS_POR_SEGUNDO = 1000
 
 _ORDEN_FIRMA_UNICO_FIRMANTE = 0
 _CODIGO_RESPUESTA_EXITOSA_ZOHO = 0
+_CODIGO_ZOHO_SIN_CREDITOS = 12000
 _INDICE_PRIMERA_ACCION = 0
 
 _MAX_CARACTERES_RESPUESTA_ERROR_CREACION = 500
@@ -169,6 +171,14 @@ class ZohoSignService:
         )
         return self._access_token
 
+    @staticmethod
+    def _es_error_zoho_sin_creditos(response: httpx.Response) -> bool:
+        """True si el cuerpo de la respuesta trae el code de "sin créditos para la API" (12000)."""
+        try:
+            return response.json().get("code") == _CODIGO_ZOHO_SIN_CREDITOS
+        except (ValueError, AttributeError):
+            return False
+
     def _headers(self) -> dict:
         return {"Authorization": f"Zoho-oauthtoken {self._obtener_token()}"}
 
@@ -294,6 +304,11 @@ class ZohoSignService:
             )
             if resp_enviar.status_code in _HTTP_STATUS_AUTENTICACION:
                 raise ZohoSignAutenticacionError(detalle)
+            if self._es_error_zoho_sin_creditos(resp_enviar):
+                raise ZohoSignSinCreditosError(
+                    f"La cuenta de ZohoSign no tiene créditos ni un plan activo "
+                    f"para enviar documentos vía API. {detalle}"
+                )
             raise RuntimeError(detalle)
         datos_enviar = resp_enviar.json()
 

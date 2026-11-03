@@ -35,6 +35,7 @@ from domain.excepciones import (
     FrecuenciaEnvioExcedidaError,
     ZohoSignIndisponibleError,
     ZohoSignAutenticacionError,
+    ZohoSignSinCreditosError,
     ZohoSignSolicitudNoCancelableError,
 )
 from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
@@ -213,6 +214,13 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         handler_from_exception_with_hint(
             502,
             hint="Problema de credenciales con el proveedor de firma electrónica. Escale a soporte/administración de credenciales de ZohoSign.",
+        ),
+    )
+    app.add_exception_handler(
+        ZohoSignSinCreditosError,
+        handler_from_exception_with_hint(
+            502,
+            hint="La cuenta de ZohoSign no tiene créditos ni un plan activo para enviar documentos vía API. Contacte al responsable de la cuenta de ZohoSign para activar un plan o comprar créditos.",
         ),
     )
     app.add_exception_handler(
