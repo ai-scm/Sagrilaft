@@ -61,8 +61,8 @@ Prefijo esperado: `/sagrilaft/staging/config/`
 | `BEDROCK_PDF_MAX_PAGES` | `7` |
 | `BEDROCK_DEFAULT_CONFIDENCE` | `0.90` |
 | `BEDROCK_RESPONSE_LOG_CHARS` | `800` |
-| `PROVEEDOR_LISTAS_CAUTELA` | `deshabilitado` (script vigente; `dummy` es histórico) |
-| `SAGRILAFT_API_URL` | no requerida con proveedor deshabilitado; placeholder técnico gestionado por CDK |
+| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (decidido 2026-11-03 para staging; `deshabilitado` queda solo para producción, ver fila de producción abajo) |
+| `SAGRILAFT_API_URL` | no requerida con proveedor dummy/deshabilitado; placeholder técnico gestionado por CDK |
 | `KEYCLOAK_URL` | `http://keycloak.sagrilaft-staging.local:8080` |
 | `KEYCLOAK_REALM` | `sagrilaft` |
 | `KEYCLOAK_CLIENT_ID` | `sagrilaft-portal` |

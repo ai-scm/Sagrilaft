@@ -146,7 +146,7 @@ definición; nunca deben contener secretos.
 
 | Variable | Qué es | Dónde se usa | Origen | Obligatoriedad / default | Sens. |
 |---|---|---|---|---|---|
-| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (simula), `sagrilaft` (API real), `deshabilitado`. `dummy` está **prohibido en production** (`load_config` y CDK). | `SagrilaftListasConfig`, `load_config()`, `api/dependencies.py` | Dev: `.env`. AWS: contexto CDK `-c proveedorListasCautela` (default `dummy` en staging, `sagrilaft` en prod) | Opc. (default código `dummy`) | — |
+| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (simula), `sagrilaft` (API real), `deshabilitado`. `dummy` está **prohibido en production** (`load_config` y CDK). | `SagrilaftListasConfig`, `load_config()`, `api/dependencies.py` | Dev: `.env`. AWS: contexto CDK `-c proveedorListasCautela` (default `dummy` en staging, `deshabilitado` en prod) | Opc. (default código `dummy`) | — |
 | `SAGRILAFT_API_URL` | URL de la API Tusdatos. Con `sagrilaft` es obligatoria. | `SagrilaftListasConfig` | AWS: contexto CDK `-c sagrilaftApiUrl` (si va vacía CDK usa el placeholder `dummy://listas-cautela`) | Obl. solo con `sagrilaft` | — |
 | `SAGRILAFT_API_KEY` | API key de Tusdatos. | `SagrilaftListasConfig` | AWS: secreto `sagrilaft_listas_cautela_credentials.api_key`, escrito por `sync_aws_runtime_assets.py --apply` solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y valor real (ver §9.1, hallazgo 4) | Obl. solo con `sagrilaft` | 🔒 |
 
