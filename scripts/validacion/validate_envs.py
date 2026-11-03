@@ -15,11 +15,15 @@ EXPECTED_RUNTIME_KEYS = {
     "AWS_REGION",
     "FRONTEND_URL",
     "PORTAL_INTERNO_URL",
+    "PORTAL_AUTH_DISABLED",
     "SECRET_KEY",
     "UVICORN_WORKERS",
     "TRUSTED_PROXY_IPS",
+    "MAX_UPLOAD_SIZE_MB",
+    "PROVEEDOR_LISTAS_CAUTELA",
+    "SAGRILAFT_API_URL",
+    "SAGRILAFT_API_KEY",
     "STORAGE_BACKEND",
-    "S3_BUCKET",
     "BEDROCK_MODEL_ID",
     "BEDROCK_MAX_TOKENS",
     "BEDROCK_TEMPERATURE",
@@ -83,6 +87,27 @@ DEV_ONLY_KEYS = {
     "DATABASE_URL",
     "PORT_PUBLICO",
     "PORT_PORTAL",
+    "AWS_PROFILE",
+}
+
+OPTIONAL_KEYS = {
+    "JWKS_CACHE_TTL_SECONDS",
+}
+
+# En staging/producción, el valor real de estas variables en ECS lo escribe
+# el CDK (SSM Parameter Store), no una persona — este validador no las exige
+# por presencia de valor. Ver infra/sagrilaft/lib/constructs/config-parameters.ts
+# y ecs-fargate.ts.
+#
+# OJO antes de eliminarlas de algún .env*: SNS_TOPIC_ARN sí es puramente
+# decorativa en los archivos locales. S3_BUCKET NO lo es — además de la
+# vía CDK/SSM, docker-compose.yml:82 la pasa al backend si alguien usa
+# STORAGE_BACKEND=s3 en local, y check_staging_readiness.py exige
+# textualmente la línea "S3_BUCKET=" en .env.staging(.example) y
+# .env.prod(.example) (confirmado: su ausencia rompe check_phase0_env_contract).
+CDK_MANAGED_KEYS = {
+    "S3_BUCKET",
+    "SNS_TOPIC_ARN",
 }
 
 ENVIRONMENTS = {
@@ -107,7 +132,11 @@ ENVIRONMENTS = {
 }
 
 ALLOWED_EXTRA_KEYS: dict[str, set[str]] = {
-    ".env.dev.example": {"KEYCLOAK_DB_URL", "SNS_TOPIC_ARN"},
+    # KEYCLOAK_DB_URL: solo la lee docker-compose.yml base (keycloak.KC_DB_URL).
+    # docker-compose.dev.yml sobreescribe KC_DB_URL con un valor fijo, así que
+    # en el flujo estándar de dev queda "sombreada", no sin uso — ver
+    # docs/produccion/configuracion/VARIABLES_DE_ENTORNO.md.
+    ".env.dev.example": {"KEYCLOAK_DB_URL"},
 }
 
 
@@ -149,6 +178,7 @@ def build_report() -> dict[str, list[FileReport]]:
             expected = set(config["required"])
             declared = parse_env_keys(ROOT / env_file)
             forbidden = declared & forbidden_in_aws if env_name in {"staging", "production"} else set()
+            allowed = expected | OPTIONAL_KEYS | CDK_MANAGED_KEYS | ALLOWED_EXTRA_KEYS.get(env_file, set())
 
             file_reports.append(
                 FileReport(
@@ -157,7 +187,7 @@ def build_report() -> dict[str, list[FileReport]]:
                     exists=(ROOT / env_file).exists(),
                     present=sorted(declared & expected),
                     missing=sorted(expected - declared),
-                    extra=sorted((declared - expected) - ALLOWED_EXTRA_KEYS.get(env_file, set())),
+                    extra=sorted(declared - allowed),
                     forbidden=sorted(forbidden),
                 )
             )

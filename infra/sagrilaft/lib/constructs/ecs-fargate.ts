@@ -394,6 +394,7 @@ export class EcsFargate extends Construct {
       SMTP_HOST: this.ssmSecret('SMTP_HOST', props, idPrefix),
       SMTP_PORT: this.ssmSecret('SMTP_PORT', props, idPrefix),
       SMTP_FROM: this.ssmSecret('SMTP_FROM', props, idPrefix),
+      SMTP_REPLY_TO: this.ssmSecret('SMTP_REPLY_TO', props, idPrefix),
       SES_EMAIL_ORIGEN: this.ssmSecret('SES_EMAIL_ORIGEN', props, idPrefix),
       SES_NOTIFICACIONES_ENABLED: this.ssmSecret('SES_NOTIFICACIONES_ENABLED', props, idPrefix),
       ALERTAS_EMAIL_DESTINATARIO: this.ssmSecret('ALERTAS_EMAIL_DESTINATARIO', props, idPrefix),

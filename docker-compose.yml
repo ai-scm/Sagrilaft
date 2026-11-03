@@ -131,6 +131,7 @@ services:
       # verificada en SES (si SES está en modo sandbox, el destinatario
       # también debe estar verificado).
       SMTP_FROM: ${SMTP_FROM}
+      SMTP_REPLY_TO: ${SMTP_REPLY_TO:-}
 
       # ── Keycloak (login del portal interno) ────────────────────────────────
       # Estas variables conectan el backend con el servidor de autenticación.
