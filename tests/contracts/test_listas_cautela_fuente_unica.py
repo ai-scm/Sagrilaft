@@ -79,6 +79,14 @@ def test_load_config_permite_dummy_en_staging(monkeypatch):
     assert cfg.listas_cautela.proveedor == "dummy"
 
 
+def test_load_config_mantiene_produccion_deshabilitada(monkeypatch):
+    _preparar_env_base(monkeypatch, "production")
+    monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "deshabilitado")
+    cfg = load_config()
+    assert sagrilaft_habilitado(cfg) is False
+    assert isinstance(obtener_consultor_listas(cfg.listas_cautela), ConsultorListasCautelaDeshabilitado)
+
+
 def test_load_config_rechaza_sagrilaft_sin_credenciales_en_staging(monkeypatch):
     _preparar_env_base(monkeypatch, "staging")
     monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "sagrilaft")

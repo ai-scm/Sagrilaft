@@ -34,6 +34,20 @@ def template(service_tag="old", migration_tag="old", count=1):
                                                  "EcsDesiredCount": {"Value": str(count)}}}
 
 
+@pytest.mark.parametrize("phase", ["prepare", "activate"])
+def test_release_compatible_rechaza_cambio_de_proveedor_listas(phase):
+    before = template()
+    before["Resources"]["proveedor"] = {
+        "Type": "AWS::SSM::Parameter",
+        "Properties": {"Name": "/sagrilaft/staging/config/PROVEEDOR_LISTAS_CAUTELA",
+                       "Type": "String", "Value": "deshabilitado"},
+    }
+    after = copy.deepcopy(before)
+    after["Resources"]["proveedor"]["Properties"]["Value"] = "dummy"
+    with pytest.raises(release.MigrationError, match="Cambio ajeno a la release: proveedor"):
+        release.assert_transition(before, after, phase, environment="staging")
+
+
 class FakeRuntime:
     def __init__(self, directory):
         self.plan, self.directory = plan(), directory
