@@ -104,7 +104,15 @@ Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de iguald
 
 - `SagrilaftStack-prod` en `CREATE_COMPLETE`; los cuatro servicios ECS en 0/0/0. Ninguna tarea activa.
 - `cdk diff` con los argumentos del bootstrap: sin diferencias. Lo desplegado coincide con el código del bootstrap.
-- Secretos de CDK (`app_secret`, `keycloak_admin`, `db_credentials`) sin cambios respecto a su escritura por CloudFormation (7 de octubre). Su fuente vigente es AWS. El 2026-10-19 se eliminaron de `.env.prod` sus claves locales (`SECRET_KEY`, `KEYCLOAK_ADMIN*`, `KEYCLOAK_DB_*`), que ningún script leía.
+- Secretos de CDK en producción (`app_secret`, `keycloak_admin`, `db_credentials`) sin cambios respecto a su escritura por CloudFormation (7 de octubre). Su fuente vigente es AWS. El 2026-10-19 se eliminaron de `.env.prod` sus claves locales (`SECRET_KEY`, `KEYCLOAK_ADMIN*`, `KEYCLOAK_DB_*`), que ningún script leía.
+- **Staging, `db_credentials` (auditado el 2026-11-03, solo lectura).** El secreto no coincide con la forma de producción. Su historial, verificado en CloudTrail y en las versiones del secreto:
+  - 2026-08-18 12:12: creado por CloudFormation con `username` y `password` (32 caracteres).
+  - 2026-08-18 12:21: el `SecretTargetAttachment` escribió las 7 claves, igual que en producción.
+  - 2026-08-18 16:56 y 16:59: edición manual del secreto (contraseña de 64 caracteres, sin las 5 claves de metadatos), seguida de `ModifyDBInstance` manual sobre RDS.
+  - 2026-10-28 14:39 y 14:56: nueva edición manual (contraseña de 65 caracteres) y `ModifyDBInstance` manual sobre RDS.
+  - 2026-11-03: backend y migración conectaron a la base en el primer intento con la contraseña actual.
+
+  Staging tiene 2 claves y producción 7 porque la edición manual del 2026-08-18 reemplazó la versión que había escrito el attachment. La edición del 2026-10-28 fue intencional y la hizo el operador desde la consola. El motivo de la del 2026-08-18 no está registrado en el repositorio. La app solo usa `username` y `password`, así que la diferencia no afecta la conexión. Detalle en [MATRIZ_AWS_CONFIG.md](../produccion/configuracion/MATRIZ_AWS_CONFIG.md).
 - Secretos externos escritos manualmente: `zoho_credentials` (24 de septiembre) y `smtp_credentials` (7 de octubre, 09:05). El 2026-10-16 `.env.prod` no coincidía con ninguno; ambos se reconciliaron el 2026-10-20 (viñeta siguiente).
 - **Sincronización de secretos: SMTP y Zoho reconciliados (2026-10-20).** SMTP: la identidad real de producción es `ses-smtp-prod-sagrilaft` (no `sagrilaft-ses-smtpp`, la identificada el 2026-10-16), ya con permisos de envío, y `.env.prod` coincide con el secreto vigente en AWS. Zoho: se confirmó en la consola de Zoho que AWS tiene la credencial de la cuenta oficial de Legal; `.env.prod` y `.env.staging` se corrigieron para coincidir, y los webhooks (borrados) se recrearon con firma HMAC. Ambas condiciones de bloqueo quedan cerradas ([P03](../produccion/PENDIENTES_PRODUCCION.md#p03); [detalle](../produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod)). El webhook recreado se probó con una firma real en staging el mismo día (expediente `SAG-9C58BEF6`, `FIRMADO`); en producción el webhook no se ha probado (P05).
 

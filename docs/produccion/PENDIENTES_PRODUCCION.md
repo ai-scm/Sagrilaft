@@ -46,7 +46,8 @@ Estado de credenciales verificado el 2026-10-16 comparando solo igualdad, sin im
 
 - `zoho_credentials`: cargado el 2026-09-24 (cuenta oficial de Legal). Sus cuatro campos **no coinciden** con `.env.prod`.
 - `smtp_credentials`: escrito el 2026-10-07 a las 09:05. El usuario coincide con una clave IAM **activa** de `sagrilaft-ses-smtpp`. `SMTP_USER` y `SMTP_PASSWORD` de `.env.prod` **no coinciden**.
-- `db_credentials`: generado por CDK y asociado a RDS el 2026-10-07 a las 08:13. El usuario coincide con RDS. Las claves `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD` se eliminaron de `.env.prod` el 2026-10-19 porque ningún script local las lee; la fuente vigente es AWS.
+- `db_credentials`: generado por CDK y asociado a RDS el 2026-10-07 a las 08:13. El usuario coincide con RDS. Las claves `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD` se eliminaron de `.env.prod` el 2026-10-19 porque ningún script local las lee; la fuente vigente es AWS. Producción no tiene más versiones que las de esa fecha.
+- `db_credentials` de staging: no sigue el mismo historial. Dos ediciones manuales (2026-08-18 y 2026-10-28) reemplazaron el JSON que escribió el attachment y cambiaron la contraseña en Secrets Manager y en RDS. Hoy las dos coinciden y la conexión funciona. No afecta a producción, pero conviene registrar el motivo de la edición del 2026-08-18. Detalle en [MATRIZ_AWS_CONFIG.md](configuracion/MATRIZ_AWS_CONFIG.md).
 
 Además, el 2026-10-19 se eliminaron de `.env.prod` las claves `SECRET_KEY`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_USER` y `KEYCLOAK_DB_PASSWORD`: ningún script local las leía y sus valores viven solo en AWS (`app_secret`, `keycloak_admin`, `db_credentials`). La sincronización con `sync_aws_runtime_assets.py --apply` estuvo bloqueada por la [condición de bloqueo](despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod) hasta el 2026-10-20, cuando se concilió Zoho y SMTP (ver cierres abajo).
 
@@ -79,7 +80,7 @@ usuario, `sagrilaft-ses-smtpp` (doble "p"), no está confirmado en uso por ning�
 no se elimina hasta confirmarlo.
 
 **Cierre de la Fase 2 del corte, sin `--apply` (2026-10-21).** Con el SHA `6897920dec80b02171c83e3446d8f6afce14512d` y árbol limpio, cuenta `874641912777` y región `us-east-1`, se ejecutó solo lectura:
-- Instantánea previa (`audit_aws_secrets_safe.py`): los tres secretos de CDK (`app_secret`, `keycloak_admin`, `db_credentials`) conservan su fecha de la línea base (2026-10-07). `zoho_credentials` conserva 2026-09-24 y `smtp_credentials` 2026-10-20 13:41, el cambio registrado arriba. `sagrilaft_listas_cautela_credentials` tiene `api_key` vacía, sin uso con el proveedor deshabilitado.
+- Instantánea previa de producción (`audit_aws_secrets_safe.py`): los tres secretos de CDK (`app_secret`, `keycloak_admin`, `db_credentials`) conservan su fecha de la línea base (2026-10-07). `zoho_credentials` conserva 2026-09-24 y `smtp_credentials` 2026-10-20 13:41, el cambio registrado arriba. `sagrilaft_listas_cautela_credentials` tiene `api_key` vacía, sin uso con el proveedor deshabilitado.
 - Dry-run de `sync_aws_runtime_assets.py`: sin `ERROR`; Zoho (cuatro campos) y SMTP (dos campos) figuran como "se actualizaría", listas de cautela como omitido, los tres secretos de CDK como no escritos y los cuatro repositorios ECR como existentes.
 - Coherencia de valores: los seis campos de `.env.prod` (cuatro de Zoho y dos de SMTP) coinciden con AWS por huella SHA-256 (comparación de igualdad, sin imprimir valores).
 

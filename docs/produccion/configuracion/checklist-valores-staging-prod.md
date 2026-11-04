@@ -107,7 +107,7 @@ Prefijo esperado: `/sagrilaft/staging/config/`
 
 | Secreto | Campos | Procedencia / referencia |
 |---|---|---|
-| `sagrilaft/staging/db_credentials` | `username`, `password` | creado por CDK y ya disponible en AWS |
+| `sagrilaft/staging/db_credentials` | `username`, `password` (la app usa solo estas) | creado por CDK; contraseña cambiada a mano el 2026-08-18 y el 2026-10-28, replicada en RDS en ambos casos (ver sección `db_credentials` de MATRIZ_AWS_CONFIG.md) |
 | `sagrilaft/staging/app_secret` | `secret_key` | creado por CDK y ya actualizado en AWS |
 | `sagrilaft/staging/zoho_credentials` | `client_id`, `client_secret`, `refresh_token`, `webhook_secret` | cargado con valores reales en AWS |
 | `sagrilaft/staging/smtp_credentials` | `username`, `password` | cargado con valores reales en AWS (consola; fuera de `sync_aws_runtime_assets.py`) |
@@ -181,7 +181,7 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 
 | Secreto | Campos | Procedencia / referencia |
 |---|---|---|
-| `sagrilaft/prod/db_credentials` | `username`, `password` | generado por CDK |
+| `sagrilaft/prod/db_credentials` | `username`, `password` (la app usa solo estas); AWS agrega `host`, `port`, `dbname`, `engine`, `dbInstanceIdentifier` | generado por CDK y asociado a RDS por `SecretTargetAttachment` (2026-10-07) |
 | `sagrilaft/prod/app_secret` | `secret_key` | generado por CDK |
 | `sagrilaft/prod/zoho_credentials` | `client_id`, `client_secret`, `refresh_token`, `webhook_secret` | secreto externo a CDK; importar con `zohoSecretYaExiste=true`; [evidencia](../../operacion/RUNBOOK_OPERATIVO.md#zoho), [validación productiva](../PENDIENTES_PRODUCCION.md#p05) |
 | `sagrilaft/prod/smtp_credentials` | `username`, `password` | carga manual en la consola de AWS Secrets Manager; sin `SMTP_*` en `.env.prod` |

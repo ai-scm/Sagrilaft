@@ -144,20 +144,51 @@ Nota:
 
 ### `sagrilaft/{env}/db_credentials`
 
-- `username`
-- `password`
+Claves que usa la aplicación:
 
-Estado esperado:
+- `username`: usuario de PostgreSQL. ECS lo inyecta en `DB_USER` y `KC_DB_USERNAME`.
+- `password`: contraseña de PostgreSQL. ECS la inyecta en `DB_PASSWORD` y `KC_DB_PASSWORD`.
 
-- generado por CDK (contraseña de 32 caracteres). RDS la usa como credencial
-  (`rds.Credentials.fromSecret`) y ECS la inyecta en `DB_USER`/`DB_PASSWORD`.
-- Última escritura esperada: 2026-10-07 08:13:19 (-05:00), asociación con RDS por
-  `SecretTargetAttachment` de CloudFormation.
+Solo estas dos claves son necesarias para conectar y migrar. `DATABASE_HOST` y
+`DATABASE_NAME` no vienen del secreto: CDK los pasa como variables de entorno del task.
 
-Nota:
+Claves que agrega AWS, no la aplicación:
 
-- Administrado por CDK. `sync_aws_runtime_assets.py` **no lo escribe**. Cambiar el
-  valor del secreto no cambia la contraseña de RDS: las tareas nuevas dejarían de conectar.
+En producción el secreto tiene además `host`, `port`, `dbname`, `engine` y
+`dbInstanceIdentifier`. Los escribe el recurso `SecretTargetAttachment` cuando CDK
+asocia el secreto con la instancia RDS. Ningún script ni variable de entorno los lee.
+
+Estado por ambiente:
+
+- **Producción:** 7 claves. Creado el 2026-10-07 08:00:35 (-05:00). Las 5 claves de
+  metadatos quedaron escritas en el attachment del 2026-10-07 08:13:19 (-05:00).
+- **Staging:** 2 claves. Historial de versiones:
+  - 2026-08-18 12:12:23: creación por CloudFormation. `username` y `password` (32 caracteres).
+  - 2026-08-18 12:21:03: escritura del `SecretTargetAttachment`, que agrega las 5 claves
+    de metadatos. Coincide con el fin del recurso en CloudFormation (12:21, -05:00).
+  - 2026-08-18 16:56:49: edición manual desde la consola. El secreto vuelve a tener solo
+    `username` y `password`, y la contraseña pasa a 64 caracteres. Esta versión
+    reemplazó a la del attachment.
+  - 2026-08-18 16:59:50: `ModifyDBInstance` manual sobre RDS con `masterUserPassword`
+    y `applyImmediately`, sin errores.
+  - 2026-10-28 14:39:14: nueva edición manual. La contraseña pasa a 65 caracteres.
+  - 2026-10-28 14:56:42: `ModifyDBInstance` manual sobre RDS, igual que el 18 de agosto.
+- Las dos versiones que conserva AWS (`AWSCURRENT` y `AWSPREVIOUS`) solo tienen
+  `username` y `password`. La del attachment ya no existe como versión activa, pero
+  se pudo leer solo para comprobar sus nombres de claves.
+- Producción no tuvo ediciones manuales. Su contraseña sigue siendo la generada por CDK
+  (32 caracteres).
+- Verificación del 2026-11-03: el backend y la tarea de migración conectaron a
+  la base en el primer intento, con la contraseña actual del secreto.
+
+Regla para cambios de contraseña:
+
+- Cambiar la contraseña en Secrets Manager no cambia la de RDS. Hay que actualizar
+  ambas en la misma ventana y comprobar la conexión después. En staging se hizo así dos
+  veces: el secreto se editó primero y RDS después (3 minutos el 2026-08-18, 17 minutos
+  el 2026-10-28). Entre ambos pasos, un despliegue nuevo habría usado una contraseña que
+  RDS todavía no aceptaba.
+- `sync_aws_runtime_assets.py` **no lo escribe**.
 - Si Keycloak usa credenciales separadas sobre RDS, ese dato debe quedar
   documentado aparte o resolverse con el usuario final definido para Keycloak.
 
