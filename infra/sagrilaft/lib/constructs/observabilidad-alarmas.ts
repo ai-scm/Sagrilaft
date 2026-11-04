@@ -16,7 +16,7 @@ export interface ObservabilidadAlarmasProps {
   /** Topic de notificaciones (SNS) al que están suscritos los ingenieros/soporte */
   readonly topicAlertas: sns.ITopic;
 
-  /** Entorno actual (staging, prod). */
+  /** Entorno actual (staging, prod). En staging no despachamos alarmas por defecto para evitar ruido. */
   readonly ambiente: string;
 }
 
@@ -34,6 +34,7 @@ export class ObservabilidadAlarmas extends Construct {
     super(scope, id);
 
     const accionNotificarEquipo = new cw_actions.SnsAction(props.topicAlertas);
+    const esProduccion = props.ambiente === 'prod';
 
     // 1. Alarma de Errores 5xx del Load Balancer (Indicador crítico de caída)
     const metricaErrores5xx = props.balanceadorCarga.metrics.httpCodeTarget(
@@ -80,8 +81,9 @@ export class ObservabilidadAlarmas extends Construct {
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
 
-    // Ambos ambientes notifican activación y recuperación al tema de su stack.
-    if (props.ambiente === 'prod' || props.ambiente === 'staging') {
+    // Conectar las alarmas al Topic SNS solo si estamos en Producción.
+    // Esto evita fatiga de alarmas en Staging donde es normal que los desarrolladores causen errores 500.
+    if (esProduccion) {
       alarmaErroresServidor.addAlarmAction(accionNotificarEquipo);
       alarmaErroresServidor.addOkAction(accionNotificarEquipo); // Notificar cuando se recupere
 

@@ -90,7 +90,7 @@ export class SagrilaftStack extends cdk.Stack {
     const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
     const proveedorListasCautela = String(
-      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'prod' ? 'deshabilitado' : 'dummy'),
+      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
     ).toLowerCase();
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');

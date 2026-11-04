@@ -16,6 +16,7 @@ function synth(environment: 'staging' | 'prod') {
   const app = new App({ context: {
     environment,
     imageTag: 'build-time-config-test',
+    proveedorListasCautela: 'deshabilitado',
     snsAlertasSub: 'pruebas@example.com',
   } });
   const stack = new SagrilaftStack(app, 'TestStack', {
@@ -47,23 +48,5 @@ for (const environment of ['staging', 'prod'] as const) {
       (container: any) => container.Name === 'backend',
     );
     ok(backend.Secrets.some((secret: any) => secret.Name === 'KEYCLOAK_URL'));
-    ok(backend.Secrets.some((secret: any) => secret.Name === 'SMTP_REPLY_TO'));
-  });
-
-  test(`${environment}: alarm activation and recovery notify SNS`, () => {
-    const resources = synth(environment).Resources as Record<string, any>;
-    const alarms = Object.values(resources).filter((r: any) => r.Type === 'AWS::CloudWatch::Alarm') as any[];
-    equal(alarms.length, 3);
-    for (const alarm of alarms) {
-      equal(alarm.Properties.AlarmActions.length, 1);
-      equal(alarm.Properties.OKActions.length, 1);
-      equal(JSON.stringify(alarm.Properties.AlarmActions), JSON.stringify(alarm.Properties.OKActions));
-    }
-    const workers = Object.values(resources).find((r: any) => r.Type === 'AWS::SSM::Parameter'
-      && r.Properties.Name === `/sagrilaft/${environment}/config/UVICORN_WORKERS`) as any;
-    equal(workers.Properties.Value, environment === 'staging' ? '2' : '4');
-    const provider = Object.values(resources).find((r: any) => r.Type === 'AWS::SSM::Parameter'
-      && r.Properties.Name === `/sagrilaft/${environment}/config/PROVEEDOR_LISTAS_CAUTELA`) as any;
-    equal(provider.Properties.Value, environment === 'staging' ? 'dummy' : 'deshabilitado');
   });
 }

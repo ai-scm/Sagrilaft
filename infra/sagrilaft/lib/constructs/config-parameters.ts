@@ -71,7 +71,7 @@ export class ConfigParameters extends Construct {
       ZOHO_SUBMIT_REQUEST_TIMEOUT_SECONDS: '30',
       ZOHO_DOWNLOAD_TIMEOUT_SECONDS: '60',
       ZOHO_SIGN_REQUEST_EXPIRATION_DAYS: '15',
-      UVICORN_WORKERS: props.ambiente === 'staging' ? '2' : '4',
+      UVICORN_WORKERS: '4',
       TRUSTED_PROXY_IPS: '172.0.0.0/8',
       // Staging puede usar dummy mientras la API real no este disponible.
       // Produccion debe usar sagrilaft o deshabilitado de forma explicita.
