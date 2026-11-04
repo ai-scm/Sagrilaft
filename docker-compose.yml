@@ -77,10 +77,6 @@ services:
       # "local" solo debe usarse en dev. Produccion/staging deben usar S3.
       STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
 
-      # Solo necesario si STORAGE_BACKEND=s3. Nombre del bucket S3 donde
-      # se almacenarán los documentos subidos.
-      S3_BUCKET: ${S3_BUCKET:-}
-
       # ── Listas de cautela (verificación SAGRILAFT) ─────────────────────────
       # "sagrilaft": proveedor real (tusdatos.co). "dummy": simulado, sin llamar
       # a la API real. "deshabilitado": oculta los botones "Verificar SAGRILAFT"
@@ -315,7 +311,7 @@ services:
 # los contenedores se detienen, se eliminan o se reconstruyen.
 volumes:
   # Almacena los documentos subidos por los usuarios (PDFs, imágenes de documentos).
-  # Solo para dev. Produccion y staging usan S3_BUCKET en ECS.
+  # Solo para dev (STORAGE_BACKEND=local). Produccion y staging usan S3 en ECS.
   uploads_data:
 
 # ── Redes ──────────────────────────────────────────────────────────────────
