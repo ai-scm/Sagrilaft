@@ -122,22 +122,17 @@ def builds(env):
         result = env.get(key, default)
         require(isinstance(result, str) and bool(result.strip()), f"Falta configuración de build: {key}")
         return result
-    # An explicit empty origin selects same-origin /api in staging/prod.
-    # A missing key remains an error: do not hide incomplete build configuration.
-    backend = env.get("VITE_BACKEND_URL")
-    require(isinstance(backend, str) and (backend == "" or bool(backend.strip())),
-            "Falta configuración de build: VITE_BACKEND_URL (vacío explícito permitido)")
     portal = value("VITE_PORTAL_INTERNO_URL")
     form = env.get("KEYCLOAK_FORMULARIO_URL") or env.get("FRONTEND_URL", "").split(",")[0]
     arguments = {
         "backend": {},
         "formulario-publico": {
-            "VITE_BACKEND_URL": backend, "VITE_PORTAL_INTERNO_URL": portal,
+            "VITE_PORTAL_INTERNO_URL": portal,
             "VITE_RAZON_SOCIAL": value("VITE_RAZON_SOCIAL", "HIGH TECH SOFTWARE S.A.S"),
             "VITE_CORREO_DATOS": value("VITE_CORREO_DATOS", "administrativocol@blend360.com"),
         },
         "portal-interno": {
-            "VITE_BACKEND_URL": backend, "VITE_KEYCLOAK_URL": value("VITE_KEYCLOAK_URL"),
+            "VITE_KEYCLOAK_URL": value("VITE_KEYCLOAK_URL"),
             "VITE_KEYCLOAK_REALM": value("VITE_KEYCLOAK_REALM", "sagrilaft"),
             "VITE_KEYCLOAK_CLIENT_ID": value("VITE_KEYCLOAK_CLIENT_ID", "sagrilaft-portal"),
         },
@@ -221,7 +216,6 @@ def build_config_from_ssm(environment, account, region, api=None):
     require(cfg["PORTAL_INTERNO_URL"] in origins and origins[0] != cfg["PORTAL_INTERNO_URL"],
             "FRONTEND_URL debe iniciar con el formulario e incluir el portal")
     return {
-        "VITE_BACKEND_URL": "",
         "VITE_PORTAL_INTERNO_URL": cfg["PORTAL_INTERNO_URL"],
         "VITE_KEYCLOAK_URL": cfg["KEYCLOAK_ISSUER_URL"],
         "VITE_KEYCLOAK_REALM": cfg["KEYCLOAK_REALM"],
