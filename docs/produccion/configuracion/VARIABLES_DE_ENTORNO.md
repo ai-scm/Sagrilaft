@@ -155,7 +155,7 @@ definición; nunca deben contener secretos.
 | Variable | Qué es | Dónde se usa | Origen | Obligatoriedad / default | Sens. |
 |---|---|---|---|---|---|
 | `STORAGE_BACKEND` | `local` (volumen) o `s3`. En staging/prod **solo `s3`** (falla en `load_config` y en `entrypoint.sh`). | `AppConfig.storage_backend` | Dev: `.env`/compose (`local`). AWS: CDK `s3` | Opc. (default `local`) | — |
-| `S3_BUCKET` | Bucket de archivos. En AWS CDK lo publica en SSM; compose lo usa si se configura S3 en local. `check_staging_readiness.py` exige su declaración en las plantillas. | `S3Config`, `entrypoint.sh`, compose y validación | AWS: CDK/SSM; local: `.env` | Necesario cuando se usa S3; opcional en `validate_envs.py` | ⚠️ |
+| `S3_BUCKET` | Bucket de archivos, **solo staging/producción**. Fuente única: CDK → SSM (`/sagrilaft/{env}/config/S3_BUCKET`, `config-parameters.ts`) → ECS como `secrets:` (`ecs-fargate.ts`). No se declara en ningún `.env*` ni `.env*.example` (eliminada el 2026-11-03): ningún flujo la lee de ahí. En desarrollo no se usa: con `STORAGE_BACKEND=local` el backend guarda en disco (`LocalStorage`). | `S3Config`, `entrypoint.sh` (solo staging/production) | AWS: CDK/SSM | Obl. en staging/prod cuando `STORAGE_BACKEND=s3` (lo garantiza CDK); no aplica en dev | ⚠️ |
 | `KEYCLOAK_URL` | URL interna con la que el backend busca las claves JWKS (en AWS: DNS interno Cloud Map). | `KeycloakConfig.url`, `jwks_uri` | Dev: `.env`. AWS: SSM (`http://keycloak.sagrilaft-{env}.local:8080`) | Opc.; vacía ⇒ integración inactiva | — |
 | `KEYCLOAK_REALM` | Realm. | `KeycloakConfig` | CDK `sagrilaft` | Opc. (`sagrilaft`) | — |
 | `KEYCLOAK_CLIENT_ID` | Client ID del portal. | `KeycloakConfig` | CDK `sagrilaft-portal` | Opc. (vacío); `configurado` lo exige | — |
@@ -177,7 +177,7 @@ prod `*sagrilaft.ia.blend360.com`.
 |---|---|---|---|
 | `APP_ENV` | `development` | `staging` | `production` |
 | `STORAGE_BACKEND` | `local` | `s3` | `s3` |
-| `S3_BUCKET` | vacío | bucket CDK de staging | bucket CDK de prod (**vacío** en `.env.prod`) |
+| `S3_BUCKET` | no aplica (no declarada; `STORAGE_BACKEND=local`) | no declarada (CDK la gestiona en SSM) | no declarada (CDK la gestiona en SSM) |
 | `FRONTEND_URL` | `http://localhost:5173` (`.env`: `…:5173,…:5174`) | formulario (real: formulario + portal) | formulario (real: formulario + portal) |
 | `VITE_BACKEND_URL` | `http://localhost:8000` | ejemplo y real: vacío (mismo origen) | ejemplo y real: vacío (mismo origen) |
 | `KEYCLOAK_URL` | `http://localhost:8080` (`.env`: `http://keycloak:8080`) | ejemplo y real: DNS interno | ejemplo y real: DNS interno |

@@ -51,7 +51,7 @@ Prefijo esperado: `/sagrilaft/staging/config/`
 | `FRONTEND_URL` | `https://forms-staging-sagrilaft.ia.blend360.com,https://staging-sagrilaft.ia.blend360.com` |
 | `PORTAL_INTERNO_URL` | `https://staging-sagrilaft.ia.blend360.com` |
 | `STORAGE_BACKEND` | `s3` |
-| `S3_BUCKET` | `<BUCKET_S3_STAGING>` |
+| `S3_BUCKET` | generado por CDK (no se declara en `.env.staging`; ver [VARIABLES_DE_ENTORNO.md](VARIABLES_DE_ENTORNO.md)) |
 | `BEDROCK_MODEL_ID` | `amazon.nova-pro-v1:0` |
 | `BEDROCK_MAX_TOKENS` | `4096` |
 | `BEDROCK_TEMPERATURE` | `0.0` |
@@ -125,7 +125,7 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 | `FRONTEND_URL` | `https://forms-sagrilaft.ia.blend360.com,https://sagrilaft.ia.blend360.com` |
 | `PORTAL_INTERNO_URL` | `https://sagrilaft.ia.blend360.com` |
 | `STORAGE_BACKEND` | `s3` |
-| `S3_BUCKET` | generado por CDK |
+| `S3_BUCKET` | generado por CDK (no se declara en `.env.prod`; ver [VARIABLES_DE_ENTORNO.md](VARIABLES_DE_ENTORNO.md)) |
 | `BEDROCK_MODEL_ID` | `amazon.nova-pro-v1:0` (valor preparado; ejecución en [P03](../PENDIENTES_PRODUCCION.md#p03)) |
 | `BEDROCK_MAX_TOKENS` | `4096` |
 | `BEDROCK_TEMPERATURE` | `0.0` |
