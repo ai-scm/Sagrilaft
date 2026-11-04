@@ -193,7 +193,6 @@ services:
       context: ./frontend
       dockerfile: apps/formulario-publico/Dockerfile
       args:
-        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
         VITE_PORTAL_INTERNO_URL: ${VITE_PORTAL_INTERNO_URL:-}
 
     restart: unless-stopped
@@ -219,7 +218,6 @@ services:
       context: ./frontend
       dockerfile: apps/portal-interno/Dockerfile
       args:
-        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-}
         VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-}
         VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-sagrilaft}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-sagrilaft-portal}
