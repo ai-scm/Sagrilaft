@@ -195,7 +195,14 @@ def crear_storage(
     s3_bucket: str,
     s3_region: str,
 ) -> IAlmacenamiento:
-    """Fábrica: selecciona el backend según la configuración."""
-    if backend == "s3" and s3_bucket:
+    """Fábrica: selecciona el backend según la configuración. Nunca cae en silencio a otro backend."""
+    tipo = backend.strip().lower()
+    if tipo == "local":
+        return LocalStorage(base_dir=upload_dir)
+    if tipo == "s3":
+        if not s3_bucket.strip():
+            raise RuntimeError(
+                "STORAGE_BACKEND=s3 requiere S3_BUCKET definido. No se usa LocalStorage como respaldo."
+            )
         return S3Storage(bucket=s3_bucket, region=s3_region)
-    return LocalStorage(base_dir=upload_dir)
+    raise RuntimeError(f"STORAGE_BACKEND={backend!r} no es válido. Use 'local' o 's3'.")
