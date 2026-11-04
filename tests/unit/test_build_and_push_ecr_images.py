@@ -17,7 +17,7 @@ SHA = "a" * 40
 ACCOUNT = "123456789012"
 REGION = "us-east-1"
 DIGEST = "sha256:" + "b" * 64
-CONFIG = {"VITE_BACKEND_URL": "https://api.test", "VITE_PORTAL_INTERNO_URL": "https://portal.test",
+CONFIG = {"VITE_PORTAL_INTERNO_URL": "https://portal.test",
           "VITE_KEYCLOAK_URL": "https://auth.test", "FRONTEND_URL": "https://form.test"}
 
 
@@ -60,7 +60,6 @@ def test_ssm_build_config_uses_selected_environment_and_account():
             return {"Parameters": [{"Name": name, "Value": values[name.rsplit("/", 1)[-1]]}
                                    for name in args[1:]]}
     result = publisher.build_config_from_ssm("staging", ACCOUNT, REGION, ConfigApi())
-    assert result["VITE_BACKEND_URL"] == ""
     assert result["VITE_KEYCLOAK_URL"] == "https://auth.test"
     args = publisher.builds(result)
     assert "KEYCLOAK_FORMULARIO_URL=https://form.test" in args["keycloak"]
@@ -473,40 +472,7 @@ def test_build_child_inherits_lock_descriptor(tmp_path, monkeypatch):
     assert publisher.lock_descriptors() == ()
 
 
-@pytest.mark.parametrize("origin", ["", "https://api.test"])
-def test_backend_origin_empty_or_absolute_is_preserved(origin):
-    options = publisher.builds(dict(CONFIG, VITE_BACKEND_URL=origin))
+def test_formulario_and_portal_builds_never_declare_backend_url():
+    options = publisher.builds(CONFIG)
     for component in ("formulario-publico", "portal-interno"):
-        assert f"VITE_BACKEND_URL={origin}" in options[component]
-        assert "VITE_BACKEND_URL=/api" not in options[component]
-
-
-@pytest.mark.parametrize("value", [None, "   "])
-def test_missing_or_whitespace_backend_origin_is_rejected(value):
-    config = dict(CONFIG)
-    if value is None:
-        del config["VITE_BACKEND_URL"]
-    else:
-        config["VITE_BACKEND_URL"] = value
-    with pytest.raises(publisher.PrecondicionError, match="VITE_BACKEND_URL"):
-        publisher.builds(config)
-
-
-def test_env_file_preserves_explicit_empty_origin(tmp_path):
-    path = tmp_path / "build.env"
-    path.write_text('VITE_BACKEND_URL=""\n')
-    config = dict(CONFIG, **publisher.parse_env(path))
-    assert "VITE_BACKEND_URL=" in publisher.builds(config)["formulario-publico"]
-
-
-def test_relative_origin_changes_manifest_input_hash():
-    empty = publisher.builds(dict(CONFIG, VITE_BACKEND_URL=""))
-    absolute = publisher.builds(CONFIG)
-    for component in ("formulario-publico", "portal-interno"):
-        assert publisher.inputs_hash(SHA, empty[component]) != publisher.inputs_hash(SHA, absolute[component])
-
-
-@pytest.mark.parametrize("value", [None, 123])
-def test_invalid_backend_url_is_not_silently_relative(value):
-    with pytest.raises(publisher.PrecondicionError, match="VITE_BACKEND_URL"):
-        publisher.builds(dict(CONFIG, VITE_BACKEND_URL=value))
+        assert not any(arg.startswith("VITE_BACKEND_URL=") for arg in options[component])
