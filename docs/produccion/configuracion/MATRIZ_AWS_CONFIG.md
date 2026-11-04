@@ -56,7 +56,7 @@ locales cuando staging/prod ya existan en AWS.
 
 Regla de escritura: CDK crea todos los secretos. Son **externos** (CDK los crea
 vacíos o los importa, y se cargan con `sync_aws_runtime_assets.py --apply`):
-`zoho_credentials`, `smtp_credentials` y `sagrilaft_listas_cautela_credentials`.
+`zoho_credentials` y `sagrilaft_listas_cautela_credentials`. `smtp_credentials` también es externo a CDK, pero se carga a mano en la consola de AWS, no desde `.env*`.
 Son **administrados por CDK** y nunca se escriben desde `.env*`: `app_secret`,
 `db_credentials`, `keycloak_admin`.
 
@@ -105,8 +105,9 @@ Origen en archivos locales:
 - `password`
 
 Fuente vigente en AWS: `sagrilaft-ses-smtppp` (staging) y `ses-smtp-prod-sagrilaft`
-(producción), reconciliadas con `.env.staging`/`.env.prod` el 2026-10-20
-([P03](../PENDIENTES_PRODUCCION.md#p03)).
+(producción). Se cargan y se rotan en la consola de Secrets Manager; ECS las inyecta
+como `secrets:`. No se declaran en `.env.staging` ni `.env.prod`, y
+`sync_aws_runtime_assets.py` no las lee.
 
 **Adenda 2026-10-20 — separación confirmada por ambiente.** `sagrilaft/staging/smtp_credentials`
 corresponde al usuario IAM `sagrilaft-ses-smtppp` (no `sagrilaft-ses-smtpp` como se había
@@ -116,14 +117,13 @@ IAM distinto, `ses-smtp-prod-sagrilaft`, exclusivo de producción; también prob
 exitosamente y ya reconciliado con `.env.prod`. `sagrilaft-ses-smtpp` (doble "p") no está en
 uso confirmado por ningún ambiente.
 
-Origen en archivos locales (no es fuente vigente hasta conciliarlo):
+Origen en archivos locales:
 
-- `.env` (desarrollo local) -> `SMTP_USER`, `SMTP_PASSWORD`. Debe reutilizar el valor de
-  `sagrilaft/staging/smtp_credentials`, no una credencial propia.
-- `.env.staging` -> `SMTP_USER`, `SMTP_PASSWORD`. Debe coincidir con
-  `sagrilaft/staging/smtp_credentials` (usuario `sagrilaft-ses-smtppp`).
-- `.env.prod` -> `SMTP_USER`, `SMTP_PASSWORD`. Reconciliado el 2026-10-20 contra
-  `ses-smtp-prod-sagrilaft`, la identidad real de producción.
+- `.env` (desarrollo local) -> `SMTP_USER`, `SMTP_PASSWORD`, pasadas al backend por Docker
+  Compose. Debe reutilizar el valor de `sagrilaft/staging/smtp_credentials`, no una
+  credencial propia.
+- `.env.staging` y `.env.prod` -> sin `SMTP_USER` ni `SMTP_PASSWORD`. Validado por
+  `scripts/validacion/validate_envs.py`, que rechaza esas claves en estos archivos.
 
 ### `sagrilaft/{env}/keycloak_admin`
 

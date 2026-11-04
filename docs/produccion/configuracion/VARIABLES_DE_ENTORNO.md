@@ -19,7 +19,7 @@ Las observaciones de AWS y de archivos locales corresponden a la fecha de la con
 |---|---|---|---|
 | `.env` | Desarrollo local | Lo lee Docker Compose (sustitución `${VAR}` en `docker-compose.yml` + `docker-compose.dev.yml`). Es el único archivo que alimenta un runtime directamente. | Ignorado (`.gitignore:2`) |
 | `.env.dev.example` | Desarrollo | Plantilla de referencia. **Confirmado 2026-10-20: no es necesario copiarla a `.env` en el día a día** — `.env` ya existe, está poblado y es la fuente que usa Docker Compose. Solo sirve para armar un `.env` desde cero (onboarding) o para ver qué variable existe y su comentario. | Versionado |
-| `.env.staging` / `.env.prod` | Staging / producción | **No son runtime.** Los consumen solo scripts de despliegue: `scripts/despliegue/build_and_push_ecr_images.py` (args de build `VITE_*`, `AWS_REGION`, `KEYCLOAK_*_URL`) y `scripts/aws/sync_aws_runtime_assets.py` (escribe en Secrets Manager solo las credenciales externas a CDK: Zoho, SMTP y, si aplica, la API de listas; nunca `app_secret`, `db_credentials` ni `keycloak_admin`). | Ignorados (`.gitignore:3`, patrón `.env.*`) |
+| `.env.staging` / `.env.prod` | Staging / producción | **No son runtime.** Los consumen solo scripts de despliegue: `scripts/despliegue/build_and_push_ecr_images.py` (args de build `VITE_*`, `AWS_REGION`, `KEYCLOAK_*_URL`) y `scripts/aws/sync_aws_runtime_assets.py` (escribe en Secrets Manager solo las credenciales externas a CDK: Zoho y, si aplica, la API de listas; nunca `app_secret`, `db_credentials` ni `keycloak_admin`). SMTP no pasa por estos archivos: `smtp_credentials` se carga en la consola de AWS. | Ignorados (`.gitignore:3`, patrón `.env.*`) |
 | `.env.staging.example` / `.env.prod.example` | Staging / producción | Plantillas con marcadores `REPLACE_STAGING_*` / `REPLACE_PROD_*`. | Versionados |
 
 En AWS (ECS Fargate) el backend recibe su configuración de:
@@ -132,8 +132,8 @@ definición; nunca deben contener secretos.
 |---|---|---|---|---|---|
 | `SMTP_HOST` | Servidor SMTP (endpoint SES `email-smtp.us-east-1.amazonaws.com`). | `SmtpConfig` | CDK constante | Opc. (vacío ⇒ sin SMTP) | — |
 | `SMTP_PORT` | Puerto (587, STARTTLS). | `SmtpConfig` | CDK `587` | Opc. (587) | — |
-| `SMTP_USER` | Usuario SMTP de SES. | `SmtpConfig`; `sync_aws_runtime_assets.py` | AWS: secreto `smtp_credentials.username` | Opc. en código; **Obl. para el sync** | 🔒 |
-| `SMTP_PASSWORD` | Contraseña SMTP de SES. | ídem | secreto `smtp_credentials.password` | ídem | 🔒 |
+| `SMTP_USER` | Usuario SMTP de SES. | `SmtpConfig` | Local: `.env` (Compose). Staging/prod: secreto `smtp_credentials.username` vía ECS `secrets:`; no se declara en `.env.staging`/`.env.prod` | Opc. (vacío ⇒ sin SMTP) | 🔒 |
+| `SMTP_PASSWORD` | Contraseña SMTP de SES. | ídem | Local: `.env` (Compose). Staging/prod: secreto `smtp_credentials.password` vía ECS `secrets:`; no se declara en `.env.staging`/`.env.prod` | ídem | 🔒 |
 | `SMTP_FROM` | Remitente visible para contrapartes. | `SmtpConfig.remitente` | AWS: SSM (= `sesEmailOrigen`, contexto CDK) | Opc. (vacío) | ⚠️ |
 | `SMTP_REPLY_TO` | Dirección de respuesta. | `SmtpConfig.responder_a` | SSM; CDK local la inyecta en ECS y compose la pasa al contenedor. Cambios locales aún sin desplegar. | Opc. (vacío) | ⚠️ |
 | `SES_EMAIL_ORIGEN` | Remitente verificado en SES para alertas internas HTML. | `SesConfig` | AWS: SSM | Opc.; `configurado` exige también `SES_NOTIFICACIONES_ENABLED=true` | ⚠️ |
@@ -202,7 +202,7 @@ salvo los dominios `VITE_*_URL`.
 ## 8. Manejo de información sensible
 
 - 🔒 **Secretos** (`AWS_*` estáticas, `SECRET_KEY`, `ZOHO_CLIENT_SECRET`,
-  `ZOHO_REFRESH_TOKEN`, `ZOHO_WEBHOOK_SECRET`, `SMTP_USER/PASSWORD`,
+  `ZOHO_REFRESH_TOKEN`, `ZOHO_WEBHOOK_SECRET`, `SMTP_USER/PASSWORD` (en `.env` local),
   `KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_DB_*`, `POSTGRES_PASSWORD`, `DATABASE_URL`,
   `SAGRILAFT_API_KEY`): nunca en Git, chats, tickets ni logs. En AWS viven en Secrets
   Manager y se inyectan como secretos ECS; localmente, solo en archivos `.env*` ignorados.

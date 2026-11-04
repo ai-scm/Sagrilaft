@@ -28,7 +28,9 @@ en AWS; ver [P03](../PENDIENTES_PRODUCCION.md#p03). Contrato y manejo de secreto
   `sagrilaft/staging/smtp_credentials` (Secrets Manager). Producción usa una credencial
   exclusiva y distinta: usuario IAM `ses-smtp-prod-sagrilaft`, fuente vigente en
   `sagrilaft/prod/smtp_credentials`. Ningún ambiente debe generar una credencial SMTP
-  nueva para pruebas locales — se reutiliza la de staging. Detalle y pendientes de
+  nueva para pruebas locales — se reutiliza la de staging. En staging y producción
+  `SMTP_USER`/`SMTP_PASSWORD` solo viven en Secrets Manager (consola AWS), nunca en
+  `.env.staging`/`.env.prod`. Detalle y pendientes de
   reconciliación: [adenda del checklist de corte](../despliegue/CHECKLIST_CORTE_PRODUCCION.md#bloqueo-env-prod)
   y [P03](../PENDIENTES_PRODUCCION.md#p03).
 - **Zoho Sign por ambiente (reconciliado 2026-10-20).** Staging y producción comparten el
@@ -108,7 +110,7 @@ Prefijo esperado: `/sagrilaft/staging/config/`
 | `sagrilaft/staging/db_credentials` | `username`, `password` | creado por CDK y ya disponible en AWS |
 | `sagrilaft/staging/app_secret` | `secret_key` | creado por CDK y ya actualizado en AWS |
 | `sagrilaft/staging/zoho_credentials` | `client_id`, `client_secret`, `refresh_token`, `webhook_secret` | cargado con valores reales en AWS |
-| `sagrilaft/staging/smtp_credentials` | `username`, `password` | cargado con valores reales en AWS |
+| `sagrilaft/staging/smtp_credentials` | `username`, `password` | cargado con valores reales en AWS (consola; fuera de `sync_aws_runtime_assets.py`) |
 | `sagrilaft/staging/keycloak_admin` | `username`, `password` | creado por CDK y ya revisado en AWS |
 | `sagrilaft/staging/sagrilaft_listas_cautela_credentials` | `api_key` | no requerido con proveedor deshabilitado; activación en [P15](../PENDIENTES_PRODUCCION.md#p15) |
 
@@ -182,7 +184,7 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 | `sagrilaft/prod/db_credentials` | `username`, `password` | generado por CDK |
 | `sagrilaft/prod/app_secret` | `secret_key` | generado por CDK |
 | `sagrilaft/prod/zoho_credentials` | `client_id`, `client_secret`, `refresh_token`, `webhook_secret` | secreto externo a CDK; importar con `zohoSecretYaExiste=true`; [evidencia](../../operacion/RUNBOOK_OPERATIVO.md#zoho), [validación productiva](../PENDIENTES_PRODUCCION.md#p05) |
-| `sagrilaft/prod/smtp_credentials` | `username`, `password` | insumo privado local; carga y validación en [P03](../PENDIENTES_PRODUCCION.md#p03) |
+| `sagrilaft/prod/smtp_credentials` | `username`, `password` | carga manual en la consola de AWS Secrets Manager; sin `SMTP_*` en `.env.prod` |
 | `sagrilaft/prod/keycloak_admin` | `username`, `password` | generado por CDK |
 | `sagrilaft/prod/sagrilaft_listas_cautela_credentials` | `api_key` | no requerido mientras `PROVEEDOR_LISTAS_CAUTELA=deshabilitado`; cargar solo cuando exista API real |
 

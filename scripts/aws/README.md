@@ -4,7 +4,7 @@ Utilidades para revisar y sincronizar la configuración que vive en AWS: secreto
 
 ## Qué contiene
 
-- `sync_aws_runtime_assets.py`: escribe en Secrets Manager **solo las credenciales externas a CDK** (`zoho_credentials`, `smtp_credentials` y, solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y una API key real, `sagrilaft_listas_cautela_credentials`). Nunca escribe `app_secret`, `db_credentials` ni `keycloak_admin`, que genera CDK. No imprime valores.
+- `sync_aws_runtime_assets.py`: escribe en Secrets Manager **solo las credenciales externas a CDK** (`zoho_credentials` y, solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y una API key real, `sagrilaft_listas_cautela_credentials`). Nunca escribe `app_secret`, `db_credentials` ni `keycloak_admin`, que genera CDK. No imprime valores.
 - `audit_aws_secrets_safe.py`: hace un inventario de los secretos. Muestra metadatos, claves JSON, si un campo está vacío, su longitud y una huella SHA-256 corta por campo. Nunca muestra el valor.
 
 ## Uso de `sync_aws_runtime_assets.py`
@@ -36,8 +36,8 @@ no tiene credenciales y el script no acepta `--profile`. En producción:
 Orden en el primer corte (procedimiento completo en el [checklist de corte](../../docs/produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#secretos-externos)):
 
 1. La infraestructura de producción ya existe (`SagrilaftStack-prod`, bootstrap del 2026-10-07). No repetir el bootstrap; comprobar diferencias con `cdk diff` y los mismos argumentos.
-2. `zoho_credentials` y `smtp_credentials` ya existen. El script no crea secretos.
-3. **Bloqueo:** no ejecutar `--apply` mientras las credenciales de Zoho y SMTP en `.env.prod` no coincidan con las fuentes aprobadas. El dry-run no compara valores (ver la sección de limitaciones del checklist). Las claves de BD y Keycloak admin ya no están en `.env.prod` y el script no las lee. El 2026-10-20 se encontró que la identidad SMTP real de `.env.prod` es `ses-smtp-prod-sagrilaft` (distinta a la comparada el 2026-10-16); el bloqueo sigue vigente hasta repetir la comparación con esa identidad — ver la adenda en el checklist.
+2. `zoho_credentials` ya existe. El script no crea secretos.
+3. **Bloqueo:** no ejecutar `--apply` mientras las credenciales de Zoho en `.env.prod` no coincidan con la fuente aprobada. El dry-run no compara valores (ver la sección de limitaciones del checklist). Las claves de BD y Keycloak admin ya no están en `.env.prod` y el script no las lee. `smtp_credentials` no pasa por este script: se carga en la consola de AWS Secrets Manager y `SMTP_USER`/`SMTP_PASSWORD` no se declaran en `.env.staging` ni `.env.prod`.
 4. Cuando el bloqueo esté resuelto: dry-run, revisión del plan y después `--apply --expected-account <cuenta>`.
 5. Comprobación posterior con `audit_aws_secrets_safe.py` contra la línea base de la sección "Línea base esperada" del checklist: los secretos de CDK no deben cambiar.
 

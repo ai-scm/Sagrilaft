@@ -54,8 +54,6 @@ EXPECTED_RUNTIME_KEYS = {
     "ZOHO_SIGN_REQUEST_EXPIRATION_DAYS",
     "SMTP_HOST",
     "SMTP_PORT",
-    "SMTP_USER",
-    "SMTP_PASSWORD",
     "SMTP_FROM",
     "SMTP_REPLY_TO",
     "SES_EMAIL_ORIGEN",
@@ -87,6 +85,9 @@ DEV_ONLY_KEYS = {
     "PORT_PUBLICO",
     "PORT_PORTAL",
     "AWS_PROFILE",
+    # Credencial SES de desarrollo local; en staging/prod viene de Secrets Manager.
+    "SMTP_USER",
+    "SMTP_PASSWORD",
     # Solo alimenta el proxy del dev server de Vite (docker-compose.dev.yml);
     # en staging/prod el frontend usa /api relativo y el ALB enruta directo
     # al backend (infra/sagrilaft/lib/constructs/load-balancer.ts).
@@ -166,7 +167,7 @@ def parse_env_keys(path: Path) -> set[str]:
 
 def build_report() -> dict[str, list[FileReport]]:
     report: dict[str, list[FileReport]] = {}
-    forbidden_in_aws = {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"}
+    forbidden_in_aws = {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "SMTP_USER", "SMTP_PASSWORD"}
 
     for env_name, config in ENVIRONMENTS.items():
         file_reports: list[FileReport] = []

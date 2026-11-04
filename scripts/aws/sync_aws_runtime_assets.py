@@ -4,7 +4,6 @@
 Secretos externos (credenciales que no genera CDK; CDK los crea vacíos o los
 importa con `zohoSecretYaExiste`). Deben existir antes de ejecutar este script:
   - zoho_credentials
-  - smtp_credentials
   - sagrilaft_listas_cautela_credentials (solo con PROVEEDOR_LISTAS_CAUTELA=sagrilaft
     y SAGRILAFT_API_KEY con valor real)
 
@@ -41,10 +40,6 @@ EXTERNAL_SECRETS: dict[str, dict[str, str]] = {
         "client_secret": "ZOHO_CLIENT_SECRET",
         "refresh_token": "ZOHO_REFRESH_TOKEN",
         "webhook_secret": "ZOHO_WEBHOOK_SECRET",
-    },
-    "smtp_credentials": {
-        "username": "SMTP_USER",
-        "password": "SMTP_PASSWORD",
     },
 }
 

@@ -127,7 +127,7 @@ activación.
 ## Fase 2 — Configuración e imágenes
 
 Seguimiento de configuración: [P03](../PENDIENTES_PRODUCCION.md#p03).
-Las credenciales externas (Zoho, SMTP) ya están cargadas en AWS y conciliadas con `.env.prod`; su eventual reescritura
+Desde el 2026-11-03 SMTP ya no pasa por `.env.prod`: `smtp_credentials` se carga solo en la consola de AWS. Las credenciales externas que siguen en el script (Zoho) ya están cargadas en AWS y conciliadas con `.env.prod`; su eventual reescritura
 depende de la [condición de bloqueo](#bloqueo-env-prod) y del procedimiento de
 [secretos externos](#secretos-externos). DB, app_secret y admin Keycloak los genera CDK y el
 procedimiento nunca los escribe. Verificar S3/SSM y los outputs.
@@ -136,7 +136,7 @@ procedimiento nunca los escribe. Verificar S3/SSM y los outputs.
 ### Secretos externos: procedimiento
 
 Solo el script [`sync_aws_runtime_assets.py`](../../../scripts/aws/sync_aws_runtime_assets.py)
-escribe secretos en esta fase. Escribe únicamente `zoho_credentials` y `smtp_credentials`,
+escribe secretos en esta fase. Escribe únicamente `zoho_credentials`,
 más `sagrilaft_listas_cautela_credentials` si `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y la
 API key tiene valor real. Con el proveedor deshabilitado, ese último secreto queda
 omitido. Nunca escribe `app_secret`, `db_credentials` ni `keycloak_admin`.
@@ -236,8 +236,7 @@ python3 scripts/aws/sync_aws_runtime_assets.py --env-file .env.prod --environmen
 **4. Revisión del plan.** Antes de continuar, comprobar en `dry-run.txt`:
 
 - Cabecera `modo DRY-RUN (sin cambios)` y ningún `ERROR`.
-- `zoho_credentials` y `smtp_credentials` aparecen como `se actualizaría` con los campos esperados
-  (cuatro para Zoho, `username` y `password` para SMTP).
+- `zoho_credentials` aparece como `se actualizaría` con sus cuatro campos esperados. `smtp_credentials` no aparece en el plan.
 - `sagrilaft_listas_cautela_credentials` aparece como `omitido` mientras el proveedor sea `deshabilitado`.
 - `app_secret`, `db_credentials` y `keycloak_admin` aparecen solo como `administrado por CDK, NO se escribe`.
 - Los cuatro repositorios ECR aparecen como `existe`.
