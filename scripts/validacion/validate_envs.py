@@ -71,7 +71,6 @@ EXPECTED_RUNTIME_KEYS = {
     "KEYCLOAK_REALM",
     "KEYCLOAK_CLIENT_ID",
     "KEYCLOAK_ISSUER_URL",
-    "VITE_BACKEND_URL",
     "VITE_PORTAL_INTERNO_URL",
     "VITE_KEYCLOAK_URL",
     "VITE_KEYCLOAK_REALM",
@@ -88,6 +87,10 @@ DEV_ONLY_KEYS = {
     "PORT_PUBLICO",
     "PORT_PORTAL",
     "AWS_PROFILE",
+    # Solo alimenta el proxy del dev server de Vite (docker-compose.dev.yml);
+    # en staging/prod el frontend usa /api relativo y el ALB enruta directo
+    # al backend (infra/sagrilaft/lib/constructs/load-balancer.ts).
+    "VITE_BACKEND_URL",
 }
 
 OPTIONAL_KEYS = {
