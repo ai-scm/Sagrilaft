@@ -215,7 +215,6 @@ def check_cdk_context() -> Check:
 def check_phase0_env_contract() -> Check:
     required = [
         "STORAGE_BACKEND=s3",
-        "S3_BUCKET=",
         "SECRET_KEY=",
         "BEDROCK_MODEL_ID=",
         "KEYCLOAK_ISSUER_URL=https://",

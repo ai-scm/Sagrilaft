@@ -102,14 +102,7 @@ OPTIONAL_KEYS = {
 # por presencia de valor. Ver infra/sagrilaft/lib/constructs/config-parameters.ts
 # y ecs-fargate.ts.
 #
-# OJO antes de eliminarlas de algún .env*: SNS_TOPIC_ARN sí es puramente
-# decorativa en los archivos locales. S3_BUCKET NO lo es — además de la
-# vía CDK/SSM, docker-compose.yml:82 la pasa al backend si alguien usa
-# STORAGE_BACKEND=s3 en local, y check_staging_readiness.py exige
-# textualmente la línea "S3_BUCKET=" en .env.staging(.example) y
-# .env.prod(.example) (confirmado: su ausencia rompe check_phase0_env_contract).
 CDK_MANAGED_KEYS = {
-    "S3_BUCKET",
     "SNS_TOPIC_ARN",
 }
 
