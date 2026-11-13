@@ -600,6 +600,20 @@ libera la consulta entre pasadas (`posponer`):
   `PDF_PROVEEDOR`; si no llega, se cierra igual con el evento `PDF_PROVEEDOR_NO_DISPONIBLE`.
   Solo lo descarga quien tiene `listas.ver_pdf_proveedor`; cada lectura deja un evento
   `EVIDENCIA_LEIDA` con el tipo y la evidencia.
+- **Capturas por fuente:** en la misma etapa, después del PDF, se pide
+  `https://static.tusdatos.co/static/img/<dest>/<captura>.jpg` para cada fuente del
+  manifiesto que genera captura (`FuenteSagrilaft.captura`; ONU se llama `onu.jpg`).
+  `dest` sale del reporte y se guarda en `respuesta_filtrada`. La petición va sin
+  credenciales (es otro host, público; ni la clave ni el token salen hacia él), sin
+  seguir redirecciones, y solo se acepta un JPEG. Cada imagen se custodia como evidencia
+  `CAPTURA_PROVEEDOR` con su `fuente_codigo` (columna nueva, migración
+  `n54c67d890eb`) y comparte el permiso del PDF. Una captura que falta (403/404) o
+  falla no detiene el cierre; queda el evento `CAPTURAS_PROVEEDOR_CUSTODIADAS`,
+  `CAPTURAS_PROVEEDOR_NO_DISPONIBLES` u `CAPTURAS_PROVEEDOR_OMITIDAS` (apagadas con
+  `LISTAS_TUSDATOS_CAPTURAS=false`, sin `dest` o con el plazo vencido). Si la misma imagen
+  ya es evidencia de otra consulta (la clave de custodia es única), no se vuelve a
+  registrar. El trabajador necesita salida a `static.tusdatos.co` además de
+  `dash-board.tusdatos.co`.
 - **Fuentes** (`infrastructure/listas/tusdatos/adaptador.py`): ofac, ofac_nombre,
   lista_onu, interpol, europol, peps, peps_denom, peps_funcion_publica, cidob,
   procuraduria, contraloria (+contraloria2) y policia. Persona: las 12; empresa (NIT):

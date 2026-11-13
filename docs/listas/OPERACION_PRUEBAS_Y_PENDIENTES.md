@@ -462,6 +462,7 @@ Sirven como aviso para quien mantenga el módulo:
 | Un NIT escrito con dígito de verificación («900123456-7») se enviaba como «9001234567» | Se quita el dígito antes de enviarlo |
 | Se gastaba un crédito aunque una fuente obligatoria estuviera caída en Tusdatos | Se revisa el estado de las fuentes antes de lanzar; la consulta se cierra sin gastar crédito, salvo con «Forzar actualización» |
 | La recarga gratuita se gastaba de inmediato aunque la fuente con error estuviera caída; Tusdatos indica que así no sirve | Antes de recargar se revisa el estado: se espera a que la fuente vuelva y, si no vuelve a tiempo, se cierra sin gastar la recarga y diciendo que estaba caída |
+| No se guardaban las capturas de pantalla que Tusdatos publica por fuente | Se custodian como evidencia `CAPTURA_PROVEEDOR` (OFAC, ONU, INTERPOL, EUROPOL, CIDOB, Procuraduría, Policía), sin credenciales hacia el host de estáticos y con el mismo permiso del PDF |
 | Un NIT inexistente gastaba una consulta de listas completa antes de saberse que no existía | Se verifica antes con `verify/nit` (y la CE con `verify/ce`). Si no existe, no se consultan listas; si no está vigente, se consulta igual con aviso |
 | Una CC en la caché de Tusdatos (`jobid: null`) se cerraba sin resultado | Se busca el reporte en el historial de la cuenta (`/api/v1/checks`); si no aparece, se cierra como antes |
 | `validate_envs.py` rechazaba `.env.dev.example` tras agregar las variables `LISTAS_*` (CI en rojo) | El validador y las tres plantillas declaran las variables nuevas |
@@ -561,10 +562,11 @@ Probado con el sandbox público y con respuestas grabadas
   no tiene. Con credenciales reales falta confirmar que la consulta en caché aparece en el
   historial, el formato de `created_at` y que `check_id` es el id que recibe `report_json`.
 - Códigos de `sources/status` para las fuentes de listas (OFAC, ONU, PEP, CIDOB, INTERPOL,
-  EUROPOL): la documentación no los publica. Revisar el aviso «sources/status no informa»
-  del trabajador en la primera consulta real.
-- Confirmar con Tusdatos si `verify/nit` y `verify/ce` gastan crédito. Si cobran, decidir si
-  se dejan encendidas (`LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO`).
+  EUROPOL): el catálogo `/api/fuentes-colombia` del sandbox trae los 12 códigos del sistema
+  escritos igual, así que lo más probable es que coincidan. Confirmarlo con el aviso
+  «sources/status no informa» del trabajador en la primera consulta real.
+- Tusdatos respondió que `verify/nit` y `verify/ce` no cobran y que el 400, el 403 y las
+  fallas sí (13-11-2026). Falta tenerlo por escrito.
 - Preguntas abiertas para Tusdatos (cobro en 400/403/fallas, historial, códigos de estado,
   auto reintentos, retención de datos): lista completa y de dónde sale cada dato en
   [TUSDATOS.md, «Qué sabemos y de dónde sale»](TUSDATOS.md#qué-sabemos-y-de-dónde-sale).

@@ -108,9 +108,9 @@
   Solo se guarda el resultado (por ejemplo «ACTIVA» o «Nit no encontrado»). No se guardan
   la razón social, el nombre, la nacionalidad ni las fechas que devuelve Tusdatos.
 
-  **Ojo con el costo:** la documentación de Tusdatos no dice si estas verificaciones gastan
-  crédito. Si cobran, cada NIT o cédula de extranjería costaría dos consultas en vez de una.
-  Para apagarlas, poner `LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Las cédulas de
+  **Sobre el costo:** la documentación no lo dice; Tusdatos respondió que estas
+  verificaciones no cobran (falta tenerlo por escrito). Si resultara distinto, se apagan con
+  `LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Las cédulas de
   ciudadanía y los pasaportes no se verifican.
 
   El nivel de riesgo que calcula Tusdatos (alto, medio, bajo) se muestra solo como
@@ -161,6 +161,14 @@
   - **PDF de Tusdatos:** es el reporte oficial del proveedor. Trae datos de todas sus
     fuentes, no solo de las de SAGRILAFT, así que solo lo descarga el equipo revisor y cada
     descarga queda registrada.
+  - **Capturas de pantalla:** para OFAC (por documento y por nombre), ONU, INTERPOL,
+    EUROPOL, CIDOB, Procuraduría y Policía, Tusdatos publica una foto de la página de la
+    fuente tal como la vio al consultar. El sistema guarda una por fuente de la consulta,
+    con su huella, junto al PDF. Sirven de prueba si alguien pregunta qué mostraba la
+    fuente ese día. Las ve el mismo equipo que ve el PDF y cada descarga queda registrada.
+    No cuestan crédito. Si alguna no está, la consulta se cierra igual. Para apagarlas,
+    `LISTAS_TUSDATOS_CAPTURAS=false`. Listas y PEP no tiene captura: su evidencia es el
+    registro que trae el reporte.
 
   ## Tiempos
 
@@ -204,32 +212,45 @@
 
   Como la propuesta ya venció, el precio y las condiciones hay que pedirlos de nuevo.
 
+  **Respuestas de Tusdatos pendientes de tener por escrito** (13-11-2026)
+
+  - `verify/nit` y `verify/ce` no cobran crédito. Por eso la verificación previa queda
+    encendida.
+  - El documento inexistente (400), el titular que no autoriza (403) y la consulta con
+    todas las fuentes en error sí cobran. Es la razón de verificar el documento y revisar
+    las fuentes caídas antes de lanzar.
+
+  Mientras no estén por escrito, se tratan como probables, no como seguras.
+
   **No documentado (hay que preguntarlo)**
 
-  - Si se cobra cuando el documento no existe (400), cuando el titular no autoriza (403) o
-    cuando todas las fuentes fallan. La frase general dice que toda consulta gasta crédito,
-    pero no aclara estos casos.
   - Si se cobra al repetir dentro de 6 horas una cédula de extranjería, un pasaporte o un
     NIT. La regla de las 6 horas solo se menciona para la cédula de ciudadanía.
-  - Si las validaciones `verify/nit` y `verify/ce` cobran y si vienen incluidas en el plan
-    (la propuesta nombra «Información estado documento de identidad»). Solo la de PPT dice
-    que cobra. El sistema ya las usa: ver «Verificación del NIT y de la cédula de
-    extranjería».
+  - Si `verify/nit` y `verify/ce` vienen incluidas en el plan (la propuesta nombra
+    «Información estado documento de identidad»).
   - Si la consulta servida desde la caché de 6 horas aparece en el historial
     (`/api/v1/checks`), si `check_id` es el mismo id que recibe `report_json` y en qué formato
-    viene `created_at`. El esquema solo dice que son textos.
+    viene `created_at`. El esquema solo dice que son textos, y el ejemplo de la página web
+    está relleno con «string». Ojo: `issued_date` es la fecha de expedición del documento;
+    la de la consulta es `created_at`, que es la que usa el sistema.
   - Cómo se envían `country` y `document_type` al historial. La documentación los marca como
     parámetros de ruta, pero la ruta escrita los pone después del `?`. El sistema los envía
     como `?country=CO&document_type=CC`. En el sandbox las dos formas responden 404, porque
     allí el historial no existe.
-  - Con qué códigos informa `sources/status` las fuentes de listas. La sección de evidencias
-    usa `ofac`, `ofac_nombre`, `lista_onu`/`onu`, `interpol`, `europol` y `cidob`, que son
-    los mismos códigos que usa el sistema. Pero esos son nombres de archivo de las capturas, y
-    la misma sección muestra casos en que no coinciden con el reporte (`personeria_bogota` y
-    `personeriabog`). Sirve como pista, no como confirmación. Listas y PEP no aparece ahí.
+  - Con qué códigos informa `sources/status` las fuentes de listas. Ya casi está resuelto:
+    el catálogo de fuentes de Tusdatos (`/api/fuentes-colombia`, consultado en el sandbox el
+    13-11-2026) trae los 12 códigos que usa el sistema, escritos igual (`ofac`, `lista_onu`,
+    `peps`, `peps_funcion_publica`, `procuraduria`…). Las cuatro fuentes que hoy informa
+    `sources/status` en el sandbox también salen de ese catálogo. Falta verlo con
+    credenciales reales: el trabajador avisa si alguna no aparece.
   - Si hay un límite de reintentos por reporte o un tiempo mínimo entre uno y otro.
-  - Cómo se relacionan los «auto reintentos» del plan con nuestro reintento: si Tusdatos ya
-    reintenta solo, el nuestro podría sobrar.
+  - Los «auto reintentos» del plan ya están explicados en la web (webhook
+    `individualRetry`): Tusdatos reintenta por su cuenta las fuentes con error y, si en ese
+    reintento aparece un hallazgo nuevo, avisa por webhook. Es un proceso suyo, aparte del
+    nuestro y más tarde. Nuestro reintento sigue haciendo falta porque corre dentro de los
+    15 minutos de la consulta. Para aprovechar el suyo habría que recibir el webhook, lo que
+    exige un endpoint público nuestro; queda para después. Falta confirmar con qué frecuencia
+    reintentan.
   - El «lanzamiento de fuente puntual» que nombra la nota de `sources/status`. No hay
     ninguna ruta documentada para eso.
   - Cuánto tiempo guarda Tusdatos los reportes y PDF, y si se puede pedir que los borren.
