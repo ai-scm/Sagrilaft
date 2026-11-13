@@ -567,7 +567,8 @@ libera la consulta entre pasadas (`posponer`):
 
     POR_LANZAR ─(turno de 5 s)─► LANZANDO ─► ESPERANDO ─► DESCARGANDO_PDF ─► TERMINADA
 
-- **Progreso** en `progreso_consulta_externa` (migración `l32a45b678c9`): etapa, `jobid`,
+- **Progreso** en `progreso_consulta_externa` (migraciones `l32a45b678c9` y
+  `m43b56c789da`, que agrega `verificacion_documento`): etapa, `jobid`,
   id del reporte, recargas, plazo, huella SHA-256 de la respuesta completa y el
   subconjunto aprobado (`respuesta_filtrada`). Es hijo de la consulta: inmutable tras el cierre.
 - **Nunca se relanza sola.** LANZANDO se confirma antes de llamar a `launch`. Si el
@@ -579,10 +580,22 @@ libera la consulta entre pasadas (`posponer`):
 - **Plazo:** 15 minutos desde la admisión. Vencido esperando → `INDETERMINADA`
   (`TIEMPO_AGOTADO_PROVEEDOR`); vencido sin lanzar → `FALLIDA`.
 - **Fuentes con error:** una recarga gratuita (`/api/retry`) y luego se cierra con lo que haya
-  (`PARCIAL` si falta una fuente requerida).
-- **Sin reporte:** titular que no autoriza (403) o CC en caché sin `jobid` se cierran
-  `FALLIDA`/`NO_CONCLUYENTE` con informe y advertencia (`TITULAR_NO_AUTORIZA`,
-  `RESULTADO_EN_CACHE_SIN_REFERENCIA`).
+  (`PARCIAL` si falta una fuente requerida). Antes de recargar se consulta
+  `/api/v1/sources/status` (estado de hace 10 s como máximo): si alguna fuente con error
+  está `under_maintenance` o `source_down`, no se recarga todavía y se vuelve a mirar cada
+  60 s. Si vuelve, se recarga. Si faltan 3 minutos o menos para el plazo, se cierra sin
+  gastar la recarga (evento `RECARGA_OMITIDA_FUENTES_CAIDAS`), y esas fuentes quedan
+  fallidas con el motivo «caída o en mantenimiento». No aplica en el sandbox.
+- **CC en caché sin `jobid`:** se busca el reporte en el historial de la cuenta
+  (`GET /api/v1/checks`, gratis) por tipo y número de documento, desde hace 6 h. Se toma la
+  consulta más reciente con fecha y hora dentro de la ventana; sin zona horaria se toma la
+  hora de Colombia. El id sale de `check_id` o, si falta, del final de `url`. Con el reporte
+  se sigue el flujo normal, recarga incluida (evento `REPORTE_RECUPERADO_DE_HISTORIAL`). Si
+  no aparece, o el historial falla, se cierra como antes. El sandbox no tiene historial
+  (404): **por confirmar con credenciales reales.**
+- **Sin reporte:** titular que no autoriza (403), o CC en caché que tampoco está en el
+  historial, se cierran `FALLIDA`/`NO_CONCLUYENTE` con informe y advertencia
+  (`TITULAR_NO_AUTORIZA`, `RESULTADO_EN_CACHE_SIN_REFERENCIA`).
 - **PDF del proveedor:** se intenta dentro del plazo y se custodia como evidencia
   `PDF_PROVEEDOR`; si no llega, se cierra igual con el evento `PDF_PROVEEDOR_NO_DISPONIBLE`.
   Solo lo descarga quien tiene `listas.ver_pdf_proveedor`; cada lectura deja un evento
@@ -602,6 +615,37 @@ libera la consulta entre pasadas (`posponer`):
 - **PEP por función pública:** Tusdatos solo incluye `peps_funcion_publica` cuando hay
   registro. Si no viene, queda como no disponible pero no impide concluir; si viene con
   error, sí lo impide. Es una regla **provisional** hasta confirmarla con datos reales.
+- **Revisión previa (gratuita) antes de `launch`:** consulta `/api/v1/sources/status`
+  (reutilizado 60 s). Si una fuente fijada que bloquea el resultado está en
+  `under_maintenance` o `source_down`, la consulta se cierra `FALLIDA` con
+  `FUENTES_CAIDAS_PROVEEDOR`, sin lanzar ni gastar crédito; con `forzar` se lanza igual. Si
+  el estado no se puede leer, no bloquea. También lee `/api/plans`: publica la métrica
+  `TusdatosCreditosRestantes` y registra un aviso con `LISTAS_TUSDATOS_ALERTA_CREDITOS`
+  créditos o menos (100 por defecto); nunca bloquea. Ninguna de las dos corre contra el
+  sandbox, cuyo estado es fijo. La primera vez que lee el estado, el trabajador registra
+  qué fuentes aprobadas no aparecen en la respuesta y qué códigos sí trae. La
+  documentación no publica esos códigos, y el sandbox solo informa cuatro; con ese
+  registro se corrige `codigos_estado` si hace falta.
+- **Verificación previa del documento (NIT y CE):** después de la revisión de fuentes y
+  antes de `launch`, se llama `POST /api/launch/verify/nit` (`{"nit": <número>}`) o
+  `/api/launch/verify/ce` (`{"ce": <número>, "fecha_expedicion": "dd/mm/aaaa"}`). El
+  resultado queda en `progreso_consulta_externa.verificacion_documento` (migración
+  `m43b56c789da`) como `{tipo, resultado, estado, avisos}`, con `resultado` en
+  `VIGENTE`, `NO_VIGENTE`, `NO_ENCONTRADO`, `SIN_DATO` o `SIN_VERIFICAR`. Solo se
+  guardan el estado y los `findings`, no los datos personales. Se hace una vez por
+  consulta: si ya hay resultado guardado, no se repite (por ejemplo, tras esperar turno).
+  `NO_ENCONTRADO` («Nit no encontrado», también si llega en `error`) cierra `FALLIDA`
+  con `DOCUMENTO_NO_ENCONTRADO` sin lanzar. `NO_VIGENTE` (estado distinto de
+  ACTIVA/ACTIVO/VIGENTE, o «Cédula no vigente») lanza igual y agrega la advertencia
+  `DOCUMENTO_NO_VIGENTE`, que el portal resalta. Si la llamada falla o la respuesta no
+  se entiende, queda `SIN_VERIFICAR` (evento `VERIFICACION_DOCUMENTO_FALLIDA`) y se
+  lanza igual. No se reintenta nunca, porque puede costar crédito. Se apaga con
+  `LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Sí corre contra el sandbox, que responde
+  siempre ACTIVA o VIGENTE.
+- **Documento no encontrado:** un 400 de `launch` con «no encontrado» o «no se
+  encuentra» (NIT fuera de RUES, CE fuera de Migración) cierra `FALLIDA` con
+  `DOCUMENTO_NO_ENCONTRADO` y un mensaje por tipo de documento. El NIT se envía sin
+  dígito de verificación (se quita un `-d` final).
 - **Documento no validado:** si `results` trae `validado: false`, el resultado lleva la
   advertencia `DOCUMENTO_NO_VALIDADO` (el portal la resalta). No cambia la conclusión: la
   decide el revisor. Pasaporte y NIT no traen ese dato.
@@ -651,8 +695,9 @@ no elige fuentes ni interpreta coincidencias; eso es del adaptador (Fase 4).
 Comportamiento observado en el sandbox (`tests/fixtures/tusdatos_sandbox/casos.json`,
 regrabable con `scripts/listas/grabar_sandbox_tusdatos.py`):
 
-- Una CC consultada en las últimas 6 h sin `force` responde `jobid: null`: no hay forma
-  documentada de llegar a su reporte (pregunta abierta con Tusdatos).
+- Una CC consultada en las últimas 6 h sin `force` responde `jobid: null` (y `doc: null`).
+  La documentación no dice cómo llegar a su reporte; el sistema lo busca en el historial
+  (`/api/v1/checks`), que en el sandbox responde 404 en cualquier forma de la ruta.
 - `dict_hallazgos` no incluye los aciertos de OFAC/ONU y viene nulo en NIT: hay que leer
   el campo de cada fuente (`ofac`, `lista_onu`, `peps`…), que puede ser booleano, objeto,
   lista o `"Error"`. `errores` usa esos mismos códigos; `results` usa nombres legibles
@@ -661,6 +706,9 @@ regrabable con `scripts/listas/grabar_sandbox_tusdatos.py`):
   ejemplo de documento no validado.
 - Los PDF del sandbox no son PDF (devuelve un texto JSON) y `/api/retry` responde 404:
   ambos solo se prueban con respuestas escritas a mano hasta tener credenciales reales.
+- `verify/nit` y `verify/ce` responden siempre ACTIVA o VIGENTE y repiten el número
+  enviado; los casos «no encontrado» y «no vigente» solo se prueban con respuestas
+  escritas a mano. `sources/status` informa solo cuatro fuentes con estado fijo.
 - `tests/contracts/test_cliente_tusdatos.py` incluye un flujo contra el sandbox real
   que se activa con `LISTAS_TUSDATOS_SANDBOX=1`.
 

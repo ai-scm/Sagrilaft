@@ -1,6 +1,6 @@
 # Módulo de listas cautelares: operación, pruebas y pendientes
 
-Estado verificado contra el código el 2026-11-12. Todo lo que se describe aquí funciona
+Estado verificado contra el código el 2026-11-13. Todo lo que se describe aquí funciona
 **solo en local** (`development`/`test`). Ningún ambiente compartido tiene el módulo
 v2 operativo, y producción está bloqueada por código.
 
@@ -458,6 +458,12 @@ Sirven como aviso para quien mantenga el módulo:
 | Tusdatos puede informar la falla de ONU con el código `onu`, y solo se reconocía `lista_onu`: la fuente habría pasado como consultada sin registros | Se reconocen los dos códigos; una prueba compara las fuentes con el catálogo de errores de Tusdatos |
 | Se ignoraba `validado: false` (Tusdatos no pudo validar el documento) | El resultado lleva la advertencia `DOCUMENTO_NO_VALIDADO` y el portal la resalta |
 | Una fuente que no venía en el reporte pero sí en `errores` quedaba como «no disponible» | Ahora queda como fallida |
+| Un NIT inexistente (400 «Nit no encontrado») cerraba la consulta con el código técnico `SOLICITUD_RECHAZADA` | Se cierra con `DOCUMENTO_NO_ENCONTRADO` y un mensaje claro; lo mismo para la CE que no está en Migración |
+| Un NIT escrito con dígito de verificación («900123456-7») se enviaba como «9001234567» | Se quita el dígito antes de enviarlo |
+| Se gastaba un crédito aunque una fuente obligatoria estuviera caída en Tusdatos | Se revisa el estado de las fuentes antes de lanzar; la consulta se cierra sin gastar crédito, salvo con «Forzar actualización» |
+| La recarga gratuita se gastaba de inmediato aunque la fuente con error estuviera caída; Tusdatos indica que así no sirve | Antes de recargar se revisa el estado: se espera a que la fuente vuelva y, si no vuelve a tiempo, se cierra sin gastar la recarga y diciendo que estaba caída |
+| Un NIT inexistente gastaba una consulta de listas completa antes de saberse que no existía | Se verifica antes con `verify/nit` (y la CE con `verify/ce`). Si no existe, no se consultan listas; si no está vigente, se consulta igual con aviso |
+| Una CC en la caché de Tusdatos (`jobid: null`) se cerraba sin resultado | Se busca el reporte en el historial de la cuenta (`/api/v1/checks`); si no aparece, se cierra como antes |
 | `validate_envs.py` rechazaba `.env.dev.example` tras agregar las variables `LISTAS_*` (CI en rojo) | El validador y las tres plantillas declaran las variables nuevas |
 
 ## 7. Pendientes
@@ -551,10 +557,25 @@ Probado con el sandbox público y con respuestas grabadas
 - Fase 5 hecha: reutilización 6 h dentro del expediente, «Forzar actualización» y
   descarga del PDF del proveedor para `listas_revisor`. Falta crear en Keycloak los roles
   `listas_*` y asignarlos (ver «Antes de cualquier ambiente compartido»).
-- Respuesta de Tusdatos sobre cómo recuperar el reporte de una CC en caché (`jobid: null`).
+- CC en caché (`jobid: null`): ya se intenta recuperar por `/api/v1/checks`, que el sandbox
+  no tiene. Con credenciales reales falta confirmar que la consulta en caché aparece en el
+  historial, el formato de `created_at` y que `check_id` es el id que recibe `report_json`.
+- Códigos de `sources/status` para las fuentes de listas (OFAC, ONU, PEP, CIDOB, INTERPOL,
+  EUROPOL): la documentación no los publica. Revisar el aviso «sources/status no informa»
+  del trabajador en la primera consulta real.
+- Confirmar con Tusdatos si `verify/nit` y `verify/ce` gastan crédito. Si cobran, decidir si
+  se dejan encendidas (`LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO`).
+- Preguntas abiertas para Tusdatos (cobro en 400/403/fallas, historial, códigos de estado,
+  auto reintentos, retención de datos): lista completa y de dónde sale cada dato en
+  [TUSDATOS.md, «Qué sabemos y de dónde sale»](TUSDATOS.md#qué-sabemos-y-de-dónde-sale).
+  La propuesta comercial venció el 22-07-2026: hay que pedir una nueva.
+- Preguntar a Tusdatos por el «lanzamiento de fuente puntual» que menciona la nota de
+  `sources/status` (`/api/v1/sources/status/{job_id}`) y no aparece en su `openapi.json`.
 - Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
   (en especial los textos de Policía y los registros PEP), confirmar que
   `peps_funcion_publica` solo llega cuando hay registro y ver cómo llega `validado`.
+- Alarma de CloudWatch sobre la métrica `TusdatosCreditosRestantes` (hoy solo hay aviso en
+  los registros del trabajador).
 - Staging (Fase 7): preparado; falta ejecutar los pasos de activación (sección
   «Antes de cualquier ambiente compartido»).
 - El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
