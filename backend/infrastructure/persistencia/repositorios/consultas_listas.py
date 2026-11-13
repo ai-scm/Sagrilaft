@@ -1,6 +1,6 @@
 """Historial, admisión y trabajos durables. No importa ni busca archivos OFAC."""
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -13,10 +13,22 @@ from domain.listas.errores import ConflictoListas, ErrorIntegridadEvidencia, Tra
 from infrastructure.persistencia.modelos_listas import (
     ArchivoFuente, BorradorConsulta, CoincidenciaLista, ConsultaFuente, ConsultaLista,
     EventoConsulta, EvidenciaConsulta, FuenteLista, FuenteVersionActiva, HallazgoProveedor,
-    PoliticaListas, RevisionCumplimiento, TrabajoConsulta, VersionFuente,
+    PoliticaListas, ProgresoConsultaExterna, RevisionCumplimiento, RitmoProveedor, TrabajoConsulta, VersionFuente,
 )
 from services.listas.informes import calcular_huella, generar_informe_pdf, version_informe
 from services.listas.politica_v2 import ActorListas, PoliticaListasV2
+
+
+@dataclass(frozen=True)
+class ProgresoExterno:
+    consulta_id: UUID
+    etapa: str
+    jobid: str | None
+    reporte_id: str | None
+    recargas: int
+    vence_en: datetime
+    huella_respuesta: str | None
+    respuesta_filtrada: dict | None
 
 
 @dataclass(frozen=True)
@@ -152,7 +164,11 @@ class RepositorioConsultasListas:
             if trabajo.concesion_hasta and trabajo.concesion_hasta > ahora:
                 raise TrabajoNoVigente("Otro ejecutor conserva la concesión")
             borrador = sesion.execute(select(BorradorConsulta.id).where(BorradorConsulta.consulta_id == consulta_id)).first()
-            if consulta.implementacion == "externo" and trabajo.numero_control > 0 and not borrador:
+            # Una consulta externa se retoma solo si su progreso prueba que no quedó un lanzamiento
+            # a medias: sin progreso, o en LANZANDO, el efecto en el proveedor es desconocido.
+            etapa = sesion.scalar(select(ProgresoConsultaExterna.etapa).where(ProgresoConsultaExterna.consulta_id == consulta_id))
+            if (consulta.implementacion == "externo" and trabajo.numero_control > 0 and not borrador
+                    and etapa in {None, "LANZANDO"}):
                 consulta.estado = "INDETERMINADA"
                 consulta.conclusion = "NO_CONCLUYENTE"
                 consulta.finalizada_en = ahora
@@ -177,6 +193,70 @@ class RepositorioConsultasListas:
             trabajo = self._exigir_concesion(sesion, concesion)
             trabajo.ultimo_latido = self.reloj()
             trabajo.concesion_hasta = self.reloj() + timedelta(seconds=duracion_segundos)
+
+    def posponer(self, concesion: ConcesionConsulta, segundos: float):
+        """Deja la consulta en curso y la libera hasta el próximo intento; otro ejecutor podrá retomarla."""
+        if not 0 < segundos <= 3600:
+            raise ValueError("Espera fuera de rango")
+        with self.sesiones.begin() as sesion:
+            trabajo = self._exigir_concesion(sesion, concesion)
+            trabajo.ultimo_latido = self.reloj()
+            trabajo.concesion_hasta = self.reloj() + timedelta(seconds=segundos)
+
+    def progreso_externo(self, consulta_id: UUID) -> "ProgresoExterno | None":
+        with self.sesiones() as sesion:
+            fila = sesion.scalar(select(ProgresoConsultaExterna).where(ProgresoConsultaExterna.consulta_id == consulta_id))
+            return ProgresoExterno(**{c.name: getattr(fila, c.name) for c in fields(ProgresoExterno)}) if fila else None
+
+    def guardar_progreso(self, concesion: ConcesionConsulta, evento: str | None = None, **cambios):
+        """Registra la etapa del protocolo externo; se confirma antes de cada llamada al proveedor."""
+        permitidos = {c.name for c in fields(ProgresoExterno)} - {"consulta_id"}
+        if set(cambios) - permitidos:
+            raise ValueError("Campo de progreso desconocido")
+        with self.sesiones.begin() as sesion:
+            self._exigir_concesion(sesion, concesion)
+            fila = sesion.scalar(select(ProgresoConsultaExterna).where(ProgresoConsultaExterna.consulta_id == concesion.consulta_id)
+                                 .with_for_update())
+            if fila is None:
+                fila = ProgresoConsultaExterna(consulta_id=concesion.consulta_id, recargas=0)
+                sesion.add(fila)
+            for campo, valor in cambios.items():
+                setattr(fila, campo, valor)
+            fila.actualizado_en = self.reloj()
+            if evento:
+                consulta = sesion.get(ConsultaLista, concesion.consulta_id)
+                self._evento(sesion, consulta.id, evento, ActorListas(consulta.actor_emisor, consulta.actor_sujeto, frozenset()),
+                             {"etapa": fila.etapa})
+
+    def reservar_turno(self, proveedor: str, intervalo_segundos: float) -> float:
+        """Reparte lanzamientos entre ejecutores: 0 si este puede lanzar ya; si no, segundos de espera."""
+        with self.sesiones.begin() as sesion:
+            sesion.execute(insert(RitmoProveedor).values(proveedor=proveedor, ultimo_lanzamiento=datetime(2000, 1, 1, tzinfo=timezone.utc))
+                           .on_conflict_do_nothing(index_elements=["proveedor"]))
+            ritmo = sesion.execute(select(RitmoProveedor).where(RitmoProveedor.proveedor == proveedor).with_for_update()).scalar_one()
+            ahora = self.reloj()
+            disponible = ritmo.ultimo_lanzamiento + timedelta(seconds=intervalo_segundos)
+            if disponible > ahora:
+                return (disponible - ahora).total_seconds()
+            ritmo.ultimo_lanzamiento = ahora
+            return 0.0
+
+    def agregar_evidencia_proveedor(self, concesion: ConcesionConsulta, tipo: str, objeto, tipo_contenido: str,
+                                    version_generador: str) -> UUID:
+        """Evidencia entregada por el proveedor (p. ej. su PDF), ya custodiada."""
+        if tipo not in {"PDF_PROVEEDOR", "RESPUESTA_ORIGINAL"}:
+            raise ValueError("Tipo de evidencia de proveedor no válido")
+        with self.sesiones.begin() as sesion:
+            self._exigir_concesion(sesion, concesion)
+            existente = sesion.scalar(select(EvidenciaConsulta.id).where(EvidenciaConsulta.consulta_id == concesion.consulta_id,
+                                                                         EvidenciaConsulta.tipo == tipo))
+            if existente:
+                return existente
+            identificador = uuid4()
+            sesion.add(EvidenciaConsulta(id=identificador, consulta_id=concesion.consulta_id, tipo=tipo, clave=objeto.clave,
+                huella=objeto.huella, tamano_bytes=objeto.tamano_bytes, tipo_contenido=tipo_contenido,
+                version_generador=version_generador))
+            return identificador
 
     def guardar_borrador(self, concesion: ConcesionConsulta, resultado: ResultadoProveedorV2):
         resultado = self._validar_resultado(resultado.model_dump())
