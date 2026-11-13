@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 from api.routers.consultas_listas import RutaListas
-from api.dependencias_listas import sesiones_listas, custodia_listas
+from api.dependencias_listas import sesiones_listas, custodia_administrativa
 from api.middleware.autenticacion import portal_interno, _decodificar_jwt, UsuarioPortalInterno
 from domain.listas.administracion import (ComparacionPropuesta, SolicitudAdministrativa,
     DecisionAdministrativa, EjecucionAdministrativa, OperacionMotivada)
@@ -42,7 +42,7 @@ class RutaAdministrativa(RutaListas):
 
 
 def servicio_administrativo(request: Request, usuario: UsuarioPortalInterno = Depends(portal_interno),
-                           sesiones=Depends(sesiones_listas), custodia=Depends(custodia_listas)):
+                           sesiones=Depends(sesiones_listas), custodia=Depends(custodia_administrativa)):
     config = request.app.state.config
     actor = ActorListas.desde_identidad_validada(config.keycloak.issuer, usuario.sub, tuple(usuario.roles))
     request.state.actor_administrativo = (actor.issuer, actor.sub)
