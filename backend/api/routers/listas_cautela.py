@@ -1,53 +1,9 @@
-"""
-Router de listas de cautela.
-
-Expone el endpoint de búsqueda en listas públicas de control de riesgo:
-OFAC, Naciones Unidas, Procuraduría, Contraloría y Policía Nacional.
-
-SRP : responsabilidad única de recibir la solicitud HTTP y retornar la respuesta.
-      La orquestación de búsqueda + cálculo de riesgo + construcción de respuesta
-      vive en ListaCautelaService.buscar_y_evaluar — no en este router.
-DIP : delega completamente en ListaCautelaService mediante inyección de dependencias.
-"""
-
-from fastapi import APIRouter, Depends
-
-from api.dependencies import obtener_servicio_lista_cautela
-from api.schemas import BusquedaListaCautela, RespuestaListaCautela, ResultadoListaCautela
-from services.listas.servicio_listas_cautela import ListaCautelaService
+"""Ruta retirada: las consultas requieren expediente y permisos del portal."""
+from fastapi import APIRouter, Depends, HTTPException
+from api.middleware.autenticacion import portal_interno
 
 enrutador = APIRouter(prefix="/api/listas-cautela", tags=["listas de cautela"])
 
-
-# ─── Endpoints ───────────────────────────────────────────────────────────────
-
-@enrutador.post("/buscar", response_model=RespuestaListaCautela)
-def buscar_en_listas(
-    busqueda: BusquedaListaCautela,
-    servicio: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
-) -> RespuestaListaCautela:
-    """
-    Busca un nombre y/o número de identificación en las listas de cautela:
-    - OFAC (EE.UU.)
-    - Naciones Unidas
-    - Procuraduría General de la Nación
-    - Contraloría General de la República
-    - Policía Nacional
-    """
-    resultado = servicio.buscar_y_evaluar(
-        busqueda.nombre,
-        busqueda.numero_identificacion,
-    )
-    return RespuestaListaCautela(
-        nombre_buscado=resultado.nombre_buscado,
-        resultados=[
-            ResultadoListaCautela(
-                lista=r.lista,
-                encontrado=r.encontrado,
-                detalle=r.detalle,
-                nivel_riesgo=r.nivel_riesgo,
-            )
-            for r in resultado.resultados
-        ],
-        riesgo_general=resultado.riesgo_general,
-    )
+@enrutador.post("/buscar", deprecated=True, dependencies=[Depends(portal_interno)])
+def buscar_en_listas():
+    raise HTTPException(410, "La búsqueda independiente está deshabilitada; use consultas por expediente")

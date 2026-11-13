@@ -38,7 +38,7 @@ from domain.excepciones import (
     ZohoSignSinCreditosError,
     ZohoSignSolicitudNoCancelableError,
 )
-from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_servicio_listas_cautela, crear_alertas_portal
+from infrastructure.composicion.ensamblaje import crear_orquestador_validacion, crear_alertas_portal
 from api.routers import acceso_manual, auditoria, expedientes, formulario, listas_cautela, validacion, webhooks
 from services.formulario.exportacion_pdf import DependenciaPdfNoInstaladaError
 from infrastructure.notificaciones.email_service import CorreoDestinatarioVacioError
@@ -105,7 +105,6 @@ async def lifespan(app: FastAPI):
     )
     app.state.orchestrator            = crear_orquestador_validacion(config)
     app.state.config                  = config
-    app.state.servicio_listas_cautela = crear_servicio_listas_cautela()
     app.state.zoho_sign               = ZohoSignService(config.zoho_sign)
     app.state.alertas_portal          = crear_alertas_portal(config)
 
@@ -123,6 +122,10 @@ async def lifespan(app: FastAPI):
 
 
 def _registrar_rutas(app: FastAPI) -> None:
+    from api.routers import consultas_listas, recepciones_listas, administracion_versiones
+    app.include_router(consultas_listas.enrutador)
+    app.include_router(recepciones_listas.enrutador)
+    app.include_router(administracion_versiones.enrutador)
     app.include_router(formulario.enrutador)
     app.include_router(validacion.enrutador)
     app.include_router(listas_cautela.enrutador)

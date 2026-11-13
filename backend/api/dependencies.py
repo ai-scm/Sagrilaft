@@ -253,9 +253,8 @@ def obtener_servicio_auditoria(
 def obtener_servicio_validacion(
     repo: RepositorioValidacion = Depends(obtener_repo_validacion),
     orquestador: OrquestadorValidacionDocumentos = Depends(obtener_orquestador),
-    servicio_listas: ListaCautelaService = Depends(obtener_servicio_lista_cautela),
 ) -> ValidacionService:
-    return ValidacionService(repo, orquestador, servicio_listas)
+    return ValidacionService(repo, orquestador)
 
 
 def obtener_servicio_verificacion_sagrilaft(

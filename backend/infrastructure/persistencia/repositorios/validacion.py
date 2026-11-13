@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from domain.formulario.entidades import FormularioDatos
@@ -28,7 +29,8 @@ class RepositorioValidacionSQLAlchemy:
 
     def limpiar_validaciones(self, formulario_id: str) -> None:
         self._sesion.query(ResultadoValidacion).filter(
-            ResultadoValidacion.formulario_id == formulario_id
+            ResultadoValidacion.formulario_id == formulario_id,
+            or_(ResultadoValidacion.tipo.is_(None), ResultadoValidacion.tipo != "lista_cautela")
         ).delete()
 
     def guardar_validaciones(self, datos: List[Dict[str, Any]]) -> List[ResultadoValidacionDominio]:

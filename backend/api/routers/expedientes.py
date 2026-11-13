@@ -404,46 +404,15 @@ def disponibilidad_sagrilaft(
 ) -> DisponibilidadSagrilaft:
     return DisponibilidadSagrilaft(habilitado=habilitado)
 
-@enrutador.post(
-    "/{formulario_id}/verificar-sagrilaft",
-    summary="Verificar contraparte en SAGRILAFT",
-    description="Consulta la contraparte en las listas cautela y retorna el resultado (simulado o real).",
-    responses={409: {"description": "La verificación SAGRILAFT está deshabilitada por configuración"}},
-    dependencies=[Depends(exigir_sagrilaft_habilitado)],
-)
-def verificar_sagrilaft(
-    formulario_id: str,
-    datos: Optional[SagrilaftConsultaManual] = None,
-    usuario: UsuarioPortalInterno = Depends(portal_interno),
-    servicio: ServicioVerificacionSagrilaft = Depends(obtener_servicio_verificacion_sagrilaft),
-) -> dict:
-    return servicio.verificar_contraparte(formulario_id, contrapartes_permitidas(usuario), datos_manuales=datos)
+@enrutador.post("/{formulario_id}/verificar-sagrilaft", deprecated=True)
+def verificar_sagrilaft(formulario_id: str, usuario: UsuarioPortalInterno = Depends(portal_interno)):
+    raise HTTPException(410, "Use consultas-listas v2; esta ruta ya no ejecuta verificaciones")
 
-@enrutador.get(
-    "/{formulario_id}/sagrilaft/pdf",
-    summary="Descargar certificado SAGRILAFT",
-    description="Descarga el certificado PDF original desde el proveedor de listas cautela.",
-    responses={409: {"description": "La verificación SAGRILAFT está deshabilitada por configuración"}},
-    dependencies=[Depends(exigir_sagrilaft_habilitado)],
-)
-def descargar_pdf_sagrilaft(
-    formulario_id: str,
-    usuario: UsuarioPortalInterno = Depends(portal_interno),
-    servicio: ServicioVerificacionSagrilaft = Depends(obtener_servicio_verificacion_sagrilaft),
-):
-    from fastapi.responses import Response
-    from fastapi import HTTPException
-    try:
-        pdf_bytes = servicio.descargar_certificado_sagrilaft(formulario_id, contrapartes_permitidas(usuario))
-        return Response(
-            content=pdf_bytes, 
-            media_type="application/pdf", 
-            headers={"Content-Disposition": f'attachment; filename="sagrilaft_{formulario_id}.pdf"'}
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error descargando PDF: {str(e)}")
+
+@enrutador.get("/{formulario_id}/sagrilaft/pdf", deprecated=True)
+def descargar_pdf_sagrilaft(formulario_id: str, usuario: UsuarioPortalInterno = Depends(portal_interno)):
+    raise HTTPException(410, "Seleccione la evidencia de una consulta; el reporte heredado no se regenera")
+
 
 @enrutador.patch(
     "/{formulario_id}/alertas/{alerta_id}/auditoria",

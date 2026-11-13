@@ -32,6 +32,6 @@ async def validar_formulario(
       1. Contraste de documentos adjuntos vs datos diligenciados (vía IA).
       2. Verificación de fechas y vigencias documentales.
       3. Consistencia de información financiera.
-      4. Búsqueda en listas de cautela (empresa y representante legal).
+      Las listas se consultan desde el portal autenticado por separado.
     """
     return await servicio.ejecutar_validacion_completa(formulario_id)
