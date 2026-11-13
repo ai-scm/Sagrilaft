@@ -272,18 +272,54 @@ class SesConfig:
         return bool(self.email_origen and self.habilitado)
 
 
+def _booleano_listas(nombre: str) -> bool:
+    valor = os.getenv(nombre, "false").lower()
+    if valor not in {"true", "false"}:
+        raise RuntimeError(f"{nombre} debe ser true o false")
+    return valor == "true"
+
+
 @dataclass(frozen=True)
 class SagrilaftListasConfig:
-    """Configuración del proveedor de listas de cautela (verificación PLAFT).
-
-    "dummy" simula resultados y puede usarse en desarrollo/staging mientras la
-    API real no esté disponible; "sagrilaft" consulta la API real (tusdatos.co);
-    "deshabilitado" omite la consulta. Ver validación de arranque en
-    `load_config()`.
-    """
-    proveedor: str = field(default_factory=lambda: os.getenv("PROVEEDOR_LISTAS_CAUTELA", "dummy").lower())
+    """Selector único v2 con compatibilidad explícita para el circuito heredado."""
+    proveedor: str | None = field(default_factory=lambda: os.getenv("PROVEEDOR_LISTAS_CAUTELA"))
     api_url: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_URL", ""))
-    api_key: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_KEY", ""))
+    api_key: str = field(default_factory=lambda: os.getenv("SAGRILAFT_API_KEY", ""), repr=False)
+    implementacion: str | None = field(default_factory=lambda: os.getenv("LISTAS_IMPLEMENTACION"))
+    escenario: str | None = field(default_factory=lambda: os.getenv("LISTAS_SIMULACION_ESCENARIO"))
+    admin_habilitada: bool = field(default_factory=lambda: _booleano_listas("LISTAS_ADMIN_HABILITADA"))
+    independiente_habilitada: bool = field(default_factory=lambda: _booleano_listas("LISTAS_BUSQUEDA_INDEPENDIENTE_HABILITADA"))
+
+    def __post_init__(self):
+        equivalencias = {"dummy": "simulado", "sagrilaft": "externo", "deshabilitado": "deshabilitado"}
+        anterior = self.proveedor.lower() if self.proveedor is not None else None
+        nueva = self.implementacion.lower() if self.implementacion is not None else None
+        # Variable heredada vacía = anulada, solo si la implementación nueva es explícita.
+        if anterior == "" and nueva:
+            anterior = None
+        if anterior is not None and anterior not in equivalencias:
+            raise RuntimeError("PROVEEDOR_LISTAS_CAUTELA desconocido")
+        if nueva is not None and nueva not in {*equivalencias.values(), "archivos"}:
+            raise RuntimeError("LISTAS_IMPLEMENTACION desconocida")
+        if anterior is not None and nueva is not None and equivalencias[anterior] != nueva:
+            raise RuntimeError("LISTAS_IMPLEMENTACION y PROVEEDOR_LISTAS_CAUTELA contradictorios")
+        modo = nueva or equivalencias.get(anterior, "deshabilitado")
+        escenario = self.escenario
+        if modo == "simulado":
+            # La variable antigua conserva una equivalencia explícita y versionada.
+            if nueva is None and escenario is None:
+                escenario = "sin_coincidencias_v1"
+            if escenario not in {"sin_coincidencias_v1", "coincidencia_v1", "parcial_v1", "error_v1"}:
+                raise RuntimeError("LISTAS_SIMULACION_ESCENARIO obligatorio y versionado en simulado")
+        object.__setattr__(self, "implementacion", modo)
+        object.__setattr__(self, "escenario", escenario)
+        # Archivos nunca se convierte en dummy a través de rutas heredadas.
+        legado = {"simulado": "dummy", "externo": "sagrilaft", "deshabilitado": "deshabilitado", "archivos": "deshabilitado"}
+        object.__setattr__(self, "proveedor", legado[modo])
+
+    def validar_entorno(self, entorno: str) -> None:
+        if entorno == "production" and (self.implementacion != "deshabilitado" or self.admin_habilitada):
+            raise RuntimeError("PROVEEDOR_LISTAS_CAUTELA / LISTAS_IMPLEMENTACION: producción debe permanecer deshabilitada")
 
     @property
     def configurado(self) -> bool:
@@ -336,6 +372,7 @@ def load_config() -> AppConfig:
 
     cfg = AppConfig()
 
+    cfg.listas_cautela.validar_entorno(cfg.entorno)
     storage_backend = cfg.storage_backend.lower()
 
     if entorno_es_productivo(cfg.entorno):
@@ -347,12 +384,6 @@ def load_config() -> AppConfig:
         if not cfg.s3.bucket:
             raise RuntimeError(
                 f"S3_BUCKET es obligatorio en APP_ENV={cfg.entorno} con STORAGE_BACKEND=s3."
-            )
-        if cfg.entorno == "production" and cfg.listas_cautela.proveedor == "dummy":
-            raise RuntimeError(
-                f"PROVEEDOR_LISTAS_CAUTELA=dummy no está permitido en APP_ENV={cfg.entorno}. "
-                "Configure PROVEEDOR_LISTAS_CAUTELA=sagrilaft (con SAGRILAFT_API_URL y "
-                "SAGRILAFT_API_KEY) o =deshabilitado si la verificación se omite a propósito."
             )
         if cfg.listas_cautela.proveedor == "sagrilaft" and not cfg.listas_cautela.configurado:
             raise RuntimeError(

@@ -1,0 +1,12 @@
+{
+  "paquete": "sintetico-v1",
+  "procedencia": "Esquema ficticio definido en F5.1; no descargado de OFAC",
+  "oficial": false,
+  "namespace": "urn:sagrilaft:pruebas:listas:v1",
+  "version_xsd": "1.0",
+  "archivos": {
+    "lista.xsd": "eb096ab3802e1b58d8d3ed78e747feb14b4219d30d7442ad13e9f18f215736b3"
+  },
+  "dependencias": [],
+  "resolucion_externa": "PROHIBIDA"
+}

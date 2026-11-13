@@ -27,5 +27,6 @@ def obtener_consultor_listas(config: SagrilaftListasConfig) -> ConsultorListasCa
             api_key=config.api_key,
         )
 
-    # Por defecto 'dummy' para desarrollo local o si el valor no es reconocido
-    return ConsultorListasCautelaDummy()
+    if config.proveedor == PROVEEDOR_DUMMY:
+        return ConsultorListasCautelaDummy()
+    raise ValueError("Proveedor de listas desconocido")
