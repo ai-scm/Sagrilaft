@@ -46,6 +46,11 @@ class FuenteSagrilaft:
     # Tusdatos solo incluye cuando hay registro (p. ej. PEP por función pública) no.
     ausencia_bloquea: bool = True
 
+    @property
+    def codigos_estado(self) -> frozenset:
+        """Códigos con que /api/v1/sources/status informa la fuente en línea (sin copias en base de datos)."""
+        return frozenset(c for c in self.errores if not any(m in c for m in ("_db", "database", "offline")))
+
 
 FUENTES = (
     FuenteSagrilaft("ofac", "OFAC (Lista Clinton), por documento", ("ofac",), ("ofac", "ofac_offline", "ofac_database_id")),
@@ -108,7 +113,11 @@ def traducir_criterio(criterio: Criterio) -> SolicitudTusdatos:
             raise ValueError("Tusdatos exige el nombre completo para consultar un pasaporte")
         if tipo == "CE" and criterio.fecha_expedicion is None:
             raise ValueError("Tusdatos exige la fecha de expedición para consultar una cédula de extranjería")
-        return SolicitudTusdatos(tipo_documento=tipo, numero=identificador.valor,
+        numero = identificador.valor.strip()
+        if tipo == "NIT":
+            # Tusdatos espera el NIT sin dígito de verificación: «900.123.456-7» → «900.123.456».
+            numero = re.sub(r"\s*-\s*\d$", "", numero)
+        return SolicitudTusdatos(tipo_documento=tipo, numero=numero,
             sujeto=EMPRESA if tipo == "NIT" else PERSONA, nombre=criterio.nombre if tipo == "PP" else None,
             fecha_expedicion=criterio.fecha_expedicion if tipo == "CE" else None)
     raise ValueError("Tusdatos requiere una cédula (CC o CE), un pasaporte o un NIT")
@@ -191,9 +200,13 @@ def _registros(valor):
 
 def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: SolicitudTusdatos, criterio: Criterio,
                         errores_estado=(), fecha_inicio: datetime, fecha_fin: datetime,
-                        fuentes: tuple[str, ...] | None = None, validado: bool | None = None) -> Interpretacion:
+                        fuentes: tuple[str, ...] | None = None, validado: bool | None = None,
+                        fuentes_caidas: frozenset[str] = frozenset(),
+                        documento_no_vigente: str | None = None) -> Interpretacion:
     """`fuentes`: las fijadas al admitir (manifiesto); por defecto, las aprobadas para el sujeto.
-    `validado`: lo que Tusdatos informa al terminar (False = no pudo validar el documento)."""
+    `validado`: lo que Tusdatos informa al terminar (False = no pudo validar el documento).
+    `fuentes_caidas`: códigos que Tusdatos reportaba caídos o en mantenimiento al cerrar.
+    `documento_no_vigente`: texto de la verificación previa si el NIT o la CE no está vigente."""
     errores = set(errores_estado) | {e for e in (reporte.get("errores") or []) if isinstance(e, str)}
     tipo_sujeto = "ENTIDAD" if solicitud.sujeto == EMPRESA else "PERSONA"
     titular = reporte.get("nombre") if isinstance(reporte.get("nombre"), str) and reporte["nombre"].strip() else None
@@ -213,7 +226,9 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
             advertencias.append(Advertencia(codigo="FUENTE_NO_DISPONIBLE", descripcion=fuente.nombre, cobertura_id=cobertura_id))
             continue
         if errores & set(fuente.errores) or any(isinstance(v, str) and v.strip().casefold() == "error" for _, v in valores):
-            cobertura.append(Cobertura(**base, estado="FALLIDA", motivo="Tusdatos informó error al consultar la fuente"))
+            motivo = ("Tusdatos informa la fuente caída o en mantenimiento; no se pudo consultar" if codigo in fuentes_caidas
+                      else "Tusdatos informó error al consultar la fuente")
+            cobertura.append(Cobertura(**base, estado="FALLIDA", motivo=motivo))
             advertencias.append(Advertencia(codigo="FUENTE_FALLIDA", descripcion=fuente.nombre, cobertura_id=cobertura_id))
             continue
         cobertura.append(Cobertura(**base, estado="CONSULTADA"))
@@ -243,6 +258,8 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
         advertencias.append(Advertencia(codigo="DOCUMENTO_NO_VALIDADO", descripcion=(
             "Tusdatos no pudo validar el documento contra la fuente oficial. Las búsquedas por documento "
             "pueden no corresponder al titular: confirme el número y el tipo antes de dar por buena la ausencia de registros")))
+    if documento_no_vigente:
+        advertencias.append(Advertencia(codigo="DOCUMENTO_NO_VIGENTE", descripcion=_texto(documento_no_vigente)))
     nivel = reporte.get("hallazgos")
     if isinstance(nivel, str) and nivel.strip():
         advertencias.append(Advertencia(codigo="NIVEL_INFORMADO_PROVEEDOR", descripcion=_texto(

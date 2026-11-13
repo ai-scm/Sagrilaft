@@ -1,18 +1,18 @@
 """Cliente HTTP de Tusdatos contra respuestas grabadas del sandbox. Sin red salvo la prueba opcional final."""
 import base64
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 
 import httpx
 import pytest
 
 from domain.listas.puertos import ListasNoDisponibles
 from infrastructure.listas.tusdatos.cliente import (
-    ClienteTusdatos, DocumentoPdf, Interruptor, PdfPendiente, limpiar_documento,
+    HORA_COLOMBIA, ClienteTusdatos, DocumentoPdf, Interruptor, PdfPendiente, limpiar_documento,
 )
 from infrastructure.listas.tusdatos.configuracion import ConfiguracionTusdatos
 from infrastructure.listas.tusdatos.errores import (
-    ConsultaFallida, CredencialesRechazadas, EfectoDesconocido, ProveedorNoDisponible,
+    ConsultaFallida, CredencialesRechazadas, DocumentoNoEncontrado, EfectoDesconocido, ProveedorNoDisponible,
     RespuestaInesperada, SolicitudRechazada, TitularNoAutoriza, TrabajoVencido,
 )
 from soporte_tusdatos import PDF_MINIMO, SimuladorTusdatos
@@ -284,3 +284,124 @@ def test_flujo_completo_contra_el_sandbox_real():
         lanzado = real.lanzar("CC", "111", fecha_expedicion=date(2014, 12, 1))
         estado = real.estado(lanzado.jobid)
         assert estado.finalizado and real.reporte(estado.reporte_id).datos
+
+
+# ── Documento inexistente ────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("texto", ["Nit no encontrado", "La Cédula de extranjería consultada NO se encuentra en el Archivo Biográfico"])
+def test_documento_inexistente_se_distingue_de_una_solicitud_mal_formada(texto):
+    c, _ = cliente(SimuladorTusdatos({("POST", "/api/launch"): httpx.Response(400, json={"error": texto})}))
+    with pytest.raises(DocumentoNoEncontrado) as error:
+        c.lanzar("NIT", "900123456")
+    assert "900123456" not in str(error.value) and not error.value.reintentable
+    c, _ = cliente(SimuladorTusdatos({("POST", "/api/launch"): httpx.Response(400, json={"error": "typedoc inválido"})}))
+    with pytest.raises(SolicitudRechazada):
+        c.lanzar("NIT", "900123456")
+
+
+def test_alerta_de_creditos_configurable(monkeypatch):
+    monkeypatch.setenv("LISTAS_TUSDATOS_URL", "https://dash-board.tusdatos.co")
+    monkeypatch.setenv("LISTAS_TUSDATOS_TOKEN", "api_td_x")
+    assert ConfiguracionTusdatos.desde_entorno("staging").alerta_creditos == 100
+    monkeypatch.setenv("LISTAS_TUSDATOS_ALERTA_CREDITOS", "25")
+    assert ConfiguracionTusdatos.desde_entorno("staging").alerta_creditos == 25
+    with pytest.raises(ListasNoDisponibles):
+        ConfiguracionTusdatos(url_base="https://dash-board.tusdatos.co", token="x", alerta_creditos=-1)
+
+
+# ── Historial de consultas (/api/v1/checks) ─────────────────────────────────
+
+def historial(*filas, estado=200):
+    return httpx.Response(estado, json={"code": "success", "status": estado, "metadata": {}, "links": {}, "data": list(filas)})
+
+
+def test_historial_filtra_por_documento_y_fecha_y_lee_el_id():
+    c, simulador = cliente()
+    simulador.extras[("GET", "/api/v1/checks")] = historial(
+        {"check_id": REPORTE_CC, "document_number": "126", "created_at": "2026-11-13T09:30:00-05:00", "url": "x"},
+        {"check_id": "", "document_number": "126", "created_at": "13/11/2026 08:00:00",
+         "url": "https://dash-board.tusdatos.co/api/report_json/8188f7e8aa70102bf2053f32"},
+        {"check_id": "../otro", "url": "../../api/plans", "document_number": "126", "created_at": "2026-11-13"})
+    previas = c.historial("CC", "1.26", date(2026, 11, 13))
+    peticion = simulador.peticiones[-1]
+    assert peticion.url.path == "/api/v1/checks"
+    assert dict(peticion.url.params) == {"country": "CO", "document_type": "CC", "document_number": "126",
+                                         "date_from": "13-11-2026", "per_page": "50"}
+    assert [p.reporte_id for p in previas] == [REPORTE_CC, "8188f7e8aa70102bf2053f32"]  # el id inseguro se descarta
+    assert previas[0].creada_en == datetime(2026, 11, 13, 14, 30, tzinfo=timezone.utc)
+    # Sin zona horaria se toma la hora de Colombia, como informa Tusdatos.
+    assert previas[1].creada_en == datetime(2026, 11, 13, 8, 0, tzinfo=HORA_COLOMBIA)
+
+
+def test_historial_sin_hora_no_tiene_fecha_utilizable():
+    c, simulador = cliente()
+    simulador.extras[("GET", "/api/v1/checks")] = historial({"check_id": REPORTE_CC, "created_at": "2026-11-13"},
+                                                            {"check_id": REPORTE_NIT, "created_at": "ayer"})
+    assert [p.creada_en for p in c.historial("CC", "126", date(2026, 11, 13))] == [None, None]
+
+
+def test_historial_inexistente_o_malformado():
+    c, _ = cliente()  # el sandbox no tiene historial: 404
+    with pytest.raises(SolicitudRechazada):
+        c.historial("CC", "126", date(2026, 11, 13))
+    c, simulador = cliente()
+    simulador.extras[("GET", "/api/v1/checks")] = httpx.Response(200, json={"data": "no es una lista"})
+    with pytest.raises(RespuestaInesperada):
+        c.historial("CC", "126", date(2026, 11, 13))
+
+
+# ── Verificación previa del documento (verify/nit, verify/ce) ───────────────
+
+def verificacion(estado="ACTIVA", hallazgos=(), error=""):
+    return httpx.Response(200, json={"status": "true", "data": {"estado": estado, "razon_social": "EMPRESA",
+                                                                 "nombre_completo": "NOMBRE"},
+                                     "error": error, "findings": list(hallazgos)})
+
+
+def test_verificar_nit_y_ce_con_las_respuestas_del_sandbox():
+    c, simulador = cliente()
+    nit = c.verificar_documento("NIT", "900.000.152")
+    ce = c.verificar_documento("CE", "960696", fecha_expedicion=date(2001, 11, 1))
+    assert (nit.estado, nit.vigente, nit.no_encontrado) == ("ACTIVA", True, False)
+    assert (ce.estado, ce.vigente) == ("VIGENTE", True)
+    cuerpos = simulador.cuerpos()
+    assert cuerpos == [{"nit": 900000152}, {"ce": 960696, "fecha_expedicion": "01/11/2001"}]  # números, sin nombre
+    assert [p.url.path for p in simulador.peticiones] == ["/api/launch/verify/nit", "/api/launch/verify/ce"]
+
+
+@pytest.mark.parametrize("respuesta,no_encontrado,vigente", [
+    (verificacion(hallazgos=["Nit no encontrado"]), True, None),
+    (verificacion(estado="", error="Nit no encontrado"), True, None),          # el aviso puede venir en `error`
+    (verificacion(estado="VIGENTE", hallazgos=["Cédula no vigente"]), False, False),
+    (verificacion(estado="CANCELADA"), False, False),
+    (verificacion(estado=""), False, None),
+])
+def test_avisos_de_la_verificacion(respuesta, no_encontrado, vigente):
+    c, simulador = cliente()
+    simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta
+    resultado = c.verificar_documento("NIT", "900000152")
+    assert (resultado.no_encontrado, resultado.vigente) == (no_encontrado, vigente)
+
+
+def test_verificacion_no_se_reintenta_ni_adivina():
+    c, simulador = cliente()
+    simulador.extras[("POST", "/api/launch/verify/nit")] = verificacion(error="Servicio temporalmente fuera de línea")
+    with pytest.raises(RespuestaInesperada):
+        c.verificar_documento("NIT", "900000152")
+    simulador.extras[("POST", "/api/launch/verify/nit")] = httpx.Response(503)
+    with pytest.raises(ProveedorNoDisponible):
+        c.verificar_documento("NIT", "900000152")
+    assert len([p for p in simulador.peticiones if p.url.path.endswith("/verify/nit")]) == 2  # una por llamada
+    with pytest.raises(ValueError):
+        c.verificar_documento("CE", "960696")  # sin fecha de expedición
+    with pytest.raises(ValueError):
+        c.verificar_documento("CC", "111")
+
+
+def test_verificacion_configurable(monkeypatch):
+    monkeypatch.setenv("LISTAS_TUSDATOS_URL", SANDBOX)
+    monkeypatch.setenv("LISTAS_TUSDATOS_USUARIO", "pruebas")
+    monkeypatch.setenv("LISTAS_TUSDATOS_CLAVE", "password")
+    assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is True
+    monkeypatch.setenv("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO", "false")
+    assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is False

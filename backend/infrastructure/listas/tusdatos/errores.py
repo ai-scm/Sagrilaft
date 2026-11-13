@@ -35,6 +35,11 @@ class SolicitudRechazada(ErrorTusdatos):
     codigo = "SOLICITUD_RECHAZADA"
 
 
+class DocumentoNoEncontrado(ErrorTusdatos):
+    """400 al lanzar: la fuente oficial no tiene ese documento (NIT en RUES, CE en Migración)."""
+    codigo = "DOCUMENTO_NO_ENCONTRADO"
+
+
 class TrabajoVencido(ErrorTusdatos):
     """El jobid no existe o venció (vigencia de 2 horas)."""
     codigo = "TRABAJO_VENCIDO"

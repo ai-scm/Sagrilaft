@@ -213,3 +213,36 @@ def test_codigos_de_las_fuentes_coinciden_con_el_catalogo_de_errores():
     from infrastructure.listas.tusdatos.adaptador import FUENTES
     reconocidos = {codigo for f in FUENTES for codigo in f.errores}
     assert catalogo <= reconocidos
+
+
+@pytest.mark.parametrize("valor,esperado", [("900.123.456-7", "900.123.456"), ("900123456 - 7", "900123456"),
+                                            ("900123456", "900123456"), ("9001234567", "9001234567")])
+def test_nit_se_envia_sin_digito_de_verificacion(valor, esperado):
+    assert traducir_criterio(criterio("NIT", valor)).numero == esperado
+
+
+def test_cedula_no_pierde_su_ultimo_digito():
+    assert traducir_criterio(criterio("CC", "79.123.456-7")).numero == "79.123.456-7"
+
+
+def test_codigos_de_estado_omiten_las_copias_en_base_de_datos():
+    from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO
+    assert FUENTES_POR_CODIGO["ofac"].codigos_estado == {"ofac"}
+    assert FUENTES_POR_CODIGO["lista_onu"].codigos_estado == {"lista_onu", "onu"}
+    assert FUENTES_POR_CODIGO["procuraduria"].codigos_estado == {"procuraduria"}
+
+
+def test_fuente_fallida_que_tusdatos_reporta_caida_lo_dice_en_el_motivo():
+    reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
+    reporte["errores"] = ["procuraduria", "policia"]
+    resultado = interpretar(reporte, "CC", "112", fuentes_caidas=frozenset({"procuraduria"})).resultado
+    assert "caída o en mantenimiento" in cobertura(resultado, "procuraduria").motivo
+    assert cobertura(resultado, "policia").motivo == "Tusdatos informó error al consultar la fuente"
+    assert resultado.estado_ejecucion == "PARCIAL"
+
+
+def test_documento_no_vigente_avisa_sin_cambiar_la_conclusion():
+    reporte = REPORTES["report_cc_sin_hallazgo"]
+    resultado = interpretar(reporte, "CC", "112", documento_no_vigente="La empresa no figura vigente").resultado
+    assert {a.codigo: a.descripcion for a in resultado.advertencias}["DOCUMENTO_NO_VIGENTE"] == "La empresa no figura vigente"
+    assert resultado.conclusion_busqueda == interpretar(reporte, "CC", "112").resultado.conclusion_busqueda

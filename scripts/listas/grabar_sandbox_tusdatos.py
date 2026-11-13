@@ -43,6 +43,8 @@ CASOS = [
     ("pdf_nit", "GET", "/api/v2/report_nit_pdf/5d9e05963817a56d989523c0", None),
     ("retry_cc", "GET", "/api/retry/7d1f10483800b5071688e101?typedoc=CC", None),
     ("estado_fuentes", "GET", "/api/v1/sources/status?country=CO", None),
+    ("verificar_nit", "POST", "/api/launch/verify/nit", {"nit": 900000152}),
+    ("verificar_ce", "POST", "/api/launch/verify/ce", {"ce": 960696, "fecha_expedicion": "01/11/2001"}),
     ("plan", "GET", "/api/plans", None),
 ]
 

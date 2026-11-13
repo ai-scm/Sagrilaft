@@ -19,6 +19,10 @@ class ConfiguracionTusdatos:
     tiempo_conexion: float = 5.0
     tiempo_lectura: float = 20.0
     tiempo_pdf: float = 60.0
+    # Con este saldo o menos se registra un aviso (y la métrica TusdatosCreditosRestantes).
+    alerta_creditos: int = 100
+    # Validar NIT y cédula de extranjería (verify/nit, verify/ce) antes de consultar listas.
+    verificar_documento: bool = True
 
     def __post_init__(self):
         partes = urlsplit(self.url_base)
@@ -30,6 +34,8 @@ class ConfiguracionTusdatos:
             raise ListasNoDisponibles("Configure LISTAS_TUSDATOS_TOKEN o usuario y clave, no ambos")
         if not self.token and not (self.usuario and self.clave):
             raise ListasNoDisponibles("Faltan usuario o clave de Tusdatos")
+        if self.alerta_creditos < 0:
+            raise ListasNoDisponibles("LISTAS_TUSDATOS_ALERTA_CREDITOS no puede ser negativo")
         for nombre in ("tiempo_conexion", "tiempo_lectura", "tiempo_pdf"):
             if not 0 < getattr(self, nombre) <= 120:
                 raise ListasNoDisponibles(f"{nombre} debe estar entre 0 y 120 segundos")
@@ -61,6 +67,9 @@ class ConfiguracionTusdatos:
             usuario=os.getenv("LISTAS_TUSDATOS_USUARIO", "").strip(), clave=os.getenv("LISTAS_TUSDATOS_CLAVE", ""),
             tiempo_conexion=segundos("LISTAS_TUSDATOS_TIEMPO_CONEXION", 5.0),
             tiempo_lectura=segundos("LISTAS_TUSDATOS_TIEMPO_LECTURA", 20.0),
-            tiempo_pdf=segundos("LISTAS_TUSDATOS_TIEMPO_PDF", 60.0))
+            tiempo_pdf=segundos("LISTAS_TUSDATOS_TIEMPO_PDF", 60.0),
+            alerta_creditos=int(segundos("LISTAS_TUSDATOS_ALERTA_CREDITOS", 100)),
+            verificar_documento=os.getenv("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO", "true").strip().lower()
+            not in {"false", "0", "no", "off"})
         configuracion.validar_entorno(entorno)
         return configuracion

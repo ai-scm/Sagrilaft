@@ -2528,5 +2528,66 @@
    },
    "tipo": "application/json"
   }
+ },
+ "verificar_ce": {
+  "peticion": {
+   "cuerpo": {
+    "ce": 960696,
+    "fecha_expedicion": "01/11/2001"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch/verify/ce"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "data": {
+     "ce": 960696,
+     "estado": "VIGENTE",
+     "fecha_expedicion": "01/11/2001",
+     "fecha_nacimiento": "15/05/1990",
+     "fecha_vencimiento": "10/02/2030",
+     "nacionalidad": "VENEZUELA",
+     "nombre_completo": "NOMBRE APELLIDO"
+    },
+    "error": "",
+    "findings": [],
+    "status": "true"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "verificar_nit": {
+  "peticion": {
+   "cuerpo": {
+    "nit": 900000152
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch/verify/nit"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "data": {
+     "categoria_matricula": "SOCIEDAD ó PERSONA JURIDICA PRINCIPAL ó ESAL",
+     "clase_identificacion": "NIT",
+     "codigo_camara": "04",
+     "codigo_estado": "",
+     "estado": "ACTIVA",
+     "identificacion": "NIT 900000152 - 7",
+     "matricula": "0003043510",
+     "nit": 900000152,
+     "nombre_camara": "BOGOTA",
+     "razon_social": "DATA FACTUM SAS",
+     "tipo": "SOCIEDAD COMERCIAL"
+    },
+    "error": "",
+    "findings": [],
+    "status": "true"
+   },
+   "tipo": "application/json"
+  }
  }
 }

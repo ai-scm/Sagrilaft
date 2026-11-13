@@ -1,4 +1,4 @@
-"""Cliente HTTP de Tusdatos: lanzar, consultar estado, reporte JSON, PDF, recarga y salud.
+"""Cliente HTTP de Tusdatos: verificar documento, lanzar, estado, reporte JSON, PDF, recarga, historial y salud.
 
 Solo conoce el protocolo. No decide qué fuentes interesan ni interpreta coincidencias:
 eso lo hace el adaptador de listas. Reglas que aplica:
@@ -14,13 +14,13 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 
 from infrastructure.listas.tusdatos.configuracion import ConfiguracionTusdatos
 from infrastructure.listas.tusdatos.errores import (
-    AccesoDenegado, ConsultaFallida, CredencialesRechazadas, EfectoDesconocido,
+    AccesoDenegado, ConsultaFallida, CredencialesRechazadas, DocumentoNoEncontrado, EfectoDesconocido,
     ProveedorNoDisponible, RespuestaInesperada, SolicitudRechazada, TitularNoAutoriza, TrabajoVencido,
 )
 
@@ -29,6 +29,7 @@ registro = logging.getLogger(__name__)
 # Alcance SAGRILAFT aprobado: persona natural (CC, CE, pasaporte) y jurídica (NIT).
 TIPOS_DOCUMENTO = frozenset({"CC", "CE", "PP", "NIT"})
 _IDENTIFICADOR = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+_ID_EN_URL = re.compile(r"/report[a-z_]*/([A-Za-z0-9-]{1,64})/?(?:\?|$)")  # p. ej. …/api/report_json/<id>
 _SIN_EFECTO = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol)
 
 
@@ -83,6 +84,71 @@ class PdfPendiente:
 class EstadoFuente:
     codigo: str
     estado: str  # operational | under_maintenance | source_down
+
+
+@dataclass(frozen=True)
+class VerificacionDocumento:
+    """Respuesta de verify/nit o verify/ce, sin nombres ni datos personales.
+
+    `estado` es el que informa la fuente oficial («ACTIVA», «VIGENTE», «CANCELADA»…);
+    `avisos` son los `findings` de Tusdatos («Nit no encontrado», «Cédula no vigente»).
+    """
+    estado: str | None
+    avisos: tuple[str, ...]
+
+    @property
+    def no_encontrado(self) -> bool:
+        return any("no encontrad" in a.casefold() or "no se encuentra" in a.casefold()
+                   or "no registrad" in a.casefold() for a in self.avisos)
+
+    @property
+    def vigente(self) -> bool | None:
+        """False si el documento existe pero no está vigente o activo; None si no se sabe."""
+        if self.no_encontrado:
+            return None
+        if any("no vigente" in a.casefold() for a in self.avisos):
+            return False
+        if not self.estado:
+            return None
+        return self.estado.strip().upper() in ESTADOS_VIGENTES
+
+
+# Estados de cámara de comercio (NIT) y Migración (CE) que cuentan como vigentes.
+ESTADOS_VIGENTES = frozenset({"ACTIVA", "ACTIVO", "VIGENTE"})
+
+
+@dataclass(frozen=True)
+class ConsultaPrevia:
+    """Una consulta del historial de la cuenta (`/api/v1/checks`)."""
+    reporte_id: str
+    documento: str
+    creada_en: datetime | None  # None si la fecha no se pudo interpretar
+
+
+# Tusdatos informa sus horas en la de Colombia (UTC-5, sin horario de verano).
+HORA_COLOMBIA = timezone(timedelta(hours=-5))
+_FORMATOS_FECHA = ("%d/%m/%Y %H:%M:%S", "%d-%m-%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d-%m-%Y %H:%M", "%Y/%m/%d %H:%M:%S")
+
+
+def _fecha_hora(valor) -> datetime | None:
+    """Fecha y hora de una consulta del historial; sin hora no sirve para la ventana de 6 h."""
+    if not isinstance(valor, str) or not valor.strip():
+        return None
+    texto = valor.strip().replace("Z", "+00:00")
+    try:
+        fecha = datetime.fromisoformat(texto)
+        tiene_hora = "T" in texto or " " in texto
+    except ValueError:
+        fecha, tiene_hora = None, True
+        for formato in _FORMATOS_FECHA:
+            try:
+                fecha = datetime.strptime(texto, formato)
+                break
+            except ValueError:
+                continue
+    if fecha is None or not tiene_hora:
+        return None
+    return fecha if fecha.tzinfo else fecha.replace(tzinfo=HORA_COLOMBIA)
 
 
 class Interruptor:
@@ -147,6 +213,44 @@ class ClienteTusdatos:
 
     # ── Operaciones ───────────────────────────────────────────────────────────
 
+    def verificar_documento(self, tipo_documento: str, numero: str,
+                            fecha_expedicion: date | None = None) -> VerificacionDocumento:
+        """Valida un NIT (cámaras de comercio) o una CE (Migración Colombia) antes de consultar.
+
+        Puede gastar crédito según el plan: nunca se reintenta sola.
+        """
+        documento = limpiar_documento(numero)
+        if not documento.isdigit():
+            raise ValueError("Número de documento no válido para el tipo")
+        if tipo_documento == "NIT":
+            ruta, cuerpo = "/api/launch/verify/nit", {"nit": int(documento)}
+        elif tipo_documento == "CE":
+            if fecha_expedicion is None:
+                raise ValueError("Cédula de extranjería requiere fecha de expedición")
+            ruta, cuerpo = "/api/launch/verify/ce", {"ce": int(documento),
+                                                      "fecha_expedicion": fecha_expedicion.strftime("%d/%m/%Y")}
+        else:
+            raise ValueError("Solo se verifican NIT y cédula de extranjería")
+        respuesta = self._llamar("verificar", "POST", ruta, json=cuerpo, reintentos=0)
+        self._exigir(respuesta, "verificar", {200})
+        datos = self._json(respuesta, "verificar")
+        avisos = datos.get("findings") or []
+        if not isinstance(avisos, list):
+            raise RespuestaInesperada("verificar", 200, "Lista de avisos no válida")
+        avisos = [a.strip() for a in avisos if isinstance(a, str) and a.strip()]
+        fuente = datos.get("data") if isinstance(datos.get("data"), dict) else {}
+        estado = fuente.get("estado")
+        verificacion = VerificacionDocumento(estado=estado.strip() if isinstance(estado, str) and estado.strip() else None,
+                                             avisos=tuple(avisos))
+        error = datos.get("error")
+        if isinstance(error, str) and error.strip():
+            # El aviso puede venir en `error` en vez de `findings`; cualquier otro error no se interpreta.
+            con_error = VerificacionDocumento(estado=verificacion.estado, avisos=(*avisos, error.strip()))
+            if not (con_error.no_encontrado or con_error.vigente is False):
+                raise RespuestaInesperada("verificar", 200, "Tusdatos informó un error en la verificación")
+            return con_error
+        return verificacion
+
     def lanzar(self, tipo_documento: str, numero: str, *, nombre: str | None = None,
                fecha_expedicion: date | None = None, forzar: bool = False, referencia: str | None = None) -> Lanzamiento:
         if tipo_documento not in TIPOS_DOCUMENTO:
@@ -168,6 +272,8 @@ class ClienteTusdatos:
         respuesta = self._llamar("lanzar", "POST", "/api/launch", json=cuerpo, reintentos=0, con_efecto=True)
         if respuesta.status_code == 403:
             raise self._error_403(respuesta)
+        if respuesta.status_code == 400 and self._no_encontrado(respuesta):
+            raise DocumentoNoEncontrado("lanzar", 400)
         self._exigir(respuesta, "lanzar", {200})
         datos = self._json(respuesta, "lanzar")
         jobid = datos.get("jobid")
@@ -230,6 +336,36 @@ class ClienteTusdatos:
                                  params={"typedoc": tipo_documento}, reintentos=0)
         self._exigir(respuesta, "recarga", {200})
         return _identificador(self._json(respuesta, "recarga").get("jobid"), "recarga")
+
+    def historial(self, tipo_documento: str, numero: str, desde: date) -> tuple[ConsultaPrevia, ...]:
+        """Consultas de la cuenta para ese documento desde `desde` (gratis; no existe en el sandbox).
+
+        Sirve para recuperar el reporte cuando `launch` responde sin jobid (CC en caché de 6 h).
+        El id del reporte sale de `check_id` o, si no viene, del final de `url`.
+        """
+        if tipo_documento not in TIPOS_DOCUMENTO:
+            raise ValueError("Tipo de documento fuera del alcance SAGRILAFT")
+        documento = limpiar_documento(numero)
+        respuesta = self._llamar("historial", "GET", "/api/v1/checks", params={
+            "country": "CO", "document_type": tipo_documento, "document_number": documento,
+            "date_from": desde.strftime("%d-%m-%Y"), "per_page": "50"})
+        self._exigir(respuesta, "historial", {200})
+        filas = self._json(respuesta, "historial").get("data")
+        if not isinstance(filas, list):
+            raise RespuestaInesperada("historial", 200, "Lista de consultas no válida")
+        previas = []
+        for fila in filas:
+            if not isinstance(fila, dict):
+                continue
+            reporte_id = fila.get("check_id")
+            if not (isinstance(reporte_id, str) and _IDENTIFICADOR.match(reporte_id)):
+                enlace = _ID_EN_URL.search(fila.get("url") or "") if isinstance(fila.get("url"), str) else None
+                reporte_id = enlace.group(1) if enlace else None
+            if not (isinstance(reporte_id, str) and _IDENTIFICADOR.match(reporte_id)):
+                continue
+            previas.append(ConsultaPrevia(reporte_id=reporte_id, documento=limpiar_documento(fila.get("document_number") or ""),
+                                          creada_en=_fecha_hora(fila.get("created_at"))))
+        return tuple(previas)
 
     def estado_fuentes(self) -> tuple[EstadoFuente, ...]:
         respuesta = self._llamar("estado_fuentes", "GET", "/api/v1/sources/status", params={"country": "CO"})
@@ -313,6 +449,15 @@ class ClienteTusdatos:
         except (ValueError, AttributeError):
             mensaje = ""
         return TitularNoAutoriza("lanzar", 403) if "titular" in mensaje.casefold() else AccesoDenegado("lanzar", 403)
+
+    @staticmethod
+    def _no_encontrado(respuesta) -> bool:
+        """Tusdatos responde 400 con un texto como «Nit no encontrado» o «NO se encuentra en…»."""
+        try:
+            mensaje = str(respuesta.json().get("error", "")).casefold()
+        except (ValueError, AttributeError):
+            return False
+        return "no encontrad" in mensaje or "no se encuentra" in mensaje
 
     @staticmethod
     def _json(respuesta, operacion):
