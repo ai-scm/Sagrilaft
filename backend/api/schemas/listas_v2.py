@@ -11,6 +11,8 @@ class SolicitudConsultaLista(BaseModel):
     sujeto_rol: Literal["CONTRAPARTE", "REPRESENTANTE"] = "CONTRAPARTE"
     criterio: Criterio
     motivo: str | None = Field(default=None, min_length=10, max_length=500)
+    # Consulta nueva aunque exista una reciente reutilizable; exige permiso y gasta créditos.
+    forzar_actualizacion: bool = False
 
 
 class RevisionLista(BaseModel):
@@ -32,6 +34,8 @@ class SolicitudConsultaArchivos(BaseModel):
 class AdmisionLista(BaseModel):
     consulta_id: UUID
     ubicacion: str
+    # Verdadero si se devolvió una consulta reciente del mismo documento en el expediente.
+    reutilizada: bool = False
 
 
 class DetalleConsultaLista(BaseModel):
@@ -42,6 +46,7 @@ class DetalleConsultaLista(BaseModel):
 class ConsultaDelGrupo(BaseModel):
     consulta_id: UUID
     sujeto_rol: Literal["CONTRAPARTE", "REPRESENTANTE"]
+    reutilizada: bool = False
 
 
 class SujetoNoConsultado(BaseModel):
@@ -62,6 +67,8 @@ class DisponibilidadListas(BaseModel):
     implementacion: Literal["deshabilitado", "simulado", "archivos", "externo"]
     # Contrato que el portal debe usar al crear consultas; nulo si no se puede consultar.
     version_contrato: Literal["2.0", "2.1"] | None = None
+    forzar: bool = False
+    ver_pdf_proveedor: bool = False
 
 
 class RevisionRegistrada(BaseModel):

@@ -6,6 +6,13 @@ from uuid import UUID, uuid4
 
 
 @dataclass(frozen=True)
+class Admision:
+    """Consulta admitida, o una reciente del mismo expediente y documento que se reutiliza."""
+    consulta_id: UUID
+    reutilizada: bool = False
+
+
+@dataclass(frozen=True)
 class ConsultaAdmitida:
     """Lo que el trabajador leyó de una consulta ya admitida, antes de ejecutarla."""
     id: UUID
@@ -20,6 +27,7 @@ class ConsultaAdmitida:
 class ModalidadListas(Protocol):
     implementacion: str
     version_contrato: str
+    admite_forzar: bool  # Solo una modalidad con proveedor y caché propios puede forzar una consulta nueva.
 
     def disponible(self, entorno: str) -> bool: ...
     def recuperar_reintento(self, servicio, solicitud, clave: str) -> UUID | None: ...
@@ -31,7 +39,8 @@ class ModalidadListas(Protocol):
 
 def crear_grupo_por_documento(servicio, expediente_id, clave, sesion, *, proveedor: str,
                               criterio_para: Callable[[str, object], tuple[dict | None, str]],
-                              manifiesto_para: Callable[[dict], dict]) -> dict:
+                              manifiesto_para: Callable[[dict], dict],
+                              reutilizable: Callable[[dict, object], UUID | None] | None = None) -> dict:
     """Admite en una transacción la consulta de la contraparte y la de su representante.
 
     `criterio_para(rol, expediente)` devuelve (criterio, motivo): criterio None omite al
@@ -59,9 +68,15 @@ def crear_grupo_por_documento(servicio, expediente_id, clave, sesion, *, proveed
     # Diferir FK para poder insertar el grupo ya completo al final.
     sesion.execute(text("SET CONSTRAINTS fk_consulta_grupo DEFERRED"))
     for solicitud in solicitudes:
+        criterio = solicitud.criterio.model_dump(mode="json")
+        anterior = reutilizable(criterio, sesion) if reutilizable else None
+        if anterior:
+            respuesta["consultas"].append({"consulta_id": str(anterior), "sujeto_rol": solicitud.contexto.sujeto_rol,
+                                           "reutilizada": True})
+            continue
         identificador = servicio.repositorio.admitir(servicio.actor,
             SolicitudIdempotente(clave=f"grupo:{grupo_id}:{solicitud.contexto.sujeto_rol}", solicitud=solicitud),
-            proveedor, manifiesto_para(solicitud.criterio.model_dump(mode="json")), grupo_id=grupo_id, sesion_actual=sesion)
+            proveedor, manifiesto_para(criterio), grupo_id=grupo_id, sesion_actual=sesion)
         respuesta["consultas"].append({"consulta_id": str(identificador), "sujeto_rol": solicitud.contexto.sujeto_rol})
     grupo.respuesta = respuesta
     sesion.add(grupo)

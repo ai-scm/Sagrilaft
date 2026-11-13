@@ -101,9 +101,10 @@ def test_contrato_distinto_al_de_la_modalidad_vigente_se_rechaza():
 
 
 class ModalidadDePrueba:
-    """Simula la futura modalidad externa: solo se registra, no se toca el servicio común."""
+    """Simula una modalidad nueva: solo se registra, no se toca el servicio común."""
     implementacion = "externo"
     version_contrato = "2.0"
+    admite_forzar = False
 
     def __init__(self):
         self.creadas = []
@@ -132,9 +133,10 @@ def test_modalidad_nueva_se_conecta_solo_registrandola(monkeypatch):
     nueva = ModalidadDePrueba()
     monkeypatch.setitem(modalidades.MODALIDADES, "externo", nueva)
     comun = servicio("externo")
-    assert comun.crear("exp-1", solicitud_20(), "clave-1") == "id-externo" and nueva.creadas == ["clave-1"]
+    assert comun.crear("exp-1", solicitud_20(), "clave-1").consulta_id == "id-externo" and nueva.creadas == ["clave-1"]
     assert disponibilidad(comun) == {"consultar": True, "historial": False, "revisar": False,
-                                     "implementacion": "externo", "version_contrato": "2.0"}
+                                     "implementacion": "externo", "version_contrato": "2.0",
+                                     "forzar": False, "ver_pdf_proveedor": False}
     assert modalidad_de_consulta(admitida("externo")) is nueva
 
 
@@ -143,3 +145,23 @@ def test_disponibilidad_sin_modalidad_no_ofrece_consultar(monkeypatch):
     comun = SimpleNamespace(actor=ActorListas("e", "s", frozenset({"listas.consultar"})),
                             politica=SimpleNamespace(config=configuracion("externo")), entorno="development")
     assert disponibilidad(comun)["consultar"] is False and disponibilidad(comun)["version_contrato"] is None
+
+
+# ── Forzar actualización y permisos del equipo revisor ───────────────────────
+
+def test_revisor_abre_pdf_del_proveedor_y_fuerza_consultas():
+    revisor = ActorListas.desde_identidad_validada("e", "s", ("listas_revisor",))
+    operador = ActorListas.desde_identidad_validada("e", "s", ("listas_operador",))
+    assert {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion"} <= revisor.permisos
+    assert not {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion"} & operador.permisos
+
+
+def test_forzar_exige_permiso_antes_de_tocar_la_modalidad():
+    with pytest.raises(PermissionError):
+        servicio("simulado").crear("exp-1", solicitud_20(), "clave-1", forzar=True)
+
+
+def test_forzar_solo_aplica_a_la_modalidad_externa():
+    comun = servicio("simulado", permisos=("listas.consultar", "listas.forzar_actualizacion"))
+    with pytest.raises(ValueError, match="externa"):
+        comun.crear("exp-1", solicitud_20(), "clave-1", forzar=True)

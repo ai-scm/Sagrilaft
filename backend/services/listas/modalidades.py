@@ -19,6 +19,7 @@ class ModalidadSimulada:
     """Escenarios ficticios versionados; nunca sustituye a otra modalidad."""
     implementacion = "simulado"
     version_contrato = "2.0"
+    admite_forzar = False
 
     @staticmethod
     def _capacidades(escenario: str):
@@ -100,6 +101,7 @@ class ModalidadArchivos:
     """Listas importadas en PostgreSQL y evaluadas con el buscador local."""
     implementacion = "archivos"
     version_contrato = "2.1"
+    admite_forzar = False
 
     def disponible(self, entorno):
         from infrastructure.listas.configuracion_archivos import ConfiguracionArchivosLocal

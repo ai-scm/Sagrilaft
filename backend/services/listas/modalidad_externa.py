@@ -17,7 +17,39 @@ Cada pasada del trabajador avanza una etapa y libera la consulta hasta el próxi
 from datetime import timedelta
 
 from domain.listas.puertos import ListasNoDisponibles
-from services.listas.modalidad_base import crear_grupo_por_documento, datos_sujeto
+from services.listas.modalidad_base import Admision, crear_grupo_por_documento, datos_sujeto
+
+
+def _documento(criterio) -> tuple[str, str] | None:
+    """(tipo Tusdatos, número sin separadores) del primer documento consultable del criterio."""
+    from infrastructure.listas.tusdatos.adaptador import TIPOS_DOCUMENTO
+    from infrastructure.listas.tusdatos.cliente import limpiar_documento
+    for identificador in (criterio or {}).get("identificadores") or ():
+        tipo = TIPOS_DOCUMENTO.get(str(identificador.get("tipo", "")).upper())
+        if tipo:
+            return tipo, limpiar_documento(identificador.get("valor", "")).upper()
+    return None
+
+
+def bloquear_documento(sesion, expediente_id, documento) -> None:
+    """Serializa admisiones del mismo documento en el expediente hasta el fin de la transacción."""
+    from sqlalchemy import text
+    from services.listas.informes import calcular_huella
+    clave = calcular_huella(["tusdatos-reutilizacion", expediente_id, *documento])
+    sesion.execute(text("SELECT pg_advisory_xact_lock(:clave)"), {"clave": int(clave[:15], 16)})
+
+
+def consulta_reutilizable(sesion, expediente_id, documento, ahora):
+    """Consulta externa reciente del mismo documento en el expediente, en curso o con resultado usable."""
+    from sqlalchemy import select
+    from infrastructure.listas.tusdatos.adaptador import PROVEEDOR
+    from infrastructure.persistencia.modelos_listas import ConsultaLista
+    filas = sesion.execute(select(ConsultaLista.id, ConsultaLista.criterio_original).where(
+        ConsultaLista.expediente_id == expediente_id, ConsultaLista.implementacion == "externo",
+        ConsultaLista.proveedor == PROVEEDOR, ConsultaLista.estado.in_(ESTADOS_REUTILIZABLES),
+        ConsultaLista.creado_en >= ahora - VENTANA_REUTILIZACION,
+    ).order_by(ConsultaLista.creado_en.desc(), ConsultaLista.id.desc()))
+    return next((fila.id for fila in filas if _documento(fila.criterio_original) == documento), None)
 
 PLAZO = timedelta(minutes=15)
 INTERVALO_LANZAMIENTOS = 5.0   # Tusdatos exige 5 s entre lanzamientos.
@@ -25,11 +57,17 @@ ESPERA_TRAS_LANZAR = 15.0      # Una consulta tarda en promedio un minuto.
 ESPERA_SONDEO = 5.0            # Frecuencia de sondeo recomendada por Tusdatos.
 ESPERA_RED = 15.0
 CONCESION_PASADA = 300         # Cubre la llamada más lenta (PDF) con sus reintentos.
+# «Bloquear y reutilizar»: dentro del mismo expediente, una consulta del mismo documento de
+# las últimas 6 horas se reutiliza en vez de gastar otro crédito. Solo dentro del expediente:
+# reutilizar la de otro expediente expondría su resultado a quien no tiene acceso a él.
+VENTANA_REUTILIZACION = timedelta(hours=6)
+ESTADOS_REUTILIZABLES = ("PENDIENTE", "EN_CURSO", "COMPLETADA", "PARCIAL")
 
 
 class ModalidadExterna:
     implementacion = "externo"
     version_contrato = "2.0"
+    admite_forzar = True
 
     def __init__(self, fabrica_cliente=None):
         # Las pruebas inyectan un cliente con transporte simulado; en ejecución se arma desde el entorno.
@@ -78,12 +116,29 @@ class ModalidadExterna:
         # El repositorio resuelve el reintento 2.0 dentro de la misma admisión.
         return None
 
-    def crear(self, servicio, solicitud, clave):
+    def crear(self, servicio, solicitud, clave, forzar: bool = False):
+        from sqlalchemy import select
         from domain.listas.contratos import SolicitudIdempotente
         from infrastructure.listas.tusdatos.adaptador import PROVEEDOR, traducir_criterio
+        from infrastructure.persistencia.modelos_listas import ConsultaLista
         traducida = traducir_criterio(solicitud.criterio)  # ValueError → 422, sin gastar créditos
-        return servicio.repositorio.admitir(servicio.actor, SolicitudIdempotente(clave=clave, solicitud=solicitud),
-                                            PROVEEDOR, self.manifiesto(servicio.entorno, traducida.sujeto))
+        contexto = solicitud.contexto
+        documento = _documento(solicitud.criterio.model_dump(mode="json"))
+        peticion = SolicitudIdempotente(clave=clave, solicitud=solicitud)
+        with servicio.sesiones.begin() as sesion:
+            bloquear_documento(sesion, contexto.expediente_id, documento)
+            # Un reintento con la misma clave lo resuelve la admisión (misma consulta o conflicto),
+            # no la reutilización: así no se informa como reutilizada la propia consulta.
+            propia = sesion.scalar(select(ConsultaLista.id).where(ConsultaLista.actor_emisor == servicio.actor.issuer,
+                ConsultaLista.actor_sujeto == servicio.actor.sub, ConsultaLista.clave_idempotencia == clave,
+                ConsultaLista.ambito_idempotencia == f"expediente:{contexto.expediente_id}:{contexto.sujeto_rol}"))
+            if not forzar and propia is None:
+                anterior = consulta_reutilizable(sesion, contexto.expediente_id, documento, servicio.repositorio.reloj())
+                if anterior:
+                    return Admision(anterior, reutilizada=True)
+            identificador = servicio.repositorio.admitir(servicio.actor, peticion, PROVEEDOR,
+                self.manifiesto(servicio.entorno, traducida.sujeto, forzar=forzar), sesion_actual=sesion)
+        return Admision(identificador)
 
     def crear_grupo(self, servicio, expediente_id, clave, sesion):
         from domain.listas.contratos import Criterio
@@ -110,8 +165,14 @@ class ModalidadExterna:
         def manifiesto_para(criterio):
             return self.manifiesto(servicio.entorno, traducir_criterio(Criterio.model_validate(criterio)).sujeto)
 
+        def reutilizable(criterio, sesion_grupo):
+            documento = _documento(criterio)
+            bloquear_documento(sesion_grupo, expediente_id, documento)
+            return consulta_reutilizable(sesion_grupo, expediente_id, documento, servicio.repositorio.reloj())
+
         return crear_grupo_por_documento(servicio, expediente_id, clave, sesion, proveedor=PROVEEDOR,
-                                         criterio_para=criterio_para, manifiesto_para=manifiesto_para)
+                                         criterio_para=criterio_para, manifiesto_para=manifiesto_para,
+                                         reutilizable=reutilizable)
 
     # ── Ejecución ────────────────────────────────────────────────────────────
 

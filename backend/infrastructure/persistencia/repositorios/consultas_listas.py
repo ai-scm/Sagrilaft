@@ -409,6 +409,25 @@ class RepositorioConsultasListas:
             self._evento(sesion, consulta_id, "EVIDENCIA_LEIDA", actor, {"tipo": "INFORME_INTERNO"})
         return contenido
 
+    def leer_evidencia_proveedor(self, actor: ActorListas, consulta_id: UUID, evidencia_id: UUID) -> bytes:
+        """PDF entregado por el proveedor; trae datos sensibles, por eso exige su propio permiso."""
+        actor.exigir("listas.ver_pdf_proveedor")
+        if not self.puede_acceder_consulta(actor, consulta_id):
+            raise PermissionError("Sin acceso al historial de la consulta")
+        with self.sesiones() as sesion:
+            evidencia = sesion.execute(select(EvidenciaConsulta).where(EvidenciaConsulta.id == evidencia_id,
+                EvidenciaConsulta.consulta_id == consulta_id, EvidenciaConsulta.tipo == "PDF_PROVEEDOR")).scalar_one()
+            try:
+                contenido = self.custodia.leer(evidencia.clave, evidencia.huella, evidencia.tamano_bytes)
+            except ErrorIntegridadEvidencia:
+                with self.sesiones.begin() as registro:
+                    self._evento(registro, consulta_id, "EVIDENCIA_NO_INTEGRA", actor, {"evidencia_id": str(evidencia.id)})
+                raise
+        with self.sesiones.begin() as sesion:
+            self._evento(sesion, consulta_id, "EVIDENCIA_LEIDA", actor,
+                         {"tipo": "PDF_PROVEEDOR", "evidencia_id": str(evidencia_id)})
+        return contenido
+
     def obtener_consulta(self, actor: ActorListas, consulta_id: UUID) -> dict:
         actor.exigir("listas.ver_evidencias")
         if not self.puede_acceder_consulta(actor, consulta_id):

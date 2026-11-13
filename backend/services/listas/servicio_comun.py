@@ -9,6 +9,7 @@ from infrastructure.persistencia.modelos_listas import ConsultaLista, Coincidenc
 from infrastructure.persistencia.modelos_grupos_listas import GrupoConsultaLista
 from infrastructure.persistencia.repositorios.consultas_listas import RepositorioConsultasListas
 from services.listas.informes import calcular_huella
+from services.listas.modalidad_base import Admision
 from services.listas.modalidades import modalidad_vigente, reintento_admitido
 from services.listas.politica_v2 import PoliticaListasV2
 
@@ -47,18 +48,24 @@ class ServicioComunListas:
         if not self.puede_acceder_consulta(self.actor, consulta_id):
             raise LookupError("Consulta no disponible")
 
-    def crear(self, expediente_id, solicitud: CrearConsultaV2, clave):
+    def crear(self, expediente_id, solicitud: CrearConsultaV2, clave, forzar: bool = False) -> Admision:
+        """`forzar`: consulta nueva aunque haya una reciente reutilizable (gasta créditos del proveedor)."""
         self.exigir_expediente(expediente_id)
         self.actor.exigir("listas.consultar")
+        if forzar:
+            self.actor.exigir("listas.forzar_actualizacion")
         if solicitud.contexto.tipo != "EXPEDIENTE" or solicitud.contexto.expediente_id != expediente_id:
             raise ValueError("El contexto debe corresponder al expediente de la ruta")
         anterior = reintento_admitido(self, solicitud, clave)
         if anterior:
-            return anterior
+            return Admision(anterior)
         modalidad = modalidad_vigente(self.politica.config)
         if solicitud.version_contrato != modalidad.version_contrato:
             raise ListasNoDisponibles(f"La modalidad vigente admite el contrato {modalidad.version_contrato}")
-        return modalidad.crear(self, solicitud, clave)
+        if forzar and not modalidad.admite_forzar:
+            raise ValueError("Forzar actualización solo aplica a la modalidad externa")
+        resultado = modalidad.crear(self, solicitud, clave, **({"forzar": True} if forzar else {}))
+        return resultado if isinstance(resultado, Admision) else Admision(resultado)
 
     def crear_grupo(self, expediente_id, clave):
         self.exigir_expediente(expediente_id)
@@ -125,14 +132,19 @@ class ServicioComunListas:
                            "reporte_id": expediente.sagrilaft_reporte_id, "evidencia_disponible": False,
                            "descripcion": "Referencia heredada sin custodia v2; no se consulta al proveedor"}}
 
-    def evidencia(self, consulta_id, evidencia_id):
+    def evidencia(self, consulta_id, evidencia_id) -> tuple[bytes, str]:
+        """(contenido, nombre de archivo). El PDF del proveedor exige un permiso propio: trae datos sensibles."""
         self.actor.exigir("listas.ver_evidencias")
         self.exigir_consulta(consulta_id)
         with self.sesiones() as sesion:
             evidencia = sesion.get(EvidenciaConsulta, evidencia_id)
-            if not evidencia or evidencia.consulta_id != consulta_id or evidencia.tipo != "INFORME_INTERNO":
+            if not evidencia or evidencia.consulta_id != consulta_id or evidencia.tipo not in {"INFORME_INTERNO", "PDF_PROVEEDOR"}:
                 raise LookupError("Evidencia no disponible")
-        return self.repositorio.leer_informe(self.actor, consulta_id)
+            tipo = evidencia.tipo
+        if tipo == "PDF_PROVEEDOR":
+            self.actor.exigir("listas.ver_pdf_proveedor")
+            return self.repositorio.leer_evidencia_proveedor(self.actor, consulta_id, evidencia_id), f"proveedor_{consulta_id}.pdf"
+        return self.repositorio.leer_informe(self.actor, consulta_id), f"listas_{consulta_id}.pdf"
 
     def revisar(self, consulta_id, resultado, justificacion, coincidencia_id=None, revision_previa_id=None):
         self.actor.exigir("listas.revisar")

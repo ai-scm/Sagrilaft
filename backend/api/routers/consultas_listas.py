@@ -46,7 +46,9 @@ def disponibilidad(servicio: ServicioComunListas = Depends(servicio_listas)):
     return {"consultar": modalidad is not None and "listas.consultar" in permisos,
             "historial": "listas.ver_evidencias" in permisos, "revisar": "listas.revisar" in permisos,
             "implementacion": servicio.politica.config.implementacion,
-            "version_contrato": modalidad.version_contrato if modalidad else None}
+            "version_contrato": modalidad.version_contrato if modalidad else None,
+            "forzar": bool(modalidad and modalidad.admite_forzar) and "listas.forzar_actualizacion" in permisos,
+            "ver_pdf_proveedor": "listas.ver_pdf_proveedor" in permisos}
 
 
 @enrutador.post("/expedientes/{expediente_id}/consultas-listas", status_code=202, response_model=AdmisionLista)
@@ -56,8 +58,10 @@ def crear(expediente_id: str, datos: SolicitudConsultaLista | SolicitudConsultaA
     modelo = CrearConsultaBusqueda if isinstance(datos, SolicitudConsultaArchivos) else CrearConsultaV2
     solicitud = modelo(version_contrato="2.1" if isinstance(datos, SolicitudConsultaArchivos) else "2.0", contexto={"tipo": "EXPEDIENTE", "expediente_id": expediente_id,
         "sujeto_rol": datos.sujeto_rol, "motivo": datos.motivo}, criterio=datos.criterio)
-    identificador = servicio.crear(expediente_id, solicitud, clave)
-    return {"consulta_id": identificador, "ubicacion": f"/api/consultas-listas/{identificador}"}
+    forzar = getattr(datos, "forzar_actualizacion", False)
+    admision = servicio.crear(expediente_id, solicitud, clave, forzar=forzar)
+    return {"consulta_id": admision.consulta_id, "ubicacion": f"/api/consultas-listas/{admision.consulta_id}",
+            "reutilizada": admision.reutilizada}
 
 
 @enrutador.post("/expedientes/{expediente_id}/consultas-listas/grupos", status_code=202, response_model=AdmisionGrupo)
@@ -79,8 +83,8 @@ def detalle(consulta_id: UUID, servicio: ServicioComunListas = Depends(servicio_
 
 @enrutador.get("/consultas-listas/{consulta_id}/evidencias/{evidencia_id}")
 def evidencia(consulta_id: UUID, evidencia_id: UUID, servicio: ServicioComunListas = Depends(servicio_listas)):
-    contenido = servicio.evidencia(consulta_id, evidencia_id)
-    return Response(contenido, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="listas_{consulta_id}.pdf"',
+    contenido, nombre = servicio.evidencia(consulta_id, evidencia_id)
+    return Response(contenido, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{nombre}"',
                                                                     "Cache-Control": "private, no-store"})
 
 

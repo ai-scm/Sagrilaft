@@ -66,28 +66,35 @@ def externo(sesiones, tmp_path, monkeypatch):
     custodia = CustodiaLocalListas(tmp_path / "custodia")
     aplicacion.dependency_overrides[dependencias_listas.sesiones_listas] = lambda: sesiones
     aplicacion.dependency_overrides[dependencias_listas.custodia_listas] = lambda: custodia
-    expediente_id = str(uuid4())
+    expediente_id, otro_id = str(uuid4()), str(uuid4())
     with sesiones.begin() as sesion:
-        sesion.add(Formulario(id=expediente_id, tipo_contraparte="cliente", estado="enviado", tipo_persona="juridica",
-            razon_social="EMPRESA DE PRUEBAS S A S", numero_identificacion="900000152", tipo_identificacion="NIT",
-            nombre_representante="MIGUEL FERNANDO PEREZ GOMEZ", numero_doc_representante="111", tipo_doc_representante="CC"))
-    token = jwt.encode({"sub": "revisor-local", "iss": keycloak.issuer, "aud": "portal", "azp": "portal",
-                        "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
-                        "realm_access": {"roles": ["acceso_clientes", "listas_revisor"]}},
-                       clave, algorithm="RS256", headers={"kid": "clave-local"})
+        for identificador in (expediente_id, otro_id):
+            sesion.add(Formulario(id=identificador, tipo_contraparte="cliente", estado="enviado", tipo_persona="juridica",
+                razon_social="EMPRESA DE PRUEBAS S A S", numero_identificacion="900000152", tipo_identificacion="NIT",
+                nombre_representante="MIGUEL FERNANDO PEREZ GOMEZ", numero_doc_representante="111", tipo_doc_representante="CC"))
+
+    def token(*roles):
+        return jwt.encode({"sub": "persona-local", "iss": keycloak.issuer, "aud": "portal", "azp": "portal",
+                           "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+                           "realm_access": {"roles": ["acceso_clientes", *(roles or ("listas_revisor",))]}},
+                          clave, algorithm="RS256", headers={"kid": "clave-local"})
     cliente = TestClient(aplicacion)
-    cliente.headers["Authorization"] = f"Bearer {token}"
+    cliente.headers["Authorization"] = f"Bearer {token()}"
     reloj = [datetime.now(timezone.utc)]
     trabajador = TrabajadorListas(sesiones, PoliticaListasV2(configuracion, "development"), custodia, reloj=lambda: reloj[0])
     yield SimpleNamespace(cliente=cliente, sesiones=sesiones, custodia=custodia, simulador=simulador,
-                          expediente=expediente_id, trabajador=trabajador, reloj=reloj)
+                          expediente=expediente_id, otro=otro_id, trabajador=trabajador, reloj=reloj, token=token)
     cliente.close()
 
 
-def crear(e, tipo="CC", valor="112", clave=None, **criterio):
-    cuerpo = {"criterio": {"tipo_sujeto": "PERSONA", "identificadores": [{"tipo": tipo, "valor": valor}], **criterio}}
-    respuesta = e.cliente.post(f"/api/expedientes/{e.expediente}/consultas-listas", json=cuerpo,
-                               headers={"Idempotency-Key": clave or str(uuid4())})
+def crear(e, tipo="CC", valor="112", clave=None, expediente=None, forzar=False, roles=None, **criterio):
+    cuerpo = {"criterio": {"tipo_sujeto": "PERSONA", "identificadores": [{"tipo": tipo, "valor": valor}], **criterio},
+              **({"forzar_actualizacion": True} if forzar else {})}
+    encabezados = {"Idempotency-Key": clave or str(uuid4())}
+    if roles:
+        encabezados["Authorization"] = f"Bearer {e.token(*roles)}"
+    respuesta = e.cliente.post(f"/api/expedientes/{expediente or e.expediente}/consultas-listas", json=cuerpo,
+                               headers=encabezados)
     alinear_reloj(e)
     return respuesta
 
@@ -283,3 +290,85 @@ def test_admision_rechaza_lo_que_tusdatos_no_puede_consultar(externo, cuerpo):
 def test_ce_con_fecha_y_pasaporte_con_nombre_se_admiten(externo):
     assert crear(externo, tipo="CE", valor="960696", fecha_expedicion="2001-11-01").status_code == 202
     assert crear(externo, tipo="PAS", valor="381310014", nombre="JUAN PEREZ PEREZ").status_code == 202
+
+
+# ── Fase 5: bloquear y reutilizar, forzar actualización y PDF del proveedor ──
+
+def test_misma_cedula_en_6_horas_reutiliza_la_consulta_y_no_gasta_credito(externo):
+    primera = crear(externo, valor="1.12")  # el documento se compara sin separadores
+    assert primera.status_code == 202 and primera.json()["reutilizada"] is False
+    segunda = crear(externo, valor="112")
+    assert segunda.status_code == 202 and segunda.json() == {**primera.json(), "reutilizada": True}
+    procesar(externo)
+    assert crear(externo, valor="112").json() == {**primera.json(), "reutilizada": True}  # también ya terminada
+    assert len(lanzamientos(externo)) == 1
+
+
+def test_reintento_con_la_misma_clave_no_se_informa_como_reutilizada(externo):
+    primera = crear(externo, clave="clave-fija").json()
+    assert crear(externo, clave="clave-fija").json() == primera and primera["reutilizada"] is False
+
+
+def test_otro_expediente_no_reutiliza_la_consulta(externo):
+    primera = crear(externo).json()["consulta_id"]
+    otra = crear(externo, expediente=externo.otro).json()
+    assert otra["consulta_id"] != primera and otra["reutilizada"] is False
+
+
+def test_consulta_fallida_o_fuera_de_ventana_no_se_reutiliza(externo, monkeypatch):
+    titular = crear(externo, valor="128").json()["consulta_id"]
+    procesar(externo)
+    assert crear(externo, valor="128").json()["consulta_id"] != titular
+    from services.listas import modalidad_externa
+    primera = crear(externo).json()["consulta_id"]
+    monkeypatch.setattr(modalidad_externa, "VENTANA_REUTILIZACION", timedelta(0))
+    assert crear(externo).json()["consulta_id"] != primera
+
+
+def test_grupo_reutiliza_la_consulta_reciente_del_representante(externo):
+    individual = crear(externo, valor="111").json()["consulta_id"]
+    respuesta = externo.cliente.post(f"/api/expedientes/{externo.expediente}/consultas-listas/grupos",
+                                     headers={"Idempotency-Key": "grupo-reutiliza"}).json()
+    alinear_reloj(externo)
+    por_rol = {c["sujeto_rol"]: c for c in respuesta["consultas"]}
+    assert por_rol["REPRESENTANTE"] == {"consulta_id": individual, "sujeto_rol": "REPRESENTANTE", "reutilizada": True}
+    assert por_rol["CONTRAPARTE"]["reutilizada"] is False
+    procesar(externo)
+    assert len(lanzamientos(externo)) == 2  # NIT nuevo + la cédula una sola vez
+
+
+def test_forzar_actualizacion_lanza_con_force_y_queda_en_el_manifiesto(externo):
+    primera = crear(externo).json()["consulta_id"]
+    forzada = crear(externo, forzar=True).json()
+    assert forzada["consulta_id"] != primera and forzada["reutilizada"] is False
+    procesar(externo)
+    cuerpos = [json.loads(p.content) for p in lanzamientos(externo)]
+    assert [c["force"] for c in cuerpos] == [False, True]
+    with externo.sesiones() as sesion:
+        assert sesion.get(ConsultaLista, UUID(forzada["consulta_id"])).manifiesto["forzar"] is True
+
+
+def test_forzar_exige_el_permiso_del_equipo_revisor(externo):
+    assert crear(externo, forzar=True, roles=("listas_operador",)).status_code == 403
+    assert externo.cliente.get("/api/listas/disponibilidad").json()["forzar"] is True
+    operador = externo.cliente.get("/api/listas/disponibilidad",
+                                   headers={"Authorization": f"Bearer {externo.token('listas_operador')}"}).json()
+    assert operador["forzar"] is False and operador["ver_pdf_proveedor"] is False
+
+
+def test_pdf_del_proveedor_solo_para_el_equipo_revisor_y_queda_auditado(externo):
+    externo.simulador.extras[("GET", f"/api/v2/report_pdf/{REPORTE_CC}")] = httpx.Response(
+        200, content=PDF_MINIMO, headers={"content-type": "application/pdf"})
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    pdf = next(e for e in detalle(externo, consulta_id)["evidencias"] if e["tipo"] == "PDF_PROVEEDOR")
+    ruta = f"/api/consultas-listas/{consulta_id}/evidencias/{pdf['id']}"
+    respuesta = externo.cliente.get(ruta)
+    assert respuesta.status_code == 200 and respuesta.content == PDF_MINIMO
+    assert f'filename="proveedor_{consulta_id}.pdf"' in respuesta.headers["content-disposition"]
+    operador = {"Authorization": f"Bearer {externo.token('listas_operador')}"}
+    assert externo.cliente.get(ruta, headers=operador).status_code == 403
+    with externo.sesiones() as sesion:
+        lecturas = [ev.detalle for ev in sesion.scalars(select(EventoConsulta).where(
+            EventoConsulta.consulta_id == UUID(consulta_id), EventoConsulta.tipo == "EVIDENCIA_LEIDA"))]
+    assert lecturas == [{"tipo": "PDF_PROVEEDOR", "evidencia_id": pdf["id"]}]
