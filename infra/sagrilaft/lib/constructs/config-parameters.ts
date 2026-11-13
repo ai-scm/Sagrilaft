@@ -15,6 +15,7 @@ export interface ConfigParametersProps {
   readonly bedrockModelId: string;
   readonly proveedorListasCautela: string;
   readonly sagrilaftApiUrl: string;
+  readonly tusdatosUrl: string;
 }
 
 export class ConfigParameters extends Construct {
@@ -73,10 +74,14 @@ export class ConfigParameters extends Construct {
       ZOHO_SIGN_REQUEST_EXPIRATION_DAYS: '15',
       UVICORN_WORKERS: '4',
       TRUSTED_PROXY_IPS: '172.0.0.0/8',
-      // Staging puede usar dummy mientras la API real no este disponible.
-      // Produccion debe usar sagrilaft o deshabilitado de forma explicita.
+      // Staging: dummy (simulado) o sagrilaft (externo, Tusdatos). Produccion: deshabilitado.
       PROVEEDOR_LISTAS_CAUTELA: props.proveedorListasCautela,
       SAGRILAFT_API_URL: sagrilaftApiUrl,
+      // Listas v2: custodia de informes y PDF del proveedor en el bucket, bajo su prefijo
+      // (ECS no tiene disco persistente), y URL de Tusdatos para la modalidad externa.
+      LISTAS_CUSTODIA_BACKEND: 's3',
+      LISTAS_CUSTODIA_S3_PREFIJO: 'listas/custodia/',
+      LISTAS_TUSDATOS_URL: props.tusdatosUrl,
     };
 
     this.parameterNameByKey = {};

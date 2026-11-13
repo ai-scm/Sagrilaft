@@ -31,6 +31,7 @@
     public readonly keycloakAdminSecret: secretsmanager.Secret;
     public readonly smtpSecret: secretsmanager.Secret;
     public readonly sagrilaftSecret: secretsmanager.Secret;
+    public readonly tusdatosSecret: secretsmanager.Secret;
 
     constructor(scope: Construct, id: string, props: SecretsProps) {
       super(scope, id);
@@ -89,13 +90,25 @@
         })),
       });
 
-      // Credencial de la API de listas de cautela (tusdatos.co). Nace vacia
-      // como zohoSecret/smtpSecret: debe rellenarse en Secrets Manager antes
-      // de desplegar con PROVEEDOR_LISTAS_CAUTELA=sagrilaft.
+      // Circuito anterior (retirado): el backend ya no lo usa para arrancar. Se conserva
+      // para no borrar en el despliegue un secreto que pudo haberse rellenado; las
+      // credenciales vigentes de Tusdatos están en tusdatosSecret.
       this.sagrilaftSecret = new secretsmanager.Secret(this, 'SagrilaftCredentialsSecret', {
         secretName: `sagrilaft/${ambiente}/sagrilaft_listas_cautela_credentials`,
         secretStringValue: cdk.SecretValue.unsafePlainText(JSON.stringify({
           api_key: '',
+        })),
+      });
+
+      // Credenciales de Tusdatos para la modalidad externa de listas (LISTAS_TUSDATOS_*).
+      // Producción usa `token` (API Token Bearer); el sandbox usa `usuario` y `clave`.
+      // Nace vacío: el backend no arranca en modo externo hasta rellenar uno de los dos.
+      this.tusdatosSecret = new secretsmanager.Secret(this, 'TusdatosCredentialsSecret', {
+        secretName: `sagrilaft/${ambiente}/tusdatos_credentials`,
+        secretStringValue: cdk.SecretValue.unsafePlainText(JSON.stringify({
+          token: '',
+          usuario: '',
+          clave: '',
         })),
       });
     }
@@ -108,5 +121,6 @@
       this.keycloakAdminSecret.grantRead(grantee);
       this.smtpSecret.grantRead(grantee);
       this.sagrilaftSecret.grantRead(grantee);
+      this.tusdatosSecret.grantRead(grantee);
     }
   }

@@ -109,7 +109,7 @@ for (const environment of ['staging', 'prod']) {
     const template = synth({ environment, imageTag: 'bootstrap-placeholder', desiredCount: 0 });
     assertMigrationTag(template, 'bootstrap-placeholder');
     const services = Object.values(template.Resources).filter((resource: any) => resource.Type === 'AWS::ECS::Service') as any[];
-    equal(services.length, 4);
+    equal(services.length, 5);  // incluye el trabajador de listas
     for (const service of services) equal(service.Properties.DesiredCount, 0);
   });
 

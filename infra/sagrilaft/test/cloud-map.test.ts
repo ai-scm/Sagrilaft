@@ -37,13 +37,14 @@ for (const environment of ['staging', 'prod'] as const) {
 
     const ecsServices = Object.values(resources).filter((resource: any) =>
       resource.Type === 'AWS::ECS::Service') as any[];
-    equal(ecsServices.length, 4);
+    equal(ecsServices.length, 5);
     const serviceFamilies = ecsServices.map((service) =>
       resources[service.Properties.TaskDefinition.Ref].Properties.Family).sort();
     deepStrictEqual(serviceFamilies, [
       `sagrilaft-${environment}-backend`,
       `sagrilaft-${environment}-frontend`,
       `sagrilaft-${environment}-keycloak`,
+      `sagrilaft-${environment}-listas-worker`,
       `sagrilaft-${environment}-portal`,
     ].sort());
     const servicesWithRegistry = ecsServices.filter((service) =>
