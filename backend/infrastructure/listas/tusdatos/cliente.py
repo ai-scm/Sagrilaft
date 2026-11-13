@@ -1,4 +1,4 @@
-"""Cliente HTTP de Tusdatos: verificar documento, lanzar, estado, reporte JSON, PDF, recarga, historial y salud.
+"""Cliente HTTP de Tusdatos: verificar documento, lanzar, estado, reporte JSON, PDF, capturas, recarga, historial y salud.
 
 Solo conoce el protocolo. No decide qué fuentes interesan ni interpreta coincidencias:
 eso lo hace el adaptador de listas. Reglas que aplica:
@@ -29,6 +29,10 @@ registro = logging.getLogger(__name__)
 # Alcance SAGRILAFT aprobado: persona natural (CC, CE, pasaporte) y jurídica (NIT).
 TIPOS_DOCUMENTO = frozenset({"CC", "CE", "PP", "NIT"})
 _IDENTIFICADOR = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+# Las capturas viven en otro host, público. `dest` llega como «static/img/<uuid>» o solo «<uuid>».
+HOST_CAPTURAS = "https://static.tusdatos.co"
+_DEST = re.compile(r"^(?:static/img/)?([A-Za-z0-9-]{1,64})/?$")
+_JPEG = b"\xff\xd8\xff"
 _ID_EN_URL = re.compile(r"/report[a-z_]*/([A-Za-z0-9-]{1,64})/?(?:\?|$)")  # p. ej. …/api/report_json/<id>
 _SIN_EFECTO = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout, httpx.UnsupportedProtocol)
 
@@ -68,6 +72,16 @@ class DocumentoReporte:
 
 @dataclass(frozen=True)
 class DocumentoPdf:
+    contenido: bytes
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.contenido).hexdigest()
+
+
+@dataclass(frozen=True)
+class DocumentoCaptura:
+    """Captura de pantalla de una fuente, tal como la publica Tusdatos (JPEG)."""
     contenido: bytes
 
     @property
@@ -327,6 +341,26 @@ class ClienteTusdatos:
             raise RespuestaInesperada("pdf", 200, "El proveedor no entregó un PDF")
         return DocumentoPdf(contenido=respuesta.content)
 
+    def captura(self, dest: str, nombre: str) -> DocumentoCaptura | None:
+        """Captura de pantalla de una fuente del reporte; None si Tusdatos no la tiene.
+
+        Va al host público de estáticos sin credenciales (no las necesita y no hay que
+        enviarlas a otro host). No gasta crédito.
+        """
+        coincidencia = _DEST.match(str(dest or "").strip())
+        if not coincidencia:
+            raise RespuestaInesperada("captura", detalle="Ruta de capturas del proveedor no válida")
+        if not re.fullmatch(r"[a-z0-9_]{1,40}", nombre or ""):
+            raise ValueError("Nombre de captura no válido")
+        direccion = f"{HOST_CAPTURAS}/static/img/{coincidencia.group(1)}/{nombre}.jpg"
+        respuesta = self._llamar("captura", "GET", direccion, sin_credenciales=True)
+        if respuesta.status_code in {403, 404}:
+            return None  # La fuente no generó captura para este reporte.
+        self._exigir(respuesta, "captura", {200})
+        if not respuesta.content.startswith(_JPEG):
+            raise RespuestaInesperada("captura", 200, "El proveedor no entregó una imagen JPEG")
+        return DocumentoCaptura(contenido=respuesta.content)
+
     def reintentar_fuentes(self, reporte_id: str, tipo_documento: str) -> str:
         """Vuelve a consultar las fuentes con error sin consumir créditos; devuelve un jobid nuevo."""
         if tipo_documento not in TIPOS_DOCUMENTO:
@@ -385,7 +419,7 @@ class ClienteTusdatos:
     # ── Transporte ────────────────────────────────────────────────────────────
 
     def _llamar(self, operacion, metodo, ruta, *, reintentos=None, con_efecto=False, reintentar_5xx=True,
-                tiempo=None, **opciones):
+                tiempo=None, sin_credenciales=False, **opciones):
         reintentos = self.reintentos_lectura if reintentos is None else reintentos
         if tiempo is not None:
             opciones["timeout"] = httpx.Timeout(tiempo, connect=self.configuracion.tiempo_conexion)
@@ -393,7 +427,13 @@ class ClienteTusdatos:
             self.interruptor.permitir(operacion)
             inicio, estado_http = time.monotonic(), None
             try:
-                respuesta = self._http.request(metodo, ruta, **opciones)
+                if sin_credenciales:
+                    # Otro host (estáticos públicos): ni usuario y clave ni el token salen hacia él.
+                    peticion = self._http.build_request(metodo, ruta, **opciones)
+                    peticion.headers.pop("Authorization", None)
+                    respuesta = self._http.send(peticion, auth=None)
+                else:
+                    respuesta = self._http.request(metodo, ruta, **opciones)
             except _SIN_EFECTO:
                 error = ProveedorNoDisponible(operacion, detalle="No se pudo conectar")
             except httpx.HTTPError:

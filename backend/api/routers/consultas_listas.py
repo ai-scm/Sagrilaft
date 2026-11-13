@@ -83,8 +83,8 @@ def detalle(consulta_id: UUID, servicio: ServicioComunListas = Depends(servicio_
 
 @enrutador.get("/consultas-listas/{consulta_id}/evidencias/{evidencia_id}")
 def evidencia(consulta_id: UUID, evidencia_id: UUID, servicio: ServicioComunListas = Depends(servicio_listas)):
-    contenido, nombre = servicio.evidencia(consulta_id, evidencia_id)
-    return Response(contenido, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{nombre}"',
+    contenido, nombre, tipo_mime = servicio.evidencia(consulta_id, evidencia_id)
+    return Response(contenido, media_type=tipo_mime, headers={"Content-Disposition": f'attachment; filename="{nombre}"',
                                                                     "Cache-Control": "private, no-store"})
 
 

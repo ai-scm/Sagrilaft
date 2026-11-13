@@ -246,3 +246,12 @@ def test_documento_no_vigente_avisa_sin_cambiar_la_conclusion():
     resultado = interpretar(reporte, "CC", "112", documento_no_vigente="La empresa no figura vigente").resultado
     assert {a.codigo: a.descripcion for a in resultado.advertencias}["DOCUMENTO_NO_VIGENTE"] == "La empresa no figura vigente"
     assert resultado.conclusion_busqueda == interpretar(reporte, "CC", "112").resultado.conclusion_busqueda
+
+
+def test_capturas_por_fuente_y_ruta_guardada():
+    from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO, filtrar_reporte
+    capturas = {codigo: f.captura for codigo, f in FUENTES_POR_CODIGO.items() if f.captura}
+    # Nombres de archivo de la sección «Evidencias» de Tusdatos (ONU se guarda como onu.jpg).
+    assert capturas == {"ofac": "ofac", "ofac_nombre": "ofac_nombre", "lista_onu": "onu", "interpol": "interpol",
+                        "europol": "europol", "cidob": "cidob", "procuraduria": "procuraduria", "policia": "policia"}
+    assert filtrar_reporte(REPORTES["report_cc_con_hallazgo"])["dest"] == "static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8"

@@ -19,6 +19,9 @@ Cada pasada del trabajador avanza una etapa y libera la consulta hasta el próxi
 - El PDF del proveedor se intenta dentro del mismo plazo; si no llega, la consulta se
   cierra igual y queda un evento PDF_PROVEEDOR_NO_DISPONIBLE (el id del reporte queda
   guardado para descargarlo después).
+- En la misma etapa se guardan las capturas de pantalla por fuente que Tusdatos publica
+  (OFAC, ONU, INTERPOL, Procuraduría…). Son gratis y no detienen el cierre: la que no
+  llegue, no llega.
 """
 import logging
 import time
@@ -572,9 +575,42 @@ class ModalidadExterna:
                     custodiado = True
                 except OSError:
                     custodiado = False
-            repositorio.guardar_progreso(concesion, etapa="TERMINADA",
-                                         evento="PDF_PROVEEDOR_CUSTODIADO" if custodiado else "PDF_PROVEEDOR_NO_DISPONIBLE")
+            repositorio.guardar_progreso(concesion, evento="PDF_PROVEEDOR_CUSTODIADO" if custodiado else "PDF_PROVEEDOR_NO_DISPONIBLE")
+            repositorio.guardar_progreso(concesion, etapa="TERMINADA", evento=self._custodiar_capturas(trabajador, concesion, consulta, progreso))
         return self._informe_y_cierre(repositorio, concesion)
+
+    def _custodiar_capturas(self, trabajador, concesion, consulta, progreso) -> str:
+        """Guarda las capturas por fuente del reporte; devuelve el evento con que se deja constancia.
+
+        Una captura que falle o no exista no detiene nada: el PDF y el JSON ya son la evidencia
+        principal. No se repite en otra pasada, para no alargar el cierre.
+        """
+        from infrastructure.listas.tusdatos.adaptador import ADAPTADOR_VERSION, FUENTES_POR_CODIGO
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        repositorio = trabajador.repositorio
+        cliente = self.cliente(trabajador.politica.entorno)
+        dest = (progreso.respuesta_filtrada or {}).get("dest")
+        if not getattr(cliente.configuracion, "capturas", False) or not dest or repositorio.reloj() >= progreso.vence_en:
+            return "CAPTURAS_PROVEEDOR_OMITIDAS"
+        custodiadas = 0
+        for codigo in consulta.manifiesto.get("fuentes") or ():
+            fuente = FUENTES_POR_CODIGO.get(codigo)
+            if fuente is None or not fuente.captura:
+                continue
+            try:
+                captura = cliente.captura(dest, fuente.captura)
+            except (ErrorTusdatos, ValueError):
+                captura = None
+            if captura is None:
+                continue
+            try:
+                objeto = trabajador.custodia.guardar(captura.contenido)
+                if repositorio.agregar_evidencia_proveedor(concesion, "CAPTURA_PROVEEDOR", objeto, "image/jpeg",
+                                                           ADAPTADOR_VERSION, fuente_codigo=codigo):
+                    custodiadas += 1
+            except OSError:
+                continue
+        return "CAPTURAS_PROVEEDOR_CUSTODIADAS" if custodiadas else "CAPTURAS_PROVEEDOR_NO_DISPONIBLES"
 
     def _cerrar_con_resultado(self, trabajador, concesion, resultado):
         trabajador.repositorio.guardar_borrador(concesion, resultado)

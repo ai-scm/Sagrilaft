@@ -243,20 +243,30 @@ class RepositorioConsultasListas:
             return 0.0
 
     def agregar_evidencia_proveedor(self, concesion: ConcesionConsulta, tipo: str, objeto, tipo_contenido: str,
-                                    version_generador: str) -> UUID:
-        """Evidencia entregada por el proveedor (p. ej. su PDF), ya custodiada."""
-        if tipo not in {"PDF_PROVEEDOR", "RESPUESTA_ORIGINAL"}:
+                                    version_generador: str, fuente_codigo: str | None = None) -> UUID | None:
+        """Evidencia entregada por el proveedor (su PDF o una captura por fuente), ya custodiada.
+
+        Devuelve None si ese mismo objeto ya es evidencia de otra consulta: la clave de
+        custodia es única en toda la tabla, y no se puede registrar dos veces.
+        """
+        if tipo not in {"PDF_PROVEEDOR", "RESPUESTA_ORIGINAL", "CAPTURA_PROVEEDOR"}:
             raise ValueError("Tipo de evidencia de proveedor no válido")
+        if (tipo == "CAPTURA_PROVEEDOR") != bool(fuente_codigo):
+            raise ValueError("La captura exige la fuente; los demás tipos no la llevan")
         with self.sesiones.begin() as sesion:
             self._exigir_concesion(sesion, concesion)
             existente = sesion.scalar(select(EvidenciaConsulta.id).where(EvidenciaConsulta.consulta_id == concesion.consulta_id,
-                                                                         EvidenciaConsulta.tipo == tipo))
+                                                                         EvidenciaConsulta.tipo == tipo,
+                                                                         EvidenciaConsulta.fuente_codigo == fuente_codigo))
             if existente:
                 return existente
+            ajena = sesion.scalar(select(EvidenciaConsulta.consulta_id).where(EvidenciaConsulta.clave == objeto.clave))
+            if ajena is not None and ajena != concesion.consulta_id:
+                return None
             identificador = uuid4()
             sesion.add(EvidenciaConsulta(id=identificador, consulta_id=concesion.consulta_id, tipo=tipo, clave=objeto.clave,
                 huella=objeto.huella, tamano_bytes=objeto.tamano_bytes, tipo_contenido=tipo_contenido,
-                version_generador=version_generador))
+                version_generador=version_generador, fuente_codigo=fuente_codigo))
             return identificador
 
     def guardar_borrador(self, concesion: ConcesionConsulta, resultado: ResultadoProveedorV2):
@@ -411,13 +421,15 @@ class RepositorioConsultasListas:
         return contenido
 
     def leer_evidencia_proveedor(self, actor: ActorListas, consulta_id: UUID, evidencia_id: UUID) -> bytes:
-        """PDF entregado por el proveedor; trae datos sensibles, por eso exige su propio permiso."""
+        """PDF o captura entregados por el proveedor; traen datos sensibles, por eso exigen su propio permiso."""
         actor.exigir("listas.ver_pdf_proveedor")
         if not self.puede_acceder_consulta(actor, consulta_id):
             raise PermissionError("Sin acceso al historial de la consulta")
         with self.sesiones() as sesion:
             evidencia = sesion.execute(select(EvidenciaConsulta).where(EvidenciaConsulta.id == evidencia_id,
-                EvidenciaConsulta.consulta_id == consulta_id, EvidenciaConsulta.tipo == "PDF_PROVEEDOR")).scalar_one()
+                EvidenciaConsulta.consulta_id == consulta_id,
+                EvidenciaConsulta.tipo.in_(("PDF_PROVEEDOR", "CAPTURA_PROVEEDOR")))).scalar_one()
+            tipo = evidencia.tipo
             try:
                 contenido = self.custodia.leer(evidencia.clave, evidencia.huella, evidencia.tamano_bytes)
             except ErrorIntegridadEvidencia:
@@ -426,7 +438,7 @@ class RepositorioConsultasListas:
                 raise
         with self.sesiones.begin() as sesion:
             self._evento(sesion, consulta_id, "EVIDENCIA_LEIDA", actor,
-                         {"tipo": "PDF_PROVEEDOR", "evidencia_id": str(evidencia_id)})
+                         {"tipo": tipo, "evidencia_id": str(evidencia_id)})
         return contenido
 
     def obtener_consulta(self, actor: ActorListas, consulta_id: UUID) -> dict:

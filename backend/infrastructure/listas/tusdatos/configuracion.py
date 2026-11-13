@@ -10,6 +10,10 @@ HOST_SANDBOX = "docs.tusdatos.co"
 HOST_PRODUCCION = "dash-board.tusdatos.co"
 
 
+def _activo(variable: str) -> bool:
+    return os.getenv(variable, "true").strip().lower() not in {"false", "0", "no", "off"}
+
+
 @dataclass(frozen=True)
 class ConfiguracionTusdatos:
     url_base: str
@@ -23,6 +27,8 @@ class ConfiguracionTusdatos:
     alerta_creditos: int = 100
     # Validar NIT y cédula de extranjería (verify/nit, verify/ce) antes de consultar listas.
     verificar_documento: bool = True
+    # Guardar las capturas de pantalla por fuente que Tusdatos publica junto con el reporte.
+    capturas: bool = True
 
     def __post_init__(self):
         partes = urlsplit(self.url_base)
@@ -69,7 +75,7 @@ class ConfiguracionTusdatos:
             tiempo_lectura=segundos("LISTAS_TUSDATOS_TIEMPO_LECTURA", 20.0),
             tiempo_pdf=segundos("LISTAS_TUSDATOS_TIEMPO_PDF", 60.0),
             alerta_creditos=int(segundos("LISTAS_TUSDATOS_ALERTA_CREDITOS", 100)),
-            verificar_documento=os.getenv("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO", "true").strip().lower()
-            not in {"false", "0", "no", "off"})
+            verificar_documento=_activo("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO"),
+            capturas=_activo("LISTAS_TUSDATOS_CAPTURAS"))
         configuracion.validar_entorno(entorno)
         return configuracion

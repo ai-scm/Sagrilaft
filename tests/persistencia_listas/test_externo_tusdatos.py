@@ -655,3 +655,59 @@ def test_cedula_de_ciudadania_y_verificacion_apagada_no_verifican(externo, monke
     crear(externo, tipo="NIT", valor="900000152")
     procesar(externo)
     assert verificaciones(externo) == [] and len(lanzamientos(externo)) == 2
+
+
+# ── Capturas de pantalla por fuente ──────────────────────────────────────────
+
+JPEG = b"\xff\xd8\xff\xe0captura-de-prueba"
+DEST_CC = "/static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8"
+
+
+def capturas(e):
+    return [p for p in e.simulador.peticiones if p.url.host == "static.tusdatos.co"]
+
+
+def test_capturas_de_las_fuentes_quedan_como_evidencia_restringida(externo):
+    externo.simulador.extras[("GET", f"{DEST_CC}/ofac.jpg")] = httpx.Response(200, content=JPEG + b"ofac")
+    externo.simulador.extras[("GET", f"{DEST_CC}/onu.jpg")] = httpx.Response(200, content=JPEG + b"onu")
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    evidencias = [e for e in detalle(externo, consulta_id)["evidencias"] if e["tipo"] == "CAPTURA_PROVEEDOR"]
+    assert sorted(e["fuente_codigo"] for e in evidencias) == ["lista_onu", "ofac"]
+    # Se piden solo las fuentes de la consulta que generan captura, sin credenciales.
+    pedidas = {p.url.path.rsplit("/", 1)[-1] for p in capturas(externo)}
+    assert pedidas == {"ofac.jpg", "ofac_nombre.jpg", "onu.jpg", "interpol.jpg", "europol.jpg", "cidob.jpg",
+                       "procuraduria.jpg", "policia.jpg"}
+    assert all("authorization" not in p.headers for p in capturas(externo))
+    assert "CAPTURAS_PROVEEDOR_CUSTODIADAS" in eventos(externo, consulta_id)
+    ofac = next(e for e in evidencias if e["fuente_codigo"] == "ofac")
+    ruta = f"/api/consultas-listas/{consulta_id}/evidencias/{ofac['id']}"
+    respuesta = externo.cliente.get(ruta)
+    assert respuesta.status_code == 200 and respuesta.content == JPEG + b"ofac"
+    assert respuesta.headers["content-type"] == "image/jpeg"
+    assert f'filename="captura_ofac_{consulta_id}.jpg"' in respuesta.headers["content-disposition"]
+    assert externo.cliente.get(ruta, headers={"Authorization": f"Bearer {externo.token('listas_operador')}"}).status_code == 403
+
+
+def test_la_misma_imagen_en_dos_consultas_no_rompe_el_cierre(externo):
+    externo.simulador.extras[("GET", f"{DEST_CC}/ofac.jpg")] = httpx.Response(200, content=JPEG)
+    primera = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    segunda = crear(externo, valor="111", forzar=True).json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, segunda)["estado_ejecucion"] == "COMPLETADA"
+    assert [e["fuente_codigo"] for e in detalle(externo, primera)["evidencias"] if e["tipo"] == "CAPTURA_PROVEEDOR"] == ["ofac"]
+
+
+def test_sin_capturas_o_apagadas_la_consulta_cierra_igual(externo, monkeypatch):
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    assert "CAPTURAS_PROVEEDOR_NO_DISPONIBLES" in eventos(externo, consulta_id)
+    apagadas = ConfiguracionTusdatos(url_base="http://docs.tusdatos.co", usuario="pruebas", clave="password", capturas=False)
+    monkeypatch.setitem(modalidades.MODALIDADES, "externo", ModalidadExterna(fabrica_cliente=lambda _e: ClienteTusdatos(
+        apagadas, transporte=externo.simulador.transporte, dormir=lambda _s: None, metricas=lambda *_: None)))
+    antes = len(capturas(externo))
+    otra = crear(externo, valor="112").json()["consulta_id"]
+    procesar(externo)
+    assert len(capturas(externo)) == antes and "CAPTURAS_PROVEEDOR_OMITIDAS" in eventos(externo, otra)

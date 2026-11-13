@@ -102,7 +102,8 @@ class ServicioComunListas:
                 grupo_id=consulta.grupo_id, fase=trabajo.fase,
                 **({"trazabilidad": consulta.manifiesto.get("busqueda")} if consulta.version_contrato == "2.1" else {}),
                 evidencias=[{"id": e.id, "tipo": e.tipo, "estado": "DISPONIBLE", "sha256": e.huella,
-                    "creada_en": e.creado_en, "generador_version": e.version_generador} for e in evidencias])
+                    "creada_en": e.creado_en, "generador_version": e.version_generador,
+                    "fuente_codigo": e.fuente_codigo} for e in evidencias])
             revisiones = list(sesion.scalars(select(RevisionCumplimiento).where(RevisionCumplimiento.consulta_id == consulta_id)
                                             .order_by(RevisionCumplimiento.creado_en, RevisionCumplimiento.id)))
             return {"consulta": datos.model_dump(mode="json"), "revisiones": [{"id": str(r.id), "resultado": r.resultado,
@@ -132,19 +133,26 @@ class ServicioComunListas:
                            "reporte_id": expediente.sagrilaft_reporte_id, "evidencia_disponible": False,
                            "descripcion": "Referencia heredada sin custodia v2; no se consulta al proveedor"}}
 
-    def evidencia(self, consulta_id, evidencia_id) -> tuple[bytes, str]:
-        """(contenido, nombre de archivo). El PDF del proveedor exige un permiso propio: trae datos sensibles."""
+    def evidencia(self, consulta_id, evidencia_id) -> tuple[bytes, str, str]:
+        """(contenido, nombre de archivo, tipo MIME). Lo que entrega el proveedor (PDF y capturas)
+        exige un permiso propio: trae datos sensibles."""
         self.actor.exigir("listas.ver_evidencias")
         self.exigir_consulta(consulta_id)
         with self.sesiones() as sesion:
             evidencia = sesion.get(EvidenciaConsulta, evidencia_id)
-            if not evidencia or evidencia.consulta_id != consulta_id or evidencia.tipo not in {"INFORME_INTERNO", "PDF_PROVEEDOR"}:
+            if not evidencia or evidencia.consulta_id != consulta_id or evidencia.tipo not in {
+                    "INFORME_INTERNO", "PDF_PROVEEDOR", "CAPTURA_PROVEEDOR"}:
                 raise LookupError("Evidencia no disponible")
-            tipo = evidencia.tipo
+            tipo, fuente = evidencia.tipo, evidencia.fuente_codigo
+        if tipo == "CAPTURA_PROVEEDOR":
+            self.actor.exigir("listas.ver_pdf_proveedor")
+            return (self.repositorio.leer_evidencia_proveedor(self.actor, consulta_id, evidencia_id),
+                    f"captura_{fuente}_{consulta_id}.jpg", "image/jpeg")
         if tipo == "PDF_PROVEEDOR":
             self.actor.exigir("listas.ver_pdf_proveedor")
-            return self.repositorio.leer_evidencia_proveedor(self.actor, consulta_id, evidencia_id), f"proveedor_{consulta_id}.pdf"
-        return self.repositorio.leer_informe(self.actor, consulta_id), f"listas_{consulta_id}.pdf"
+            return (self.repositorio.leer_evidencia_proveedor(self.actor, consulta_id, evidencia_id),
+                    f"proveedor_{consulta_id}.pdf", "application/pdf")
+        return self.repositorio.leer_informe(self.actor, consulta_id), f"listas_{consulta_id}.pdf", "application/pdf"
 
     def revisar(self, consulta_id, resultado, justificacion, coincidencia_id=None, revision_previa_id=None):
         self.actor.exigir("listas.revisar")

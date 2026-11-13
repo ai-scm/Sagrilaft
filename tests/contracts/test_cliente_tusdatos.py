@@ -405,3 +405,42 @@ def test_verificacion_configurable(monkeypatch):
     assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is True
     monkeypatch.setenv("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO", "false")
     assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is False
+
+
+# ── Capturas de pantalla por fuente (static.tusdatos.co) ─────────────────────
+
+JPEG = b"\xff\xd8\xff\xe0captura-de-prueba"
+RUTA_CAPTURA = "/static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8/ofac.jpg"
+
+
+@pytest.mark.parametrize("dest", ["static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8",
+                                  "63776b99-4f26-4f11-b426-dcbbb124dfb8/"])
+def test_captura_se_pide_al_host_de_estaticos(dest):
+    c, simulador = cliente()
+    simulador.extras[("GET", RUTA_CAPTURA)] = httpx.Response(200, content=JPEG)
+    captura = c.captura(dest, "ofac")
+    peticion = simulador.peticiones[-1]
+    assert str(peticion.url) == "https://static.tusdatos.co" + RUTA_CAPTURA
+    assert captura.contenido == JPEG and len(captura.sha256) == 64
+
+
+@pytest.mark.parametrize("config", [configuracion(), configuracion(url_base="https://dash-board.tusdatos.co",
+                                                                     token="api_td_secreto", usuario="", clave="")])
+def test_captura_nunca_lleva_credenciales(config):
+    c, simulador = cliente(config=config)
+    simulador.extras[("GET", RUTA_CAPTURA)] = httpx.Response(200, content=JPEG)
+    c.captura("static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8", "ofac")
+    assert "authorization" not in simulador.peticiones[-1].headers
+
+
+def test_captura_inexistente_o_rara():
+    c, simulador = cliente()
+    simulador.extras[("GET", RUTA_CAPTURA)] = httpx.Response(403, text="<Error/>")
+    assert c.captura("static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8", "ofac") is None
+    simulador.extras[("GET", RUTA_CAPTURA)] = httpx.Response(200, content=b"<html>no es una imagen</html>")
+    with pytest.raises(RespuestaInesperada):
+        c.captura("static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8", "ofac")
+    with pytest.raises(RespuestaInesperada):
+        c.captura("../../api/plans", "ofac")  # la ruta no puede salir del directorio de capturas
+    with pytest.raises(ValueError):
+        c.captura("static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8", "../ofac")

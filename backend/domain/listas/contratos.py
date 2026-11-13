@@ -170,8 +170,10 @@ class ErrorConsulta(DTO):
 
 class Evidencia(DTO):
     id: UUID
-    tipo: Literal["INFORME_INTERNO", "MANIFIESTO", "RESPUESTA_ORIGINAL", "PDF_PROVEEDOR"]
+    tipo: Literal["INFORME_INTERNO", "MANIFIESTO", "RESPUESTA_ORIGINAL", "PDF_PROVEEDOR", "CAPTURA_PROVEEDOR"]
     estado: Literal["PENDIENTE", "DISPONIBLE", "NO_DISPONIBLE", "ERROR_INTEGRIDAD"]
+    # Solo CAPTURA_PROVEEDOR: código de la fuente a la que pertenece la captura de pantalla.
+    fuente_codigo: Codigo | None = None
     sha256: Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")] | None = None
     creada_en: AwareDatetime
     generador_version: Codigo | None = None

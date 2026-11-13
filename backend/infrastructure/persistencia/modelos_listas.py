@@ -386,6 +386,7 @@ class EvidenciaConsulta(IdentidadRegistro, Base):
     tamano_bytes: Mapped[int] = mapped_column(BigInteger)
     tipo_contenido: Mapped[str] = mapped_column(String(100))
     version_generador: Mapped[str] = mapped_column(String(64))
+    fuente_codigo: Mapped[str | None] = mapped_column(String(64))  # solo capturas del proveedor (migración n54c67d890eb)
 
 
 class RevisionCumplimiento(IdentidadRegistro, Base):

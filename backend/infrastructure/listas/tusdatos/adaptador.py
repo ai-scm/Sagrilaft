@@ -45,6 +45,9 @@ class FuenteSagrilaft:
     # Si el campo no viene en el reporte, ¿la fuente impide concluir? Las fuentes que
     # Tusdatos solo incluye cuando hay registro (p. ej. PEP por función pública) no.
     ausencia_bloquea: bool = True
+    # Nombre del archivo de la captura de pantalla que Tusdatos publica para la fuente
+    # (static.tusdatos.co/static/img/<dest>/<captura>.jpg). None: la fuente no genera captura.
+    captura: str | None = None
 
     @property
     def codigos_estado(self) -> frozenset:
@@ -53,24 +56,26 @@ class FuenteSagrilaft:
 
 
 FUENTES = (
-    FuenteSagrilaft("ofac", "OFAC (Lista Clinton), por documento", ("ofac",), ("ofac", "ofac_offline", "ofac_database_id")),
+    FuenteSagrilaft("ofac", "OFAC (Lista Clinton), por documento", ("ofac",), ("ofac", "ofac_offline", "ofac_database_id"),
+                    captura="ofac"),
     FuenteSagrilaft("ofac_nombre", "OFAC (Lista Clinton), por nombre", ("ofac_nombre",),
-                    ("ofac_nombre", "ofac_offline_name", "ofac_database_nombre"), frozenset({PERSONA}), True),
-    # El catálogo de errores de Tusdatos usa dos códigos para ONU: lista_onu y onu.
-    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu", "onu")),
-    FuenteSagrilaft("interpol", "INTERPOL", ("interpol",), ("interpol",), frozenset({PERSONA})),
-    FuenteSagrilaft("europol", "EUROPOL", ("europol",), ("europol",), frozenset({PERSONA})),
+                    ("ofac_nombre", "ofac_offline_name", "ofac_database_nombre"), frozenset({PERSONA}), True, captura="ofac_nombre"),
+    # El catálogo de errores de Tusdatos usa dos códigos para ONU: lista_onu y onu. La captura se llama onu.jpg.
+    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu", "onu"), captura="onu"),
+    FuenteSagrilaft("interpol", "INTERPOL", ("interpol",), ("interpol",), frozenset({PERSONA}), captura="interpol"),
+    FuenteSagrilaft("europol", "EUROPOL", ("europol",), ("europol",), frozenset({PERSONA}), captura="europol"),
     FuenteSagrilaft("peps", "Listas y PEP, por documento", ("peps",), ("peps",)),
     FuenteSagrilaft("peps_denom", "Listas y PEP, por nombre", ("peps_denom",), ("peps_denom",), AMBOS, True),
-    FuenteSagrilaft("cidob", "CIDOB, PEP a nivel mundial", ("cidob",), ("cidob",), frozenset({PERSONA}), True),
+    FuenteSagrilaft("cidob", "CIDOB, PEP a nivel mundial", ("cidob",), ("cidob",), frozenset({PERSONA}), True, captura="cidob"),
     # PEP por cargo en la función pública colombiana. En el sandbox solo aparece cuando hay
     # registro, así que su ausencia no impide concluir (por confirmar con datos reales).
     FuenteSagrilaft("peps_funcion_publica", "Listas y PEP, función pública (Colombia)", ("peps_funcion_publica",),
                     ("peps_funcion_publica",), frozenset({PERSONA}), ausencia_bloquea=False),
-    FuenteSagrilaft("procuraduria", "Procuraduría General de la Nación", ("procuraduria",), ("procuraduria", "procuraduria_db")),
+    FuenteSagrilaft("procuraduria", "Procuraduría General de la Nación", ("procuraduria",), ("procuraduria", "procuraduria_db"),
+                    captura="procuraduria"),
     FuenteSagrilaft("contraloria", "Contraloría General de la República", ("contraloria", "contraloria2"),
                     ("contraloria", "contraloria_db")),
-    FuenteSagrilaft("policia", "Policía Nacional", ("policia",), ("policia",), frozenset({PERSONA})),
+    FuenteSagrilaft("policia", "Policía Nacional", ("policia",), ("policia",), frozenset({PERSONA}), captura="policia"),
 )
 FUENTES_POR_CODIGO = {f.codigo: f for f in FUENTES}
 CATEGORIAS_PEP = (("restrictiv", "listas_restrictivas"), ("vinculant", "listas_vinculantes"), ("internacional", "peps_internacionales"))
@@ -296,6 +301,7 @@ def filtrar_reporte(reporte: dict) -> dict:
                                 and (h.get("codigo") in CODIGOS_HALLAZGO_APROBADOS or h.get("fuente") in CAMPOS_APROBADOS)]
     return {"id": reporte.get("id"), "typedoc": reporte.get("typedoc"), "fecha": reporte.get("fecha"),
             "nombre": reporte.get("nombre"), "nivel": reporte.get("hallazgos"),
+            "dest": reporte.get("dest") if isinstance(reporte.get("dest"), str) else None,  # ruta de las capturas
             "errores": sorted(e for e in (reporte.get("errores") or []) if e in {c for f in FUENTES for c in f.errores}),
             "fuentes": {campo: reporte[campo] for campo in sorted(CAMPOS_APROBADOS) if campo in reporte},
             "dict_hallazgos": hallazgos}
