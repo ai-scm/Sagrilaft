@@ -380,7 +380,7 @@ historial y revisar, y la modalidad activa. «Consultar» solo es verdadero en
 | Rol | Permisos |
 |---|---|
 | `listas_operador` | `listas.consultar`, `listas.ver_evidencias` |
-| `listas_revisor` | los anteriores + `listas.revisar` |
+| `listas_revisor` | los anteriores + `listas.revisar`, `listas.ver_pdf_proveedor` (PDF del proveedor) y `listas.forzar_actualizacion` (consulta externa nueva) |
 | `listas_cargador` | `listas.importar`, `listas.comparar`, `listas.ver_administracion` |
 | `listas_aprobador` | `listas.comparar`, `listas.ver_administracion`, `listas.aprobar_version`, `listas.activar_version` |
 | `listas_incidentes` | `listas.ver_administracion`, `listas.bloquear_version`, `listas.reconstruir_version` |
@@ -583,7 +583,8 @@ libera la consulta entre pasadas (`posponer`):
   `RESULTADO_EN_CACHE_SIN_REFERENCIA`).
 - **PDF del proveedor:** se intenta dentro del plazo y se custodia como evidencia
   `PDF_PROVEEDOR`; si no llega, se cierra igual con el evento `PDF_PROVEEDOR_NO_DISPONIBLE`.
-  Su descarga restringida al equipo revisor es de la Fase 5.
+  Solo lo descarga quien tiene `listas.ver_pdf_proveedor`; cada lectura deja un evento
+  `EVIDENCIA_LEIDA` con el tipo y la evidencia.
 - **Fuentes** (`infrastructure/listas/tusdatos/adaptador.py`): ofac, ofac_nombre,
   lista_onu, interpol, europol, peps, peps_denom, cidob, procuraduria, contraloria
   (+contraloria2) y policia. Persona: las 11; empresa (NIT): ofac, lista_onu, peps,
@@ -593,8 +594,19 @@ libera la consulta entre pasadas (`posponer`):
 - **Admisión:** exige CC, CE (con fecha de expedición), pasaporte (`PAS`/`PASAPORTE`, con
   nombre) o NIT; si no, 422 sin gastar créditos. Se envía `force: false`.
 
-Pendiente: «bloquear y reutilizar» (6 h), botón «Forzar actualización», descarga del PDF
-y permisos (Fase 5); custodia S3, trabajador y secretos en staging (Fase 7).
+- **Bloquear y reutilizar (Fase 5):** si en el **mismo expediente** hay una consulta externa
+  del mismo documento (tipo y número sin separadores) de las últimas 6 horas, `PENDIENTE`,
+  `EN_CURSO`, `COMPLETADA` o `PARCIAL`, se devuelve esa con `reutilizada: true` y no se gasta
+  otro crédito. `FALLIDA` e `INDETERMINADA` no se reutilizan. Nunca se reutiliza entre
+  expedientes: expondría el resultado a quien no tiene acceso. Un bloqueo por expediente y
+  documento evita dos lanzamientos por clics simultáneos; el grupo aplica la misma regla
+  por sujeto. Un reintento con la misma `Idempotency-Key` devuelve su propia consulta.
+- **Forzar actualización (Fase 5):** `forzar_actualizacion: true` en la petición individual
+  exige `listas.forzar_actualizacion`, solo vale para la modalidad externa (422 en las
+  demás), omite la reutilización y envía `force: true`; queda en el manifiesto (`forzar`).
+  `GET /api/listas/disponibilidad` informa `forzar` y `ver_pdf_proveedor` al portal.
+
+Pendiente: custodia S3, trabajador y secretos en staging (Fase 7).
 
 Reglas que deberá respetar:
 

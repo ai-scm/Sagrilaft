@@ -517,9 +517,9 @@ Probado con el sandbox público y con respuestas grabadas
 (`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
 `tests/persistencia_listas/test_externo_tusdatos.py`). Falta:
 
-- Fase 5: «bloquear y reutilizar» 6 h por documento, botón «Forzar actualización»,
-  descarga del PDF del proveedor y permisos `listas.ver_pdf_proveedor` y
-  `listas.forzar_actualizacion` para `listas_revisor`.
+- Fase 5 hecha: reutilización 6 h dentro del expediente, «Forzar actualización» y
+  descarga del PDF del proveedor para `listas_revisor`. Falta crear en Keycloak los roles
+  `listas_*` y asignarlos (ver «Antes de cualquier ambiente compartido»).
 - Respuesta de Tusdatos sobre cómo recuperar el reporte de una CC en caché (`jobid: null`).
 - Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
   (en especial los textos de Policía y los registros PEP).
