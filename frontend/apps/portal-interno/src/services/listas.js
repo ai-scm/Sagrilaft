@@ -13,7 +13,7 @@ export const listas = {
   revisar: (id, datos) => requestJson(`/consultas-listas/${id}/revisiones`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos),
   }),
-  async evidencia(consulta, evidencia) {
+  async evidencia(consulta, evidencia, tipo) {
     const token = await getToken();
     const respuesta = await fetch(`${API_BASE}/consultas-listas/${consulta}/evidencias/${evidencia}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -22,7 +22,7 @@ export const listas = {
     const direccion = URL.createObjectURL(await respuesta.blob());
     const enlace = document.createElement('a');
     enlace.href = direccion;
-    enlace.download = `listas_${consulta}.pdf`;
+    enlace.download = tipo === 'PDF_PROVEEDOR' ? `proveedor_${consulta}.pdf` : `listas_${consulta}.pdf`;
     enlace.click();
     URL.revokeObjectURL(direccion);
   },

@@ -79,7 +79,7 @@ const CandidatoLista = memo(function CandidatoLista({ candidato, fuente, clasifi
   </section>;
 });
 
-function ResultadoConsultaListas({ consulta, descargar }) {
+function ResultadoConsultaListas({ consulta, descargar, puedeVerPdfProveedor = false }) {
   const clasificado = consulta.version_contrato === '2.1';
   const fuentes = useMemo(() => new Map(consulta.cobertura.map(f => [f.id, f])), [consulta.cobertura]);
   const trazabilidad = consulta.trazabilidad;
@@ -122,9 +122,11 @@ function ResultadoConsultaListas({ consulta, descargar }) {
     {!consulta.evidencias.length && <p>No hay un informe disponible para esta consulta.</p>}
     {consulta.evidencias.map(e => <div key={e.id}>
       <Datos pares={[
-        ['Evidencia', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version], ['SHA-256 del PDF', e.sha256],
+        ['Evidencia', e.tipo === 'PDF_PROVEEDOR' ? 'PDF del proveedor' : 'Informe interno'], ['Identificador', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version], ['SHA-256 del PDF', e.sha256],
       ]} />
-      {e.estado === 'DISPONIBLE' && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id)}>Descargar informe conservado</button>}
+      {e.tipo === 'PDF_PROVEEDOR' && <p className="listas-nota">PDF entregado por el proveedor. Contiene información de otras fuentes; su acceso queda registrado.</p>}
+      {e.estado === 'DISPONIBLE' && e.tipo !== 'PDF_PROVEEDOR' && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar informe conservado</button>}
+      {e.estado === 'DISPONIBLE' && e.tipo === 'PDF_PROVEEDOR' && puedeVerPdfProveedor && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar PDF del proveedor</button>}
     </div>)}
   </div>;
 }
