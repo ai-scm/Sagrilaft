@@ -95,7 +95,7 @@ services:
       # Si necesitas correr dos backends a la vez, cambia a "8001:8000".
       - "8000:8000"
 
-    environment:
+    environment: &entorno_backend_local
       # La URL de conexión a la base de datos apunta al contenedor postgres
       # (no a AWS). Se construye con las mismas variables del .env.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -171,6 +171,18 @@ services:
       # SNS_NOTIFICACIONES_ENABLED: ${SNS_NOTIFICACIONES_ENABLED:-false}
 
       APP_ENV: ${APP_ENV:-development}
+      # Variable heredada: vacía = ausente. LISTAS_IMPLEMENTACION manda en desarrollo.
+      PROVEEDOR_LISTAS_CAUTELA: ""
+      LISTAS_IMPLEMENTACION: ${LISTAS_IMPLEMENTACION:-deshabilitado}
+      LISTAS_ADMIN_HABILITADA: ${LISTAS_ADMIN_HABILITADA:-false}
+      LISTAS_OFAC_LOCAL_HABILITADA: ${LISTAS_OFAC_LOCAL_HABILITADA:-false}
+      LISTAS_ARCHIVOS_LOCAL_HABILITADA: ${LISTAS_ARCHIVOS_LOCAL_HABILITADA:-false}
+      LISTAS_ARCHIVOS_FUENTES: ${LISTAS_ARCHIVOS_FUENTES:-}
+      LISTAS_ARCHIVOS_POLITICA_ID: ${LISTAS_ARCHIVOS_POLITICA_ID:-}
+      LISTAS_ADMIN_POLITICA_ID: ${LISTAS_ADMIN_POLITICA_ID:-}
+      LISTAS_CUSTODIA_DIRECTORIO: /app/uploads/listas
+      LISTAS_BASE_LOCAL: ${POSTGRES_DB}
+
 
     # El backend no arranca hasta que Postgres haya pasado su healthcheck.
     depends_on:
@@ -184,6 +196,25 @@ services:
 
   # ── Formulario Público (React + Vite dev) ─────────────────────────────────
   # Servidor de desarrollo para el formulario público.
+  trabajador-listas:
+    image: solucion-backend
+    restart: unless-stopped
+    command: sh -c "exec python -m infrastructure.listas.trabajador_local"
+    environment:
+      <<: *entorno_backend_local
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+      AWS_EC2_METADATA_DISABLED: "true"
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/app/uploads
+    networks:
+      - interna
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   formulario-publico:
     build:
       context: ./frontend
