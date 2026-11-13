@@ -1,0 +1,58 @@
+/* Panel de consultas de listas cautelares (F6). Reutiliza .form-input y .btn-modal de Modals.css. */
+.listas-panel { color: #0F172A; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 20px; }
+.listas-panel h3, .listas-panel h4, .listas-panel h5, .listas-panel h6 { margin: 0; color: #0F172A; letter-spacing: -0.01em; }
+.listas-panel h3 { font-size: 18px; }
+.listas-panel h4 { font-size: 15px; }
+.listas-panel p { margin: 0; }
+.listas-panel__titulo { display: block; }
+.listas-en-modal .listas-panel__titulo { display: none; }
+
+/* Mensajes */
+.listas-aviso, .listas-ok, .listas-error, .listas-progreso, .listas-nota {
+  padding: 10px 14px; border-radius: 8px; border: 1px solid; font-size: 13px;
+}
+.listas-aviso { background: #EFF6FF; border-color: #BFDBFE; color: #1E3A8A; }
+.listas-ok { background: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+.listas-error { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+.listas-progreso { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+.listas-nota { background: #F8FAFC; border-color: #E2E8F0; color: #475569; }
+.listas-simulado { background: #FEF3C7; border: 1px dashed #D97706; color: #92400E; padding: 8px 12px; border-radius: 8px; }
+
+/* Formulario de consulta */
+.listas-formulario { border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px 18px; margin: 0; background: #F8FAFC; }
+.listas-formulario legend { font-size: 13px; font-weight: 700; color: #334155; padding: 0 8px; }
+.listas-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px 14px; }
+.listas-campo { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #334155; }
+.listas-campo .form-input { font-weight: 400; }
+.listas-acciones { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.listas-ayuda { margin-top: 10px !important; font-size: 12px; color: #64748B; }
+
+/* Historial */
+.listas-historial { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.listas-historial li { margin: 0; }
+.listas-item {
+  width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; text-align: left; cursor: pointer;
+  background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; font: inherit; color: #334155;
+  transition: border-color .15s, background .15s;
+}
+.listas-item:hover { border-color: #93C5FD; background: #F8FAFC; }
+.listas-item[aria-current="true"] { border-color: #2563EB; background: #EFF6FF; }
+.listas-estado { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #E2E8F0; color: #334155; }
+.listas-estado[data-estado="COMPLETADA"] { background: #D1FAE5; color: #065F46; }
+.listas-estado[data-estado="FALLIDA"] { background: #FEE2E2; color: #991B1B; }
+.listas-estado[data-estado="PENDIENTE"], .listas-estado[data-estado="EN_CURSO"] { background: #FEF3C7; color: #92400E; }
+.listas-estado[data-estado="PARCIAL"], .listas-estado[data-estado="INDETERMINADA"] { background: #FFEDD5; color: #9A3412; }
+.listas-vacio { color: #64748B; padding: 12px 0; }
+.listas-mas { align-self: flex-start; }
+
+/* Detalle y revisión */
+.listas-detalle { border-top: 1px solid #E2E8F0; padding-top: 20px; display: flex; flex-direction: column; gap: 16px; }
+.listas-detalle-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.listas-detalle-encabezado h4 { margin: 0; }
+.listas-revisiones { margin: 0; padding-left: 18px; }
+.listas-revision-form { display: grid; gap: 14px; border: 1px solid #E2E8F0; border-radius: 10px; padding: 16px 18px; background: #F8FAFC; }
+.listas-revision-form textarea { min-height: 80px; resize: vertical; }
+.listas-panel details { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; background: #FFFFFF; }
+.listas-panel details > summary { cursor: pointer; font-weight: 600; color: #334155; }
+
+@media (max-width: 720px) { .listas-campos { grid-template-columns: 1fr; } }

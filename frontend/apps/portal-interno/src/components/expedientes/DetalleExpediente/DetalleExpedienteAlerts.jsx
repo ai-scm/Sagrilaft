@@ -21,17 +21,6 @@ export default function DetalleExpedienteAlerts({
         />
       )}
 
-      {resultadoSagrilaft && (
-        <Alert
-          mensaje={`SAGRILAFT: ${resultadoSagrilaft.estado || resultadoSagrilaft.error}. ${resultadoSagrilaft.riesgo ? `Riesgo: ${resultadoSagrilaft.riesgo}.` : ''} ${resultadoSagrilaft.detalles || ''}`}
-          style={{
-            marginBottom: '16px',
-            background: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#ecfdf5' : '#fef2f2',
-            borderColor: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#10b981' : '#ef4444',
-            color: resultadoSagrilaft.estado === 'APROBADO_SAGRILAFT' ? '#065f46' : '#991b1b',
-          }}
-        />
-      )}
     </>
   );
 }

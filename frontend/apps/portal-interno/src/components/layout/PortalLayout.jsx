@@ -14,6 +14,10 @@ const TEXTOS_VISTA = {
     titulo:    'Formularios recibidos',
     subtitulo: 'Aqui puede consultar los formularios enviados por la contraparte, con sus documentos adjuntos.',
   },
+  '/verificar-sagrilaft': {
+    titulo:    'Verificar SAGRILAFT',
+    subtitulo: 'Consulte un expediente en listas cautelares (OFAC). El resultado es informativo y requiere revisión humana.',
+  },
 };
 
 function BarraUsuario({ keycloak }) {
@@ -67,16 +71,27 @@ function EncabezadoConTabs() {
         <NavLink to="/expedientes" style={navLinkStyle}>
           Formularios
         </NavLink>
+        <NavLink to="/verificar-sagrilaft" style={navLinkStyle}>
+          Verificar SAGRILAFT
+        </NavLink>
       </div>
     </>
   );
 }
 
+// El contenedor base está pensado para el formulario angosto de "Crear acceso"
+// (maxWidth 560px). El formulario de consulta de listas cautelares tiene varias
+// columnas y necesita más espacio para no verse apretado (antes vivía en un
+// modal de 1040px).
 export default function PortalLayout({ keycloak }) {
+  const { pathname } = useLocation();
+  const esAncho = pathname.startsWith('/verificar-sagrilaft');
+  const estiloContenedor = esAncho ? { ...ESTILOS.contenedor, maxWidth: '1040px' } : ESTILOS.contenedor;
+
   return (
     <div style={ESTILOS.pagina}>
       <BarraUsuario keycloak={keycloak} />
-      <div style={ESTILOS.contenedor}>
+      <div style={estiloContenedor}>
         <EncabezadoConTabs />
         <Outlet />
       </div>

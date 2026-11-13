@@ -1,0 +1,21 @@
+.listas-resultado { color: #0F172A; line-height: 1.5; font-size: 14px; display: flex; flex-direction: column; gap: 12px; }
+.listas-resultado h4 { font-size: 16px; margin: 0; }
+.listas-resultado h5 { font-size: 15px; margin: 8px 0 0; padding-top: 12px; border-top: 1px solid #E2E8F0; }
+.listas-resultado h6 { font-size: 13px; margin: 12px 0 4px; color: #334155; text-transform: uppercase; letter-spacing: .04em; }
+.listas-resultado p { margin: 0; }
+.listas-resultado small { color: #64748B; }
+.listas-datos { margin: 4px 0; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+.listas-datos > div { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 3fr); gap: .75rem; padding: 8px 14px; }
+.listas-datos > div:nth-child(even) { background: #F8FAFC; }
+.listas-datos dt { font-weight: 600; color: #334155; }
+.listas-datos dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.listas-candidato { border: 1px solid #CBD5E1; border-left: 5px solid #94A3B8; border-radius: 10px; padding: 16px 18px; margin: 4px 0; background: #FFFFFF; }
+.listas-candidato[data-nivel="ALTA"] { border-left-color: #DC2626; background: #FEF2F2; }
+.listas-candidato[data-nivel="MEDIA"] { border-left-color: #D97706; background: #FFFBEB; }
+.listas-candidato[data-nivel="BAJA"] { border-left-color: #2563EB; background: #EFF6FF; }
+.listas-candidato h5 { margin: 0 0 6px; padding: 0; border: 0; font-size: 16px; }
+.listas-nivel { font-size: 13px; }
+.listas-motivo { border-top: 1px solid #E2E8F0; padding: 8px 0; }
+.listas-resultado details { margin: 4px 0; }
+.listas-resultado summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 600px) { .listas-datos > div { grid-template-columns: 1fr; gap: 0; } }

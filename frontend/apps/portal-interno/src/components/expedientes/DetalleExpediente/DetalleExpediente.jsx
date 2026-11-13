@@ -5,7 +5,6 @@ import './DetalleExpediente.css';
 import '../../modals/Modals.css';
 import { useExpedienteDetalle } from '../../../hooks/useExpedienteDetalle';
 import { useDocumentosExpediente } from '../../../hooks/useDocumentosExpediente';
-import { useSagrilaftExpediente } from '../../../hooks/useSagrilaftExpediente';
 import {
   ETIQUETA_TIPO_CONTRAPARTE,
   ETIQUETA_TIPO_SOLICITUD,
@@ -26,7 +25,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
   const [mostrarModalCargaManual, setMostrarModalCargaManual] = useState(false);
   const [mostrarModalReapertura, setMostrarModalReapertura] = useState(false);
   const [mostrarModalReporteFinal, setMostrarModalReporteFinal] = useState(false);
-  const [mostrarModalSagrilaft, setMostrarModalSagrilaft] = useState(false);
   const [avisoReapertura, setAvisoReapertura] = useState(null);
 
   const todosDocumentos = expediente?.documentos ?? [];
@@ -40,12 +38,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
     ? (ETIQUETA_TIPO_SOLICITUD[expediente.tipo_solicitud] ?? expediente.tipo_solicitud)
     : '';
 
-  const sagrilaft = useSagrilaftExpediente({
-    formularioId,
-    expediente: expediente ?? {},
-    onActualizado: recargarExpediente,
-  });
-
   function handleReabierto(resultado) {
     setMostrarModalReapertura(false);
     if (resultado && !resultado.correo_enviado) {
@@ -56,13 +48,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
       );
     }
     recargarExpediente();
-  }
-
-  async function handleVerificarSagrilaft(datosManuales) {
-    const resultado = await sagrilaft.verificarSagrilaft(datosManuales);
-    if (!resultado?.error) {
-      setMostrarModalSagrilaft(false);
-    }
   }
 
   return (
@@ -84,15 +69,10 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               tipoSolicitudLabel={tipoSolicitudLabel}
               estaCerrado={estaCerrado}
               permiteReaperturaActualizacion={permiteReaperturaActualizacion}
-              sagrilaftHabilitado={sagrilaft.sagrilaftHabilitado}
-              verificandoSagrilaft={sagrilaft.verificandoSagrilaft}
-              descargandoCertificado={sagrilaft.descargandoCertificado}
               onReabrirActualizacion={() => {
                 setAvisoReapertura(null);
                 setMostrarModalReapertura(true);
               }}
-              onVerificarSagrilaft={() => setMostrarModalSagrilaft(true)}
-              onDescargarCertificado={sagrilaft.descargarCertificado}
               onCargarManual={() => {
                 if (!estaCerrado) setMostrarModalCargaManual(true);
               }}
@@ -101,8 +81,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
 
             <DetalleExpedienteAlerts
               avisoReapertura={avisoReapertura}
-              errorCertificado={sagrilaft.errorCertificado}
-              resultadoSagrilaft={sagrilaft.resultadoSagrilaft}
             />
 
             <ExpedienteModals
@@ -111,9 +89,6 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
               mostrarModalCargaManual={mostrarModalCargaManual}
               mostrarModalReporteFinal={mostrarModalReporteFinal}
               mostrarModalReapertura={mostrarModalReapertura}
-              mostrarModalSagrilaft={mostrarModalSagrilaft}
-              verificandoSagrilaft={sagrilaft.verificandoSagrilaft}
-              errorSagrilaft={sagrilaft.resultadoSagrilaft?.error}
               onCargaManualCargada={() => {
                 setMostrarModalCargaManual(false);
                 recargarExpediente();
@@ -123,14 +98,10 @@ export default function DetalleExpediente({ formularioId, razonSocial, onVolver 
                 recargarExpediente();
               }}
               onReabierto={handleReabierto}
-              onVerificarSagrilaft={handleVerificarSagrilaft}
               onCerrarCargaManual={() => setMostrarModalCargaManual(false)}
               onCerrarReporteFinal={() => setMostrarModalReporteFinal(false)}
               onCerrarReapertura={() => setMostrarModalReapertura(false)}
-              onCerrarSagrilaft={() => {
-                setMostrarModalSagrilaft(false);
-                sagrilaft.setResultadoSagrilaft(null);
-              }}
+
             />
 
             <div className="expediente-grid">

@@ -3,6 +3,7 @@ import PortalLayout from './components/layout/PortalLayout';
 import CrearAccesoManual from './components/accesos/CrearAccesoManual';
 import ListaAccesosManuales from './components/accesos/ListaAccesosManuales';
 import VistaExpedientes from './components/expedientes/VistaExpedientes';
+import VistaVerificarSagrilaft from './components/expedientes/VistaVerificarSagrilaft';
 
 function App({ keycloak }) {
   return (
@@ -14,6 +15,7 @@ function App({ keycloak }) {
           <Route path="accesos" element={<ListaAccesosManuales />} />
           <Route path="expedientes" element={<VistaExpedientes />} />
           <Route path="expedientes/:id" element={<VistaExpedientes />} />
+          <Route path="verificar-sagrilaft" element={<VistaVerificarSagrilaft />} />
           <Route path="*" element={<Navigate to="/crear" replace />} />
         </Route>
       </Routes>

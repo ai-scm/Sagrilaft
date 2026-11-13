@@ -79,15 +79,6 @@ export const api = {
     });
   },
 
-  // Listas de cautela
-  async buscarListasCautela(nombre, numeroIdentificacion = null) {
-    return requestJson('/listas-cautela/buscar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nombre, numero_identificacion: numeroIdentificacion }),
-    });
-  },
-
   // Recuperación de sesión por acceso manual (código de petición + PIN)
   async recuperarSesionPorAcceso(codigoPeticion, pin) {
     try {
