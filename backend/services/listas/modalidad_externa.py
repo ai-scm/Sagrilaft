@@ -292,7 +292,7 @@ class ModalidadExterna:
             return self._terminar_con_fallo(repositorio, concesion, error.codigo, indeterminada=True)
         interpretacion = interpretar_reporte(reporte.datos, consulta_id=consulta.id, solicitud=solicitud, criterio=criterio,
             fuentes=fuentes or None, errores_estado=estado.errores, fecha_inicio=consulta.admitida_en,
-            fecha_fin=repositorio.reloj())
+            fecha_fin=repositorio.reloj(), validado=estado.validado)
         # Solo el subconjunto aprobado y la huella de la respuesta completa llegan a PostgreSQL.
         repositorio.guardar_progreso(concesion, etapa="DESCARGANDO_PDF", reporte_id=estado.reporte_id,
                                      huella_respuesta=reporte.sha256, respuesta_filtrada=interpretacion.respuesta_filtrada)

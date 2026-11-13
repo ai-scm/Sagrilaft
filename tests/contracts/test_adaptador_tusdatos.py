@@ -53,7 +53,7 @@ def test_sin_documento_soportado_no_se_consulta():
 
 def test_empresa_no_incluye_fuentes_solo_de_personas():
     assert set(fuentes_para("EMPRESA")) == {"ofac", "lista_onu", "peps", "peps_denom", "procuraduria", "contraloria"}
-    assert {"interpol", "europol", "cidob", "policia", "ofac_nombre"} <= set(fuentes_para("PERSONA"))
+    assert {"interpol", "europol", "cidob", "policia", "ofac_nombre", "peps_funcion_publica"} <= set(fuentes_para("PERSONA"))
 
 
 # ── Interpretación de los reportes grabados ──────────────────────────────────
@@ -71,10 +71,12 @@ def test_cc_con_hallazgos_produce_candidatos_por_fuente():
 
 
 def test_cc_sin_hallazgos_y_nit_concluyen_sin_candidatos():
-    for nombre, tipo, valor, cantidad in (("report_cc_sin_hallazgo", "CC", "112", 11), ("report_nit", "NIT", "900000152", 6)):
+    # La cédula suma PEP por función pública (12 fuentes); el NIT no la incluye (6).
+    for nombre, tipo, valor, cantidad in (("report_cc_sin_hallazgo", "CC", "112", 12), ("report_nit", "NIT", "900000152", 6)):
         resultado = interpretar(REPORTES[nombre], tipo, valor).resultado
         assert resultado.estado_ejecucion == "COMPLETADA" and resultado.conclusion_busqueda == "SIN_CANDIDATOS"
-        assert len(resultado.cobertura) == cantidad and all(c.estado == "CONSULTADA" for c in resultado.cobertura)
+        assert len(resultado.cobertura) == cantidad
+        assert all(c.estado == "CONSULTADA" for c in resultado.cobertura if c.requerida)
 
 
 def test_fuentes_con_error_no_permiten_concluir():
@@ -149,3 +151,65 @@ def test_cierre_sin_reporte_cumple_el_contrato():
                                       mensaje="El titular no autoriza", fecha_inicio=AHORA, fecha_fin=AHORA)
     assert resultado.estado_ejecucion == "FALLIDA" and resultado.conclusion_busqueda == "NO_CONCLUYENTE"
     assert resultado.error.codigo == "TITULAR_NO_AUTORIZA" and not resultado.error.reintentable
+
+
+# ── Correcciones frente al catálogo de Tusdatos ──────────────────────────────
+
+def cobertura(resultado, codigo):
+    return next(c for c in resultado.cobertura if c.fuente_codigo == codigo)
+
+
+def test_error_de_onu_con_el_codigo_corto_no_pasa_como_consultada():
+    """El catálogo de errores usa `onu` además de `lista_onu`; antes la falla se perdía."""
+    reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
+    reporte["errores"] = ["onu"]
+    resultado = interpretar(reporte, "CC", "112").resultado
+    assert cobertura(resultado, "lista_onu").estado == "FALLIDA"
+    assert resultado.estado_ejecucion == "PARCIAL" and resultado.conclusion_busqueda == "NO_CONCLUYENTE"
+
+
+def test_documento_no_validado_queda_advertido():
+    reporte = REPORTES["report_cc_sin_hallazgo"]
+    advertido = interpretar(reporte, "CC", "112", validado=False).resultado
+    assert "DOCUMENTO_NO_VALIDADO" in {a.codigo for a in advertido.advertencias}
+    for validado in (True, None):  # None: el proveedor no valida pasaportes ni NIT
+        resultado = interpretar(reporte, "CC", "112", validado=validado).resultado
+        assert "DOCUMENTO_NO_VALIDADO" not in {a.codigo for a in resultado.advertencias}
+
+
+def test_pep_por_funcion_publica_produce_candidato():
+    resultado = interpretar(REPORTES["report_cc_con_hallazgo"]).resultado
+    candidato = next(c for c in resultado.candidatos if c.motivos[0].campo == "peps_funcion_publica")
+    assert candidato.nombre_principal == "MIGUEL FERNANDO PEREZ GOMEZ"
+    assert candidato.atributos["DENOMINACION_CARGO"] == "Secretario de Planeación"
+    assert "peps_funcion_publica" in interpretar(REPORTES["report_cc_con_hallazgo"]).respuesta_filtrada["fuentes"]
+
+
+def test_pep_por_funcion_publica_ausente_no_impide_concluir_pero_con_error_si():
+    sin = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado
+    fuente = cobertura(sin, "peps_funcion_publica")
+    assert fuente.estado == "NO_DISPONIBLE" and fuente.requerida is False
+    assert sin.estado_ejecucion == "COMPLETADA"
+    reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
+    reporte["errores"] = ["peps_funcion_publica"]
+    fallida = interpretar(reporte, "CC", "112").resultado
+    assert cobertura(fallida, "peps_funcion_publica").estado == "FALLIDA"
+    assert cobertura(fallida, "peps_funcion_publica").requerida is True
+    assert fallida.estado_ejecucion == "PARCIAL"
+
+
+def test_fuente_ausente_pero_con_error_cuenta_como_fallida():
+    reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
+    del reporte["interpol"]
+    reporte["errores"] = ["interpol"]
+    assert cobertura(interpretar(reporte, "CC", "112").resultado, "interpol").estado == "FALLIDA"
+
+
+def test_codigos_de_las_fuentes_coinciden_con_el_catalogo_de_errores():
+    """Catálogo /api/catalogo-errores-fuentes del sandbox (13-11-2026), filtrado a las fuentes aprobadas."""
+    catalogo = {"cidob", "contraloria", "contraloria_db", "europol", "interpol", "lista_onu", "onu", "ofac",
+                "ofac_database_id", "ofac_database_nombre", "ofac_nombre", "ofac_offline", "peps", "peps_denom",
+                "peps_funcion_publica", "policia", "procuraduria", "procuraduria_db"}
+    from infrastructure.listas.tusdatos.adaptador import FUENTES
+    reconocidos = {codigo for f in FUENTES for codigo in f.errores}
+    assert catalogo <= reconocidos

@@ -165,9 +165,11 @@ def test_estados_del_trabajo():
     assert not c.estado("6769d210-3476-4c82-a044-045e9d5bc157").finalizado
     final = c.estado(JOB_CON_HALLAZGO)
     assert final.finalizado and final.reporte_id == REPORTE_CC and final.hallazgo and final.errores == ()
+    assert final.validado is True
     con_error = c.estado("485e9823-df75-4b1e-9f64-58916a82dfd7")
     assert {"ofac", "lista_onu", "policia"} <= set(con_error.errores)
-    assert c.estado("e7451a5e-97ca-498e-a7f0-a352658cbc26").reporte_id == REPORTE_NIT
+    nit = c.estado("e7451a5e-97ca-498e-a7f0-a352658cbc26")
+    assert nit.reporte_id == REPORTE_NIT and nit.validado is None
 
 
 def test_trabajo_vencido_y_consulta_fallida_no_se_reintentan():

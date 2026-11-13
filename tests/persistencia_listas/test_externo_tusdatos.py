@@ -156,8 +156,8 @@ def test_cc_con_hallazgos_completa_y_solo_guarda_lo_aprobado(externo):
     procesar(externo)
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "COMPLETADA" and consulta["conclusion_busqueda"] == "CON_CANDIDATOS"
-    assert consulta["proveedor"] == "tusdatos" and len(consulta["cobertura"]) == 11
-    assert {c["motivos"][0]["campo"] for c in consulta["candidatos"]} >= {"ofac", "peps", "procuraduria"}
+    assert consulta["proveedor"] == "tusdatos" and len(consulta["cobertura"]) == 12  # 12 fuentes para cédula
+    assert {c["motivos"][0]["campo"] for c in consulta["candidatos"]} >= {"ofac", "peps", "procuraduria", "peps_funcion_publica"}
     assert [e["tipo"] for e in consulta["evidencias"]] == ["INFORME_INTERNO"]
     # Un solo lanzamiento, con el documento limpio y sin fecha (solo CE la exige).
     assert len(lanzamientos(externo)) == 1
@@ -372,3 +372,13 @@ def test_pdf_del_proveedor_solo_para_el_equipo_revisor_y_queda_auditado(externo)
         lecturas = [ev.detalle for ev in sesion.scalars(select(EventoConsulta).where(
             EventoConsulta.consulta_id == UUID(consulta_id), EventoConsulta.tipo == "EVIDENCIA_LEIDA"))]
     assert lecturas == [{"tipo": "PDF_PROVEEDOR", "evidencia_id": pdf["id"]}]
+
+
+def test_documento_que_tusdatos_no_valida_queda_advertido(externo):
+    externo.simulador.extras[("GET", "/api/results/5c6c80c0-4dd3-41c9-9648-46871a7176ad")] = httpx.Response(200, json={
+        "estado": "finalizado", "id": "8188f7e8aa70102bf2053f32", "hallazgo": False, "errores": [], "validado": False})
+    consulta_id = crear(externo).json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "COMPLETADA"
+    assert "DOCUMENTO_NO_VALIDADO" in {a["codigo"] for a in consulta["advertencias"]}

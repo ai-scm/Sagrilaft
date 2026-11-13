@@ -42,18 +42,26 @@ class FuenteSagrilaft:
     errores: tuple[str, ...]
     aplica: frozenset = AMBOS
     por_nombre: bool = False
+    # Si el campo no viene en el reporte, ¿la fuente impide concluir? Las fuentes que
+    # Tusdatos solo incluye cuando hay registro (p. ej. PEP por función pública) no.
+    ausencia_bloquea: bool = True
 
 
 FUENTES = (
     FuenteSagrilaft("ofac", "OFAC (Lista Clinton), por documento", ("ofac",), ("ofac", "ofac_offline", "ofac_database_id")),
     FuenteSagrilaft("ofac_nombre", "OFAC (Lista Clinton), por nombre", ("ofac_nombre",),
                     ("ofac_nombre", "ofac_offline_name", "ofac_database_nombre"), frozenset({PERSONA}), True),
-    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu",)),
+    # El catálogo de errores de Tusdatos usa dos códigos para ONU: lista_onu y onu.
+    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu", "onu")),
     FuenteSagrilaft("interpol", "INTERPOL", ("interpol",), ("interpol",), frozenset({PERSONA})),
     FuenteSagrilaft("europol", "EUROPOL", ("europol",), ("europol",), frozenset({PERSONA})),
     FuenteSagrilaft("peps", "Listas y PEP, por documento", ("peps",), ("peps",)),
     FuenteSagrilaft("peps_denom", "Listas y PEP, por nombre", ("peps_denom",), ("peps_denom",), AMBOS, True),
     FuenteSagrilaft("cidob", "CIDOB, PEP a nivel mundial", ("cidob",), ("cidob",), frozenset({PERSONA}), True),
+    # PEP por cargo en la función pública colombiana. En el sandbox solo aparece cuando hay
+    # registro, así que su ausencia no impide concluir (por confirmar con datos reales).
+    FuenteSagrilaft("peps_funcion_publica", "Listas y PEP, función pública (Colombia)", ("peps_funcion_publica",),
+                    ("peps_funcion_publica",), frozenset({PERSONA}), ausencia_bloquea=False),
     FuenteSagrilaft("procuraduria", "Procuraduría General de la Nación", ("procuraduria",), ("procuraduria", "procuraduria_db")),
     FuenteSagrilaft("contraloria", "Contraloría General de la República", ("contraloria", "contraloria2"),
                     ("contraloria", "contraloria_db")),
@@ -66,7 +74,7 @@ CODIGOS_HALLAZGO_APROBADOS = CAMPOS_APROBADOS | {c for _, c in CATEGORIAS_PEP} |
     f"{c}_denom" for _, c in CATEGORIAS_PEP}
 # Texto con que la Policía informa ausencia de antecedentes (por verificar con datos reales).
 _POLICIA_SIN_ANTECEDENTES = re.compile(r"no\s+tiene\s+asuntos\s+pendientes", re.IGNORECASE)
-_NOMBRE = ("NOMBRECOMPLETO", "name", "nombre", "Nombre", "nombres", "nombre_completo", "title", "contador")
+_NOMBRE = ("NOMBRECOMPLETO", "NOMBRE_PEP", "name", "nombre", "Nombre", "nombres", "nombre_completo", "title", "contador")
 _UID = ("ID", "CODIGO", "id", "codigo")
 _MAX_ATRIBUTOS, _MAX_TEXTO = 40, 500
 
@@ -183,8 +191,9 @@ def _registros(valor):
 
 def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: SolicitudTusdatos, criterio: Criterio,
                         errores_estado=(), fecha_inicio: datetime, fecha_fin: datetime,
-                        fuentes: tuple[str, ...] | None = None) -> Interpretacion:
-    """`fuentes`: las fijadas al admitir (manifiesto); por defecto, las aprobadas para el sujeto."""
+                        fuentes: tuple[str, ...] | None = None, validado: bool | None = None) -> Interpretacion:
+    """`fuentes`: las fijadas al admitir (manifiesto); por defecto, las aprobadas para el sujeto.
+    `validado`: lo que Tusdatos informa al terminar (False = no pudo validar el documento)."""
     errores = set(errores_estado) | {e for e in (reporte.get("errores") or []) if isinstance(e, str)}
     tipo_sujeto = "ENTIDAD" if solicitud.sujeto == EMPRESA else "PERSONA"
     titular = reporte.get("nombre") if isinstance(reporte.get("nombre"), str) and reporte["nombre"].strip() else None
@@ -197,8 +206,10 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
         cobertura_id = _id(consulta_id, "cobertura", codigo)
         valores = [(campo, reporte[campo]) for campo in fuente.campos if campo in reporte]
         base = dict(id=cobertura_id, fuente_codigo=codigo, nombre_origen=fuente.nombre, requerida=True)
-        if not valores:
-            cobertura.append(Cobertura(**base, estado="NO_DISPONIBLE", motivo="La fuente no vino en el reporte del plan contratado"))
+        if not valores and not errores & set(fuente.errores):
+            cobertura.append(Cobertura(**{**base, "requerida": fuente.ausencia_bloquea}, estado="NO_DISPONIBLE",
+                                       motivo="La fuente no vino en el reporte" + ("" if fuente.ausencia_bloquea
+                                              else "; Tusdatos solo la incluye cuando hay registro")))
             advertencias.append(Advertencia(codigo="FUENTE_NO_DISPONIBLE", descripcion=fuente.nombre, cobertura_id=cobertura_id))
             continue
         if errores & set(fuente.errores) or any(isinstance(v, str) and v.strip().casefold() == "error" for _, v in valores):
@@ -228,6 +239,10 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
                 hallazgos.append(Hallazgo(id=_id(consulta_id, "marca", campo), cobertura_id=cobertura_id, codigo=codigo,
                     descripcion=f"{fuente.nombre}: Tusdatos reporta un registro sin detalle; revisar el PDF del proveedor",
                     referencia_raw=campo))
+    if validado is False:
+        advertencias.append(Advertencia(codigo="DOCUMENTO_NO_VALIDADO", descripcion=(
+            "Tusdatos no pudo validar el documento contra la fuente oficial. Las búsquedas por documento "
+            "pueden no corresponder al titular: confirme el número y el tipo antes de dar por buena la ausencia de registros")))
     nivel = reporte.get("hallazgos")
     if isinstance(nivel, str) and nivel.strip():
         advertencias.append(Advertencia(codigo="NIVEL_INFORMADO_PROVEEDOR", descripcion=_texto(

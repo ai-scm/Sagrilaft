@@ -51,6 +51,8 @@ class EstadoTrabajo:
     hallazgo: bool | None = None
     errores: tuple[str, ...] = ()
     porcentaje: int | None = None
+    # False si Tusdatos no pudo validar el documento; None si no aplica (pasaporte, NIT).
+    validado: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -190,9 +192,10 @@ class ClienteTusdatos:
         errores = datos.get("errores") or []
         if not isinstance(errores, list) or not all(isinstance(e, str) for e in errores):
             raise RespuestaInesperada("estado", respuesta.status_code, "Lista de errores no válida")
-        hallazgo = datos.get("hallazgo")
+        hallazgo, validado = datos.get("hallazgo"), datos.get("validado")
         return EstadoTrabajo(finalizado=True, reporte_id=_identificador(datos.get("id"), "estado"),
-                             hallazgo=hallazgo if isinstance(hallazgo, bool) else None, errores=tuple(errores))
+                             hallazgo=hallazgo if isinstance(hallazgo, bool) else None, errores=tuple(errores),
+                             validado=validado if isinstance(validado, bool) else None)
 
     def reporte(self, reporte_id: str) -> DocumentoReporte:
         respuesta = self._llamar("reporte", "GET", f"/api/report_json/{_identificador(reporte_id, 'reporte')}")
