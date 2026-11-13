@@ -60,6 +60,8 @@ class DisponibilidadListas(BaseModel):
     historial: bool
     revisar: bool
     implementacion: Literal["deshabilitado", "simulado", "archivos", "externo"]
+    # Contrato que el portal debe usar al crear consultas; nulo si no se puede consultar.
+    version_contrato: Literal["2.0", "2.1"] | None = None
 
 
 class RevisionRegistrada(BaseModel):

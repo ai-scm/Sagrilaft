@@ -1,16 +1,15 @@
 """Consultas del portal con historial durable; no decide riesgo ni estado comercial."""
-from uuid import uuid4
-
 from sqlalchemy import select, text, or_, and_
 
-from domain.listas.contratos import CrearConsultaV2, SolicitudIdempotente, ConsultaV2
-from domain.listas.contratos_busqueda import CrearConsultaBusqueda, ConsultaBusquedaF6
+from domain.listas.contratos import CrearConsultaV2, ConsultaV2
+from domain.listas.contratos_busqueda import ConsultaBusquedaF6
 from domain.listas.puertos import ListasNoDisponibles
 from infrastructure.persistencia.models import Formulario, ResultadoValidacion
 from infrastructure.persistencia.modelos_listas import ConsultaLista, CoincidenciaLista, EvidenciaConsulta, TrabajoConsulta, RevisionCumplimiento
 from infrastructure.persistencia.modelos_grupos_listas import GrupoConsultaLista
 from infrastructure.persistencia.repositorios.consultas_listas import RepositorioConsultasListas
 from services.listas.informes import calcular_huella
+from services.listas.modalidades import modalidad_vigente, reintento_admitido
 from services.listas.politica_v2 import PoliticaListasV2
 
 
@@ -48,28 +47,22 @@ class ServicioComunListas:
         if not self.puede_acceder_consulta(self.actor, consulta_id):
             raise LookupError("Consulta no disponible")
 
-    def _manifiesto(self):
-        if self.politica.config.implementacion != "simulado":
-            raise ListasNoDisponibles("Esta entrega permite únicamente consultas simuladas")
-        return {"implementacion": "simulado", "proveedor": "simulador", "adaptador": "simulado-v1",
-                "algoritmo": "fixture-v1", "escenario": self.politica.config.escenario}
-
     def crear(self, expediente_id, solicitud: CrearConsultaV2, clave):
         self.exigir_expediente(expediente_id)
         self.actor.exigir("listas.consultar")
         if solicitud.contexto.tipo != "EXPEDIENTE" or solicitud.contexto.expediente_id != expediente_id:
             raise ValueError("El contexto debe corresponder al expediente de la ruta")
-        if isinstance(solicitud, CrearConsultaBusqueda):
-            from services.listas.servicio_archivos_portal import crear_individual
-            return crear_individual(self, solicitud, clave)
-        if any(i.tipo not in {"CC", "NIT", "PASAPORTE"} for i in solicitud.criterio.identificadores):
-            raise ValueError("Tipo de identificador no soportado por el simulador")
-        return self.repositorio.admitir(self.actor, SolicitudIdempotente(clave=clave, solicitud=solicitud), "simulador", self._manifiesto())
+        anterior = reintento_admitido(self, solicitud, clave)
+        if anterior:
+            return anterior
+        modalidad = modalidad_vigente(self.politica.config)
+        if solicitud.version_contrato != modalidad.version_contrato:
+            raise ListasNoDisponibles(f"La modalidad vigente admite el contrato {modalidad.version_contrato}")
+        return modalidad.crear(self, solicitud, clave)
 
     def crear_grupo(self, expediente_id, clave):
         self.exigir_expediente(expediente_id)
         self.actor.exigir("listas.consultar")
-        huella = calcular_huella({"expediente": expediente_id, "operacion": "ambos_sujetos_v1"})
         with self.sesiones.begin() as sesion:
             # Serializa solo esta identidad/expediente/clave y se libera con el commit.
             bloqueo = calcular_huella([self.actor.issuer, self.actor.sub, expediente_id, clave])
@@ -79,42 +72,7 @@ class ServicioComunListas:
                 GrupoConsultaLista.clave == clave))
             if anterior:
                 return anterior.respuesta
-            if self.politica.config.implementacion == "archivos":
-                from services.listas.servicio_archivos_portal import crear_grupo
-                return crear_grupo(self, expediente_id, clave, sesion, uuid4())
-            manifiesto = self._manifiesto()
-            expediente = sesion.get(Formulario, expediente_id)
-            grupo_id = uuid4()
-            solicitudes, omitidos = [], []
-            for rol, nombre, documento, tipo in (
-                ("CONTRAPARTE", expediente.razon_social, expediente.numero_identificacion, expediente.tipo_identificacion),
-                ("REPRESENTANTE", expediente.nombre_representante, expediente.numero_doc_representante, expediente.tipo_doc_representante),
-            ):
-                criterio = {"tipo_sujeto": "NO_DETERMINADO" if rol == "CONTRAPARTE" else "PERSONA"}
-                if nombre and nombre.strip():
-                    criterio["nombre"] = nombre.strip()
-                if documento and tipo in {"CC", "NIT", "PASAPORTE"}:
-                    criterio["identificadores"] = [{"tipo": tipo, "valor": documento}]
-                if len(criterio) == 1:
-                    omitidos.append({"sujeto_rol": rol, "motivo": "No hay criterios utilizables por el simulador"})
-                    continue
-                solicitudes.append(CrearConsultaV2(version_contrato="2.0", contexto={"tipo": "EXPEDIENTE",
-                    "expediente_id": expediente_id, "sujeto_rol": rol}, criterio=criterio))
-            # El grupo se inserta terminado; cada hijo lo referencia en esta misma transacción.
-            respuesta = {"grupo_id": str(grupo_id), "consultas": [], "no_consultados": omitidos}
-            # La respuesta definitiva se calcula con ids reservados por el repositorio.
-            grupo = GrupoConsultaLista(id=grupo_id, actor_emisor=self.actor.issuer, actor_sujeto=self.actor.sub,
-                expediente_id=expediente_id, clave=clave, huella=huella, respuesta={})
-            # Diferir FK para poder insertar el grupo ya completo al final.
-            sesion.execute(text("SET CONSTRAINTS fk_consulta_grupo DEFERRED"))
-            for solicitud in solicitudes:
-                identificador = self.repositorio.admitir(self.actor,
-                    SolicitudIdempotente(clave=f"grupo:{grupo_id}:{solicitud.contexto.sujeto_rol}", solicitud=solicitud),
-                    "simulador", manifiesto, grupo_id=grupo_id, sesion_actual=sesion)
-                respuesta["consultas"].append({"consulta_id": str(identificador), "sujeto_rol": solicitud.contexto.sujeto_rol})
-            grupo.respuesta = respuesta
-            sesion.add(grupo)
-            return respuesta
+            return modalidad_vigente(self.politica.config).crear_grupo(self, expediente_id, clave, sesion)
 
     def detalle(self, consulta_id):
         self.actor.exigir("listas.ver_evidencias")

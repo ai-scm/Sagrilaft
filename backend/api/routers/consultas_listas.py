@@ -11,6 +11,7 @@ from domain.excepciones import SinPermisoError
 from domain.listas.puertos import ListasNoDisponibles
 from api.dependencias_listas import servicio_listas
 from api.schemas.listas_v2 import SolicitudConsultaLista, SolicitudConsultaArchivos, RevisionLista, AdmisionLista, DetalleConsultaLista, AdmisionGrupo, DisponibilidadListas, RevisionRegistrada, HistorialListas
+from services.listas.modalidades import modalidad_disponible
 from services.listas.servicio_comun import ServicioComunListas
 
 
@@ -41,17 +42,11 @@ enrutador = APIRouter(prefix="/api", tags=["consultas de listas v2"], route_clas
 @enrutador.get("/listas/disponibilidad", response_model=DisponibilidadListas)
 def disponibilidad(servicio: ServicioComunListas = Depends(servicio_listas)):
     permisos = servicio.actor.permisos
-    archivos = False
-    if servicio.politica.config.implementacion == "archivos":
-        from infrastructure.listas.configuracion_archivos import ConfiguracionArchivosLocal
-        try:
-            ConfiguracionArchivosLocal.cargar(servicio.entorno)
-            archivos = True
-        except ListasNoDisponibles:
-            pass
-    return {"consultar": (servicio.politica.config.implementacion == "simulado" or archivos) and "listas.consultar" in permisos,
+    modalidad = modalidad_disponible(servicio.politica.config, servicio.entorno)
+    return {"consultar": modalidad is not None and "listas.consultar" in permisos,
             "historial": "listas.ver_evidencias" in permisos, "revisar": "listas.revisar" in permisos,
-            "implementacion": servicio.politica.config.implementacion}
+            "implementacion": servicio.politica.config.implementacion,
+            "version_contrato": modalidad.version_contrato if modalidad else None}
 
 
 @enrutador.post("/expedientes/{expediente_id}/consultas-listas", status_code=202, response_model=AdmisionLista)

@@ -87,13 +87,23 @@ def test_load_config_mantiene_produccion_deshabilitada(monkeypatch):
     assert isinstance(obtener_consultor_listas(cfg.listas_cautela), ConsultorListasCautelaDeshabilitado)
 
 
-def test_load_config_rechaza_sagrilaft_sin_credenciales_en_staging(monkeypatch):
+def test_load_config_rechaza_externo_sin_credenciales_de_tusdatos_en_staging(monkeypatch):
+    """`sagrilaft` equivale a `externo`; desde la Fase 4 exige LISTAS_TUSDATOS_*, no SAGRILAFT_API_*."""
     _preparar_env_base(monkeypatch, "staging")
     monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "sagrilaft")
-    monkeypatch.delenv("SAGRILAFT_API_URL", raising=False)
-    monkeypatch.delenv("SAGRILAFT_API_KEY", raising=False)
-    with pytest.raises(RuntimeError, match="SAGRILAFT_API_URL"):
+    for variable in ("LISTAS_TUSDATOS_URL", "LISTAS_TUSDATOS_TOKEN", "LISTAS_TUSDATOS_USUARIO", "LISTAS_TUSDATOS_CLAVE"):
+        monkeypatch.delenv(variable, raising=False)
+    with pytest.raises(RuntimeError, match="LISTAS_TUSDATOS_URL"):
         load_config()
+
+
+def test_load_config_admite_externo_con_tusdatos_en_staging(monkeypatch):
+    _preparar_env_base(monkeypatch, "staging")
+    monkeypatch.setenv("LISTAS_IMPLEMENTACION", "externo")
+    monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "")
+    monkeypatch.setenv("LISTAS_TUSDATOS_URL", "https://dash-board.tusdatos.co")
+    monkeypatch.setenv("LISTAS_TUSDATOS_TOKEN", "api_td_prueba")
+    assert load_config().listas_cautela.implementacion == "externo"
 
 
 def test_load_config_rechaza_sagrilaft_incluso_configurado_en_produccion(monkeypatch):

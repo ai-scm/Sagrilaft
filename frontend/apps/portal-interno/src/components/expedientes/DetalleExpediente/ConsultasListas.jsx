@@ -102,7 +102,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
 
   const consultar = useCallback(async function consultar(criterio, ambos) {
     setOcupado(true); setError(''); setAviso('');
-    const datos = { ...(capacidades.implementacion === 'archivos' ? { version_contrato: '2.1' } : {}), sujeto_rol: 'CONTRAPARTE', criterio };
+    const datos = { ...(capacidades.version_contrato === '2.1' ? { version_contrato: '2.1' } : {}), sujeto_rol: 'CONTRAPARTE', criterio };
     const operacion = ambos ? 'grupo' : JSON.stringify(datos);
     const almacenamiento = `listas-pendiente:${expediente.id}:${ambos ? 'grupo' : 'individual'}`;
     try {
@@ -119,7 +119,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       }
     } catch (e) { setError(e.message); }
     finally { setOcupado(false); }
-  }, [capacidades.implementacion, capacidades.historial, expediente.id, cargar, ver]);
+  }, [capacidades.version_contrato, capacidades.historial, expediente.id, cargar, ver]);
 
   const revisar = useCallback(async function revisar(datosRevision) {
     setOcupado(true); setError('');
