@@ -96,14 +96,13 @@ def test_load_config_rechaza_sagrilaft_sin_credenciales_en_staging(monkeypatch):
         load_config()
 
 
-def test_load_config_acepta_sagrilaft_configurado_en_produccion(monkeypatch):
+def test_load_config_rechaza_sagrilaft_incluso_configurado_en_produccion(monkeypatch):
     _preparar_env_base(monkeypatch, "production")
     monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "sagrilaft")
     monkeypatch.setenv("SAGRILAFT_API_URL", "https://api.tusdatos.co")
     monkeypatch.setenv("SAGRILAFT_API_KEY", "usuario:clave")
-    cfg = load_config()
-    assert cfg.listas_cautela.proveedor == "sagrilaft"
-    assert cfg.listas_cautela.configurado
+    with pytest.raises(RuntimeError, match="producción debe permanecer deshabilitada"):
+        load_config()
 
 
 def test_load_config_permite_dummy_en_development(monkeypatch):

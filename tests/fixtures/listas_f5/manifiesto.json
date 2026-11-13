@@ -1,0 +1,12 @@
+{
+  "perfil": "f5-sintetico-v1",
+  "oficial": false,
+  "archivos": {
+    "esperado.json": "b9a7dc42fdc1e9bb137e3bb15a9ecd8ceed4a744ee84863edd7c77335f5b2ee3",
+    "invalido.xml": "c6c8aae79c8b476da500ede7b885583421334ff720ca46aefe428e412603bf01",
+    "lista_sintetica.xsd": "eb096ab3802e1b58d8d3ed78e747feb14b4219d30d7442ad13e9f18f215736b3",
+    "v1.xml": "d5150da7a6838829c5105180fb5c4dc0674f0361b04fcf67790a19cf65ec974f",
+    "v1.zip": "b3e0f409ef10722e1db9f00d29563199fb2828a22bae30a6fd421b83e3e3bcfe",
+    "v2.xml": "5600170c52e2745801c2af7f29f75ac39cb357129a9cc43eacd0d372735fffd8"
+  }
+}

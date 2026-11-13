@@ -1,0 +1,26 @@
+{
+  "version": "nombres-sinteticos-f63-v1",
+  "descripcion": "Pares ficticios adicionales a los casos prioritarios. No representan calidad sobre SDN real.",
+  "casos": [
+    {"id":"CAL-01","fuente":"Ángela Torres Díaz","consulta":"ANGELA TORRES DIAZ","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-02","fuente":"Ángela Torres Díaz","consulta":"Torres Díaz Ángela","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-03","fuente":"Ángela Torres Díaz","consulta":"Angela Torrez Diaz","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-04","fuente":"Ángela Torres Díaz","consulta":"Ángela Torers Díaz","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-05","fuente":"Ángela Torres Díaz","consulta":"Ángela Torres","tipo":"PERSONA","nivel":"BAJA"},
+    {"id":"CAL-06","fuente":"Ángela Torres Díaz","consulta":"A Torres Díaz","tipo":"PERSONA","nivel":"BAJA"},
+    {"id":"CAL-07","fuente":"Servicios Horizonte S.A.S.","consulta":"Servicios Horizonte SA","tipo":"ENTIDAD","nivel":"BAJA"},
+    {"id":"CAL-08","fuente":"Servicios Horizonte S.A.S.","consulta":"Servicios Horizonte Trading","tipo":"ENTIDAD","nivel":"BAJA"},
+    {"id":"CAL-09","fuente":"Andrés Muñoz Silva","consulta":"Andrés Munoz Silva","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-10","fuente":"Александр Иванов","consulta":"Александр Иванов","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-11","fuente":"Ángela Torres Díaz","consulta":"Pedro Salazar Ramos","tipo":"PERSONA","nivel":null},
+    {"id":"CAL-12","fuente":"Minerales Horizonte 2024","consulta":"Minerales Horizonte 2025","tipo":"ENTIDAD","nivel":"BAJA"},
+    {"id":"CAL-13","fuente":"Negocios Río Claro","consulta":"Negocios Río Oscuro","tipo":"ENTIDAD","nivel":"BAJA"},
+    {"id":"CAL-14","fuente":"Ángela Torres Díaz","consulta":"Ángela Pérez González","tipo":"PERSONA","nivel":null},
+    {"id":"CAL-15","fuente":"Empresa ficticia Uno","consulta":"Juan Carlos Pérez Gómez","tipo":"PERSONA","nivel":null},
+    {"id":"CAL-16","fuente":"Industrias Norte Azul","consulta":"Cooperativa Sur Verde","tipo":"ENTIDAD","nivel":null},
+    {"id":"CAL-17","fuente":"Lucía Rojas Ortiz","consulta":"LUCIA ROJAS ORTIZ","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-18","fuente":"Lucía Rojas Ortiz","consulta":"Lucía Rojas Ortiiz","tipo":"PERSONA","nivel":"MEDIA"},
+    {"id":"CAL-19","fuente":"Manufacturas Valle Verde","consulta":"Manufacturas Valle Verde S.A.","tipo":"ENTIDAD","nivel":"BAJA"},
+    {"id":"CAL-20","fuente":"Manufacturas Valle Verde","consulta":"Manufacturas Valle Verde Filial","tipo":"ENTIDAD","nivel":"BAJA"}
+  ]
+}

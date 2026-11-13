@@ -1,0 +1,13 @@
+{
+  "altas": [
+    "prueba_empresa_nueva"
+  ],
+  "bajas": [
+    "prueba_empresa"
+  ],
+  "modificados": [
+    "prueba_persona"
+  ],
+  "registros_v1": 2,
+  "registros_v2": 2
+}

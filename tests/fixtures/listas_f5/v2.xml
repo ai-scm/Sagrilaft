@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lista xmlns="urn:sagrilaft:pruebas:listas:v1" sintetica="true">
+  <registro uid="prueba_persona" clase="PERSONA"><nombre>Persona ficticia Ámbar</nombre><alias>Alias sintético Dos</alias><identificador tipo="PRUEBA" pais="ZZ">00002</identificador><direccion>Dirección ficticia 2</direccion><observacion>Actualización completamente sintética.</observacion><relacion destino="prueba_empresa_nueva"/></registro>
+  <registro uid="prueba_empresa_nueva" clase="ENTIDAD"><nombre>Empresa ficticia Dos</nombre></registro>
+</lista>

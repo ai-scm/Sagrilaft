@@ -1,0 +1,28 @@
+{
+  "solicitud": {
+    "version_contrato": "2.0",
+    "contexto": {
+      "tipo": "EXPEDIENTE",
+      "expediente_id": "exp-1",
+      "sujeto_rol": "CONTRAPARTE",
+      "motivo": null
+    },
+    "criterio": {
+      "tipo_sujeto": "PERSONA",
+      "nombre": "Persona prueba",
+      "nombres_adicionales": [],
+      "identificadores": [
+        {
+          "tipo": "CC",
+          "valor": "000123",
+          "pais_emisor": null
+        }
+      ],
+      "fecha_nacimiento": null,
+      "fecha_expedicion": null,
+      "nacionalidades": [],
+      "ubicacion": null
+    }
+  },
+  "hash_cuerpo": "00e79ae8fa35374f53895519171e5d5ccce5da1d82d5ce1b32ab25520e1fd2c7"
+}
