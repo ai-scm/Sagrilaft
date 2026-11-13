@@ -1,6 +1,6 @@
 # Módulo de consultas a listas cautelares: arquitectura
 
-Estado verificado contra el código el 2026-11-12. Si este documento y el código
+Estado verificado contra el código el 2026-11-13. Si este documento y el código
 difieren, manda el código; corrige el documento en el mismo cambio.
 
 Documentos relacionados:
@@ -9,6 +9,8 @@ Documentos relacionados:
   se clasifican los candidatos (ALTA/MEDIA/BAJA) y qué casos lo comprueban.
 - [Operación, pruebas y pendientes](OPERACION_PRUEBAS_Y_PENDIENTES.md): cómo se
   configura, cómo se carga OFAC, cómo se prueba y qué falta antes de usarlo en serio.
+- [Consultas con Tusdatos](TUSDATOS.md): guía corta de la modalidad externa, pensada
+  para quien revisa resultados o atiende la operación.
 
 Convención de estado usada en los tres documentos:
 
@@ -586,11 +588,23 @@ libera la consulta entre pasadas (`posponer`):
   Solo lo descarga quien tiene `listas.ver_pdf_proveedor`; cada lectura deja un evento
   `EVIDENCIA_LEIDA` con el tipo y la evidencia.
 - **Fuentes** (`infrastructure/listas/tusdatos/adaptador.py`): ofac, ofac_nombre,
-  lista_onu, interpol, europol, peps, peps_denom, cidob, procuraduria, contraloria
-  (+contraloria2) y policia. Persona: las 11; empresa (NIT): ofac, lista_onu, peps,
-  peps_denom, procuraduria y contraloria. `peps_internacionales`, `listas_restrictivas`
-  y `listas_vinculantes` son categorías de los registros PEP (`categoria_sagrilaft`).
-  Las fuentes se fijan en el manifiesto al admitir.
+  lista_onu, interpol, europol, peps, peps_denom, peps_funcion_publica, cidob,
+  procuraduria, contraloria (+contraloria2) y policia. Persona: las 12; empresa (NIT):
+  ofac, lista_onu, peps, peps_denom, procuraduria y contraloria. `peps_internacionales`,
+  `listas_restrictivas` y `listas_vinculantes` son categorías de los registros PEP
+  (`categoria_sagrilaft`). Las fuentes se fijan en el manifiesto al admitir: una consulta
+  vieja conserva su lista aunque luego se agreguen fuentes.
+- **Cómo se decide el estado de cada fuente:** con registro → candidato; `true` sin
+  detalle → hallazgo para revisar; vacío o `false` → consultada sin registro; código en
+  `errores` o valor `"Error"` → fallida (también si el campo no vino); campo ausente →
+  no disponible. Los códigos de error siguen el catálogo `/api/catalogo-errores-fuentes`
+  (por ejemplo, ONU puede llegar como `lista_onu` u `onu`).
+- **PEP por función pública:** Tusdatos solo incluye `peps_funcion_publica` cuando hay
+  registro. Si no viene, queda como no disponible pero no impide concluir; si viene con
+  error, sí lo impide. Es una regla **provisional** hasta confirmarla con datos reales.
+- **Documento no validado:** si `results` trae `validado: false`, el resultado lleva la
+  advertencia `DOCUMENTO_NO_VALIDADO` (el portal la resalta). No cambia la conclusión: la
+  decide el revisor. Pasaporte y NIT no traen ese dato.
 - **Admisión:** exige CC, CE (con fecha de expedición), pasaporte (`PAS`/`PASAPORTE`, con
   nombre) o NIT; si no, 422 sin gastar créditos. Se envía `force: false`.
 
@@ -643,6 +657,8 @@ regrabable con `scripts/listas/grabar_sandbox_tusdatos.py`):
   el campo de cada fuente (`ofac`, `lista_onu`, `peps`…), que puede ser booleano, objeto,
   lista o `"Error"`. `errores` usa esos mismos códigos; `results` usa nombres legibles
   que cambian según el tipo de documento.
+- `peps_funcion_publica` solo aparece en el reporte con hallazgos; la cédula 125 es el
+  ejemplo de documento no validado.
 - Los PDF del sandbox no son PDF (devuelve un texto JSON) y `/api/retry` responde 404:
   ambos solo se prueban con respuestas escritas a mano hasta tener credenciales reales.
 - `tests/contracts/test_cliente_tusdatos.py` incluye un flujo contra el sandbox real

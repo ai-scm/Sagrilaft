@@ -455,6 +455,10 @@ Sirven como aviso para quien mantenga el módulo:
 | Usuario autenticado sin roles de carpeta provocaba una excepción en las rutas de listas | Ahora responde 403 |
 | El seguimiento del portal se detenía tras un error de red | Sondeo cada 2 s; tras un fallo espera 4 s y luego 8 s; tras tres fallos seguidos se pausa y ofrece «Reintentar seguimiento» |
 | El middleware aceptaba JWT sin `exp` | `exp` obligatorio para todo el portal |
+| Tusdatos puede informar la falla de ONU con el código `onu`, y solo se reconocía `lista_onu`: la fuente habría pasado como consultada sin registros | Se reconocen los dos códigos; una prueba compara las fuentes con el catálogo de errores de Tusdatos |
+| Se ignoraba `validado: false` (Tusdatos no pudo validar el documento) | El resultado lleva la advertencia `DOCUMENTO_NO_VALIDADO` y el portal la resalta |
+| Una fuente que no venía en el reporte pero sí en `errores` quedaba como «no disponible» | Ahora queda como fallida |
+| `validate_envs.py` rechazaba `.env.dev.example` tras agregar las variables `LISTAS_*` (CI en rojo) | El validador y las tres plantillas declaran las variables nuevas |
 
 ## 7. Pendientes
 
@@ -537,8 +541,9 @@ Sigue pendiente:
 
 ### Proveedor externo
 
-Adaptador de Tusdatos implementado (Fases 2 a 4; ver
-[arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)).
+Adaptador de Tusdatos implementado (Fases 2 a 5; ver
+[arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)
+y la guía corta [Consultas con Tusdatos](TUSDATOS.md)).
 Probado con el sandbox público y con respuestas grabadas
 (`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
 `tests/persistencia_listas/test_externo_tusdatos.py`). Falta:
@@ -548,7 +553,8 @@ Probado con el sandbox público y con respuestas grabadas
   `listas_*` y asignarlos (ver «Antes de cualquier ambiente compartido»).
 - Respuesta de Tusdatos sobre cómo recuperar el reporte de una CC en caché (`jobid: null`).
 - Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
-  (en especial los textos de Policía y los registros PEP).
+  (en especial los textos de Policía y los registros PEP), confirmar que
+  `peps_funcion_publica` solo llega cuando hay registro y ver cómo llega `validado`.
 - Staging (Fase 7): preparado; falta ejecutar los pasos de activación (sección
   «Antes de cualquier ambiente compartido»).
 - El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
