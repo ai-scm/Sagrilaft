@@ -657,3 +657,12 @@ class AlertaInconsistencia(Base):
     fecha_creacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     formulario = relationship("Formulario", back_populates="alertas_inconsistencia")
+
+# Registra el catálogo e historial de listas en la misma metadata de Alembic.
+from infrastructure.persistencia import modelos_listas  # noqa: F401,E402
+from infrastructure.persistencia import modelos_grupos_listas  # noqa: F401,E402
+from infrastructure.persistencia import modelos_recepcion_listas  # noqa: F401,E402
+from infrastructure.persistencia import modelos_importacion_listas  # noqa: F401,E402
+
+from infrastructure.persistencia import modelos_administracion_listas  # noqa: F401,E402
+from infrastructure.persistencia import modelos_busqueda_listas  # noqa: F401,E402

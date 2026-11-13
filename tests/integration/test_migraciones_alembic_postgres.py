@@ -161,7 +161,7 @@ def test_alembic_respeta_lock_antes_de_crear_esquema(bd_migracion_guard, monkeyp
     monkeypatch.setenv("MIGRATION_VERIFY_HEAD", "1")
     command.upgrade(_config_alembic(), "head")
     with bd_migracion_guard.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f8a9b0c1d2e3"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "e65f78a901b2"
 
 
 def test_verificacion_rechaza_revision_final_distinta_y_revierte(bd_migracion_guard, monkeypatch, capsys):
@@ -184,7 +184,7 @@ def test_upgrade_verificado_con_datos_y_segunda_ejecucion(bd_migracion_guard, mo
     assert '"migration_schema_verified"' in output
     with bd_migracion_guard.connect() as connection:
         assert connection.execute(text("SELECT correo_destinatario FROM accesos_manuales WHERE id='PHASE3'")).scalar_one() == "prueba@example.invalid"
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "f8a9b0c1d2e3"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "e65f78a901b2"
     command.upgrade(_config_alembic(), "head")
     assert '"migration_schema_verified"' in capsys.readouterr().out
 
@@ -269,12 +269,12 @@ def test_alembic_upgrade_head_crea_esquema_postgresql(monkeypatch):
         _eliminar_base_temporal(admin_url, nombre_bd)
 
 
-def test_las_28_revisiones_desde_cero_y_head_idempotente(bd_migracion_guard, monkeypatch):
+def test_las_33_revisiones_desde_cero_y_head_idempotente(bd_migracion_guard, monkeypatch):
     """Execute every revision, including both branches and their merge."""
     script = ScriptDirectory.from_config(_config_alembic())
     revisions = list(reversed(list(script.walk_revisions())))
-    assert len(revisions) == 28
-    assert script.get_heads() == ['f8a9b0c1d2e3']
+    assert len(revisions) == 33
+    assert script.get_heads() == ['e65f78a901b2']
     for revision in revisions:
         command.upgrade(_config_alembic(), revision.revision)
     monkeypatch.setenv('MIGRATION_VERIFY_HEAD', '1')
@@ -432,7 +432,7 @@ def esquema_actual(bd_migracion_guard, monkeypatch):
     monkeypatch.setenv('MIGRATION_VERIFY_HEAD', '1')
     command.upgrade(_config_alembic(), 'head')
     with bd_migracion_guard.connect() as conn:
-        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == 'f8a9b0c1d2e3'
+        assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar_one() == ScriptDirectory.from_config(_config_alembic()).get_current_head()
     return bd_migracion_guard
 
 
