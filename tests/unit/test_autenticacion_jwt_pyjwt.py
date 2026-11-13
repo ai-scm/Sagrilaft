@@ -144,6 +144,19 @@ async def test_token_expirado_se_rechaza():
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("exp_nulo", [False, True])
+async def test_token_sin_vencimiento_se_rechaza(exp_nulo):
+    contenido = jwt.decode(_token(), options={"verify_signature": False})
+    contenido.pop("exp")
+    if exp_nulo:
+        contenido["exp"] = None
+    token = jwt.encode(contenido, _PRIVADA, algorithm="RS256", headers={"kid": _KID})
+    with pytest.raises(Exception) as error:
+        await _decodificar_jwt(token, _config_keycloak(), _RequestFalso())
+    assert error.value.status_code == 401
+
+
+@pytest.mark.anyio
 async def test_kid_desconocido_se_rechaza():
     token = _token(kid="kid-que-no-existe-en-el-jwks")
 

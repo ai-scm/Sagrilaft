@@ -165,6 +165,7 @@ async def _decodificar_jwt(token: str, config: KeycloakConfig, request: Request)
             algorithms=["RS256"],
             issuer=config.issuer,
             audience=config.client_id,
+            options={"require": ["exp"]},
         )
     except (PyJWTError, KeyError) as exc:
         _registrar_fallo_ip(ip)
