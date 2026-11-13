@@ -457,6 +457,7 @@ class ProgresoConsultaExterna(IdentidadRegistro, Base):
     actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     huella_respuesta: Mapped[str | None] = mapped_column(String(64))
     respuesta_filtrada: Mapped[dict | None] = mapped_column(DATOS)
+    verificacion_documento: Mapped[dict | None] = mapped_column(DATOS)  # migración m43b56c789da
 
 
 class RitmoProveedor(Base):

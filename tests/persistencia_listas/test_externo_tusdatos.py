@@ -382,3 +382,276 @@ def test_documento_que_tusdatos_no_valida_queda_advertido(externo):
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "COMPLETADA"
     assert "DOCUMENTO_NO_VALIDADO" in {a["codigo"] for a in consulta["advertencias"]}
+
+
+# ── Documento inexistente y revisión previa de fuentes y créditos ────────────
+
+def test_nit_inexistente_se_cierra_con_un_mensaje_claro(externo):
+    externo.simulador.extras[("POST", "/api/launch")] = httpx.Response(400, json={"error": "Nit no encontrado"})
+    consulta_id = crear(externo, tipo="NIT", valor="900.123.456-7").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["error"]["codigo"] == "DOCUMENTO_NO_ENCONTRADO"
+    assert "registro mercantil" in consulta["error"]["mensaje"]
+    assert [e["tipo"] for e in consulta["evidencias"]] == ["INFORME_INTERNO"]
+    assert json.loads(lanzamientos(externo)[0].content)["doc"] == "900123456"  # sin dígito de verificación
+
+
+def test_el_sandbox_no_revisa_fuentes_ni_creditos(externo):
+    crear(externo)
+    procesar(externo)
+    rutas = {p.url.path for p in externo.simulador.peticiones}
+    assert "/api/v1/sources/status" not in rutas and "/api/plans" not in rutas
+
+
+def estado_fuentes(**estados):
+    return httpx.Response(200, json={"sources": [{"code": c, "status": s} for c, s in estados.items()]})
+
+
+@pytest.fixture
+def produccion(externo, monkeypatch):
+    """Misma base y simulador, pero con la configuración de producción: activa la revisión previa."""
+    metricas = []
+    configuracion = ConfiguracionTusdatos(url_base="https://dash-board.tusdatos.co", token="api_td_pruebas", alerta_creditos=50)
+    modalidad = ModalidadExterna(fabrica_cliente=lambda _entorno: ClienteTusdatos(
+        configuracion, transporte=externo.simulador.transporte, dormir=lambda _s: None,
+        metricas=lambda *argumentos: metricas.append(argumentos)),
+        monotonic=lambda: externo.reloj[0].timestamp())  # la caché del estado sigue el reloj de la prueba
+    monkeypatch.setitem(modalidades.MODALIDADES, "externo", modalidad)
+    externo.simulador.extras[("GET", "/api/v1/sources/status")] = estado_fuentes(policia="operational", procuraduria="operational")
+    externo.simulador.extras[("GET", "/api/plans")] = httpx.Response(200, json={"amount": 500, "purchase_amount": 1000})
+    externo.metricas = metricas
+    return externo
+
+
+def test_fuente_obligatoria_caida_no_gasta_credito(produccion):
+    produccion.simulador.extras[("GET", "/api/v1/sources/status")] = estado_fuentes(procuraduria="under_maintenance", rut="source_down")
+    consulta_id = crear(produccion).json()["consulta_id"]
+    procesar(produccion)
+    consulta = detalle(produccion, consulta_id)
+    assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["error"]["codigo"] == "FUENTES_CAIDAS_PROVEEDOR"
+    assert "Procuraduría General de la Nación" in consulta["error"]["mensaje"] and "RUT" not in consulta["error"]["mensaje"]
+    assert lanzamientos(produccion) == [] and "FUENTES_CAIDAS_PROVEEDOR" in eventos(produccion, consulta_id)
+
+
+def test_forzar_consulta_aunque_haya_fuentes_caidas(produccion):
+    produccion.simulador.extras[("GET", "/api/v1/sources/status")] = estado_fuentes(policia="source_down")
+    consulta_id = crear(produccion, forzar=True).json()["consulta_id"]
+    procesar(produccion)
+    assert detalle(produccion, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    assert len(lanzamientos(produccion)) == 1
+
+
+@pytest.mark.parametrize("estado", [
+    estado_fuentes(peps_funcion_publica="source_down", rut="source_down"),  # no deciden el resultado
+    httpx.Response(503),                                                    # sin estado no se bloquea
+])
+def test_caidas_que_no_bloquean(produccion, estado):
+    produccion.simulador.extras[("GET", "/api/v1/sources/status")] = estado
+    consulta_id = crear(produccion).json()["consulta_id"]
+    procesar(produccion)
+    assert detalle(produccion, consulta_id)["estado_ejecucion"] == "COMPLETADA" and len(lanzamientos(produccion)) == 1
+
+
+def test_empresa_no_se_bloquea_por_fuentes_solo_de_personas(produccion):
+    produccion.simulador.extras[("GET", "/api/v1/sources/status")] = estado_fuentes(policia="source_down", interpol="source_down")
+    consulta_id = crear(produccion, tipo="NIT", valor="900000152").json()["consulta_id"]
+    procesar(produccion)
+    assert detalle(produccion, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+
+
+@pytest.mark.parametrize("restantes,aviso", [(500, False), (12, True)])
+def test_creditos_se_publican_y_avisan_cuando_quedan_pocos(produccion, caplog, monkeypatch, restantes, aviso):
+    # El fileConfig de Alembic (migración de la sesión de pruebas) desactiva los loggers ya creados.
+    import logging
+    monkeypatch.setattr(logging.getLogger("services.listas.modalidad_externa"), "disabled", False)
+    produccion.simulador.extras[("GET", "/api/plans")] = httpx.Response(200, json={"amount": restantes, "purchase_amount": 1000})
+    with caplog.at_level("WARNING", logger="services.listas.modalidad_externa"):
+        crear(produccion)
+        procesar(produccion)
+    assert any(m[2] == {"TusdatosCreditosRestantes": restantes} for m in produccion.metricas)
+    assert ("quedan 12 créditos" in caplog.text) is aviso
+    assert len(lanzamientos(produccion)) == 1  # los créditos nunca bloquean la consulta
+
+
+
+# ── Recarga según el estado de las fuentes ───────────────────────────────────
+
+def recargas_pedidas(e):
+    return [p for p in e.simulador.peticiones if p.url.path.startswith("/api/retry")]
+
+
+def preparar_consulta_con_errores(e, *estados):
+    e.simulador.extras[("POST", "/api/launch")] = httpx.Response(200, json={"jobid": JOB_CON_ERROR, "validado": True})
+    e.simulador.extras[("GET", f"/api/retry/{REPORTE_CON_ERROR}")] = httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO})
+    e.simulador.extras[("GET", "/api/v1/sources/status")] = list(estados)
+
+
+def test_recarga_espera_a_que_vuelva_la_fuente_caida(produccion):
+    operativa = estado_fuentes(procuraduria="operational", policia="operational")
+    caida = estado_fuentes(procuraduria="under_maintenance", policia="operational")
+    preparar_consulta_con_errores(produccion, operativa, caida, caida, operativa)
+    consulta_id = crear(produccion, valor="113").json()["consulta_id"]
+    procesar(produccion)
+    assert detalle(produccion, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    assert len(recargas_pedidas(produccion)) == 1 and len(lanzamientos(produccion)) == 1
+    consultas_estado = [p for p in produccion.simulador.peticiones if p.url.path == "/api/v1/sources/status"]
+    assert len(consultas_estado) == 4  # antes de lanzar, dos veces caída, y la recarga solo al volver
+    assert "RECARGA_FUENTES_EXTERNAS" in eventos(produccion, consulta_id)
+
+
+def test_si_la_fuente_no_vuelve_a_tiempo_no_gasta_la_recarga_y_dice_por_que(produccion):
+    preparar_consulta_con_errores(produccion, estado_fuentes(procuraduria="operational"),
+                                  estado_fuentes(procuraduria="source_down"))
+    consulta_id = crear(produccion, valor="113").json()["consulta_id"]
+    procesar(produccion)
+    consulta = detalle(produccion, consulta_id)
+    # El sandbox con error falla en todas las fuentes: sin ninguna consultada, la consulta queda FALLIDA.
+    assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["conclusion_busqueda"] == "NO_CONCLUYENTE"
+    procuraduria = next(c for c in consulta["cobertura"] if c["fuente_codigo"] == "procuraduria")
+    assert "caída o en mantenimiento" in procuraduria["motivo"]
+    assert recargas_pedidas(produccion) == [] and "RECARGA_OMITIDA_FUENTES_CAIDAS" in eventos(produccion, consulta_id)
+
+
+def test_en_el_sandbox_la_recarga_no_espera(externo):
+    preparar_consulta_con_errores(externo, estado_fuentes(procuraduria="source_down"))
+    consulta_id = crear(externo, valor="113").json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA" and len(recargas_pedidas(externo)) == 1
+
+
+def test_avisa_una_vez_las_fuentes_que_tusdatos_no_informa(produccion, caplog, monkeypatch):
+    import logging
+    monkeypatch.setattr(logging.getLogger("services.listas.modalidad_externa"), "disabled", False)
+    with caplog.at_level("WARNING", logger="services.listas.modalidad_externa"):
+        crear(produccion)
+        crear(produccion, valor="111")
+        procesar(produccion)
+    avisos = [r.getMessage() for r in caplog.records if "no informa" in r.getMessage()]
+    assert len(avisos) == 1 and "ofac" in avisos[0] and "procuraduria" not in avisos[0].split(".")[0]
+
+
+# ── CC en la caché de Tusdatos: recuperación por el historial ────────────────
+
+REPORTE_SIN_HALLAZGO = "8188f7e8aa70102bf2053f32"
+
+
+def fila_historial(e, reporte_id, hace=timedelta(hours=1), documento="126"):
+    creada = (e.reloj[0] - hace).isoformat()
+    return {"check_id": reporte_id, "document_type": "CC", "document_number": documento, "created_at": creada,
+            "url": f"https://dash-board.tusdatos.co/api/report_json/{reporte_id}"}
+
+
+def test_cc_en_cache_se_recupera_del_historial_sin_gastar_credito(externo):
+    externo.simulador.extras[("GET", "/api/v1/checks")] = lambda _p: httpx.Response(200, json={"data": [
+        fila_historial(externo, REPORTE_CC, hace=timedelta(hours=5)),
+        fila_historial(externo, REPORTE_SIN_HALLAZGO, hace=timedelta(hours=1))]})
+    consulta_id = crear(externo, valor="126").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "COMPLETADA" and consulta["conclusion_busqueda"] == "SIN_CANDIDATOS"
+    assert progreso(externo, consulta_id).reporte_id == REPORTE_SIN_HALLAZGO  # la más reciente
+    assert "REPORTE_RECUPERADO_DE_HISTORIAL" in eventos(externo, consulta_id) and len(lanzamientos(externo)) == 1
+    consulta_historial = next(p for p in externo.simulador.peticiones if p.url.path == "/api/v1/checks")
+    assert consulta_historial.url.params["document_number"] == "126"
+
+
+def test_cc_recuperada_con_fuentes_fallidas_usa_la_recarga(externo):
+    externo.simulador.extras[("GET", "/api/v1/checks")] = lambda _p: httpx.Response(200, json={"data": [
+        fila_historial(externo, REPORTE_CON_ERROR)]})
+    externo.simulador.extras[("GET", f"/api/retry/{REPORTE_CON_ERROR}")] = httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO})
+    consulta_id = crear(externo, valor="126").json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    assert progreso(externo, consulta_id).recargas == 1 and len(lanzamientos(externo)) == 1
+
+
+@pytest.mark.parametrize("filas", [
+    lambda e: [fila_historial(e, REPORTE_CC, hace=timedelta(hours=7))],             # fuera de la ventana de 6 h
+    lambda e: [fila_historial(e, REPORTE_CC, documento="999")],                    # de otro documento
+    lambda e: [{**fila_historial(e, REPORTE_CC), "created_at": "2026-11-13"}],       # sin hora: no se adivina
+    lambda e: [],
+])
+def test_si_el_historial_no_sirve_se_cierra_como_antes(externo, filas):
+    externo.simulador.extras[("GET", "/api/v1/checks")] = lambda _p: httpx.Response(200, json={"data": filas(externo)})
+    consulta_id = crear(externo, valor="126").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "FALLIDA"
+    assert "RESULTADO_EN_CACHE_SIN_REFERENCIA" in {a["codigo"] for a in consulta["advertencias"]}
+    assert not any(p.url.path.startswith("/api/report_json") for p in externo.simulador.peticiones)
+
+
+# ── Verificación previa del documento (verify/nit, verify/ce) ────────────────
+
+def verificaciones(e):
+    return [p for p in e.simulador.peticiones if p.url.path.startswith("/api/launch/verify/")]
+
+
+def respuesta_verificacion(estado="ACTIVA", hallazgos=()):
+    return httpx.Response(200, json={"status": "true", "data": {"estado": estado}, "error": "", "findings": list(hallazgos)})
+
+
+def test_nit_inexistente_se_detecta_antes_de_consultar_listas(externo):
+    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta_verificacion("", ["Nit no encontrado"])
+    consulta_id = crear(externo, tipo="NIT", valor="900123456").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["error"]["codigo"] == "DOCUMENTO_NO_ENCONTRADO"
+    assert "antes de consultar listas" in consulta["error"]["mensaje"]
+    assert lanzamientos(externo) == [] and "DOCUMENTO_NO_ENCONTRADO" in eventos(externo, consulta_id)
+    assert progreso(externo, consulta_id).verificacion_documento == {
+        "tipo": "NIT", "resultado": "NO_ENCONTRADO", "estado": None, "avisos": ["Nit no encontrado"]}
+
+
+def test_empresa_no_activa_se_consulta_igual_con_aviso(externo):
+    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta_verificacion("CANCELADA")
+    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    assert consulta["estado_ejecucion"] == "COMPLETADA" and len(lanzamientos(externo)) == 1
+    aviso = {a["codigo"]: a["descripcion"] for a in consulta["advertencias"]}["DOCUMENTO_NO_VIGENTE"]
+    assert "La empresa" in aviso and "CANCELADA" in aviso
+
+
+def test_cedula_de_extranjeria_no_vigente_se_consulta_igual(externo):
+    externo.simulador.extras[("POST", "/api/launch/verify/ce")] = respuesta_verificacion("VIGENTE", ["Cédula no vigente"])
+    consulta_id = crear(externo, tipo="CE", valor="960696", fecha_expedicion="2001-11-01").json()["consulta_id"]
+    procesar(externo)
+    assert json.loads(verificaciones(externo)[0].content) == {"ce": 960696, "fecha_expedicion": "01/11/2001"}
+    assert len(lanzamientos(externo)) == 1
+    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "NO_VIGENTE"
+
+
+def test_nit_vigente_se_verifica_una_sola_vez_aunque_espere_turno(externo):
+    from infrastructure.listas.tusdatos.adaptador import PROVEEDOR
+    externo.trabajador.repositorio.reservar_turno(PROVEEDOR, 5.0)  # otro trabajador acaba de lanzar
+    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    assert len(verificaciones(externo)) == 1 and len(lanzamientos(externo)) == 1
+    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "VIGENTE"
+    assert "DOCUMENTO_VERIFICADO" in eventos(externo, consulta_id)
+
+
+def test_si_la_verificacion_falla_la_consulta_sigue(externo):
+    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = httpx.Response(503)
+    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
+    procesar(externo)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA" and len(lanzamientos(externo)) == 1
+    assert len(verificaciones(externo)) == 1  # no se repite: puede costar
+    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "SIN_VERIFICAR"
+    assert "VERIFICACION_DOCUMENTO_FALLIDA" in eventos(externo, consulta_id)
+
+
+def test_cedula_de_ciudadania_y_verificacion_apagada_no_verifican(externo, monkeypatch):
+    crear(externo, valor="112")
+    procesar(externo)
+    assert verificaciones(externo) == []
+    apagada = ConfiguracionTusdatos(url_base="http://docs.tusdatos.co", usuario="pruebas", clave="password",
+                                    verificar_documento=False)
+    monkeypatch.setitem(modalidades.MODALIDADES, "externo", ModalidadExterna(fabrica_cliente=lambda _e: ClienteTusdatos(
+        apagada, transporte=externo.simulador.transporte, dormir=lambda _s: None, metricas=lambda *_: None)))
+    crear(externo, tipo="NIT", valor="900000152")
+    procesar(externo)
+    assert verificaciones(externo) == [] and len(lanzamientos(externo)) == 2

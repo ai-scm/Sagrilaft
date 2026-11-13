@@ -29,6 +29,7 @@ class ProgresoExterno:
     vence_en: datetime
     huella_respuesta: str | None
     respuesta_filtrada: dict | None
+    verificacion_documento: dict | None = None
 
 
 @dataclass(frozen=True)

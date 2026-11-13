@@ -4,16 +4,24 @@ Cada pasada del trabajador avanza una etapa y libera la consulta hasta el próxi
 
     POR_LANZAR ──(turno de 5 s)──► LANZANDO ──► ESPERANDO ──► DESCARGANDO_PDF ──► TERMINADA
                                      │             │ (sondeo; una recarga gratuita
-                                     │             │  si fallaron fuentes requeridas)
+                                     │             │  si fallaron fuentes requeridas,
+                                     │             │  esperando a que vuelvan si están caídas)
                                      └─ si el trabajador cae aquí, la consulta queda
                                         INDETERMINADA y nunca se relanza sola.
 
 - LANZANDO se confirma en la base ANTES de llamar a `launch`, que gasta un crédito.
 - El plazo es de 15 minutos desde la admisión; vencido, se cierra NO_CONCLUYENTE.
+- Antes de lanzar, un NIT o una cédula de extranjería se valida con `verify/nit` o
+  `verify/ce` (una sola vez por consulta). Si no existe, se cierra sin consultar listas;
+  si no está vigente, se consulta igual y el resultado lleva un aviso.
+- Si Tusdatos responde sin jobid (CC en su caché de 6 h), el reporte se busca en el
+  historial de la cuenta (`/api/v1/checks`) y se sigue desde ahí sin gastar crédito.
 - El PDF del proveedor se intenta dentro del mismo plazo; si no llega, la consulta se
   cierra igual y queda un evento PDF_PROVEEDOR_NO_DISPONIBLE (el id del reporte queda
   guardado para descargarlo después).
 """
+import logging
+import time
 from datetime import timedelta
 
 from domain.listas.puertos import ListasNoDisponibles
@@ -29,6 +37,17 @@ def _documento(criterio) -> tuple[str, str] | None:
         if tipo:
             return tipo, limpiar_documento(identificador.get("valor", "")).upper()
     return None
+
+
+def _aviso_no_vigente(progreso) -> str | None:
+    """Texto del aviso al revisor si la verificación previa encontró el documento no vigente."""
+    verificacion = getattr(progreso, "verificacion_documento", None) or {}
+    if verificacion.get("resultado") != "NO_VIGENTE":
+        return None
+    que = "La empresa" if verificacion.get("tipo") == "NIT" else "La cédula de extranjería"
+    estado = verificacion.get("estado") or "; ".join(verificacion.get("avisos") or ()) or "no vigente"
+    return (f"{que} no figura vigente en la fuente oficial (estado informado: {estado}). "
+            "Las listas se consultaron igual; confirme el documento con la contraparte")
 
 
 def bloquear_documento(sesion, expediente_id, documento) -> None:
@@ -57,6 +76,20 @@ ESPERA_TRAS_LANZAR = 15.0      # Una consulta tarda en promedio un minuto.
 ESPERA_SONDEO = 5.0            # Frecuencia de sondeo recomendada por Tusdatos.
 ESPERA_RED = 15.0
 CONCESION_PASADA = 300         # Cubre la llamada más lenta (PDF) con sus reintentos.
+VIGENCIA_SALUD = 60.0          # Segundos que se reutiliza el estado de fuentes y créditos.
+ESPERA_FUENTE_CAIDA = 60.0     # Cada cuánto se revisa si volvió una fuente caída antes de recargar.
+VIGENCIA_SALUD_RECARGA = 10.0  # Para decidir la recarga se usa un estado reciente, no el de antes de lanzar.
+MARGEN_RECARGA = timedelta(minutes=3)  # Tiempo mínimo antes del plazo para esperar y aun recargar.
+VENTANA_CACHE = timedelta(hours=6)     # Tusdatos reutiliza una CC consultada en las últimas 6 h.
+TIPOS_VERIFICABLES = frozenset({"NIT", "CE"})  # verify/nit (cámaras de comercio) y verify/ce (Migración)
+ESTADOS_CAIDOS = frozenset({"under_maintenance", "source_down"})
+MENSAJES_NO_ENCONTRADO = {
+    "NIT": "Tusdatos no encontró el NIT en el registro mercantil (RUES). Envíe el NIT sin dígito de verificación",
+    "CE": "Tusdatos no encontró la cédula de extranjería en el registro de Migración Colombia",
+    "CC": "Tusdatos no encontró el documento en la fuente oficial",
+    "PP": "Tusdatos no encontró el pasaporte",
+}
+registro = logging.getLogger(__name__)
 # «Bloquear y reutilizar»: dentro del mismo expediente, una consulta del mismo documento de
 # las últimas 6 horas se reutiliza en vez de gastar otro crédito. Solo dentro del expediente:
 # reutilizar la de otro expediente expondría su resultado a quien no tiene acceso a él.
@@ -69,10 +102,13 @@ class ModalidadExterna:
     version_contrato = "2.0"
     admite_forzar = True
 
-    def __init__(self, fabrica_cliente=None):
+    def __init__(self, fabrica_cliente=None, monotonic=time.monotonic):
         # Las pruebas inyectan un cliente con transporte simulado; en ejecución se arma desde el entorno.
         self._fabrica = fabrica_cliente
+        self._monotonic = monotonic  # reloj de la caché de estado de fuentes y créditos
         self._clientes = {}
+        self._salud = {}  # entorno → (instante, {código: estado} | None)
+        self._sin_estado_avisado = set()  # entornos donde ya se registraron las fuentes sin estado
 
     # ── Configuración ────────────────────────────────────────────────────────
 
@@ -212,10 +248,25 @@ class ModalidadExterna:
     def _lanzar(self, trabajador, concesion, consulta, solicitud):
         from infrastructure.listas.tusdatos.adaptador import PROVEEDOR, resultado_sin_reporte
         from infrastructure.listas.tusdatos.errores import (
-            AccesoDenegado, CredencialesRechazadas, EfectoDesconocido, ProveedorNoDisponible,
-            RespuestaInesperada, SolicitudRechazada, TitularNoAutoriza,
+            AccesoDenegado, CredencialesRechazadas, DocumentoNoEncontrado, EfectoDesconocido,
+            ProveedorNoDisponible, RespuestaInesperada, SolicitudRechazada, TitularNoAutoriza,
         )
         repositorio = trabajador.repositorio
+        forzar = bool(consulta.manifiesto.get("forzar"))
+        caidas = self._fuentes_caidas(trabajador.politica.entorno, consulta)
+        if caidas and not forzar:
+            # No se gasta un crédito en una consulta que de todos modos quedaría parcial.
+            repositorio.guardar_progreso(concesion, etapa="TERMINADA", evento="FUENTES_CAIDAS_PROVEEDOR")
+            return self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
+                consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="FUENTES_CAIDAS_PROVEEDOR",
+                mensaje="Tusdatos informa fuentes caídas o en mantenimiento: " + ", ".join(caidas)
+                        + ". No se hizo la consulta ni se gastó crédito",
+                advertencia="Intente más tarde, o use «Forzar actualización» para consultar de todos modos "
+                            "(el resultado quedará parcial)", estado_cobertura="DESCONOCIDA",
+                fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
+        if self._verificar_documento(trabajador, concesion, consulta, solicitud):
+            return None  # El documento no existe: la consulta ya quedó cerrada.
+        self._vigilar_creditos(trabajador.politica.entorno)
         espera = repositorio.reservar_turno(PROVEEDOR, INTERVALO_LANZAMIENTOS)
         if espera > 0:
             return repositorio.posponer(concesion, max(espera, 1.0))
@@ -223,7 +274,7 @@ class ModalidadExterna:
         try:
             lanzado = self.cliente(trabajador.politica.entorno).lanzar(
                 solicitud.tipo_documento, solicitud.numero, nombre=solicitud.nombre,
-                fecha_expedicion=solicitud.fecha_expedicion, forzar=bool(consulta.manifiesto.get("forzar")),
+                fecha_expedicion=solicitud.fecha_expedicion, forzar=forzar,
                 referencia=str(consulta.id))
         except ProveedorNoDisponible:
             # No llegó al proveedor: es seguro volver a intentarlo más tarde.
@@ -235,6 +286,13 @@ class ModalidadExterna:
                 consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="TITULAR_NO_AUTORIZA",
                 mensaje="El titular de los datos no autoriza la consulta (protección de datos personales)",
                 fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
+        except DocumentoNoEncontrado:
+            repositorio.guardar_progreso(concesion, etapa="TERMINADA")
+            return self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
+                consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="DOCUMENTO_NO_ENCONTRADO",
+                mensaje=MENSAJES_NO_ENCONTRADO.get(solicitud.tipo_documento, MENSAJES_NO_ENCONTRADO["CC"]),
+                advertencia="Revise el número y el tipo de documento antes de repetir la consulta",
+                estado_cobertura="DESCONOCIDA", fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
         except (CredencialesRechazadas, AccesoDenegado, SolicitudRechazada) as error:
             return self._terminar_con_fallo(repositorio, concesion, error.codigo)
         except ValueError:
@@ -243,17 +301,187 @@ class ModalidadExterna:
             # El progreso queda en LANZANDO: nadie relanzará esta consulta automáticamente.
             return repositorio.fallar(concesion, "EFECTO_EXTERNO_DESCONOCIDO", indeterminada=True)
         if lanzado.en_cache:
-            repositorio.guardar_progreso(concesion, etapa="TERMINADA")
-            return self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
-                consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="RESULTADO_EN_CACHE_SIN_REFERENCIA",
-                mensaje="Tusdatos devolvió una consulta anterior (últimas 6 horas) sin referencia a su reporte",
-                advertencia="Use «Forzar actualización» para obtener un reporte nuevo", estado_cobertura="DESCONOCIDA",
-                fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
+            return self._desde_cache(trabajador, concesion, consulta, solicitud)
         repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=lanzado.jobid)
         return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
 
+    # ── Verificación previa del documento (NIT y cédula de extranjería) ─────
+
+    def _verificar_documento(self, trabajador, concesion, consulta, solicitud):
+        """Valida el NIT o la CE antes de consultar listas; True si cerró la consulta (documento inexistente).
+
+        Se hace una sola vez por consulta (queda en el progreso). Si la verificación falla o
+        no se puede interpretar, la consulta sigue: nunca bloquea por un problema del servicio.
+        """
+        from infrastructure.listas.tusdatos.adaptador import resultado_sin_reporte
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        if solicitud.tipo_documento not in TIPOS_VERIFICABLES:
+            return False
+        repositorio = trabajador.repositorio
+        cliente = self.cliente(trabajador.politica.entorno)
+        if not getattr(cliente.configuracion, "verificar_documento", False):
+            return False
+        progreso = repositorio.progreso_externo(consulta.id)
+        if progreso is not None and progreso.verificacion_documento is not None:
+            return False  # Ya se verificó en una pasada anterior.
+        try:
+            verificacion = cliente.verificar_documento(solicitud.tipo_documento, solicitud.numero,
+                                                       fecha_expedicion=solicitud.fecha_expedicion)
+        except (ErrorTusdatos, ValueError) as error:
+            codigo = getattr(error, "codigo", "DATOS_NO_VERIFICABLES")
+            repositorio.guardar_progreso(concesion, evento="VERIFICACION_DOCUMENTO_FALLIDA",
+                                         verificacion_documento={"tipo": solicitud.tipo_documento,
+                                                                 "resultado": "SIN_VERIFICAR", "motivo": codigo})
+            registro.info("Tusdatos: no se pudo verificar el documento (%s); la consulta sigue", codigo)
+            return False
+        if verificacion.no_encontrado:
+            resultado = "NO_ENCONTRADO"
+        elif verificacion.vigente is False:
+            resultado = "NO_VIGENTE"
+        elif verificacion.vigente:
+            resultado = "VIGENTE"
+        else:
+            resultado = "SIN_DATO"
+        guardado = {"tipo": solicitud.tipo_documento, "resultado": resultado, "estado": verificacion.estado,
+                    "avisos": list(verificacion.avisos)}
+        if resultado != "NO_ENCONTRADO":
+            repositorio.guardar_progreso(concesion, evento="DOCUMENTO_VERIFICADO", verificacion_documento=guardado)
+            return False
+        repositorio.guardar_progreso(concesion, etapa="TERMINADA", evento="DOCUMENTO_NO_ENCONTRADO",
+                                     verificacion_documento=guardado)
+        self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
+            consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="DOCUMENTO_NO_ENCONTRADO",
+            mensaje=MENSAJES_NO_ENCONTRADO[solicitud.tipo_documento]
+                    + ". Se comprobó antes de consultar listas, así que no se hizo esa consulta",
+            advertencia="Revise el número y el tipo de documento antes de repetir la consulta",
+            estado_cobertura="DESCONOCIDA", fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
+        return True
+
+    # ── CC en caché de Tusdatos: recuperación por el historial ──────────────
+
+    def _desde_cache(self, trabajador, concesion, consulta, solicitud):
+        """`launch` respondió sin jobid: se busca el reporte de esa consulta en el historial."""
+        from domain.listas.contratos import Criterio
+        from infrastructure.listas.tusdatos.adaptador import resultado_sin_reporte
+        from infrastructure.listas.tusdatos.cliente import EstadoTrabajo
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        repositorio = trabajador.repositorio
+        cliente = self.cliente(trabajador.politica.entorno)
+        ahora = repositorio.reloj()
+        reporte = None
+        try:
+            reporte_id = self._reporte_en_historial(cliente, solicitud, ahora)
+            if reporte_id:
+                reporte = (reporte_id, cliente.reporte(reporte_id))
+        except ErrorTusdatos:
+            reporte = None  # El historial no existe en el sandbox; tampoco se adivina si falla.
+        if reporte is None:
+            repositorio.guardar_progreso(concesion, etapa="TERMINADA")
+            return self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
+                consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="RESULTADO_EN_CACHE_SIN_REFERENCIA",
+                mensaje="Tusdatos devolvió una consulta anterior (últimas 6 horas) sin referencia a su reporte, "
+                        "y no se encontró en el historial de la cuenta",
+                advertencia="Use «Forzar actualización» para obtener un reporte nuevo", estado_cobertura="DESCONOCIDA",
+                fecha_inicio=consulta.admitida_en, fecha_fin=ahora))
+        reporte_id, documento = reporte
+        repositorio.guardar_progreso(concesion, reporte_id=reporte_id, evento="REPORTE_RECUPERADO_DE_HISTORIAL")
+        errores = tuple(e for e in (documento.datos.get("errores") or []) if isinstance(e, str))
+        estado = EstadoTrabajo(finalizado=True, reporte_id=reporte_id, errores=errores)
+        # Aún en LANZANDO: no se puede posponer (se tomaría como lanzamiento interrumpido).
+        return self._procesar_finalizado(trabajador, concesion, consulta, Criterio.model_validate(consulta.criterio),
+                                         solicitud, repositorio.progreso_externo(consulta.id), estado,
+                                         reporte=documento, puede_esperar=False)
+
+    @staticmethod
+    def _reporte_en_historial(cliente, solicitud, ahora) -> str | None:
+        """Id del reporte más reciente de ese documento dentro de la ventana de caché de 6 h.
+
+        Una consulta sin fecha y hora legibles no se usa: no se puede saber si es la de la caché.
+        """
+        from infrastructure.listas.tusdatos.cliente import HORA_COLOMBIA, limpiar_documento
+        desde = ahora - VENTANA_CACHE
+        previas = cliente.historial(solicitud.tipo_documento, solicitud.numero, desde.astimezone(HORA_COLOMBIA).date())
+        documento = limpiar_documento(solicitud.numero)
+        vigentes = [p for p in previas if p.creada_en is not None and desde <= p.creada_en <= ahora + timedelta(minutes=5)
+                    and (not p.documento or p.documento == documento)]
+        return max(vigentes, key=lambda p: p.creada_en).reporte_id if vigentes else None
+
+    # ── Revisión previa (gratuita): fuentes caídas y créditos ───────────────
+
+    def _estado_fuentes(self, entorno, vigencia=VIGENCIA_SALUD):
+        """{código: estado} de Tusdatos, reutilizado `vigencia` segundos; None si no se pudo saber."""
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        guardado = self._salud.get(entorno)
+        if guardado and self._monotonic() - guardado[0] < vigencia:
+            return guardado[1]
+        try:
+            estados = {f.codigo: f.estado for f in self.cliente(entorno).estado_fuentes()}
+        except ErrorTusdatos:
+            estados = None  # Sin estado no se bloquea: la consulta sigue como siempre.
+        self._salud[entorno] = (self._monotonic(), estados)
+        if estados and entorno not in self._sin_estado_avisado:
+            self._avisar_fuentes_sin_estado(estados)
+            self._sin_estado_avisado.add(entorno)
+        return estados
+
+    @staticmethod
+    def _avisar_fuentes_sin_estado(estados):
+        """Deja constancia (una vez por proceso) de las fuentes aprobadas que Tusdatos no informa.
+
+        Esas fuentes no se pueden revisar antes de consultar. El registro dice con qué
+        códigos las informa Tusdatos en realidad, para corregir `codigos_estado` si hace falta.
+        """
+        from infrastructure.listas.tusdatos.adaptador import FUENTES
+        faltantes = sorted(f.codigo for f in FUENTES if not f.codigos_estado & set(estados))
+        if faltantes:
+            registro.warning("Tusdatos sources/status no informa estas fuentes aprobadas: %s. Códigos informados: %s",
+                             ", ".join(faltantes), ", ".join(sorted(estados)))
+
+    def _codigos_caidos(self, entorno, codigos, vigencia=VIGENCIA_SALUD) -> set[str]:
+        """De esos códigos de fuente, los que Tusdatos reporta caídos o en mantenimiento."""
+        from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO
+        if getattr(self.cliente(entorno).configuracion, "es_sandbox", False):
+            return set()  # El sandbox devuelve un estado fijo (Procuraduría siempre en mantenimiento).
+        estados = self._estado_fuentes(entorno, vigencia)
+        if not estados:
+            return set()
+        return {codigo for codigo in codigos if codigo in FUENTES_POR_CODIGO
+                and any(estados.get(c) in ESTADOS_CAIDOS for c in FUENTES_POR_CODIGO[codigo].codigos_estado)}
+
+    def _fuentes_caidas(self, entorno, consulta) -> list[str]:
+        """Nombres de las fuentes que deciden el resultado y Tusdatos reporta caídas."""
+        from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO
+        bloqueantes = [c for c in consulta.manifiesto.get("fuentes") or ()
+                       if c in FUENTES_POR_CODIGO and FUENTES_POR_CODIGO[c].ausencia_bloquea]
+        caidas = self._codigos_caidos(entorno, bloqueantes)
+        return [FUENTES_POR_CODIGO[c].nombre for c in bloqueantes if c in caidas]
+
+    def _vigilar_creditos(self, entorno):
+        """Publica el saldo de créditos y avisa cuando está bajo; nunca bloquea la consulta."""
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        cliente = self.cliente(entorno)
+        configuracion = cliente.configuracion
+        if configuracion.es_sandbox:
+            return  # El sandbox informa siempre 0 créditos.
+        clave = (entorno, "creditos")
+        guardado = self._salud.get(clave)
+        if guardado and self._monotonic() - guardado[0] < VIGENCIA_SALUD:
+            return
+        try:
+            restantes = cliente.creditos_restantes()
+        except ErrorTusdatos:
+            restantes = None
+        self._salud[clave] = (self._monotonic(), restantes)
+        if restantes is None:
+            return
+        try:
+            cliente.metricas("Sagrilaft/Listas", {"Proveedor": "Tusdatos"}, {"TusdatosCreditosRestantes": restantes})
+        except Exception:  # Las métricas nunca interrumpen la consulta.
+            registro.debug("No se pudo emitir la métrica de créditos", exc_info=True)
+        if restantes <= configuracion.alerta_creditos:
+            registro.warning("Tusdatos: quedan %d créditos (umbral de aviso %d)", restantes, configuracion.alerta_creditos)
+
     def _esperar(self, trabajador, concesion, consulta, criterio, solicitud, progreso):
-        from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO, interpretar_reporte
         from infrastructure.listas.tusdatos.errores import (
             ConsultaFallida, ErrorTusdatos, ProveedorNoDisponible, TrabajoVencido,
         )
@@ -271,28 +499,48 @@ class ModalidadExterna:
             return self._terminar_con_fallo(repositorio, concesion, error.codigo, indeterminada=True)
         if not estado.finalizado:
             return repositorio.posponer(concesion, ESPERA_SONDEO)
+        return self._procesar_finalizado(trabajador, concesion, consulta, criterio, solicitud, progreso, estado)
+
+    def _procesar_finalizado(self, trabajador, concesion, consulta, criterio, solicitud, progreso, estado,
+                             reporte=None, puede_esperar=True):
+        """Recarga si hace falta, interpreta el reporte y pasa a descargar el PDF."""
+        from infrastructure.listas.tusdatos.adaptador import FUENTES_POR_CODIGO, interpretar_reporte
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos, ProveedorNoDisponible
+        repositorio = trabajador.repositorio
+        entorno = trabajador.politica.entorno
+        cliente = self.cliente(entorno)
         fuentes = tuple(consulta.manifiesto.get("fuentes") or ())
         fallidas = [f for f in fuentes if f in FUENTES_POR_CODIGO and set(FUENTES_POR_CODIGO[f].errores) & set(estado.errores)]
+        caidas = self._codigos_caidos(entorno, fallidas, VIGENCIA_SALUD_RECARGA) if fallidas else set()
         if fallidas and progreso.recargas == 0:
-            # Recarga gratuita de las fuentes con error, una sola vez.
+            if caidas and puede_esperar and progreso.vence_en - repositorio.reloj() > MARGEN_RECARGA:
+                # Tusdatos: recargar con la fuente caída no sirve. Se espera a que vuelva.
+                return repositorio.posponer(concesion, ESPERA_FUENTE_CAIDA)
+            if caidas:
+                # Sin tiempo para esperar: se cierra parcial sin gastar la única recarga.
+                repositorio.guardar_progreso(concesion, recargas=1, evento="RECARGA_OMITIDA_FUENTES_CAIDAS")
+            else:
+                # Recarga gratuita de las fuentes con error, una sola vez.
+                try:
+                    nuevo = cliente.reintentar_fuentes(estado.reporte_id, solicitud.tipo_documento)
+                except ErrorTusdatos:
+                    nuevo = None
+                if nuevo:
+                    repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=nuevo, recargas=1,
+                                                 reporte_id=estado.reporte_id, evento="RECARGA_FUENTES_EXTERNAS")
+                    return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
+                repositorio.guardar_progreso(concesion, recargas=1)
+        if reporte is None:
             try:
-                nuevo = cliente.reintentar_fuentes(estado.reporte_id, solicitud.tipo_documento)
-            except ErrorTusdatos:
-                nuevo = None
-            if nuevo:
-                repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=nuevo, recargas=1,
-                                             reporte_id=estado.reporte_id, evento="RECARGA_FUENTES_EXTERNAS")
-                return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
-            repositorio.guardar_progreso(concesion, recargas=1)
-        try:
-            reporte = cliente.reporte(estado.reporte_id)
-        except ProveedorNoDisponible:
-            return repositorio.posponer(concesion, ESPERA_RED)
-        except ErrorTusdatos as error:
-            return self._terminar_con_fallo(repositorio, concesion, error.codigo, indeterminada=True)
+                reporte = cliente.reporte(estado.reporte_id)
+            except ProveedorNoDisponible:
+                return repositorio.posponer(concesion, ESPERA_RED)
+            except ErrorTusdatos as error:
+                return self._terminar_con_fallo(repositorio, concesion, error.codigo, indeterminada=True)
         interpretacion = interpretar_reporte(reporte.datos, consulta_id=consulta.id, solicitud=solicitud, criterio=criterio,
             fuentes=fuentes or None, errores_estado=estado.errores, fecha_inicio=consulta.admitida_en,
-            fecha_fin=repositorio.reloj(), validado=estado.validado)
+            fecha_fin=repositorio.reloj(), validado=estado.validado, fuentes_caidas=frozenset(caidas),
+            documento_no_vigente=_aviso_no_vigente(progreso))
         # Solo el subconjunto aprobado y la huella de la respuesta completa llegan a PostgreSQL.
         repositorio.guardar_progreso(concesion, etapa="DESCARGANDO_PDF", reporte_id=estado.reporte_id,
                                      huella_respuesta=reporte.sha256, respuesta_filtrada=interpretacion.respuesta_filtrada)
