@@ -511,17 +511,22 @@ las rutas v2 responderían 503 por la custodia y las consultas admitidas no se p
 
 ### Proveedor externo
 
-Integración por hacer, sin afectar a dummy ni a local (detalle de lo preparado y lo que
-falta en [arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)):
+Adaptador de Tusdatos implementado (Fases 2 a 4; ver
+[arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)).
+Probado con el sandbox público y con respuestas grabadas
+(`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
+`tests/persistencia_listas/test_externo_tusdatos.py`). Falta:
 
-- Contrato comercial y documentación técnica del proveedor, ambiente de pruebas y
-  credenciales.
-- Adaptador `ConsultorListasV2`, selección en fábrica, servicio común y trabajador,
-  renovación de la concesión y evidencia `RESPUESTA_ORIGINAL`.
-- Configuración y secretos propios. El secreto `sagrilaft_listas_cautela_credentials`
-  (`SAGRILAFT_API_KEY`) y `SAGRILAFT_API_URL` pertenecen al circuito retirado.
-- Habilitar el modo `externo` en disponibilidad y en el portal; pruebas con respuestas
-  grabadas y regresión de las otras modalidades.
+- Fase 5: «bloquear y reutilizar» 6 h por documento, botón «Forzar actualización»,
+  descarga del PDF del proveedor y permisos `listas.ver_pdf_proveedor` y
+  `listas.forzar_actualizacion` para `listas_revisor`.
+- Respuesta de Tusdatos sobre cómo recuperar el reporte de una CC en caché (`jobid: null`).
+- Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
+  (en especial los textos de Policía y los registros PEP).
+- Staging (Fase 7): `LISTAS_TUSDATOS_URL` y `LISTAS_TUSDATOS_TOKEN` en Secrets Manager,
+  salida de red hacia `dash-board.tusdatos.co`, trabajador desplegado y custodia S3.
+- El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
+  `SAGRILAFT_API_URL` pertenecen al circuito retirado y ya no se usan para arrancar.
 - El seguimiento de contratación es la tarea P15 de
   [pendientes de producción](../produccion/PENDIENTES_PRODUCCION.md#p15).
 
@@ -538,6 +543,5 @@ falta en [arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-u
 | — | `servicios_externos/sagrilaft/deshabilitado.py` usa `ErrorConsultaListas` sin importarlo: `descargar_pdf` lanza `NameError` (código retirado) |
 | — | `.env.prod.example` sugiere activar con `sagrilaft`; eso hoy impide arrancar en producción |
 | — | El CDK (`infra/sagrilaft/lib/sagrilaft-stack.ts`) usa por defecto `proveedorListasCautela=sagrilaft` en prod si no se pasa el contexto; con ese valor el backend no arranca en producción. Hay que pasar siempre `-c proveedorListasCautela=deshabilitado` o corregir el valor por defecto |
-| — | `.env.dev.example` y `.env.staging.example` siguen usando solo `PROVEEDOR_LISTAS_CAUTELA` |
+| — | `.env.staging.example` sigue usando solo `PROVEEDOR_LISTAS_CAUTELA` |
 | — | Retirar el circuito anterior: `domain/puertos/consultor_listas_cautela.py`, `servicios_externos/sagrilaft/`, `ServicioVerificacionSagrilaft`, `ListaCautelaService`, `proveedores_simulados.py` y la ruta `/api/expedientes/sagrilaft/disponibilidad` |
-| — | El servicio común fija `"simulador"` y los tipos CC/NIT/PASAPORTE, en lugar de leer las capacidades del adaptador |
