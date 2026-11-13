@@ -255,7 +255,7 @@ Se registraron WebsiteURL/UseCaseDescription de otro proyecto y ticket interno a
 
 **Estado:** 🔴 Diferido; no bloquea el corte acordado.
 
-Contratar proveedor, obtener URL/credenciales y validar integración real cuando se active. La decisión de arrancar deshabilitado ya está tomada; no equivale a contratarlo. [Procedimiento de activación](../integraciones/integracion_tusdatos_swagger.md#activacion).
+Contratar proveedor, obtener URL/credenciales y validar integración real cuando se active. La decisión de arrancar deshabilitado ya está tomada; no equivale a contratarlo. Activarlo **requiere desarrollo**: el módulo de listas v2 no tiene adaptador externo y el código obliga a `deshabilitado` en producción. Trabajo pendiente en [Operación del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#proveedor-externo).
 
 **Pendiente de confirmar:** si existe la aprobación de Cumplimiento para operar temporalmente sin proveedor de listas. La plantilla local refleja `deshabilitado`; no modifica la configuración efectiva de producción.
 

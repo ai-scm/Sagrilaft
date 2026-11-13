@@ -87,7 +87,11 @@ realm-sagrilaft.dev.json
 sns-policy.json
 
 reset_entorno.sh
-docs
+# docs/ sigue ignorado salvo excepciones explícitas. Se usa /docs/* (no "docs")
+# porque Git no puede reincluir archivos si la carpeta padre está excluida.
+# Los archivos de docs/ ya versionados siguen versionados (git ls-files docs).
+/docs/*
+!/docs/listas/
 tmp/
 PLAN.md
 

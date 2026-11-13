@@ -137,7 +137,7 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 | `BEDROCK_PDF_MAX_PAGES` | `7` |
 | `BEDROCK_DEFAULT_CONFIDENCE` | `0.90` |
 | `BEDROCK_RESPONSE_LOG_CHARS` | `800` |
-| `PROVEEDOR_LISTAS_CAUTELA` | `deshabilitado` (decidido 2026-09-29: aun no hay proveedor de listas de cautela contratado; migrar a `sagrilaft` + `SAGRILAFT_API_URL` real cuando exista) |
+| `PROVEEDOR_LISTAS_CAUTELA` | `deshabilitado` (decidido 2026-09-29: aún no hay proveedor de listas contratado). Pasarlo siempre explícito con `-c proveedorListasCautela=deshabilitado`: sin contexto, CDK usa `sagrilaft` y el backend se niega a arrancar en producción. **No migrar a `sagrilaft`**: el código obliga a `deshabilitado` en producción y el módulo de listas v2 no tiene adaptador externo; activarlo requiere desarrollo ([pendientes del módulo](../../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#proveedor-externo)) |
 | `SAGRILAFT_API_URL` | no aplica mientras `PROVEEDOR_LISTAS_CAUTELA=deshabilitado` |
 | `KEYCLOAK_URL` | `http://keycloak.sagrilaft-prod.local:8080` |
 | `KEYCLOAK_REALM` | `sagrilaft` |

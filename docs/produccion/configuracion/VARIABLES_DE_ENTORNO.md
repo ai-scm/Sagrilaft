@@ -142,13 +142,22 @@ definición; nunca deben contener secretos.
 | `SNS_NOTIFICACIONES_ENABLED` | Interruptor del adaptador SNS (hoy apagado; SES es el canal). | `SnsConfig.habilitado` | CDK `false` | Opc. (`false`) | — |
 | `SNS_TOPIC_ARN` | ARN del topic SNS de alertas. **Administrada por CDK**: ninguna persona la configura; `validate_envs.py` la trata como opcional en los tres entornos (`CDK_MANAGED_KEYS`), no como requerida. | `SnsConfig.topic_arn` | AWS: CDK lo inyecta (`ecs-fargate.ts:361`). Dev: comentada | Opc. (CDK-managed) | ⚠️ (ARN con ID de cuenta) |
 
-### 5.4 Listas de cautela (Tusdatos)
+### 5.4 Listas cautelares
+
+El módulo y todas sus variables se documentan en
+[Operación del módulo de listas](../../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#1-puesta-en-marcha-local)
+y [Arquitectura, sección 7](../../listas/ARQUITECTURA_LISTAS.md#7-selección-de-modalidad-y-configuración).
+Aquí solo se resume lo que afecta a los ambientes.
 
 | Variable | Qué es | Dónde se usa | Origen | Obligatoriedad / default | Sens. |
 |---|---|---|---|---|---|
-| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (simula), `sagrilaft` (API real), `deshabilitado`. `dummy` está **prohibido en production** (`load_config` y CDK). | `SagrilaftListasConfig`, `load_config()`, `api/dependencies.py` | Dev: `.env`. AWS: contexto CDK `-c proveedorListasCautela` (default `dummy` en staging, `deshabilitado` en prod) | Opc. (default código `dummy`) | — |
-| `SAGRILAFT_API_URL` | URL de la API Tusdatos. Con `sagrilaft` es obligatoria. | `SagrilaftListasConfig` | AWS: contexto CDK `-c sagrilaftApiUrl` (si va vacía CDK usa el placeholder `dummy://listas-cautela`) | Obl. solo con `sagrilaft` | — |
-| `SAGRILAFT_API_KEY` | API key de Tusdatos. | `SagrilaftListasConfig` | AWS: secreto `sagrilaft_listas_cautela_credentials.api_key`, escrito por `sync_aws_runtime_assets.py --apply` solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y valor real (ver §9.1, hallazgo 4) | Obl. solo con `sagrilaft` | 🔒 |
+| `LISTAS_IMPLEMENTACION` | Modalidad: `deshabilitado`, `simulado`, `archivos` o `externo`. Manda sobre la variable heredada. En **production** `load_config()` rechaza cualquier valor distinto de `deshabilitado`. `archivos` solo funciona en `development`/`test`; `externo` no está implementado | `SagrilaftListasConfig` | Dev: Compose (default `deshabilitado`). AWS: **no existe en SSM ni CDK** | Opc. Sin esta variable ni la heredada: `deshabilitado` | — |
+| `PROVEEDOR_LISTAS_CAUTELA` | Variable heredada, traducida: `dummy` → `simulado`, `sagrilaft` → `externo` (no implementado), `deshabilitado`. Si contradice a `LISTAS_IMPLEMENTACION`, la aplicación no arranca | `SagrilaftListasConfig`, `api/dependencies.py` | Dev: el Compose la deja vacía. AWS: contexto CDK `-c proveedorListasCautela`. **Sin el contexto, CDK usa `dummy` en staging y `sagrilaft` en prod**, y con `sagrilaft` el backend se niega a arrancar en producción. Pasar siempre `-c proveedorListasCautela=deshabilitado` en prod | Opc. | — |
+| `SAGRILAFT_API_URL` | URL de la API Tusdatos del circuito **retirado**. Solo la valida `load_config()` cuando el valor heredado es `sagrilaft` | `SagrilaftListasConfig` | AWS: contexto CDK `-c sagrilaftApiUrl` (vacía → placeholder `dummy://listas-cautela`) | Obl. solo con `sagrilaft` | — |
+| `SAGRILAFT_API_KEY` | Credencial Tusdatos del circuito **retirado** | `SagrilaftListasConfig` | AWS: secreto `sagrilaft_listas_cautela_credentials.api_key`, escrito por `sync_aws_runtime_assets.py --apply` solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y valor real (ver §9.1, hallazgo 4) | Obl. solo con `sagrilaft` | 🔒 |
+
+Las demás variables `LISTAS_*` (escenario del simulador, administración, fuentes,
+políticas y custodia) solo se usan en local y no tienen origen en AWS.
 
 ## 6. Almacenamiento y Keycloak
 
@@ -182,7 +191,7 @@ prod `*sagrilaft.ia.blend360.com`.
 | `VITE_BACKEND_URL` | `http://localhost:8000` | ejemplo y real: vacío (mismo origen) | ejemplo y real: vacío (mismo origen) |
 | `KEYCLOAK_URL` | `http://localhost:8080` (`.env`: `http://keycloak:8080`) | ejemplo y real: DNS interno | ejemplo y real: DNS interno |
 | `ZOHO_SIGN_TESTING` | `true` | ejemplo `true`; **real `false`** | `false` |
-| `PROVEEDOR_LISTAS_CAUTELA` | `dummy` (`.env`: `deshabilitado`) | ejemplo y archivo local: `dummy`; CDK local: `dummy` | ejemplo y archivo local: `deshabilitado`; CDK local: `deshabilitado` |
+| `PROVEEDOR_LISTAS_CAUTELA` | ejemplo `dummy`; `docker-compose.dev.yml` la fuerza a vacía y usa `LISTAS_IMPLEMENTACION` (default `deshabilitado`) | ejemplo y archivo local: `dummy`; CDK sin contexto: `dummy` | ejemplo y archivo local: `deshabilitado`; CDK sin contexto: `sagrilaft` (pasar `deshabilitado` explícito) |
 | `SNS_NOTIFICACIONES_ENABLED` | `false` | ejemplo y real `false` | ejemplo y real `false` |
 | `SES_NOTIFICACIONES_ENABLED` | `false` | `true` | `true` |
 | `SMTP_FROM` / `SES_EMAIL_ORIGEN` | `no-responder@localhost` / vacío | ejemplo: no-reply; archivo local: SMTP no-reply y SES correo personal | no-reply |
@@ -242,7 +251,7 @@ los archivos locales pueden haber cambiado. Las diferencias revisadas aparecen e
 
 ### 9.2 Diferencias y decisiones pendientes en staging/prod
 
-- Listas de cautela: las plantillas, los archivos locales consultados y los defaults de CDK locales reflejan `dummy` en staging y `deshabilitado` en producción. Aún hay que verificar la configuración efectiva antes de desplegar.
+- Listas cautelares: las plantillas y los archivos locales reflejan `dummy` en staging y `deshabilitado` en producción. El CDK usa por defecto `sagrilaft` en prod si no se pasa el contexto, valor con el que el backend no arranca en producción. En staging, `dummy` habilita el simulador, pero no hay custodia (`LISTAS_CUSTODIA_DIRECTORIO`) ni trabajador desplegados, así que el módulo v2 no puede operar allí (ver [pendientes del módulo](../../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#7-pendientes)). Hay que verificar la configuración efectiva antes de desplegar.
 - Zoho: el `.env.staging` consultado tenía `ZOHO_SIGN_TESTING=false`; la decisión es `true` en staging y `false` en producción. El archivo local no configura por sí solo ECS.
 - Bedrock: se decidió `amazon.nova-pro-v1:0` en ambos ambientes. El `.env.staging` consultado contiene un perfil de inferencia; debe conciliarse sin asumir que es el valor efectivo de ECS.
 - Remitente: en el `.env.staging` consultado `SMTP_FROM` ya usa no-reply y `SES_EMAIL_ORIGEN` contiene otro correo. La decisión es utilizar no-reply para las rutas de SAGRILAFT; verificar SSM y tareas antes de aplicar cambios.
@@ -284,7 +293,7 @@ reales y la publicación de imágenes requieren autorización posterior.
 
 | Tema | Decisión |
 |---|---|
-| Listas de cautela | Staging `dummy`; producción `deshabilitado`. Preparar el proveedor real primero en staging cuando existan credenciales. |
+| Listas cautelares | Staging `dummy` (simulador); producción `deshabilitado`, exigido por el código. El proveedor externo no está implementado en el módulo v2: activarlo requiere desarrollo, no solo credenciales ([pendientes](../../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#proveedor-externo)). |
 | Zoho | Staging modo pruebas; producción modo real. Las credenciales OAuth compartidas siguen pendientes de revisión. |
 | Bedrock | Identificador directo `amazon.nova-pro-v1:0` en ambos ambientes. |
 | Workers | Staging 2; producción conserva 4, pendiente comparación de carga. |

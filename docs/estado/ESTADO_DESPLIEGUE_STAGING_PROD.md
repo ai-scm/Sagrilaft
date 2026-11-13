@@ -151,7 +151,7 @@ identifica qué salió del backlog sin duplicar esos relatos.
 
 - El despliegue CDK sigue siendo manual por decisión del 2026-09-29.
 - Se prepara producción con listas deshabilitadas hasta contratar proveedor;
-  las condiciones de activación están en la [integración](../integraciones/integracion_tusdatos_swagger.md).
+  lo que falta para activarlo está en los [pendientes del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#7-pendientes).
 - La aceptación operativa del riesgo Outlook fue registrada el 2026-10-06.
   El registro formal y su seguimiento se gestionan en [P02](../produccion/PENDIENTES_PRODUCCION.md#p02).
 
