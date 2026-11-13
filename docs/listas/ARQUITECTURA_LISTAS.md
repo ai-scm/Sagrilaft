@@ -606,7 +606,8 @@ libera la consulta entre pasadas (`posponer`):
   demás), omite la reutilización y envía `force: true`; queda en el manifiesto (`forzar`).
   `GET /api/listas/disponibilidad` informa `forzar` y `ver_pdf_proveedor` al portal.
 
-Pendiente: custodia S3, trabajador y secretos en staging (Fase 7).
+Despliegue en staging (custodia S3, trabajador ECS, secreto y roles): ver
+[operación, «Antes de cualquier ambiente compartido»](OPERACION_PRUEBAS_Y_PENDIENTES.md#antes-de-cualquier-ambiente-compartido-staging).
 
 Reglas que deberá respetar:
 

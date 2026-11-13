@@ -470,27 +470,53 @@ Sirven como aviso para quien mantenga el módulo:
 
 ### Antes de cualquier ambiente compartido (staging)
 
-Hoy, en staging, `PROVEEDOR_LISTAS_CAUTELA=dummy` equivale a `simulado`, pero no hay
-custodia configurada ni trabajador desplegado en la infraestructura (CDK). Según el código,
-las rutas v2 responderían 503 por la custodia y las consultas admitidas no se procesarían.
-**No se ha comprobado en el ambiente.**
+**Preparado en código e infraestructura (Fase 7, sin desplegar ni comprobar en el
+ambiente):**
 
-- Custodia persistente compartida (el disco de ECS es efímero) y su copia o restauración
-  coordinada con SQL. Procedimiento **propuesto**, nunca ensayado:
+- Custodia en S3 (`LISTAS_CUSTODIA_BACKEND=s3`): informes y PDF del proveedor en el
+  bucket de la aplicación bajo `listas/custodia/<sha256>`, verificados al leer y entregados
+  solo por el backend. La administración de listas exige custodia local y responde 409 con S3.
+- Trabajador como servicio ECS (`sagrilaft-<ambiente>-listas-worker`,
+  `python -m infrastructure.listas.trabajador_servicio`): una tarea (`-c listasWorkerCount`,
+  0 en bootstrap), rol propio con acceso solo a `listas/custodia/*`, logs en
+  `/sagrilaft/<ambiente>/ecs/listas-worker` sin datos personales.
+- Parámetros SSM `LISTAS_CUSTODIA_BACKEND`, `LISTAS_CUSTODIA_S3_PREFIJO` y
+  `LISTAS_TUSDATOS_URL`, y el secreto `sagrilaft/<ambiente>/tusdatos_credentials`
+  (`token`, o `usuario` y `clave` del sandbox), inyectados al backend, la migración y el trabajador.
+- CDK: `-c proveedorListasCautela` acepta `simulado`/`dummy`, `externo`/`sagrilaft` y
+  `deshabilitado`. Externo exige `-c habilitarNatEgress=true`; producción por defecto
+  `deshabilitado` y rechaza externo y el sandbox. `-c tusdatosUrl` permite el sandbox fuera de prod.
+- Roles `listas_operador` y `listas_revisor` en `keycloak/realm-sagrilaft.json` (realms
+  nuevos) y `scripts/listas/crear_roles_listas_keycloak.sh` para el realm ya existente.
+
+**Activar Tusdatos en staging** (pasos manuales, en este orden):
+
+1. Desplegar con los cambios (los scripts de staging siguen en simulado) y comprobar que
+   el trabajador arranca y que una consulta simulada se cierra con informe en S3.
+2. Crear y asignar los roles con el script de Keycloak (ECS Exec en la tarea de Keycloak).
+3. Rellenar `sagrilaft/staging/tusdatos_credentials`: `token` (producción de Tusdatos) o
+   `usuario`/`clave` del sandbox con `-c tusdatosUrl=http://docs.tusdatos.co`. Con
+   `externo` y el secreto vacío, el backend no arranca.
+4. Desplegar con `-c proveedorListasCautela=externo -c habilitarNatEgress=true` (crea un
+   NAT Gateway, con costo mensual) y ejecutar una consulta real de prueba.
+
+Sigue pendiente:
+
+- Copia y restauración coordinada de SQL y custodia. Procedimiento **propuesto**, nunca ensayado:
   1. Detener admisiones y trabajos del módulo; identificar operaciones en curso y anotar
      la revisión de Alembic y el punto de corte de la copia SQL.
-  2. Copiar la base y un manifiesto de todos los archivos referenciados (originales,
-     evidencias, borradores) con clave, hash y tamaño; copiar esos archivos sin
+  2. Copiar la base y un manifiesto de todos los objetos referenciados (originales,
+     evidencias, borradores) con clave, hash y tamaño; copiar esos objetos sin
      sobrescribir y verificar el manifiesto completo.
-  3. Restaurar SQL y archivos en un entorno aislado con las consultas desactivadas, y
-     verificar restricciones, punteros, versiones, eventos y cada archivo. Un archivo
+  3. Restaurar SQL y objetos en un entorno aislado con las consultas desactivadas, y
+     verificar restricciones, punteros, versiones, eventos y cada objeto. Un objeto
      faltante o corrupto impide declarar la recuperación; nunca se reconstruye un
      informe consultando de nuevo.
   4. Revisar los trabajos pendientes: los que tienen borrador continúan; los externos
      sin resultado no se repiten automáticamente. Reanudar solo después de conciliar.
-- Despliegue y supervisión del trabajador, con concesiones y número de trabajadores.
-- Roles `listas_*` creados y asignados a cuentas nominales en Keycloak.
-- Variables `LISTAS_*` en SSM o CDK, que hoy no existen allí.
+- Retención del PDF del proveedor en S3 (hoy sin regla de ciclo de vida) y cifrado con
+  KMS propio si Cumplimiento lo exige (hoy SSE-S3, el cifrado del bucket).
+- Alarma si el trabajador se detiene o acumula consultas pendientes.
 - Migraciones revisadas contra la base del ambiente y su versión de PostgreSQL.
 - Rol de aplicación sin propiedad de tablas, DDL, `TRUNCATE` ni control de triggers.
 - Inventario de consumidores externos de las rutas antiguas, que responden 410.
@@ -523,8 +549,8 @@ Probado con el sandbox público y con respuestas grabadas
 - Respuesta de Tusdatos sobre cómo recuperar el reporte de una CC en caché (`jobid: null`).
 - Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
   (en especial los textos de Policía y los registros PEP).
-- Staging (Fase 7): `LISTAS_TUSDATOS_URL` y `LISTAS_TUSDATOS_TOKEN` en Secrets Manager,
-  salida de red hacia `dash-board.tusdatos.co`, trabajador desplegado y custodia S3.
+- Staging (Fase 7): preparado; falta ejecutar los pasos de activación (sección
+  «Antes de cualquier ambiente compartido»).
 - El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
   `SAGRILAFT_API_URL` pertenecen al circuito retirado y ya no se usan para arrancar.
 - El seguimiento de contratación es la tarea P15 de
