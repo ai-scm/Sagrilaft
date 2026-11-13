@@ -2,6 +2,12 @@ import { memo, useMemo, useState } from 'react';
 import { etiquetaLista, valorLista } from './presentacionListas';
 import './ResultadoConsultaListas.css';
 
+// Avisos sobre el documento consultado que el revisor no debe pasar por alto.
+const AVISOS_DESTACADOS = {
+  DOCUMENTO_NO_VALIDADO: 'Documento no validado',
+  DOCUMENTO_NO_VIGENTE: 'Documento no vigente',
+};
+
 const Datos = memo(function Datos({ pares }) {
   return <dl className="listas-datos">{pares.map(([nombre, valor]) => <div key={nombre}><dt>{nombre}</dt><dd>{valorLista(valor)}</dd></div>)}</dl>;
 });
@@ -100,8 +106,8 @@ function ResultadoConsultaListas({ consulta, descargar, puedeVerPdfProveedor = f
       ['Fuente', f.nombre_origen], ['Cobertura', etiquetaLista(f.estado)], ['Versión consultada', f.version_id ?? f.version_declarada],
       ['Revisión activa al admitir', f.revision_activa], ['Hash del contenido', f.hash_contenido],
     ]} />{f.motivo && <p>{f.motivo}</p>}</div>)}
-    {consulta.advertencias.map((a, i) => a.codigo === 'DOCUMENTO_NO_VALIDADO'
-      ? <p key={`aviso-${i}`} role="alert" className="listas-error"><strong>Documento no validado:</strong> {a.descripcion}</p>
+    {consulta.advertencias.map((a, i) => AVISOS_DESTACADOS[a.codigo]
+      ? <p key={`aviso-${i}`} role="alert" className="listas-error"><strong>{AVISOS_DESTACADOS[a.codigo]}:</strong> {a.descripcion}</p>
       : <p key={`aviso-${i}`}>Advertencia: {a.descripcion}</p>)}
     {consulta.criterios_no_aplicados.map((a, i) => <p key={`criterio-${i}`}>Criterio no aplicado: {a.descripcion}</p>)}
     {consulta.candidatos.map(c => <CandidatoLista key={c.id} candidato={c} fuente={fuentes.get(c.cobertura_id)} clasificado={clasificado} />)}
