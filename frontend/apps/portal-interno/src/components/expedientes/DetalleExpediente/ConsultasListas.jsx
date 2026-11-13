@@ -155,7 +155,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
   }, [detalle, ver]);
 
   const descargar = useCallback(
-    (id, tipo) => listas.evidencia(seleccion.current, id, tipo).catch(err => setError(err.message)),
+    (id, tipo, fuente) => listas.evidencia(seleccion.current, id, tipo, fuente).catch(err => setError(err.message)),
     [],
   );
 

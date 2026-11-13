@@ -8,6 +8,13 @@ const AVISOS_DESTACADOS = {
   DOCUMENTO_NO_VIGENTE: 'Documento no vigente',
 };
 
+const NOMBRES_EVIDENCIA = {
+  PDF_PROVEEDOR: 'PDF del proveedor',
+  CAPTURA_PROVEEDOR: 'Captura de pantalla del proveedor',
+  INFORME_INTERNO: 'Informe interno',
+};
+const esDelProveedor = e => e.tipo === 'PDF_PROVEEDOR' || e.tipo === 'CAPTURA_PROVEEDOR';
+
 const Datos = memo(function Datos({ pares }) {
   return <dl className="listas-datos">{pares.map(([nombre, valor]) => <div key={nombre}><dt>{nombre}</dt><dd>{valorLista(valor)}</dd></div>)}</dl>;
 });
@@ -130,11 +137,16 @@ function ResultadoConsultaListas({ consulta, descargar, puedeVerPdfProveedor = f
     {!consulta.evidencias.length && <p>No hay un informe disponible para esta consulta.</p>}
     {consulta.evidencias.map(e => <div key={e.id}>
       <Datos pares={[
-        ['Evidencia', e.tipo === 'PDF_PROVEEDOR' ? 'PDF del proveedor' : 'Informe interno'], ['Identificador', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version], ['SHA-256 del PDF', e.sha256],
+        ['Evidencia', NOMBRES_EVIDENCIA[e.tipo] ?? e.tipo], ...(e.fuente_codigo ? [['Fuente', e.fuente_codigo]] : []),
+        ['Identificador', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version],
+        [e.tipo === 'CAPTURA_PROVEEDOR' ? 'SHA-256 de la imagen' : 'SHA-256 del PDF', e.sha256],
       ]} />
       {e.tipo === 'PDF_PROVEEDOR' && <p className="listas-nota">PDF entregado por el proveedor. Contiene información de otras fuentes; su acceso queda registrado.</p>}
-      {e.estado === 'DISPONIBLE' && e.tipo !== 'PDF_PROVEEDOR' && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar informe conservado</button>}
-      {e.estado === 'DISPONIBLE' && e.tipo === 'PDF_PROVEEDOR' && puedeVerPdfProveedor && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar PDF del proveedor</button>}
+      {e.tipo === 'CAPTURA_PROVEEDOR' && <p className="listas-nota">Pantalla de la fuente tal como la vio el proveedor al consultar. Su acceso queda registrado.</p>}
+      {e.estado === 'DISPONIBLE' && !esDelProveedor(e) && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar informe conservado</button>}
+      {e.estado === 'DISPONIBLE' && esDelProveedor(e) && puedeVerPdfProveedor && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo, e.fuente_codigo)}>
+        {e.tipo === 'PDF_PROVEEDOR' ? 'Descargar PDF del proveedor' : `Descargar captura (${e.fuente_codigo})`}
+      </button>}
     </div>)}
   </div>;
 }
