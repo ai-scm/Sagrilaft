@@ -22,8 +22,8 @@ Toda la red está programada en código (usando AWS CDK en `infra/sagrilaft/lib`
 ### A. AWS ECS Fargate (El Cerebro Computacional)
 Aquí viven nuestros 4 componentes de software: El Backend (FastAPI), el Portal Interno, el Formulario Público y el gestor de usuarios (Keycloak).
 *   **¿Por qué Fargate?** Porque es *Serverless*. AWS gestiona los fierros. Si un contenedor se daña, AWS lanza otro automáticamente.
-*   **Decisión Core:** el valor se configura por ambiente mediante CDK. Staging se desplegó con `desiredCount=1` para validar el flujo con un costo controlado; producción se prepara con `desiredCount=2` o más donde aplique para alta disponibilidad. El valor efectivo debe comprobarse en la salida del despliegue, no inferirse del diagrama.
-*   **Autoscaling (actualizado 2026-07-30):** Solo el servicio **Backend** escala automáticamente (`service.autoScaleTaskCount`, target tracking en CPU 60% / memoria 70%, hasta `backendMaxCapacity` tasks, default 4). Es el único de los 4 con carga variable real (extracción con Bedrock, generación de PDF). Portal/Formulario Público se quedan con capacidad fija por ser contenedores estáticos de bajo costo, y Keycloak se deja fuera a propósito porque escalarlo requeriría configurar clustering de sesiones (JGroups/Infinispan) primero.
+*   **Decisión Core:** el valor se configura por ambiente mediante CDK. Staging se desplegó con `desiredCount=1` para validar el flujo con un costo controlado; producción también corre con 1 copia por servicio. El valor por defecto del código es `1`; para más copias hay que pedirlas con `-c desiredCount`. El valor efectivo debe comprobarse en la salida del despliegue, no inferirse del diagrama.
+*   **Autoscaling (actualizado 2026-07-30):** Solo el servicio **Backend** escala automáticamente (`service.autoScaleTaskCount`, target tracking en CPU 60% / memoria 70%, hasta `backendMaxCapacity` tasks, 2 por defecto). Es el único de los 4 con carga variable real (extracción con Bedrock, generación de PDF). Portal/Formulario Público se quedan con capacidad fija por ser contenedores estáticos de bajo costo, y Keycloak se deja fuera a propósito porque escalarlo requeriría configurar clustering de sesiones (JGroups/Infinispan) primero.
 
 ### B. Application Load Balancer (ALB) + AWS WAF (El Portero y el Guardaespaldas)
 Todo el tráfico de internet golpea primero el ALB por el puerto seguro 443 (HTTPS).
@@ -74,13 +74,13 @@ Los identificadores de cuenta, certificado y dominios se mantienen en el
 
 | Construct | Recurso AWS | Tipo | Propósito |
 |-----------|------------|------|-----------|
-| `Networking` | VPC `10.0.0.0/16`, subnets públicas/privadas, SGs, NAT de producción y VPC endpoints | VPC | Red privada para ECS/RDS; acceso a servicios AWS por endpoints y salida externa controlada por NAT en producción. |
+| `Networking` | VPC `10.0.0.0/16`, subnets públicas/privadas, SGs, NAT Gateway y endpoint gateway de S3 | VPC | Red privada para ECS/RDS. El NAT da la salida a internet y a las APIs de AWS; S3 va por su endpoint gratuito. Los endpoints de interfaz solo se crean si un ambiente se despliega sin NAT. Ver [Costos AWS](../produccion/ESTIMACION_COSTOS_AWS.md). |
 | `Storage` | Bucket S3 de uploads | S3 | Documentos, PDFs y temporales. Versionado en `prod`. |
 | `Secrets` | Secretos por ambiente | Secrets Manager | DB credentials, `SECRET_KEY`, Zoho, SMTP y Keycloak admin. |
 | `ConfigParameters` | `/sagrilaft/{env}/config/*` | SSM | Configuracion no sensible e URLs publicas. |
 | `Notifications` | SES EmailIdentity + SNS Topic | SES + SNS | Alertas internas al equipo de analistas. |
 | `Ecr` | Repos por servicio | ECR | Imagenes Docker privadas para backend, formulario, portal y Keycloak. |
-| `Database` | RDS PostgreSQL 16 `db.t3.medium`, una AZ, backups de 7 días | RDS | Base `sagrilaft` usada por backend y Keycloak. La recuperación productiva aún no se ha ensayado; el riesgo está aceptado para el primer corte y P10 sigue abierto. |
+| `Database` | RDS PostgreSQL 16, `db.t3.small` con 100 GB en producción y `db.t4g.small` con 20 GB gp3 en staging/dev, una AZ, backups de 7 días | RDS | Base `sagrilaft` usada por backend y Keycloak. La recuperación productiva aún no se ha ensayado; el riesgo está aceptado para el primer corte y P10 sigue abierto. |
 | `EcsFargate` | Cluster, task definitions, services, roles, logs, target groups | ECS | Runtime productivo de los cuatro servicios. |
 | `LoadBalancer` | ALB + ACM Certificate | ALB + ACM | Enrutamiento HTTPS por hostname/path hacia ECS; el CDK prepara `Strict-Transport-Security: max-age=31536000` en respuestas HTTPS. La verificación productiva sigue pendiente (P08). |
 
@@ -99,14 +99,15 @@ ALB publico (sgAlb: TCP 80/443)
 VPC 10.0.0.0/16 - 2 AZs
 |-- Subnets publicas
 |   `-- ALB
-`-- Subnets privadas (aisladas en staging por defecto; con salida NAT en producción)
+`-- Subnets privadas (salida por NAT)
     |-- ECS Fargate services
     |-- RDS PostgreSQL
-    `-- VPC Endpoints: ECR API/Docker, CloudWatch Logs, Secrets Manager, SSM,
-        ssmmessages (ECS Exec), SES API/SMTP, S3 Gateway y Bedrock Runtime
+    |-- S3 Gateway endpoint (gratuito, siempre)
+    `-- Solo sin NAT: VPC Endpoints de interfaz ECR API/Docker, CloudWatch Logs,
+        Secrets Manager, SSM, ssmmessages (ECS Exec), SES API/SMTP y Bedrock Runtime
 
-NAT Gateway: staging sin NAT por defecto (temporal para pruebas externas);
-producción con NAT habilitada en los scripts de despliegue.
+NAT Gateway: activo en staging y producción. Es la salida hacia Zoho Sign,
+Tusdatos y las APIs de AWS.
 ```
 
 ### Permisos IAM - Roles ECS
