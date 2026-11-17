@@ -249,25 +249,113 @@ class RepositorioConsultasListas:
         Devuelve None si ese mismo objeto ya es evidencia de otra consulta: la clave de
         custodia es única en toda la tabla, y no se puede registrar dos veces.
         """
+        self._validar_tipo_proveedor(tipo, fuente_codigo)
+        with self.sesiones.begin() as sesion:
+            self._exigir_concesion(sesion, concesion)
+            return self._insertar_evidencia(sesion, concesion.consulta_id, tipo, objeto, tipo_contenido,
+                                            version_generador, fuente_codigo)
+
+    @staticmethod
+    def _validar_tipo_proveedor(tipo, fuente_codigo):
         if tipo not in {"PDF_PROVEEDOR", "RESPUESTA_ORIGINAL", "CAPTURA_PROVEEDOR"}:
             raise ValueError("Tipo de evidencia de proveedor no válido")
         if (tipo == "CAPTURA_PROVEEDOR") != bool(fuente_codigo):
             raise ValueError("La captura exige la fuente; los demás tipos no la llevan")
+
+    @staticmethod
+    def _insertar_evidencia(sesion, consulta_id, tipo, objeto, tipo_contenido, version_generador, fuente_codigo):
+        existente = sesion.scalar(select(EvidenciaConsulta.id).where(EvidenciaConsulta.consulta_id == consulta_id,
+                                                                     EvidenciaConsulta.tipo == tipo,
+                                                                     EvidenciaConsulta.fuente_codigo == fuente_codigo))
+        if existente:
+            return existente
+        ajena = sesion.scalar(select(EvidenciaConsulta.consulta_id).where(EvidenciaConsulta.clave == objeto.clave))
+        if ajena is not None and ajena != consulta_id:
+            return None
+        identificador = uuid4()
+        sesion.add(EvidenciaConsulta(id=identificador, consulta_id=consulta_id, tipo=tipo, clave=objeto.clave,
+            huella=objeto.huella, tamano_bytes=objeto.tamano_bytes, tipo_contenido=tipo_contenido,
+            version_generador=version_generador, fuente_codigo=fuente_codigo))
+        return identificador
+
+    # ── Recuperación después del cierre ─────────────────────────────────────
+    # Una consulta cerrada no cambia: su resultado y su progreso son inmutables. Lo único que
+    # se le puede sumar es evidencia del proveedor que llegó tarde (la tabla de evidencias solo
+    # prohíbe modificar o borrar) y eventos. Recargar sus fuentes crea otra consulta enlazada.
+
+    def agregar_evidencia_tardia(self, consulta_id: UUID, tipo: str, objeto, tipo_contenido: str,
+                                 version_generador: str, fuente_codigo: str | None = None) -> UUID | None:
+        """Suma a una consulta ya cerrada el PDF o una captura que el proveedor no entregó a tiempo."""
+        self._validar_tipo_proveedor(tipo, fuente_codigo)
         with self.sesiones.begin() as sesion:
-            self._exigir_concesion(sesion, concesion)
-            existente = sesion.scalar(select(EvidenciaConsulta.id).where(EvidenciaConsulta.consulta_id == concesion.consulta_id,
-                                                                         EvidenciaConsulta.tipo == tipo,
-                                                                         EvidenciaConsulta.fuente_codigo == fuente_codigo))
-            if existente:
-                return existente
-            ajena = sesion.scalar(select(EvidenciaConsulta.consulta_id).where(EvidenciaConsulta.clave == objeto.clave))
-            if ajena is not None and ajena != concesion.consulta_id:
-                return None
-            identificador = uuid4()
-            sesion.add(EvidenciaConsulta(id=identificador, consulta_id=concesion.consulta_id, tipo=tipo, clave=objeto.clave,
-                huella=objeto.huella, tamano_bytes=objeto.tamano_bytes, tipo_contenido=tipo_contenido,
-                version_generador=version_generador, fuente_codigo=fuente_codigo))
+            consulta = sesion.get(ConsultaLista, consulta_id)
+            if consulta is None or consulta.estado in {"PENDIENTE", "EN_CURSO"}:
+                raise ConflictoListas("Solo se recupera evidencia de una consulta cerrada")
+            identificador = self._insertar_evidencia(sesion, consulta_id, tipo, objeto, tipo_contenido,
+                                                     version_generador, fuente_codigo)
+            if identificador:
+                self._evento(sesion, consulta_id, "EVIDENCIA_PROVEEDOR_RECUPERADA", self._actor_de(consulta),
+                             {"tipo": tipo, **({"fuente": fuente_codigo} if fuente_codigo else {})})
             return identificador
+
+    def reclamar_reintento_evidencia(self, consulta_id: UUID, esperas: tuple[timedelta, ...]) -> int | None:
+        """Turno para volver a pedir la evidencia de una consulta cerrada; None si aún no toca o ya se agotó.
+
+        El evento que deja es a la vez el contador de intentos y el candado entre trabajadores:
+        quien llegue después ya lo ve y espera al siguiente turno.
+        """
+        with self.sesiones.begin() as sesion:
+            from sqlalchemy import text
+            bloqueo = calcular_huella(["reintento-evidencia", str(consulta_id)])
+            sesion.execute(text("SELECT pg_advisory_xact_lock(:clave)"), {"clave": int(bloqueo[:15], 16)})
+            consulta = sesion.get(ConsultaLista, consulta_id)
+            if consulta is None or consulta.finalizada_en is None:
+                return None
+            previos = [e.detalle.get("en") for e in sesion.scalars(select(EventoConsulta).where(
+                EventoConsulta.consulta_id == consulta_id, EventoConsulta.tipo == "EVIDENCIA_PROVEEDOR_REINTENTADA"))]
+            if len(previos) >= len(esperas):
+                return None
+            ultimo = max([datetime.fromisoformat(p) for p in previos if p] or [consulta.finalizada_en])
+            ahora = self.reloj()
+            if ultimo + esperas[len(previos)] > ahora:
+                return None
+            self._evento(sesion, consulta_id, "EVIDENCIA_PROVEEDOR_REINTENTADA", self._actor_de(consulta),
+                         {"intento": len(previos) + 1, "en": ahora.isoformat()})
+            return len(previos) + 1
+
+    def admitir_recuperacion(self, previa_id: UUID, manifiesto: dict, sesion_actual=None) -> UUID | None:
+        """Admite la recarga automática de una consulta cerrada como consulta nueva enlazada.
+
+        Conserva el expediente, el rol, el criterio y la identidad de quien pidió la original
+        (es la misma consulta, completada después). La clave de idempotencia la deriva de la
+        consulta previa: dos trabajadores no pueden admitir dos recargas de la misma consulta.
+        Devuelve None si ya existía.
+        """
+        with (nullcontext(sesion_actual) if sesion_actual is not None else self.sesiones.begin()) as sesion:
+            previa = sesion.get(ConsultaLista, previa_id)
+            if previa is None or previa.estado in {"PENDIENTE", "EN_CURSO"}:
+                raise ConflictoListas("Solo se recupera una consulta cerrada")
+            identificador = uuid4()
+            creado = sesion.execute(insert(ConsultaLista).values(
+                id=identificador, grupo_id=None, consulta_previa_id=previa.id, creado_en=self.reloj(),
+                actor_emisor=previa.actor_emisor, actor_sujeto=previa.actor_sujeto, expediente_id=previa.expediente_id,
+                sujeto_rol=previa.sujeto_rol, motivo=previa.motivo, ambito_idempotencia=previa.ambito_idempotencia,
+                clave_idempotencia=f"recuperacion:{previa.id}", huella_peticion=previa.huella_peticion,
+                implementacion=previa.implementacion, proveedor=previa.proveedor, version_contrato=previa.version_contrato,
+                criterio_original=previa.criterio_original, manifiesto=manifiesto, politica_id=previa.politica_id,
+                estado="PENDIENTE",
+            ).on_conflict_do_nothing(constraint="uq_consulta_peticion").returning(ConsultaLista.id)).scalar_one_or_none()
+            if creado is None:
+                return None
+            sesion.add(TrabajoConsulta(consulta_id=identificador, fase="ADMISION", numero_control=0))
+            actor = self._actor_de(previa)
+            self._evento(sesion, identificador, "ADMITIDA", actor, {"recupera": str(previa.id)})
+            self._evento(sesion, previa.id, "RECUPERACION_PROGRAMADA", actor, {"consulta_id": str(identificador)})
+            return identificador
+
+    @staticmethod
+    def _actor_de(consulta):
+        return ActorListas(consulta.actor_emisor, consulta.actor_sujeto, frozenset())
 
     def guardar_borrador(self, concesion: ConcesionConsulta, resultado: ResultadoProveedorV2):
         resultado = self._validar_resultado(resultado.model_dump())

@@ -207,11 +207,13 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
                         errores_estado=(), fecha_inicio: datetime, fecha_fin: datetime,
                         fuentes: tuple[str, ...] | None = None, validado: bool | None = None,
                         fuentes_caidas: frozenset[str] = frozenset(),
-                        documento_no_vigente: str | None = None) -> Interpretacion:
+                        documento_no_vigente: str | None = None,
+                        recuperacion: str | None = None) -> Interpretacion:
     """`fuentes`: las fijadas al admitir (manifiesto); por defecto, las aprobadas para el sujeto.
     `validado`: lo que Tusdatos informa al terminar (False = no pudo validar el documento).
     `fuentes_caidas`: códigos que Tusdatos reportaba caídos o en mantenimiento al cerrar.
-    `documento_no_vigente`: texto de la verificación previa si el NIT o la CE no está vigente."""
+    `documento_no_vigente`: texto de la verificación previa si el NIT o la CE no está vigente.
+    `recuperacion`: texto que explica que es la recarga automática de una consulta anterior."""
     errores = set(errores_estado) | {e for e in (reporte.get("errores") or []) if isinstance(e, str)}
     tipo_sujeto = "ENTIDAD" if solicitud.sujeto == EMPRESA else "PERSONA"
     titular = reporte.get("nombre") if isinstance(reporte.get("nombre"), str) and reporte["nombre"].strip() else None
@@ -265,6 +267,8 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
             "pueden no corresponder al titular: confirme el número y el tipo antes de dar por buena la ausencia de registros")))
     if documento_no_vigente:
         advertencias.append(Advertencia(codigo="DOCUMENTO_NO_VIGENTE", descripcion=_texto(documento_no_vigente)))
+    if recuperacion:
+        advertencias.append(Advertencia(codigo="RECUPERACION_AUTOMATICA", descripcion=_texto(recuperacion)))
     nivel = reporte.get("hallazgos")
     if isinstance(nivel, str) and nivel.strip():
         advertencias.append(Advertencia(codigo="NIVEL_INFORMADO_PROVEEDOR", descripcion=_texto(

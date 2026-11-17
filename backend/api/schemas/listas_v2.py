@@ -81,6 +81,7 @@ class ResumenConsultaLista(BaseModel):
     conclusion: Literal["SIN_CANDIDATOS", "CON_CANDIDATOS", "NO_CONCLUYENTE"] | None
     sujeto_rol: Literal["CONTRAPARTE", "REPRESENTANTE"]
     creado_en: str
+    recupera: UUID | None = None  # recarga automática de esa consulta anterior
 
 
 class AntecedenteLista(BaseModel):

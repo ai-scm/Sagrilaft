@@ -125,7 +125,9 @@ class ServicioComunListas:
             filas = list(sesion.scalars(sentencia.order_by(ConsultaLista.creado_en.desc(), ConsultaLista.id.desc()).limit(limite + 1)))
             expediente = sesion.get(Formulario, expediente_id)
             return {"consultas": [{"consulta_id": str(c.id), "estado": c.estado, "conclusion": c.conclusion,
-                    "sujeto_rol": c.sujeto_rol, "creado_en": c.creado_en.isoformat()} for c in filas[:limite]],
+                    "sujeto_rol": c.sujeto_rol, "creado_en": c.creado_en.isoformat(),
+                    # Recarga automática: la consulta anterior que completa.
+                    "recupera": str(c.consulta_previa_id) if c.consulta_previa_id else None} for c in filas[:limite]],
                 "siguiente": str(filas[limite-1].id) if len(filas) > limite else None,
                 "legado": {"validaciones": [{"campo": r.campo, "resultado_original": r.resultado, "detalle": r.detalle}
                     for r in sesion.scalars(select(ResultadoValidacion).where(ResultadoValidacion.formulario_id == expediente_id,

@@ -20,11 +20,21 @@ Cada pasada del trabajador avanza una etapa y libera la consulta hasta el próxi
   cierra igual y queda un evento PDF_PROVEEDOR_NO_DISPONIBLE (el id del reporte queda
   guardado para descargarlo después).
 - En la misma etapa se guardan las capturas de pantalla por fuente que Tusdatos publica
-  (OFAC, ONU, INTERPOL, Procuraduría…). Son gratis y no detienen el cierre: la que no
-  llegue, no llega.
+  (OFAC, ONU, INTERPOL, Procuraduría…). Son gratis y no detienen el cierre.
+
+Después del cierre (`revisar_pendientes`, cada minuto, sin gastar créditos):
+
+- Si una consulta cerró con fuentes fallidas, se vuelve a recargar con `/api/retry` cuando
+  esas fuentes estén operativas: 10 min, 1 h y 4 h después de cada cierre, como máximo tres
+  veces y dentro de las 24 h. Cada recarga es una consulta nueva enlazada a la anterior
+  (`consulta_previa_id`): el resultado cerrado no se toca. Si el usuario ya volvió a
+  consultar ese documento en el expediente, no se recarga.
+- Si el PDF o las capturas no llegaron antes del cierre, se vuelven a pedir en esos mismos
+  tiempos y se suman como evidencia a la misma consulta.
 """
 import logging
 import time
+from dataclasses import dataclass
 from datetime import timedelta
 
 from domain.listas.puertos import ListasNoDisponibles
@@ -51,6 +61,16 @@ def _aviso_no_vigente(progreso) -> str | None:
     estado = verificacion.get("estado") or "; ".join(verificacion.get("avisos") or ()) or "no vigente"
     return (f"{que} no figura vigente en la fuente oficial (estado informado: {estado}). "
             "Las listas se consultaron igual; confirme el documento con la contraparte")
+
+
+def _aviso_recuperacion(consulta) -> str | None:
+    """Texto del aviso al revisor si la consulta es la recarga automática de otra."""
+    recupera = (consulta.manifiesto or {}).get("recupera") or {}
+    if not recupera:
+        return None
+    return (f"Recarga automática de la consulta {recupera.get('consulta_id')} (intento {recupera.get('intento')} "
+            f"de {len(ESPERAS_RECUPERACION)}): Tusdatos volvió a consultar las fuentes que habían fallado. "
+            "No se gastó crédito")
 
 
 def bloquear_documento(sesion, expediente_id, documento) -> None:
@@ -84,6 +104,8 @@ ESPERA_FUENTE_CAIDA = 60.0     # Cada cuánto se revisa si volvió una fuente ca
 VIGENCIA_SALUD_RECARGA = 10.0  # Para decidir la recarga se usa un estado reciente, no el de antes de lanzar.
 MARGEN_RECARGA = timedelta(minutes=3)  # Tiempo mínimo antes del plazo para esperar y aun recargar.
 VENTANA_CACHE = timedelta(hours=6)     # Tusdatos reutiliza una CC consultada en las últimas 6 h.
+VENTANA_RECUPERACION = timedelta(hours=24)  # Después no se recupera nada: el revisor ya decidió con lo que había.
+ESPERAS_RECUPERACION = (timedelta(minutes=10), timedelta(hours=1), timedelta(hours=4))
 TIPOS_VERIFICABLES = frozenset({"NIT", "CE"})  # verify/nit (cámaras de comercio) y verify/ce (Migración)
 ESTADOS_CAIDOS = frozenset({"under_maintenance", "source_down"})
 MENSAJES_NO_ENCONTRADO = {
@@ -98,6 +120,23 @@ registro = logging.getLogger(__name__)
 # reutilizar la de otro expediente expondría su resultado a quien no tiene acceso a él.
 VENTANA_REUTILIZACION = timedelta(hours=6)
 ESTADOS_REUTILIZABLES = ("PENDIENTE", "EN_CURSO", "COMPLETADA", "PARCIAL")
+
+
+@dataclass(frozen=True)
+class ConsultaCerrada:
+    """Lo necesario para recuperar, después del cierre, lo que una consulta no alcanzó a traer."""
+    id: object
+    estado: str
+    expediente_id: str | None
+    creado_en: object
+    finalizada_en: object
+    criterio: dict
+    manifiesto: dict
+    resultado: dict | None
+    reporte_id: str
+    dest: str | None
+    evidencias: frozenset
+    eventos: frozenset
 
 
 class ModalidadExterna:
@@ -233,7 +272,8 @@ class ModalidadExterna:
             return self._cerrar(trabajador, concesion, consulta, solicitud)
         progreso = repositorio.progreso_externo(consulta.id)
         if progreso is None:
-            repositorio.guardar_progreso(concesion, etapa="POR_LANZAR", vence_en=consulta.admitida_en + PLAZO)
+            repositorio.guardar_progreso(concesion, etapa="POR_LANZAR", vence_en=consulta.admitida_en + PLAZO,
+                                         **self._verificacion_heredada(repositorio, consulta))
             progreso = repositorio.progreso_externo(consulta.id)
         if progreso.etapa == "TERMINADA":
             return repositorio.fallar(concesion, "EJECUCION_INTERRUMPIDA")
@@ -242,6 +282,8 @@ class ModalidadExterna:
                 return self._terminar_con_fallo(repositorio, concesion, "TIEMPO_AGOTADO_SIN_LANZAR")
             return self._terminar_con_fallo(repositorio, concesion, "TIEMPO_AGOTADO_PROVEEDOR", indeterminada=True)
         if progreso.etapa == "POR_LANZAR":
+            if consulta.manifiesto.get("recupera"):
+                return self._recargar_previa(trabajador, concesion, consulta, solicitud)
             return self._lanzar(trabajador, concesion, consulta, solicitud)
         if progreso.etapa == "ESPERANDO":
             return self._esperar(trabajador, concesion, consulta, criterio, solicitud, progreso)
@@ -306,6 +348,152 @@ class ModalidadExterna:
         if lanzado.en_cache:
             return self._desde_cache(trabajador, concesion, consulta, solicitud)
         repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=lanzado.jobid)
+        return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
+
+
+    # ── Recuperación después del cierre (gratis) ────────────────────────────
+
+    def revisar_pendientes(self, trabajador):
+        """Recupera sin gastar créditos lo que quedó incompleto en consultas ya cerradas."""
+        entorno = trabajador.politica.entorno
+        if not self.disponible(entorno):
+            return
+        configuracion = self.cliente(entorno).configuracion
+        if not getattr(configuracion, "recuperar", False):
+            return
+        for cerrada in self._cerradas_recientes(trabajador):
+            for paso in (self._recuperar_evidencia, self._programar_recarga):
+                try:
+                    paso(trabajador, cerrada)
+                except Exception as error:  # Una consulta con problemas no frena la revisión de las demás.
+                    registro.error("Tusdatos: no se pudo revisar la consulta cerrada %s: %s", cerrada.id, type(error).__name__)
+
+    def _cerradas_recientes(self, trabajador):
+        """Consultas externas cerradas en la ventana de recuperación que tienen reporte de Tusdatos."""
+        from sqlalchemy import select
+        from infrastructure.listas.tusdatos.adaptador import ADAPTADOR_VERSION, PROVEEDOR
+        from infrastructure.persistencia.modelos_listas import (
+            ConsultaLista, EventoConsulta, EvidenciaConsulta, ProgresoConsultaExterna,
+        )
+        desde = trabajador.repositorio.reloj() - VENTANA_RECUPERACION
+        with trabajador.sesiones() as sesion:
+            filas = sesion.execute(select(ConsultaLista, ProgresoConsultaExterna.reporte_id, ProgresoConsultaExterna.respuesta_filtrada)
+                .join(ProgresoConsultaExterna, ProgresoConsultaExterna.consulta_id == ConsultaLista.id)
+                .where(ConsultaLista.implementacion == self.implementacion, ConsultaLista.proveedor == PROVEEDOR,
+                       ConsultaLista.estado.in_(("COMPLETADA", "PARCIAL", "FALLIDA")), ConsultaLista.finalizada_en >= desde,
+                       ProgresoConsultaExterna.reporte_id.is_not(None))
+                .order_by(ConsultaLista.finalizada_en, ConsultaLista.id)).all()
+            filas = [f for f in filas if (f[0].manifiesto or {}).get("adaptador") == ADAPTADOR_VERSION]
+            ids = [f[0].id for f in filas]
+            evidencias, eventos = {}, {}
+            if ids:
+                for consulta_id, tipo in sesion.execute(select(EvidenciaConsulta.consulta_id, EvidenciaConsulta.tipo)
+                                                         .where(EvidenciaConsulta.consulta_id.in_(ids))):
+                    evidencias.setdefault(consulta_id, set()).add(tipo)
+                for consulta_id, tipo in sesion.execute(select(EventoConsulta.consulta_id, EventoConsulta.tipo)
+                                                         .where(EventoConsulta.consulta_id.in_(ids))):
+                    eventos.setdefault(consulta_id, set()).add(tipo)
+            return [ConsultaCerrada(id=c.id, estado=c.estado, expediente_id=c.expediente_id, creado_en=c.creado_en,
+                                    finalizada_en=c.finalizada_en, criterio=c.criterio_original, manifiesto=c.manifiesto,
+                                    resultado=c.resultado, reporte_id=reporte_id, dest=(filtrada or {}).get("dest"),
+                                    evidencias=frozenset(evidencias.get(c.id, ())), eventos=frozenset(eventos.get(c.id, ())))
+                    for c, reporte_id, filtrada in filas]
+
+    def _recuperar_evidencia(self, trabajador, cerrada):
+        """Vuelve a pedir el PDF y las capturas que no llegaron antes del cierre."""
+        from domain.listas.contratos import Criterio
+        from infrastructure.listas.tusdatos.adaptador import ADAPTADOR_VERSION, FUENTES_POR_CODIGO, traducir_criterio
+        from infrastructure.listas.tusdatos.cliente import PdfPendiente
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
+        cliente = self.cliente(trabajador.politica.entorno)
+        capturables = [c for c in cerrada.manifiesto.get("fuentes") or () if c in FUENTES_POR_CODIGO and FUENTES_POR_CODIGO[c].captura]
+        falta_pdf = "PDF_PROVEEDOR" not in cerrada.evidencias
+        # Solo si no se alcanzaron a pedir: si Tusdatos respondió que no hay, no hay.
+        faltan_capturas = bool(getattr(cliente.configuracion, "capturas", False) and cerrada.dest and capturables
+                               and "CAPTURA_PROVEEDOR" not in cerrada.evidencias
+                               and "CAPTURAS_PROVEEDOR_OMITIDAS" in cerrada.eventos)
+        if not (falta_pdf or faltan_capturas):
+            return
+        repositorio = trabajador.repositorio
+        if repositorio.reclamar_reintento_evidencia(cerrada.id, ESPERAS_RECUPERACION) is None:
+            return
+        if falta_pdf:
+            solicitud = traducir_criterio(Criterio.model_validate(cerrada.criterio))
+            try:
+                documento = cliente.pdf(cerrada.reporte_id, es_nit=solicitud.es_nit)
+            except ErrorTusdatos:
+                documento = None
+            if documento is not None and not isinstance(documento, PdfPendiente):
+                repositorio.agregar_evidencia_tardia(cerrada.id, "PDF_PROVEEDOR", trabajador.custodia.guardar(documento.contenido),
+                                                     "application/pdf", ADAPTADOR_VERSION)
+        if faltan_capturas:
+            for codigo in capturables:
+                try:
+                    captura = cliente.captura(cerrada.dest, FUENTES_POR_CODIGO[codigo].captura)
+                except (ErrorTusdatos, ValueError):
+                    captura = None
+                if captura is not None:
+                    repositorio.agregar_evidencia_tardia(cerrada.id, "CAPTURA_PROVEEDOR", trabajador.custodia.guardar(captura.contenido),
+                                                         "image/jpeg", ADAPTADOR_VERSION, fuente_codigo=codigo)
+
+    def _programar_recarga(self, trabajador, cerrada):
+        """Admite la recarga gratuita de una consulta que cerró con fuentes fallidas, si ya toca."""
+        if cerrada.estado not in {"PARCIAL", "FALLIDA"} or not cerrada.resultado:
+            return
+        fallidas = [c.get("fuente_codigo") for c in cerrada.resultado.get("cobertura") or ()
+                    if c.get("estado") == "FALLIDA" and c.get("fuente_codigo")]
+        if not fallidas:
+            return
+        intento = int((cerrada.manifiesto.get("recupera") or {}).get("intento") or 0) + 1
+        repositorio = trabajador.repositorio
+        if intento > len(ESPERAS_RECUPERACION) or cerrada.finalizada_en + ESPERAS_RECUPERACION[intento - 1] > repositorio.reloj():
+            return
+        if self._codigos_caidos(trabajador.politica.entorno, fallidas, VIGENCIA_SALUD_RECARGA):
+            return  # Recargar con la fuente caída no sirve; se vuelve a mirar en la próxima revisión.
+        documento = _documento(cerrada.criterio)
+        manifiesto = {**cerrada.manifiesto, "forzar": False,
+                      "recupera": {"consulta_id": str(cerrada.id), "reporte_id": cerrada.reporte_id, "intento": intento}}
+        with trabajador.sesiones.begin() as sesion:
+            bloquear_documento(sesion, cerrada.expediente_id, documento)
+            if self._hay_posterior(sesion, cerrada, documento):
+                return  # Ya hay una consulta más nueva de ese documento (otra recarga o una del usuario).
+            nueva = repositorio.admitir_recuperacion(cerrada.id, manifiesto, sesion_actual=sesion)
+        if nueva:
+            registro.info("Tusdatos: recarga automática %s de la consulta %s (intento %d)", nueva, cerrada.id, intento)
+
+    def _hay_posterior(self, sesion, cerrada, documento) -> bool:
+        from sqlalchemy import select
+        from infrastructure.persistencia.modelos_listas import ConsultaLista
+        filas = sesion.execute(select(ConsultaLista.criterio_original).where(
+            ConsultaLista.expediente_id == cerrada.expediente_id, ConsultaLista.implementacion == self.implementacion,
+            ConsultaLista.creado_en > cerrada.creado_en, ConsultaLista.id != cerrada.id))
+        return any(_documento(fila.criterio_original) == documento for fila in filas)
+
+    @staticmethod
+    def _verificacion_heredada(repositorio, consulta) -> dict:
+        """La recarga conserva la verificación previa del documento (y su aviso) de la consulta original."""
+        from uuid import UUID
+        recupera = consulta.manifiesto.get("recupera") or {}
+        if not recupera.get("consulta_id"):
+            return {}
+        previa = repositorio.progreso_externo(UUID(recupera["consulta_id"]))
+        return {"verificacion_documento": previa.verificacion_documento} if previa and previa.verificacion_documento else {}
+
+    def _recargar_previa(self, trabajador, concesion, consulta, solicitud):
+        """Primera etapa de una recarga automática: `/api/retry` sobre el reporte anterior, sin crédito."""
+        from infrastructure.listas.tusdatos.errores import ErrorTusdatos, ProveedorNoDisponible
+        repositorio = trabajador.repositorio
+        reporte_id = consulta.manifiesto["recupera"]["reporte_id"]
+        try:
+            nuevo = self.cliente(trabajador.politica.entorno).reintentar_fuentes(reporte_id, solicitud.tipo_documento)
+        except ProveedorNoDisponible:
+            return repositorio.posponer(concesion, ESPERA_RED)  # Recargar es gratis: repetirlo no cuesta.
+        except (ErrorTusdatos, ValueError):
+            # Tusdatos no admitió la recarga (por ejemplo, un reporte que ya no acepta reintentos):
+            # se deja de insistir y la consulta anterior conserva su resultado.
+            return self._terminar_con_fallo(repositorio, concesion, "RECARGA_NO_ADMITIDA_PROVEEDOR")
+        repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=nuevo, recargas=1, reporte_id=reporte_id,
+                                     evento="RECARGA_FUENTES_EXTERNAS")
         return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
 
     # ── Verificación previa del documento (NIT y cédula de extranjería) ─────
@@ -543,7 +731,7 @@ class ModalidadExterna:
         interpretacion = interpretar_reporte(reporte.datos, consulta_id=consulta.id, solicitud=solicitud, criterio=criterio,
             fuentes=fuentes or None, errores_estado=estado.errores, fecha_inicio=consulta.admitida_en,
             fecha_fin=repositorio.reloj(), validado=estado.validado, fuentes_caidas=frozenset(caidas),
-            documento_no_vigente=_aviso_no_vigente(progreso))
+            documento_no_vigente=_aviso_no_vigente(progreso), recuperacion=_aviso_recuperacion(consulta))
         # Solo el subconjunto aprobado y la huella de la respuesta completa llegan a PostgreSQL.
         repositorio.guardar_progreso(concesion, etapa="DESCARGANDO_PDF", reporte_id=estado.reporte_id,
                                      huella_respuesta=reporte.sha256, respuesta_filtrada=interpretacion.respuesta_filtrada)

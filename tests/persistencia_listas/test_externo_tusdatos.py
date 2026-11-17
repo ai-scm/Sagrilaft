@@ -711,3 +711,150 @@ def test_sin_capturas_o_apagadas_la_consulta_cierra_igual(externo, monkeypatch):
     otra = crear(externo, valor="112").json()["consulta_id"]
     procesar(externo)
     assert len(capturas(externo)) == antes and "CAPTURAS_PROVEEDOR_OMITIDAS" in eventos(externo, otra)
+
+
+# ── Recuperación después del cierre (gratis) ─────────────────────────────────
+
+def revisar(e, minutos):
+    """Avanza el reloj y corre la revisión de consultas cerradas, como la haría el trabajador."""
+    e.reloj[0] += timedelta(minutes=minutos)
+    e.trabajador.revisar_pendientes()
+
+
+def recargas_de(e, consulta_id):
+    with e.sesiones() as sesion:
+        return [str(c) for c in sesion.scalars(select(ConsultaLista.id).where(ConsultaLista.consulta_previa_id == UUID(consulta_id)))]
+
+
+def cerrar_con_fuentes_fallidas(e, *recargas):
+    """Consulta cuyas fuentes fallan también en la recarga del cierre; `recargas` responde las siguientes."""
+    e.simulador.extras[("POST", "/api/launch")] = httpx.Response(200, json={"jobid": JOB_CON_ERROR, "validado": True})
+    e.simulador.extras[("GET", f"/api/retry/{REPORTE_CON_ERROR}")] = [
+        httpx.Response(200, json={"jobid": JOB_CON_ERROR}), *recargas]
+    consulta_id = crear(e, valor="113").json()["consulta_id"]
+    procesar(e)
+    assert detalle(e, consulta_id)["estado_ejecucion"] == "FALLIDA" and len(recargas_pedidas(e)) == 1
+    return consulta_id
+
+
+def test_fuentes_fallidas_se_recargan_solas_despues_del_cierre_sin_gastar_credito(externo):
+    original = cerrar_con_fuentes_fallidas(externo, httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO}))
+    revisar(externo, 5)
+    assert recargas_de(externo, original) == []  # la primera recarga espera 10 minutos
+    revisar(externo, 6)
+    [recarga] = recargas_de(externo, original)
+    procesar(externo)
+    consulta = detalle(externo, recarga)
+    assert consulta["estado_ejecucion"] == "COMPLETADA" and consulta["contexto"]["sujeto_rol"] == "CONTRAPARTE"
+    aviso = next(a for a in consulta["advertencias"] if a["codigo"] == "RECUPERACION_AUTOMATICA")
+    assert original in aviso["descripcion"] and "intento 1 de 3" in aviso["descripcion"]
+    assert len(lanzamientos(externo)) == 1 and len(recargas_pedidas(externo)) == 2
+    assert "RECUPERACION_PROGRAMADA" in eventos(externo, original)
+    # La original no cambia y las dos quedan en el historial del expediente.
+    assert detalle(externo, original)["estado_ejecucion"] == "FALLIDA"
+    historial = externo.cliente.get(f"/api/expedientes/{externo.expediente}/consultas-listas").json()["consultas"]
+    assert {c["consulta_id"]: c.get("recupera") for c in historial} == {original: None, recarga: original}
+    revisar(externo, 120)
+    assert recargas_de(externo, recarga) == []  # completa: no hay nada más que recargar
+
+
+def test_la_recarga_automatica_se_detiene_a_las_tres(externo):
+    original = cerrar_con_fuentes_fallidas(externo)  # Tusdatos sigue respondiendo con error
+    cadena = [original]
+    for _ in range(4):
+        revisar(externo, 5 * 60)
+        cadena += recargas_de(externo, cadena[-1])
+        procesar(externo)
+    assert len(cadena) == 4 and len(recargas_pedidas(externo)) == 4 and len(lanzamientos(externo)) == 1
+    assert "intento 3 de 3" in next(a["descripcion"] for a in detalle(externo, cadena[-1])["advertencias"]
+                                     if a["codigo"] == "RECUPERACION_AUTOMATICA")
+
+
+def test_no_recarga_si_el_usuario_ya_volvio_a_consultar(externo):
+    original = cerrar_con_fuentes_fallidas(externo)
+    externo.simulador.extras[("POST", "/api/launch")] = httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO, "validado": True})
+    crear(externo, valor="113", forzar=True)
+    procesar(externo)
+    revisar(externo, 11)
+    assert recargas_de(externo, original) == []
+
+
+def test_si_tusdatos_no_admite_la_recarga_se_deja_de_insistir(externo):
+    original = cerrar_con_fuentes_fallidas(externo, httpx.Response(400, json={"Error": "Message"}))
+    revisar(externo, 11)
+    [recarga] = recargas_de(externo, original)
+    procesar(externo)
+    assert detalle(externo, recarga)["error"]["codigo"] == "RECARGA_NO_ADMITIDA_PROVEEDOR"
+    revisar(externo, 120)
+    assert recargas_de(externo, recarga) == [] and len(recargas_pedidas(externo)) == 2
+
+
+def test_con_la_fuente_aun_caida_la_recarga_espera(produccion):
+    original = cerrar_con_fuentes_fallidas(produccion, httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO}))
+    produccion.simulador.extras[("GET", "/api/v1/sources/status")] = [
+        estado_fuentes(procuraduria="source_down"), estado_fuentes(procuraduria="operational")]
+    revisar(produccion, 11)
+    assert recargas_de(produccion, original) == []
+    revisar(produccion, 1)
+    assert len(recargas_de(produccion, original)) == 1
+
+
+def test_recuperacion_apagada_no_hace_nada(externo, monkeypatch):
+    original = cerrar_con_fuentes_fallidas(externo)
+    apagada = ConfiguracionTusdatos(url_base="http://docs.tusdatos.co", usuario="pruebas", clave="password", recuperar=False)
+    monkeypatch.setitem(modalidades.MODALIDADES, "externo", ModalidadExterna(fabrica_cliente=lambda _e: ClienteTusdatos(
+        apagada, transporte=externo.simulador.transporte, dormir=lambda _s: None, metricas=lambda *_: None)))
+    antes = len(externo.simulador.peticiones)
+    revisar(externo, 11)
+    assert recargas_de(externo, original) == [] and len(externo.simulador.peticiones) == antes
+
+
+def test_el_pdf_que_no_llego_se_suma_despues_a_la_misma_consulta(externo):
+    ruta_pdf = f"/api/v2/report_pdf/{REPORTE_CC}"
+    externo.simulador.extras[("GET", ruta_pdf)] = [
+        httpx.Response(404), httpx.Response(404),
+        httpx.Response(200, content=PDF_MINIMO, headers={"content-type": "application/pdf"})]
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    assert "PDF_PROVEEDOR_NO_DISPONIBLE" in eventos(externo, consulta_id)
+    revisar(externo, 11)  # sigue sin llegar
+    assert "PDF_PROVEEDOR" not in {e["tipo"] for e in detalle(externo, consulta_id)["evidencias"]}
+    revisar(externo, 30)
+    assert "PDF_PROVEEDOR" not in {e["tipo"] for e in detalle(externo, consulta_id)["evidencias"]}  # aún no toca
+    revisar(externo, 30)
+    assert "PDF_PROVEEDOR" in {e["tipo"] for e in detalle(externo, consulta_id)["evidencias"]}
+    assert "EVIDENCIA_PROVEEDOR_RECUPERADA" in eventos(externo, consulta_id)
+    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA"
+    pedidas = len([p for p in externo.simulador.peticiones if p.url.path == ruta_pdf])
+    revisar(externo, 5 * 60)
+    assert len([p for p in externo.simulador.peticiones if p.url.path == ruta_pdf]) == pedidas  # ya está
+
+
+def test_el_pdf_se_pide_como_maximo_tres_veces_despues_del_cierre(externo):
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)
+    ruta_pdf = f"/api/v2/report_pdf/{REPORTE_CC}"
+    antes = len([p for p in externo.simulador.peticiones if p.url.path == ruta_pdf])
+    for _ in range(5):
+        revisar(externo, 5 * 60)
+    assert len([p for p in externo.simulador.peticiones if p.url.path == ruta_pdf]) == antes + 3
+    assert eventos(externo, consulta_id).count("EVIDENCIA_PROVEEDOR_REINTENTADA") == 3
+
+
+def test_capturas_que_no_alcanzaron_a_pedirse_se_recuperan(externo):
+    listo = {"pdf": False}
+
+    def pdf(_peticion):
+        if listo["pdf"]:
+            return httpx.Response(200, content=PDF_MINIMO, headers={"content-type": "application/pdf"})
+        return httpx.Response(202, json={"status": "processing"}, headers={"Retry-After": "10"})
+    externo.simulador.extras[("GET", f"/api/v2/report_pdf/{REPORTE_CC}")] = pdf
+    externo.simulador.extras[("GET", f"{DEST_CC}/ofac.jpg")] = httpx.Response(200, content=JPEG + b"ofac")
+    consulta_id = crear(externo, valor="111").json()["consulta_id"]
+    procesar(externo)  # el PDF no termina antes del plazo: no hay tiempo para las capturas
+    assert "CAPTURAS_PROVEEDOR_OMITIDAS" in eventos(externo, consulta_id) and capturas(externo) == []
+    listo["pdf"] = True
+    revisar(externo, 11)
+    evidencias = detalle(externo, consulta_id)["evidencias"]
+    assert {e["tipo"] for e in evidencias} == {"INFORME_INTERNO", "PDF_PROVEEDOR", "CAPTURA_PROVEEDOR"}
+    assert [e["fuente_codigo"] for e in evidencias if e["tipo"] == "CAPTURA_PROVEEDOR"] == ["ofac"]

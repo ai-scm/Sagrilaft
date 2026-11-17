@@ -1,12 +1,14 @@
 """Ejecutor recuperable. Solo consume trabajos ya admitidos; la modalidad que los admitió los ejecuta."""
 import logging
+from datetime import timedelta
 from sqlalchemy import select, or_
 from domain.listas.errores import TrabajoNoVigente
 from infrastructure.persistencia.modelos_listas import ConsultaLista, TrabajoConsulta, BorradorConsulta
 from infrastructure.persistencia.repositorios.consultas_listas import RepositorioConsultasListas
-from services.listas.modalidades import ConsultaAdmitida, modalidad_de_consulta
+from services.listas.modalidades import MODALIDADES, ConsultaAdmitida, modalidad_de_consulta
 
 registro = logging.getLogger(__name__)
+INTERVALO_REVISION = timedelta(seconds=60)
 
 
 class TrabajadorListas:
@@ -16,12 +18,28 @@ class TrabajadorListas:
         # No es una entrada pública: trabaja exclusivamente sobre admisiones persistidas.
         self.repositorio = RepositorioConsultasListas(sesiones, politica, custodia,
             lambda *_: False, lambda *_: False, self._sin_archivos, reloj=reloj)
+        self._proxima_revision = None
 
     @staticmethod
     def _sin_archivos(*_):
         raise RuntimeError("Archivos no implementado en F3")
 
+    def revisar_pendientes(self):
+        """Tareas de las modalidades sobre consultas ya cerradas (por ejemplo, recuperar lo que faltó)."""
+        for modalidad in list(MODALIDADES.values()):
+            revisar = getattr(modalidad, "revisar_pendientes", None)
+            if revisar is None:
+                continue
+            try:
+                revisar(self)
+            except Exception as error:  # Nunca detiene el procesamiento de consultas.
+                registro.error("Falló la revisión de pendientes de %s: %s", type(modalidad).__name__, type(error).__name__)
+
     def ejecutar_uno(self):
+        ahora = self.repositorio.reloj()
+        if self._proxima_revision is None or ahora >= self._proxima_revision:
+            self._proxima_revision = ahora + INTERVALO_REVISION
+            self.revisar_pendientes()
         with self.sesiones() as sesion:
             identificador = sesion.scalar(select(TrabajoConsulta.consulta_id).where(
                 TrabajoConsulta.fase != "FINALIZADA",

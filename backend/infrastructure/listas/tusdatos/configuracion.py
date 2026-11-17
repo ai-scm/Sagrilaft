@@ -29,6 +29,9 @@ class ConfiguracionTusdatos:
     verificar_documento: bool = True
     # Guardar las capturas de pantalla por fuente que Tusdatos publica junto con el reporte.
     capturas: bool = True
+    # Recuperar gratis, después del cierre, lo que quedó incompleto: recargar las fuentes que
+    # fallaron (/api/retry) y volver a pedir el PDF y las capturas que no llegaron.
+    recuperar: bool = True
 
     def __post_init__(self):
         partes = urlsplit(self.url_base)
@@ -76,6 +79,7 @@ class ConfiguracionTusdatos:
             tiempo_pdf=segundos("LISTAS_TUSDATOS_TIEMPO_PDF", 60.0),
             alerta_creditos=int(segundos("LISTAS_TUSDATOS_ALERTA_CREDITOS", 100)),
             verificar_documento=_activo("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO"),
-            capturas=_activo("LISTAS_TUSDATOS_CAPTURAS"))
+            capturas=_activo("LISTAS_TUSDATOS_CAPTURAS"),
+            recuperar=_activo("LISTAS_TUSDATOS_RECUPERAR"))
         configuracion.validar_entorno(entorno)
         return configuracion
