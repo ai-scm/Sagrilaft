@@ -465,6 +465,7 @@ Sirven como aviso para quien mantenga el módulo:
 | No se guardaban las capturas de pantalla que Tusdatos publica por fuente | Se custodian como evidencia `CAPTURA_PROVEEDOR` (OFAC, ONU, INTERPOL, EUROPOL, CIDOB, Procuraduría, Policía), sin credenciales hacia el host de estáticos y con el mismo permiso del PDF |
 | Un NIT inexistente gastaba una consulta de listas completa antes de saberse que no existía | Se verifica antes con `verify/nit` (y la CE con `verify/ce`). Si no existe, no se consultan listas; si no está vigente, se consulta igual con aviso |
 | Una CC en la caché de Tusdatos (`jobid: null`) se cerraba sin resultado | Se busca el reporte en el historial de la cuenta (`/api/v1/checks`); si no aparece, se cierra como antes |
+| Una consulta que cerraba con fuentes fallidas, o sin PDF, quedaba así: nadie volvía a intentarlo aunque recargar es gratis | El trabajador revisa cada minuto las consultas cerradas de las últimas 24 h. Recarga las fuentes fallidas cuando están operativas (10 min, 1 h y 4 h; cada recarga es una consulta nueva enlazada) y vuelve a pedir el PDF y las capturas que faltaron. Nada de esto gasta crédito |
 | `validate_envs.py` rechazaba `.env.dev.example` tras agregar las variables `LISTAS_*` (CI en rojo) | El validador y las tres plantillas declaran las variables nuevas |
 
 ## 7. Pendientes
@@ -573,7 +574,8 @@ Probado con el sandbox público y con respuestas grabadas
   La propuesta comercial venció el 22-07-2026: hay que pedir una nueva.
 - Preguntar a Tusdatos por el «lanzamiento de fuente puntual» que menciona la nota de
   `sources/status` (`/api/v1/sources/status/{job_id}`) y no aparece en su `openapi.json`.
-- Con credenciales reales: verificar el PDF, `/api/retry` y la forma real de cada fuente
+- Con credenciales reales: verificar el PDF, `/api/retry` (también horas después del
+  cierre, que es lo que usa la recarga automática) y la forma real de cada fuente
   (en especial los textos de Policía y los registros PEP), confirmar que
   `peps_funcion_publica` solo llega cuando hay registro y ver cómo llega `validado`.
 - Alarma de CloudWatch sobre la métrica `TusdatosCreditosRestantes` (hoy solo hay aviso en

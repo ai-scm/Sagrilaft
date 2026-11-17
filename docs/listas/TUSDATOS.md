@@ -176,6 +176,28 @@
   consulta se cierra como no concluyente. Entre una consulta y la siguiente el sistema
   espera 5 segundos, como pide Tusdatos.
 
+  ## Lo que quedó incompleto se recupera solo
+
+  Dentro de esos 15 minutos el sistema ya reintenta una vez, gratis, las fuentes que
+  fallaron. Si aun así la consulta cierra incompleta, el trabajador la sigue mirando
+  durante 24 horas y recupera lo que falte sin gastar crédito:
+
+  - **Fuentes que fallaron.** A los 10 minutos, a la hora y a las 4 horas del cierre
+    pide a Tusdatos que vuelva a consultar esas fuentes (`/api/retry`, que no cobra). Antes
+    revisa que estén operativas: si siguen caídas, espera a la siguiente vuelta. Cada
+    recarga es **una consulta nueva** en el historial, marcada «recarga automática» y
+    enlazada a la anterior. La anterior no se toca: lo que el revisor ya vio queda igual.
+    El resultado nuevo trae un aviso que dice de qué consulta viene y que no costó crédito.
+  - **PDF y capturas que no llegaron.** Se vuelven a pedir en esos mismos tiempos y se
+    suman como evidencia a la misma consulta. Las capturas solo se vuelven a pedir si no se
+    alcanzaron a pedir antes del cierre; si Tusdatos dijo que no había, no se insiste.
+
+  No se recarga si alguien ya volvió a consultar ese documento en el expediente, si
+  Tusdatos rechaza la recarga (se deja de insistir) ni después de tres intentos. Lo que
+  gasta crédito (una consulta que no alcanzó a enviarse, o que quedó indeterminada) no se
+  repite solo: lo decide una persona. Para apagar todo esto,
+  `LISTAS_TUSDATOS_RECUPERAR=false`.
+
   ## Qué sabemos y de dónde sale
 
   Revisado el 13-11-2026 contra dos documentos: la documentación de la API
@@ -243,14 +265,17 @@
     `peps`, `peps_funcion_publica`, `procuraduria`…). Las cuatro fuentes que hoy informa
     `sources/status` en el sandbox también salen de ese catálogo. Falta verlo con
     credenciales reales: el trabajador avisa si alguna no aparece.
-  - Si hay un límite de reintentos por reporte o un tiempo mínimo entre uno y otro.
-  - Los «auto reintentos» del plan ya están explicados en la web (webhook
-    `individualRetry`): Tusdatos reintenta por su cuenta las fuentes con error y, si en ese
-    reintento aparece un hallazgo nuevo, avisa por webhook. Es un proceso suyo, aparte del
-    nuestro y más tarde. Nuestro reintento sigue haciendo falta porque corre dentro de los
-    15 minutos de la consulta. Para aprovechar el suyo habría que recibir el webhook, lo que
-    exige un endpoint público nuestro; queda para después. Falta confirmar con qué frecuencia
-    reintentan.
+  - Si `/api/retry` tiene un límite de veces por reporte, un tiempo mínimo entre uno y otro
+    o deja de servir pasado un tiempo. La documentación no pone ninguno, pero tampoco dice
+    que no existan, y documenta un 400 sin explicar cuándo sale. Por eso el sistema se pone
+    su propio límite (tres recargas en 24 horas) y deja de insistir si Tusdatos responde
+    con error.
+  - Cómo funcionan los «auto reintentos» del plan. La propuesta comercial los nombra, y el
+    webhook `individualRetry` avisa «cuando un proceso de retry encuentra nuevos hallazgos
+    relevantes». Pero la documentación no dice quién lanza ese retry, cada cuánto, ni si el
+    reporte se actualiza. Lo más probable es que sea un proceso suyo; falta que lo confirmen.
+    Para aprovecharlo habría que recibir el webhook, lo que exige un endpoint público
+    nuestro; queda para después. Mientras tanto, nuestra recarga diferida cubre el caso.
   - El «lanzamiento de fuente puntual» que nombra la nota de `sources/status`. No hay
     ninguna ruta documentada para eso.
   - Cuánto tiempo guarda Tusdatos los reportes y PDF, y si se puede pedir que los borren.
@@ -263,7 +288,8 @@
     Hay que confirmarla con credenciales reales (ver «No documentado» arriba).
   - Tusdatos no publica con qué códigos informa el estado de OFAC, ONU, PEP y las demás
     listas. El sistema deja registrado cuáles faltan en la primera consulta real.
-  - Con credenciales reales falta verificar: el PDF, el reintento de fuentes fallidas, la
+  - Con credenciales reales falta verificar: el PDF, el reintento de fuentes fallidas (en
+    especial horas después del cierre, que es lo que usa la recarga automática), la
     forma real de cada fuente, la regla de PEP por función pública y el aviso de documento
     no validado.
   - Falta la alarma de CloudWatch sobre la métrica de créditos, para que el aviso le llegue

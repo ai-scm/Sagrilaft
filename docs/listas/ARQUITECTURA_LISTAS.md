@@ -614,6 +614,32 @@ libera la consulta entre pasadas (`posponer`):
   ya es evidencia de otra consulta (la clave de custodia es única), no se vuelve a
   registrar. El trabajador necesita salida a `static.tusdatos.co` además de
   `dash-board.tusdatos.co`.
+- **Recuperación después del cierre** (`ModalidadExterna.revisar_pendientes`, la llama
+  `TrabajadorListas` cada 60 s). Mira las consultas externas cerradas en las últimas 24 h
+  que tienen id de reporte. No gasta créditos. Se apaga con `LISTAS_TUSDATOS_RECUPERAR=false`.
+  - *Recarga diferida:* si la consulta cerró `PARCIAL` o `FALLIDA` con alguna cobertura
+    `FALLIDA`, a los 10 min, 1 h y 4 h de cada cierre se admite una consulta nueva con
+    `consulta_previa_id` apuntando a la cerrada. Copia el expediente, el rol, el criterio, el
+    actor original y el manifiesto (con `recupera: {consulta_id, reporte_id, intento}`), y su
+    clave de idempotencia es `recuperacion:<id previa>`, así que dos trabajadores no la
+    duplican. Arranca con `/api/retry` sobre el reporte anterior en vez de `launch`, hereda la
+    verificación previa del documento y sigue el flujo normal (PDF y capturas incluidos). Su
+    resultado lleva la advertencia `RECUPERACION_AUTOMATICA`. No se admite si las fuentes
+    fallidas siguen caídas (se vuelve a mirar en la próxima revisión), si ya hay una consulta
+    más nueva del mismo documento en el expediente (otra recarga o una del usuario, bajo el
+    mismo candado de documento que la admisión), ni pasado el tercer intento. Si Tusdatos
+    rechaza el retry, la recarga cierra `FALLIDA` (`RECARGA_NO_ADMITIDA_PROVEEDOR`) y la
+    cadena se detiene. Eventos: `RECUPERACION_PROGRAMADA` en la previa y `ADMITIDA` con
+    `recupera` en la nueva. El historial del expediente devuelve `recupera` y el portal la
+    marca «recarga automática».
+  - *Evidencia tardía:* si falta el PDF, o las capturas quedaron `CAPTURAS_PROVEEDOR_OMITIDAS`,
+    se vuelven a pedir en esos mismos tiempos y se suman a la misma consulta cerrada
+    (`agregar_evidencia_tardia`: los triggers permiten insertar evidencia y eventos en una
+    consulta cerrada, no modificarlos). Cada intento deja `EVIDENCIA_PROVEEDOR_REINTENTADA`
+    (es el contador y el candado entre trabajadores) y cada objeto recuperado deja
+    `EVIDENCIA_PROVEEDOR_RECUPERADA`.
+  - Lo que gasta crédito no se repite solo: ni las consultas que no alcanzaron a lanzarse ni
+    las indeterminadas.
 - **Fuentes** (`infrastructure/listas/tusdatos/adaptador.py`): ofac, ofac_nombre,
   lista_onu, interpol, europol, peps, peps_denom, peps_funcion_publica, cidob,
   procuraduria, contraloria (+contraloria2) y policia. Persona: las 12; empresa (NIT):
@@ -761,6 +787,7 @@ versionado):
 | T01 | Primer formato: OFAC Advanced XML/ZIP con XSD fijado; Enhanced no se presume compatible | 2026-11-04 | Vigente |
 | T02 | PostgreSQL como autoridad de versiones e historial; sin motor de búsqueda externo | 2026-11-04 | Vigente |
 | T03 | Lotes con checkpoint y número de control; activación idempotente; cierre recuperable | 2026-11-04 | Vigente |
+| T06 | Tusdatos: lo incompleto se recupera después del cierre solo si es gratis (`/api/retry`, PDF, capturas); cada recarga es una consulta nueva enlazada (`consulta_previa_id`), máximo tres en 24 h | 2026-11-13 | Vigente |
 | T05 | Contrato común con dobles de prueba; sin llamadas ni credenciales externas en la primera entrega | 2026-11-04 | Vigente; el adaptador externo sigue pendiente |
 | — | Producción permanece deshabilitada | 2026-11-04 | Vigente; aplicada en el código |
 | — | Descarga de listas manual; nunca automática ni desde el buscador web de OFAC | 2026-11-04 | Vigente |
