@@ -186,6 +186,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       {!historial.length && <p className="listas-vacio">No hay consultas registradas en el módulo nuevo.</p>}
       <ul className="listas-historial">{paginacionHistorial.elementosPagina.map(c => <li key={c.consulta_id}><button type="button" className="listas-item" aria-current={consulta?.consulta_id === c.consulta_id} onClick={() => ver(c.consulta_id)}>
         {c.sujeto_rol} · <span className="listas-estado" data-estado={c.estado}>{etiquetas[c.estado]}</span> · {new Date(c.creado_en).toLocaleString()}
+        {c.recupera && <> · <span title="Tusdatos volvió a consultar, sin gastar crédito, las fuentes que fallaron en la consulta anterior">recarga automática</span></>}
       </button></li>)}</ul>
       <ControlsPaginacion
         {...paginacionHistorial}
