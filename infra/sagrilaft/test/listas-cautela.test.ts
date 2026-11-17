@@ -19,17 +19,22 @@ function synth(environment: 'staging' | 'prod', proveedorListasCautela: string) 
   })).toJSON();
 }
 
-test('staging: habilitar dummy solo cambia el valor del parámetro del proveedor', () => {
+test('staging: habilitar dummy solo cambia el parámetro del proveedor y enciende el trabajador', () => {
   const before = synth('staging', 'deshabilitado');
   const after = synth('staging', 'dummy');
   const changed = Object.keys(after.Resources).filter(key =>
     JSON.stringify(before.Resources[key]) !== JSON.stringify(after.Resources[key]));
-  equal(changed.length, 1);
-  const parameter = after.Resources[changed[0]];
-  equal(parameter.Type, 'AWS::SSM::Parameter');
+  equal(changed.length, 2);
+  const parameterKey = changed.find(key => after.Resources[key].Type === 'AWS::SSM::Parameter')!;
+  const workerKey = changed.find(key => after.Resources[key].Type === 'AWS::ECS::Service')!;
+  const parameter = after.Resources[parameterKey];
   equal(parameter.Properties.Name, '/sagrilaft/staging/config/PROVEEDOR_LISTAS_CAUTELA');
   equal(parameter.Properties.Value, 'dummy');
-  before.Resources[changed[0]].Properties.Value = 'dummy';
+  equal(JSON.stringify(after.Resources[workerKey].Properties.TaskDefinition).includes('ListasWorkerTaskDefinition'), true);
+  equal(before.Resources[workerKey].Properties.DesiredCount, 0);
+  equal(after.Resources[workerKey].Properties.DesiredCount, 1);
+  before.Resources[parameterKey].Properties.Value = 'dummy';
+  before.Resources[workerKey].Properties.DesiredCount = 1;
   deepEqual(after, before);
 });
 

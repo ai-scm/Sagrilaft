@@ -383,6 +383,9 @@ export class EcsFargate extends Construct {
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       enableExecuteCommand: true,
+      // Las tareas heredan Project/Environment: sin esto, el costo de Fargate
+      // no aparece en Cost Explorer al filtrar por Project=sagrilaft.
+      propagateTags: ecs.PropagatedTagSource.SERVICE,
       circuitBreaker: { rollback: true },
       cloudMapOptions: cloudMapName ? { name: cloudMapName } : undefined,
     });

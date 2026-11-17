@@ -71,17 +71,26 @@ export class Networking extends Construct {
     });
     this.sgRds.addIngressRule(this.sgEcs, ec2.Port.tcp(5432), 'desde ECS Fargate');
 
+    // Gratuito: S3 nunca pasa por el NAT (evita su cobro por GB).
+    this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+      subnets: [{ subnetType: this.ecsSubnetType }],
+    });
+
+    // Con NAT, las tareas ya llegan a las APIs de AWS por esa salida (cifrado TLS).
+    // Los endpoints de interfaz cuestan 0,01 USD/h por endpoint y por zona
+    // (9 × 2 zonas ≈ 131 USD/mes por ambiente), así que solo se crean en una red
+    // aislada, donde son la única ruta. Ver docs/produccion/ESTIMACION_COSTOS_AWS.md.
+    if (usaEgressExterno) {
+      return;
+    }
+
     const sgVpcEndpoints = new ec2.SecurityGroup(this, 'SgVpcEndpoints', {
       vpc: this.vpc,
       description: 'VPC endpoints para ECS Fargate sin NAT',
     });
     sgVpcEndpoints.addIngressRule(this.sgEcs, ec2.Port.tcp(443), 'ECS hacia endpoints privados AWS');
     sgVpcEndpoints.addIngressRule(this.sgEcs, ec2.Port.tcp(587), 'ECS hacia SES SMTP privado');
-
-    this.vpc.addGatewayEndpoint('S3GatewayEndpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: this.ecsSubnetType }],
-    });
 
     [
       ['EcrApiEndpoint', ec2.InterfaceVpcEndpointAwsService.ECR],

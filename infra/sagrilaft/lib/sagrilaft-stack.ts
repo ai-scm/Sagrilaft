@@ -106,13 +106,17 @@ export class SagrilaftStack extends cdk.Stack {
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
     // Tusdatos: producción usa HTTPS; el sandbox público (HTTP, sin créditos) solo fuera de prod.
     const tusdatosUrl = String(this.node.tryGetContext('tusdatosUrl') ?? 'https://dash-board.tusdatos.co').replace(/\/+$/, '');
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
+    // Una copia por servicio: es lo que corre hoy en staging y producción (plan de
+    // release). En picos, el backend sube hasta backendMaxCapacity (2 por defecto).
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '1');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
-    const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
+    const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '2');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
     const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
     // Un trabajador de listas basta: los turnos y concesiones viven en PostgreSQL.
-    const listasWorkerCountRaw = String(this.node.tryGetContext('listasWorkerCount') ?? (desiredCount > 0 ? '1' : '0'));
+    // Con las listas deshabilitadas no hay nada que procesar: no se enciende.
+    const listasWorkerPorDefecto = desiredCount > 0 && proveedorListasCautela !== 'deshabilitado' ? '1' : '0';
+    const listasWorkerCountRaw = String(this.node.tryGetContext('listasWorkerCount') ?? listasWorkerPorDefecto);
     const listasWorkerCount = Number.parseInt(listasWorkerCountRaw, 10);
     if (!Number.isInteger(listasWorkerCount) || listasWorkerCount < 0 || listasWorkerCount > 2) {
       throw new Error(`listasWorkerCount invalido: ${listasWorkerCountRaw}. Use 0, 1 o 2.`);
