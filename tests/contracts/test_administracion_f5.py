@@ -101,6 +101,9 @@ for nombre in ('v1.xml','v2.xml'):
 assert not schema.validate(etree.parse(str(p/'invalido.xml'),parser))
 print('XSD sintético: dos válidos y uno inválido comprobados')
 '''
+    # En CI el Python del sistema no trae lxml: sin él no hay con qué validar el XSD.
+    if subprocess.run(['/usr/bin/python3','-c','import lxml'],capture_output=True).returncode != 0:
+        pytest.skip('lxml no está instalado en el Python del sistema')
     resultado=subprocess.run(['/usr/bin/python3','-c',programa,str(RAIZ)],capture_output=True,text=True)
     assert resultado.returncode == 0, resultado.stderr
 

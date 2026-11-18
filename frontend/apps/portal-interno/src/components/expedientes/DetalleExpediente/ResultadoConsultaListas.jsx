@@ -2,6 +2,19 @@ import { memo, useMemo, useState } from 'react';
 import { etiquetaLista, valorLista } from './presentacionListas';
 import './ResultadoConsultaListas.css';
 
+// Avisos sobre el documento consultado que el revisor no debe pasar por alto.
+const AVISOS_DESTACADOS = {
+  DOCUMENTO_NO_VALIDADO: 'Documento no validado',
+  DOCUMENTO_NO_VIGENTE: 'Documento no vigente',
+};
+
+const NOMBRES_EVIDENCIA = {
+  PDF_PROVEEDOR: 'PDF del proveedor',
+  CAPTURA_PROVEEDOR: 'Captura de pantalla del proveedor',
+  INFORME_INTERNO: 'Informe interno',
+};
+const esDelProveedor = e => e.tipo === 'PDF_PROVEEDOR' || e.tipo === 'CAPTURA_PROVEEDOR';
+
 const Datos = memo(function Datos({ pares }) {
   return <dl className="listas-datos">{pares.map(([nombre, valor]) => <div key={nombre}><dt>{nombre}</dt><dd>{valorLista(valor)}</dd></div>)}</dl>;
 });
@@ -79,7 +92,7 @@ const CandidatoLista = memo(function CandidatoLista({ candidato, fuente, clasifi
   </section>;
 });
 
-function ResultadoConsultaListas({ consulta, descargar }) {
+function ResultadoConsultaListas({ consulta, descargar, puedeVerPdfProveedor = false }) {
   const clasificado = consulta.version_contrato === '2.1';
   const fuentes = useMemo(() => new Map(consulta.cobertura.map(f => [f.id, f])), [consulta.cobertura]);
   const trazabilidad = consulta.trazabilidad;
@@ -100,7 +113,9 @@ function ResultadoConsultaListas({ consulta, descargar }) {
       ['Fuente', f.nombre_origen], ['Cobertura', etiquetaLista(f.estado)], ['Versión consultada', f.version_id ?? f.version_declarada],
       ['Revisión activa al admitir', f.revision_activa], ['Hash del contenido', f.hash_contenido],
     ]} />{f.motivo && <p>{f.motivo}</p>}</div>)}
-    {consulta.advertencias.map((a, i) => <p key={`aviso-${i}`}>Advertencia: {a.descripcion}</p>)}
+    {consulta.advertencias.map((a, i) => AVISOS_DESTACADOS[a.codigo]
+      ? <p key={`aviso-${i}`} role="alert" className="listas-error"><strong>{AVISOS_DESTACADOS[a.codigo]}:</strong> {a.descripcion}</p>
+      : <p key={`aviso-${i}`}>Advertencia: {a.descripcion}</p>)}
     {consulta.criterios_no_aplicados.map((a, i) => <p key={`criterio-${i}`}>Criterio no aplicado: {a.descripcion}</p>)}
     {consulta.candidatos.map(c => <CandidatoLista key={c.id} candidato={c} fuente={fuentes.get(c.cobertura_id)} clasificado={clasificado} />)}
     {!consulta.candidatos.length && !['PENDIENTE', 'EN_CURSO'].includes(consulta.estado_ejecucion) && <p>
@@ -122,9 +137,16 @@ function ResultadoConsultaListas({ consulta, descargar }) {
     {!consulta.evidencias.length && <p>No hay un informe disponible para esta consulta.</p>}
     {consulta.evidencias.map(e => <div key={e.id}>
       <Datos pares={[
-        ['Evidencia', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version], ['SHA-256 del PDF', e.sha256],
+        ['Evidencia', NOMBRES_EVIDENCIA[e.tipo] ?? e.tipo], ...(e.fuente_codigo ? [['Fuente', e.fuente_codigo]] : []),
+        ['Identificador', e.id], ['Estado', etiquetaLista(e.estado)], ['Fecha', e.creada_en], ['Generador', e.generador_version],
+        [e.tipo === 'CAPTURA_PROVEEDOR' ? 'SHA-256 de la imagen' : 'SHA-256 del PDF', e.sha256],
       ]} />
-      {e.estado === 'DISPONIBLE' && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id)}>Descargar informe conservado</button>}
+      {e.tipo === 'PDF_PROVEEDOR' && <p className="listas-nota">PDF entregado por el proveedor. Contiene información de otras fuentes; su acceso queda registrado.</p>}
+      {e.tipo === 'CAPTURA_PROVEEDOR' && <p className="listas-nota">Pantalla de la fuente tal como la vio el proveedor al consultar. Su acceso queda registrado.</p>}
+      {e.estado === 'DISPONIBLE' && !esDelProveedor(e) && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar informe conservado</button>}
+      {e.estado === 'DISPONIBLE' && esDelProveedor(e) && puedeVerPdfProveedor && <button type="button" className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo, e.fuente_codigo)}>
+        {e.tipo === 'PDF_PROVEEDOR' ? 'Descargar PDF del proveedor' : `Descargar captura (${e.fuente_codigo})`}
+      </button>}
     </div>)}
   </div>;
 }

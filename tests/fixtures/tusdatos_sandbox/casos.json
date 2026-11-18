@@ -1,0 +1,2593 @@
+{
+ "estado_fuentes": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/v1/sources/status?country=CO"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "code": "success",
+    "message": "OK",
+    "sources": [
+     {
+      "code": "policia",
+      "country": "CO",
+      "name": "Policia Nacional de Colombia",
+      "status": "operational",
+      "status_label": "Operativo"
+     },
+     {
+      "code": "procuraduria",
+      "country": "CO",
+      "name": "Procuraduría General de la Nación",
+      "status": "under_maintenance",
+      "status_label": "En reparación por Tusdatos"
+     },
+     {
+      "code": "rut",
+      "country": "CO",
+      "name": "Registro Único Tributario (RUT)",
+      "status": "source_down",
+      "status_label": "Fuente externa caída"
+     },
+     {
+      "code": "registraduria_certificado",
+      "country": "CO",
+      "name": "Registraduría Nacional del Estado Civil",
+      "status": "operational",
+      "status_label": "Operativo"
+     }
+    ],
+    "status": 200,
+    "summary": {
+     "operational": 2,
+     "source_down": 1,
+     "total": 4,
+     "under_maintenance": 1
+    }
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_cc_con_hallazgo": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 111,
+    "fechaE": "01/12/2014",
+    "typedoc": "CC"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": 111,
+    "email": "usuario@pruebas.com",
+    "jobid": "6460fc34-4154-43db-9438-8c5a059304c0",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_cc_en_cache": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 126,
+    "typedoc": "CC"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": null,
+    "email": null,
+    "jobid": null,
+    "nombre": "JUAN SANCHEZ",
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_cc_forzada": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 127,
+    "fechaE": "05/01/2015",
+    "force": true,
+    "typedoc": "CC"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": null,
+    "email": "usuario@pruebas.com",
+    "jobid": "99bf7965-2740-45b1-9a49-efa28fadf67f",
+    "nombre": "NOMBRE APELLIDO",
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_cc_sin_hallazgo": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 112,
+    "fechaE": "01/12/2014",
+    "typedoc": "CC"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": 112,
+    "email": "usuario@pruebas.com",
+    "jobid": "5c6c80c0-4dd3-41c9-9648-46871a7176ad",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_cc_titular_no_autoriza": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 128,
+    "fechaE": "08/06/2007",
+    "typedoc": "CC"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 403,
+   "json": {
+    "error": "La consulta no se puede realizar por instruccion del titular de los datos."
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_ce": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 960696,
+    "fechaE": "01/11/2001",
+    "typedoc": "CE"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": 960696,
+    "email": "usuario@pruebas.com",
+    "jobid": "24874f68-7894-4376-a645-ea862cbfe614",
+    "nombre": "MATILDA COLLEEN WILLARD",
+    "typedoc": "CE",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_invalido": {
+  "peticion": {
+   "cuerpo": {
+    "typedoc": "C"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 422,
+   "json": {
+    "detail": [
+     {
+      "ctx": {
+       "limit_value": 2
+      },
+      "loc": [
+       "body",
+       "typedoc"
+      ],
+      "msg": "ensure this value has at least 2 characters",
+      "type": "value_error.any_str.min_length"
+     }
+    ]
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_nit": {
+  "peticion": {
+   "cuerpo": {
+    "doc": 900000152,
+    "typedoc": "NIT"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": null,
+    "email": "usuario@pruebas.com",
+    "jobid": "e7451a5e-97ca-498e-a7f0-a352658cbc26",
+    "nombre": "EMPRESA DE PRUEBAS S A S",
+    "typedoc": "NIT",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "launch_pp": {
+  "peticion": {
+   "cuerpo": {
+    "doc": "381310014",
+    "name": "JUAN PEREZ PEREZ",
+    "typedoc": "PP"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "doc": null,
+    "email": "usuario@pruebas.com",
+    "jobid": "99bf7965-2740-45b1-9a49-efa28fadf67f",
+    "nombre": "Procesando pasaporte",
+    "typedoc": "PP",
+    "validado": null
+   },
+   "tipo": "application/json"
+  }
+ },
+ "pdf_nit": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/v2/report_nit_pdf/5d9e05963817a56d989523c0"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": "Reporte en PDF",
+   "tipo": "application/json"
+  }
+ },
+ "pdf_persona": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/v2/report_pdf/5d9e00483800a5071688a101"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": "Reporte en PDF",
+   "tipo": "application/json"
+  }
+ },
+ "plan": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/plans"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "amount": 0,
+    "purchase_amount": 0,
+    "purchase_date": "string",
+    "user": "string"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "report_cc_con_error": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/report_json/d9530d51473cf57e73945088"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "cidob": "Error",
+    "contadores_s": "Error",
+    "contaduria": "Error",
+    "contaduria_pdf": "Error",
+    "contraloria": "Error",
+    "contraloria2": "Error",
+    "dest": "static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8",
+    "dict_hallazgos": {
+     "altos": [],
+     "bajos": [],
+     "infos": [],
+     "medios": []
+    },
+    "error": true,
+    "errores": [
+     "anec",
+     "contadores_s",
+     "cpqcol",
+     "reputacional",
+     "ofac_offline",
+     "ruaf",
+     "rues",
+     "rucom",
+     "ofac_database_nombre",
+     "inmov_bog",
+     "ofac_database_id",
+     "sigep",
+     "contraloria",
+     "inpec",
+     "peps_denom",
+     "ofac_nombre",
+     "rnmc",
+     "peps_funcion_publica",
+     "delitos_sexuales",
+     "simit",
+     "lista_onu",
+     "cpbiol",
+     "europol",
+     "juzgados_tyba",
+     "profesion",
+     "cpae",
+     "contraloria_db",
+     "procuraduria_db",
+     "libretamilitar",
+     "interpol",
+     "cpnt",
+     "contaduria",
+     "comvezcol",
+     "consejopro",
+     "cidob",
+     "conte",
+     "jcc",
+     "peps",
+     "rut",
+     "desmovilizados",
+     "rama_abogados",
+     "secop_s",
+     "proveedores_ficticios",
+     "offshoreleaks",
+     "simur",
+     "secop2",
+     "postulados",
+     "procuraduria",
+     "rndc",
+     "rethus",
+     "garantias_mobiliarias",
+     "copnia",
+     "ofac_offline_name",
+     "transitobog",
+     "ofac",
+     "policia",
+     "runt_app",
+     "registraduria_certificado",
+     "sisconmp",
+     "personeriabog",
+     "colpsic",
+     "secop",
+     "lista_banco_mundial",
+     "fopep",
+     "conalpe",
+     "cpiq",
+     "sena",
+     "iadb",
+     "rama_unificada",
+     "sisben",
+     "armeniajepms",
+     "barranquillajepms",
+     "bogotajepms",
+     "bucaramangajepms",
+     "bugajepms",
+     "calijepms",
+     "cartagenajepms",
+     "florenciajepms",
+     "ibaguejepms",
+     "manizalesjepms",
+     "medellinjepms",
+     "monteriajepms",
+     "neivajepms",
+     "palmirajepms",
+     "pastojepms",
+     "pereirajepms",
+     "popayanjepms",
+     "quibdojepms",
+     "santamartajepms",
+     "ladoradajepms",
+     "valleduparjepms",
+     "tunjajepms",
+     "villavicenciojepms"
+    ],
+    "europol": "Error",
+    "fecha": "Este reporte fue generado el 4, Oct 2023 a las 10:00AM",
+    "fopep": "Error",
+    "garantias_mobiliarias": "Error",
+    "genero": "M",
+    "hallazgos": "",
+    "iadb": "Error",
+    "inmov_bog": "Error",
+    "inpec": "Error",
+    "interpol": "Error",
+    "juzgados_tyba": "Error",
+    "libretamilitar": "Error",
+    "lista_banco_mundial": "Error",
+    "lista_onu": "Error",
+    "monitoring_date": false,
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "ofac": "Error",
+    "ofac_nombre": "Error",
+    "peps": "Error",
+    "peps2": "Error",
+    "peps_denom": "Error",
+    "personeriabog": "Error",
+    "policia": "Error",
+    "procuraduria": "Error",
+    "profesion": {
+     "abogados_judicial": "Error",
+     "anec": "Error",
+     "colpsic": "Error",
+     "comvezcol": "Error",
+     "conalpe": "Error",
+     "conaltel": "Error",
+     "consejopro": "Error",
+     "conte": "Error",
+     "copnia": "Error",
+     "cpae": "Error",
+     "cpbiol": "Error",
+     "cpiq": "Error",
+     "cpnt": "Error",
+     "cpqcol": "Error",
+     "jcc": "Error",
+     "rethus": "Error"
+    },
+    "proveedores_ficticios": "Error",
+    "rama": {
+     "armeniajepms": "Error",
+     "barranquillajepms": "Error",
+     "bogotajepms": "Error",
+     "bucaramangajepms": "Error",
+     "bugajepms": "Error",
+     "calijepms": "Error",
+     "cartagenajepms": "Error",
+     "florenciajepms": "Error",
+     "ibaguejepms": "Error",
+     "ladoradajepms": "Error",
+     "manizalesjepms": "Error",
+     "medellinjepms": "Error",
+     "monteriajepms": "Error",
+     "neivajepms": "Error",
+     "palmirajepms": "Error",
+     "pastojepms": "Error",
+     "pereirajepms": "Error",
+     "popayanjepms": "Error",
+     "quibdojepms": "Error",
+     "santamartajepms": "Error",
+     "tunjajepms": "Error",
+     "valleduparjepms": "Error",
+     "villavicenciojepms": "Error"
+    },
+    "rama_unificada": "Error",
+    "registraduria_certificado": {
+     "error": "Error en la fuente"
+    },
+    "relacionados": [],
+    "reputacional": "Error",
+    "rndc": "Error",
+    "rnmc": "Error",
+    "ruaf": {
+     "error": "Error al consultar la fuente"
+    },
+    "rues": "Error",
+    "runt_app": "Error",
+    "rut": "Error",
+    "secop": "Error",
+    "secop2": "Error",
+    "secop_s": "Error",
+    "sena": "Error",
+    "sigep": "Error",
+    "simit": "Error",
+    "simur": "Error",
+    "sirna": "Error",
+    "sisben": "Error",
+    "sisconmp": "Error",
+    "transitobog": "Error",
+    "typedoc": "CC"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "report_cc_con_hallazgo": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/report_json/651c2ede72476080772781f5"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "candidatos_no_elegidos": [
+     {
+      "CATEGORIA": "PEPS",
+      "CODIGO": "CNE-001",
+      "FECHA_FINAL_ROL": "2019-10-27",
+      "FECHA_UPDATE": "2019-10-27",
+      "ID": "111",
+      "NOMBRECOMPLETO": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "NOMBRE_LISTA": "Candidatos no elegidos",
+      "RELACIONADO_CON": "Elecciones locales 2019",
+      "ROL_O_DESCRIPCION1": "Candidato a Concejo Municipal",
+      "TIPO_ID": "CC",
+      "TIPO_LISTA": "CANDIDATOS NO ELEGIDOS"
+     }
+    ],
+    "cidob": {
+     "Alias": " ",
+     "Cargo": "Primer ministro (2010-2014)",
+     "Informacion_completa": "link",
+     "Mandato": "23 mayo 2013 - 7 abril 2016",
+     "Nacimiento": "Ciudad prueba,  marzo 1975",
+     "Pais": "Pais pruebas",
+     "Partido político": "Partido de pruebas (PD)"
+    },
+    "concordato": [
+     {
+      "ACTIVOS": 1500000000,
+      "CIUDAD": "BOGOTA D.C.",
+      "DEPARTAMENTO": "CUNDINAMARCA",
+      "DEPENDENCIA": "Superintendencia de Sociedades",
+      "FECHA_ACUERDO": "2020-05-10",
+      "FECHA_CIERRE": "",
+      "NIT": 900123456,
+      "PASIVOS": 2000000000,
+      "PROCESO": "Concordato",
+      "PROMOTOR": "Promotor de prueba",
+      "RAZON_SOCIAL": "EMPRESA CONCORDATO DE PRUEBA S.A.S.",
+      "SECTOR": "Comercio"
+     }
+    ],
+    "contadores_s": [
+     {
+      "c_dula": "111",
+      "contador": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "fecha_ejecutoria": "2010-06-23T00:00:00.000",
+      "fecha_fin": "2010-12-23T00:00:00.000",
+      "fecha_inicio": "2010-06-23T00:00:00.000",
+      "fecha_registro": "2010-07-14T00:00:00.000",
+      "fecha_resoluci_n": "2009-12-03T00:00:00.000",
+      "meses": "6",
+      "proceso_jur_dico": "1235",
+      "resoluci_n": "372",
+      "tipo": "SUSPENSIÓN"
+     }
+    ],
+    "contaduria": true,
+    "contaduria_data": [
+     {
+      "entity": "ALCALDIA MUNICIPAL DE PRUEBA",
+      "estado": "MOROSO",
+      "fecha_de_corte": "31/12/2022",
+      "no_bdme": "Reportado por ALCALDIA MUNICIPAL DE PRUEBA (Boletín BDME)",
+      "nombre_reportado": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "número_de_obligación": "123456789"
+     }
+    ],
+    "contaduria_hallazgo": "Aparece en el Boletin de Deudores Morosos del Estado",
+    "contaduria_pdf": "https://static.tusdatos.co/static/pdf/63776b99-4f26-4f11-b426-dcbbb124dfb8/contaduria.pdf",
+    "contraloria": true,
+    "contraloria2": true,
+    "defunciones_registraduria": {
+     "date": "",
+     "doc": "111",
+     "validity": "Vigente"
+    },
+    "delitos_sexuales": {
+     "finding": "REGISTRA INHABILIDAD"
+    },
+    "dest": "static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8",
+    "dict_hallazgos": {
+     "altos": [
+      {
+       "cantidad": "001",
+       "codigo": "sirna",
+       "coincidencia": "True",
+       "descripcion": "El titular del documento consultado aparece con sanciones vigentes en los archivos de Antecedentes Disciplinarios de la Comisión, así como los del Tribunal Disciplinario y los de la Sala Jurisdiccional Disciplinaria en el ejercicio de su profesión como abogado.",
+       "fuente": "sirna",
+       "hallazgo": "SIRNA: Esta sancionado en el Sistema de Información del Registro Nacional de Abogados",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "ruia_multa",
+       "coincidencia": "True",
+       "descripcion": "Se registra una penalidad económica impuesta por la autoridad ambiental debido al incumplimiento de la ley.",
+       "fuente": "ruia_sanciones_ambientales",
+       "hallazgo": "RUIA: El documento consultado registra sanción de Multa por incumplimiento de normativa ambiental.",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "sicaac_insolvencia_deudor",
+       "coincidencia": "True",
+       "descripcion": "El documento consultado registra un trámite formal de Insolvencia Económica en calidad de DEUDOR. Este hallazgo confirma que el consultado se ha acogido a los beneficios de ley por encontrarse en situación de cesación de pagos, buscando reestructurar sus obligaciones financieras o liquidar sus bienes.",
+       "fuente": "sicaac",
+       "hallazgo": "Ministerio de Justicia (SICAAC): El documento consultado registra proceso de insolvencia económica en calidad de deudor.",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "delitos_sexuales",
+       "coincidencia": "True",
+       "descripcion": "El titular del documento se encuentra en el Registro Nacional de Inhabilidades por Delitos Sexuales Cometidos contra Menores.",
+       "fuente": "delitos_sexuales",
+       "hallazgo": "Delitos Sexuales: Aparece en el registro",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "supersociedades_resoluciones_sagrilaft-ptee",
+       "coincidencia": "True",
+       "descripcion": "El documento consultado registra en la lista de empresas sancionadas por incumplir las normas de SAGRILAFT (prevención de lavado de activos) y PTEE (ética empresarial) de la Superintendencia de Sociedades.",
+       "fuente": "supersociedades_sancionados",
+       "hallazgo": "Superintendencia de sociedades: Registra en la lista de empresas sancionadas por presuntos incumplimientos con los Programas SAGRILAFT y PTEE.",
+       "html_id": null,
+       "news_number": null
+      }
+     ],
+     "bajos": [
+      {
+       "cantidad": "001",
+       "codigo": "rama_demandante",
+       "coincidencia": "True",
+       "descripcion": "El titular consultado ha presentado una demanda contra una persona o entidad, pero la información proporcionada no es suficiente para identificar claramente el tipo de proceso judicial en el que está involucrado el demandado en la Rama Judicial Unificada. Te sugerimos revisar y analizar el detalle de la consulta asociados con el proceso para que puedas identificar y entender mejor la naturaleza del caso.",
+       "fuente": "rama_unificada",
+       "hallazgo": "Rama Unificada: Registra como demandante en un proceso no identificado (Estudiar evidencia)",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "secop2",
+       "coincidencia": "True",
+       "descripcion": "El documento registra en la base de datos SECOP 2 (Sistema Electrónico de Contratación Pública), dentro de la cual se encuentran los datos de procesos de contratación con el estado registrados en Colombia compra eficiente.",
+       "fuente": "secop2",
+       "hallazgo": "SECOP 2: Registra en la fuente",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "reputacional_news",
+       "coincidencia": "True",
+       "descripcion": "Es posible que el titular de documento se encuentra en al menos una noticia o sitio de internet al consultarlo con base a su nombre completo. Las noticias pueden tener un sentimiento positivo, neutral o negativo. Para mayor información revisar el enlace de la noticia en la sección reputacional.  ",
+       "fuente": "reputacional",
+       "hallazgo": "Noticias Reputacionales",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "reputacional_social",
+       "coincidencia": "True",
+       "descripcion": "Es posible que el titular de documento se encuentra en alguna red social como Facebook, LinkedIn, YouTube o Twitter. Para mayor información revisar el enlace de la red social en la sección reputacional. ",
+       "fuente": "reputacional",
+       "hallazgo": "Redes Sociales",
+       "html_id": null,
+       "news_number": null
+      }
+     ],
+     "infos": [
+      {
+       "cantidad": "001",
+       "codigo": "rut",
+       "coincidencia": "True",
+       "descripcion": "El titular del documento está inscrito en el Registro Único Tributario (RUT).",
+       "fuente": "rut",
+       "hallazgo": "RUT: Inscrito en Registro Único Tributario",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "libretamilitar_info",
+       "coincidencia": "True",
+       "descripcion": "Información de la Libreta Militar para personas que tienen su situación definida expedido por el Comando de Reclutamiento y Control de Reservas del Ejército de Colombia.",
+       "fuente": "libretamilitar",
+       "hallazgo": "Libreta Militar: Titular posee libreta militar: Reservista-2da Clase",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "fosyga_estado",
+       "coincidencia": "True",
+       "descripcion": "El documento consultado presenta novedad de su estado de afiliación aparece como activo o inactivo en la BDUA (Base Datos Única de Afiliados del Sistema General de Seguridad Social).",
+       "fuente": "fosyga",
+       "hallazgo": "FOSYGA: Su estado de afiliación es ACTIVO",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "candidatos_no_elegidos",
+       "coincidencia": "True",
+       "descripcion": "Se identifica que el ciudadano figuró en listas electorales oficiales, sin embargo, según los registros de escrutinio, no resultó elegido para ocupar la posición.",
+       "fuente": "candidatos_no_elegidos",
+       "hallazgo": "Candidatos no elegidos: El documento consultado registra participación en procesos electorales previos.",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "contaduria",
+       "coincidencia": "True",
+       "descripcion": "El titular del documento aparece como deudor en estado de mora en el Boletín de Deudores Morosos del Estado (BDME) emitido por la Contaduría General de la República.",
+       "fuente": "contaduria",
+       "hallazgo": "Contaduria: Aparece en el Boletín de Deudores Morosos del Estado",
+       "html_id": null,
+       "news_number": null
+      }
+     ],
+     "medios": [
+      {
+       "cantidad": "001",
+       "codigo": "juzgados_tyba",
+       "coincidencia": "True",
+       "descripcion": "El titular consultado se encuentra relacionado ya sea como demandado o demandante, pero la información proporcionada no es suficiente para identificar claramente el tipo de proceso judicial en el que está involucrado en los Juzgados TYBA Te sugerimos revisar y analizar el detalle de la consulta asociados con el proceso para que puedas identificar y entender mejor la naturaleza del caso.",
+       "fuente": "juzgados_tyba",
+       "hallazgo": "Juzgados TYBA: Registra en la Rama Judicial TYBA",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "sicaac_conciliacion_convocado",
+       "coincidencia": "True",
+       "descripcion": "El documento consultado figura como parte invitada o citada (Convocado) en una solicitud de audiencia de conciliación extrajudicial.",
+       "fuente": "sicaac",
+       "hallazgo": "Ministerio de Justicia (SICAAC): El documento consulta registra trámite de conciliación en calidad de Convocado.",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "panamapapers",
+       "coincidencia": "True",
+       "descripcion": "El nombre o la información financiera del documento consultado ha sido expuesta y revelada como parte de una filtración masiva de datos conocida como \"Panama Papers\".",
+       "fuente": "offshoreleaks",
+       "hallazgo": "Offshore Leaks: Aparece en Panama Papers",
+       "html_id": null,
+       "news_number": null
+      },
+      {
+       "cantidad": "001",
+       "codigo": "paco",
+       "coincidencia": "True",
+       "descripcion": "El titular del documento aparece en el Portal Anticorrupción de Colombia (PACO) que agrupa información de contratación con Entidades públicas, sanciones, reportes y posibles noticias sobre hechos de corrupción.",
+       "fuente": "paco_online",
+       "hallazgo": "El Portal Anticorrupción de Colombia (PACO): Registra en la fuente",
+       "html_id": null,
+       "news_number": null
+      }
+     ]
+    },
+    "error": false,
+    "errores": [],
+    "europol": {
+     "birth_date": "Ene 22, 1975 (48 años)",
+     "crimes": [
+      "crimen1",
+      "crimen2"
+     ],
+     "gender": "Hombre",
+     "more_info": "Info",
+     "name": "PEREZ GOMEZ, Miguel Fernando",
+     "nationality": "Prueba",
+     "picture": "link",
+     "state_of_case": "Investigación activa",
+     "status": "Wanted by prueba"
+    },
+    "fecha": "Este reporte fue generado el 4, Oct 2023 a las 10:00AM",
+    "fopep": {
+     "documento": "111",
+     "estado": "",
+     "fecha_inclusion": "2014-12-01",
+     "tipo_documento": "CC"
+    },
+    "fosyga": {
+     "apellidos": "PEREZ GOMEZ",
+     "departamento": "CUNDINAMARCA",
+     "documento": "111",
+     "entidad": "EPS DE PRUEBA S.A.",
+     "estado": "ACTIVO",
+     "fecha_afiliacion": "2018-01-10",
+     "fecha_finalizacion_afiliacion": "",
+     "fecha_nacimiento": "1975-03-15",
+     "municipio": "BOGOTA D.C.",
+     "nombre_completo": "MIGUEL FERNANDO PEREZ GOMEZ",
+     "nombres": "MIGUEL FERNANDO",
+     "regimen": "CONTRIBUTIVO",
+     "tipo_afiliado": "COTIZANTE",
+     "tipo_identificacion": "CC"
+    },
+    "garantias_mobiliarias": [
+     {
+      "Acreedor(es)": "Banco s.a.",
+      "Detalles": {
+       "Acreedor": {
+        "Celular": "",
+        "Ciudad": "Ciudad de prueba",
+        "Correo Electrónico 1": "",
+        "Correo Electrónico 2": "",
+        "Dirección": "",
+        "Dígito De Verificación": "8",
+        "Número de Identificación": "852",
+        "Porcentaje de participación": "100,00%",
+        "Razón Social o Nombre": "Banco s.a.",
+        "Teléfono": "",
+        "Tipo Identificación": "NIT"
+       },
+       "Bienes garantizados": {},
+       "Bienes inmuebles": {},
+       "Deudor": {
+        "Bien para uso": "",
+        "Celular": "",
+        "Ciudad": "PASTO",
+        "Correo Electrónico": "",
+        "Dirección": "",
+        "Dígito De Verificación": "",
+        "Género": "MASCULINO",
+        "Número de Identificación": "111",
+        "Razón Social o Nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+        "Sectores": "Otras actividades de servicios.",
+        "Tamaño de la empresa": "",
+        "Teléfono": "",
+        "Tipo Identificación": "CEDULA DE CIUDADANIA"
+       },
+       "Info general": {
+        "Fecha Finalización": "19/01/2030 11:59:59 p.m.",
+        "Fecha de inscripción en el registro especial o de celebración del contrato": "",
+        "Garantía Inscrita en un Registro Especial": "",
+        "Monto Máximo de la obligación garantizada": "$ 69.990.000",
+        "Tipo Garantía": "Garantía Mobiliaria"
+       }
+      },
+      "Fecha de inscripción inicial\n(dd/mm/aaaa hh:mm:ss)": "23/01/2018 12:49:25 p.m.",
+      "Folio Electrónico": "45484864564211351",
+      "Garante - Deudor": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "Número de Identificación": "111",
+      "Ultima Operación": "Formulario Registral de Inscripción Inicial"
+     }
+    ],
+    "genero": "M",
+    "google": [
+     {
+      "description": "Descripción de prueba",
+      "idioma": "es",
+      "keyword": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "link": "link",
+      "rank": 1,
+      "sentimiento": "neutral",
+      "source": "google",
+      "title": "MIGUEL FERNANDO PEREZ GOMEZ"
+     },
+     {
+      "description": "Descripccion de prueba 2",
+      "idioma": "es",
+      "keyword": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "link": "link",
+      "rank": 3,
+      "sentimiento": "neutral",
+      "source": "google",
+      "title": "titulo de prueba"
+     }
+    ],
+    "hallazgos": "alto",
+    "iadb": [
+     {
+      "_from": "January 10, 2022",
+      "country": "PAIS DE PRUEBA",
+      "entity": "Individual",
+      "grounds": "Fraud",
+      "nationality": "NACIONALIDAD DE PRUEBA",
+      "source": "IDB",
+      "title": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "to": "January 09, 2025"
+     }
+    ],
+    "id": "19272354",
+    "inmov_bog": {
+     "datos_de_entrada_a_patios": [
+      {
+       "clase_vehículo": "10 - MOTOCICLETA",
+       "comparendo": " 192545512",
+       "conductor": "",
+       "dirección": "CARRERA 72 - CALLE 14 ",
+       "fecha_de_entrada": "06/15/2012 10:52",
+       "fecha_de_inmovilización": "06/15/2012 10:52",
+       "imagen_comparendo": "VER COMPARENDO",
+       "infracción": "DESCRIPCIÓN DE LA INFRACCIÓN",
+       "nombre_conductor": "MIGUEL FERNANDO PEREZ GOMEZ",
+       "nro_documento": "111",
+       "nro_inventario": "816217",
+       "patio": "NUMERO PATIO",
+       "placa": "BKA452",
+       "servicio": "OFICIAL",
+       "tipo_documento": "CEDULA DE CIUDADANIA"
+      }
+     ],
+     "datos_de_salida_a_patios": [
+      {
+       "autorizado_salida": "",
+       "día_autorización": "06/16/2012 10:57",
+       "el_vehículo_debe_salir_en_grúa": "NO",
+       "fecha_salida": "SIN INFORMACION",
+       "nombre_autorizado": "FERNANDOROJAS CARPETA ",
+       "nro_autorización": "11238",
+       "nro_documento": "111",
+       "nro_factura": "SIN INFORMACION",
+       "tipo_autorización": "DEFINITIVA ",
+       "tipo_documento": "CEDULA DE CIUDADANIA"
+      }
+     ]
+    },
+    "inpec": {
+     "Establecimiento a cargo": "COMPLEJO CARCELARIO Y PENITENCIARIO CIUDAD DE PRUEBA",
+     "Estado de ingreso": "PRISION DOMICILIARIA",
+     "Género": "MASCULINO",
+     "Identificación": "111",
+     "Nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+     "Número único (INPEC)": "486524",
+     "Situación jurídica": "CONDENADO"
+    },
+    "insolvencias": [
+     {
+      "ACTIVOS": 800000000.0,
+      "ANO_APERTURA": 2021,
+      "CATEGORIA": "Insolvencia",
+      "CIIU": "4711",
+      "CIUDAD": "BOGOTA D.C.",
+      "DEPARTAMENTO": "CUNDINAMARCA",
+      "EMPLEOS": 25,
+      "MACROSECTOR": "Comercio",
+      "NIT": 900123456,
+      "NOMBRE": "EMPRESA INSOLVENCIA DE PRUEBA S.A.S.",
+      "PASIVOS": 1200000000.0,
+      "PROCESO": "Reorganización",
+      "REGIONAL": "Bogotá"
+     }
+    ],
+    "interpol": true,
+    "juzgados_tyba": [
+     {
+      "CODIGO PROCESO": "110541468445212351854",
+      "DESPACHO": "SALA PLENA CONSEJO DE PRUEBA",
+      "INFO PROCES0": {
+       "Celular": "",
+       "Ciudad": "PRUEBA, D.C",
+       "Clase Proceso": "PERDIDA DE INVESTIDURA",
+       "Corporación": "CONSEJO DE PRUEBA",
+       "Correo Electrónico Externo": "prueba@consejodeprueba.gov.co",
+       "Código Proceso": "110541468445212351854",
+       "Departamento": "DEPARTAMENTO DE PRUEBA",
+       "Despacho": "sala plena consejo de prueba",
+       "Dirección": "",
+       "Distrito\\Circuito": "ÚNICO NACIONAL",
+       "Especialidad": "CONSEJO DE PRUEBA - SALA PLENA",
+       "Fecha Finalización": "",
+       "Fecha Providencia": "16/08/2018",
+       "Fecha Publicación": "28/08/2018",
+       "Número Despacho": "000",
+       "Observaciones Finalización": "",
+       "Subclase Proceso": "EN GENERAL / SIN SUBCLASE",
+       "Teléfono": "",
+       "Tipo Decisión": "ADMITE",
+       "Tipo Proceso": "CONSTITUCIONAL",
+       "actuaciones": [],
+       "sujetos": [
+        {
+         "ES EMPLAZADO": "NO",
+         "FECHA REGISTRO": "28-08-2018",
+         "NOMBRE(S) Y APELLIDO(S) / RAZÓN SOCIAL": "DEMANDANTE DE PRUEBA",
+         "NÚMERO DE IDENTIFICACIÓN": "1.485.123.584",
+         "TIPO DOCUMENTO": "CC",
+         "TIPO SUJETO": "DEMANDANTE/ACCIONANTE"
+        }
+       ]
+      }
+     }
+    ],
+    "libretamilitar": {
+     "clase": "Reservista-1ra Clase",
+     "documento": "111",
+     "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+     "tipo_documento": "Cédula de Ciudadanía"
+    },
+    "lista_banco_mundial": {
+     "debarred_firms_individuals": [],
+     "others_sanctions": []
+    },
+    "lista_onu": true,
+    "monitoring_date": "Wed, 27 Sep 2023 00:00:00 GMT",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "nombre-procuraduria": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "nombre_policia": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "ofac": {
+     "": "Ciudad de prueba, Pais de prueba",
+     "Citizenship:": "",
+     "Date of Birth:": "22 Jen 1975",
+     "First Name:": "Miguel Fernando",
+     "Last Name:": "Perez Gomez",
+     "List:": "Individual",
+     "Nationality:": "Nacionalidad de prueba",
+     "Place of Birth:": "Ciudad de prueba, Pais de prueba",
+     "Program:": "REALES BRITTO",
+     "Remarks:": "",
+     "Title:": "",
+     "Type:": "Individual",
+     "addresses": [
+      {
+       "Address": "",
+       "City": "",
+       "Country": "Pais de prueba",
+       "Postal Code": "",
+       "State/Province": ""
+      }
+     ],
+     "aliases": [
+      {
+       "Category": "weak",
+       "Name": "Migue",
+       "Type": "a.k.a."
+      }
+     ],
+     "docs": [
+      {
+       "Country": "Pais de prueba",
+       "Expire Date": "",
+       "ID#": "AS34512",
+       "Issue Date": "",
+       "Type": "Passport"
+      }
+     ]
+    },
+    "ofac_nombre": {
+     "": "Ciudad de prueba, Pais de prueba",
+     "Citizenship:": "",
+     "Date of Birth:": "22 Jen 1975",
+     "First Name:": "Miguel Fernando",
+     "Last Name:": "Perez Gomez",
+     "List:": "Individual",
+     "Nationality:": "Nacionalidad de prueba",
+     "Place of Birth:": "Ciudad de prueba, Pais de prueba",
+     "Program:": "REALES BRITTO",
+     "Remarks:": "",
+     "Title:": "",
+     "Type:": "Individual",
+     "addresses": [
+      {
+       "Address": "",
+       "City": "",
+       "Country": "Pais de prueba",
+       "Postal Code": "",
+       "State/Province": ""
+      }
+     ],
+     "aliases": [
+      {
+       "Category": "weak",
+       "Name": "Migue",
+       "Type": "a.k.a."
+      }
+     ],
+     "docs": [
+      {
+       "Country": "Pais de prueba",
+       "Expire Date": "",
+       "ID#": "AS34512",
+       "Issue Date": "",
+       "Type": "Passport"
+      }
+     ]
+    },
+    "offshoreleaks": {
+     "Bahamas Leaks": [],
+     "Offshore Leaks": [],
+     "Panama Papers": [
+      {
+       "match": {
+        "address": "Ciudad de Panamá",
+        "countries": "Colombia",
+        "former_name": "",
+        "jurisdiction": "Panama",
+        "name": "MIGUEL FERNANDO PEREZ GOMEZ",
+        "original_name": "MIGUEL FERNANDO PEREZ GOMEZ",
+        "service_provider": "Mossack Fonseca",
+        "status": "Active",
+        "type": "Officer"
+       },
+       "relationships": [
+        {
+         "jurisdiction": "Panama",
+         "name": "EMPRESA OFFSHORE DE PRUEBA S.A.",
+         "type": "Entity"
+        }
+       ]
+      }
+     ],
+     "Pandora Papers": [],
+     "Paradise Papers": []
+    },
+    "otros": [
+     {
+      "afiliacion": "AUC",
+      "cedula": 111,
+      "primer_apellido": "PEREZ",
+      "primer_nombre": "MIGUEL",
+      "segundo_apellido": "GOMEZ",
+      "segundo_nombre": "FERNANDO"
+     }
+    ],
+    "paco_online": [
+     {
+      "departamento": "Bogotá",
+      "entidad": "MINISTERIO DE PRUEBA",
+      "fecha_fin": "2021-01-01",
+      "fecha_inicio": "2020-01-01",
+      "id_proceso": "PROC-789",
+      "monto": "$10,000,000.00",
+      "nit": "111",
+      "nit_entidad": "899999999",
+      "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "objeto_contrato": "Prestación de servicios profesionales de prueba",
+      "referencia": "REF-CONTRATO-001",
+      "url_contrato": "https://www.contratos.gov.co/consultas/detalleProceso.do?numConstancia=19-12-123456",
+      "url_porta": "https://portal.paco.gov.co/index.php?pagina=contratista&identificacion=111&tipo=1",
+      "valor_contrato": 10000000
+     }
+    ],
+    "peps": [
+     {
+      "AKA": "",
+      "CATEGORIA": "Listas restrictivas",
+      "CODIGO": "OFAC_545468515",
+      "DIRECCION": "",
+      "ESTADO": "",
+      "FECHA_FINAL_ROL": "",
+      "FECHA_UPDATE": "Nov  7 2022 12:00AM",
+      "ID": "1082884409",
+      "NACIONALIDAD_PAISDEORIGEN": "",
+      "NOMBRECOMPLETO": "MIGUE",
+      "NOMBRE_DESCRIPTIVO_LISTA": "OFAC Lista Clinton",
+      "NOMBRE_LISTA": "Office of Foreign Assets Control OFAC",
+      "ORIGEN_LISTA": "INTERNACIONAL",
+      "PRIMER_APELLIDO": "",
+      "PRIMER_NOMBRE": "",
+      "RELACIONADO_CON": "",
+      "ROL_O_DESCRIPCION1": "",
+      "ROL_O_DESCRIPCION2": "",
+      "SEGUNDO_APELLIDO": "",
+      "SEGUNDO_NOMBRE": "",
+      "TIPO_ID": "C",
+      "TIPO_LISTA": "OFAC",
+      "TIPO_PERSONA": ""
+     }
+    ],
+    "peps2": true,
+    "peps_denom": [
+     {
+      "AKA": "",
+      "CATEGORIA": "Listas restrictivas",
+      "CODIGO": "OFAC_545468515",
+      "DIRECCION": "",
+      "ESTADO": "",
+      "FECHA_FINAL_ROL": "",
+      "FECHA_UPDATE": "Nov  7 2022 12:00AM",
+      "ID": "1082884409",
+      "NACIONALIDAD_PAISDEORIGEN": "",
+      "NOMBRECOMPLETO": "MIGUE",
+      "NOMBRE_DESCRIPTIVO_LISTA": "OFAC Lista Clinton",
+      "NOMBRE_LISTA": "Office of Foreign Assets Control OFAC",
+      "ORIGEN_LISTA": "INTERNACIONAL",
+      "PRIMER_APELLIDO": "",
+      "PRIMER_NOMBRE": "",
+      "RELACIONADO_CON": "",
+      "ROL_O_DESCRIPCION1": "",
+      "ROL_O_DESCRIPCION2": "",
+      "SEGUNDO_APELLIDO": "",
+      "SEGUNDO_NOMBRE": "",
+      "TIPO_ID": "C",
+      "TIPO_LISTA": "OFAC",
+      "TIPO_PERSONA": ""
+     }
+    ],
+    "peps_funcion_publica": [
+     {
+      "DENOMINACION_CARGO": "Secretario de Planeación",
+      "ENLACE_HV_SIGEP": "https://www.sigep.gov.co/hv/111",
+      "FECHA_FIN_PEP": "2022-12-31",
+      "FECHA_INICIO_PEP": "2019-01-01",
+      "NOMBRE_ENTIDAD": "ALCALDIA MUNICIPAL DE PRUEBA",
+      "NOMBRE_PEP": "MIGUEL FERNANDO PEREZ GOMEZ"
+     }
+    ],
+    "personeriabog": [
+     {
+      "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "sancion": "Sancion de prueba"
+     }
+    ],
+    "policia": "El ciudadano MIGUEL FERNANDO PEREZ GOMEZ, presenta asuntos pendientes con las autoridades judiciales.",
+    "procuraduria": [
+     {
+      "datos": [
+       {
+        "Descripción": [
+         {
+          "Descripción": "Sanción disciplinaria por falta grave en el ejercicio de funciones públicas.",
+          "Fecha": "04-04-2017"
+         }
+        ],
+        "Instancias": [
+         {
+          "Autoridad": "PERSONERIA DE PRUEBA - DELEGADA ASUNTOS DISCIPLINARIOS IV",
+          "Fecha providencia": "30-08-2016",
+          "Nombre": "PRIMERA",
+          "fecha efecto Juridicos": "04-04-2017"
+         }
+        ],
+        "SIRI": "SIRI: 1213583",
+        "Sanciones": [
+         {
+          "Clase sanción": "PRINCIPAL",
+          "Entidad": "INSTITUTO DISTRITAL DE PATRIMONIO CULTURAL- PRUEBA (PRUEBA DC)    PRUEBA DC(PRUEBA DC)",
+          "Fecha": "04-04-2017",
+          "Sanción": "DESTITUCION",
+          "Término": ""
+         }
+        ]
+       }
+      ],
+      "delito": "ANTECEDENTES DISCIPLINARIOS"
+     },
+     {
+      "inhabilidades": [
+       {
+        "Descripción": "Inhabilidad para el ejercicio de funciones públicas",
+        "Entidad": "PROCURADURIA GENERAL DE LA NACION",
+        "Fecha": "04-04-2017",
+        "Término": "10 años"
+       }
+      ]
+     }
+    ],
+    "profesion": {
+     "abogado": {},
+     "abogados_judicial": [],
+     "anec": {},
+     "colpsic": {},
+     "comvezcol": {},
+     "conalpe": {},
+     "conaltel": [],
+     "consejopro": {},
+     "copnia": {
+      "certificate_number": "123585-346875",
+      "certificate_status": "VIGENTE",
+      "certificate_type": "MATRICULA PROFESIONAL",
+      "document_number": "111",
+      "document_type": "CEDULA DE CIUDADANIA",
+      "full_name": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "profession": "INGENIERIA AMBIENTAL",
+      "resolution_date": "7/13/2018",
+      "resolution_number": "328"
+     },
+     "cpae": {},
+     "cpbiol": {},
+     "cpiq": {},
+     "cpnt": {},
+     "cpqcol": {},
+     "jcc": {},
+     "rethus": {}
+    },
+    "proveedores_ficticios": true,
+    "radicaciones_sic": {
+     "radicaciones": [
+      {
+       "actuacion": "Recibido",
+       "asignacion_correspondencia": "Grupo de Atención al Consumidor",
+       "año": "2022",
+       "cons_rad": "0001",
+       "ctrl": "01",
+       "evento": "Radicación",
+       "fecha": "2022-03-15",
+       "numero": "12345",
+       "sec_eve": "01",
+       "solicitante": "MIGUEL FERNANDO PEREZ GOMEZ",
+       "tipo": "Queja",
+       "tramite": "QUEJAS Y PETICIONES"
+      }
+     ],
+     "registros": "Se encontraron 1 radicaciones",
+     "total_registros": 1
+    },
+    "rama": {
+     "armeniajepms": true,
+     "barranquillajepms": true,
+     "bogotajepms": true,
+     "bucaramangajepms": true,
+     "bugajepms": true,
+     "calijepms": true,
+     "cartagenajepms": true,
+     "florenciajepms": true,
+     "ibaguejepms": true,
+     "manizalesjepms": true,
+     "medellinjepms": true,
+     "monteriajepms": true,
+     "neivajepms": true,
+     "palmirajepms": true,
+     "pastojepms": true,
+     "pereirajepms": true,
+     "popayanjepms": true,
+     "quibdojepms": true,
+     "tunjajepms": true,
+     "villavicenciojepms": true
+    },
+    "rama_unificada": [
+     {
+      "actuaciones": [
+       {
+        "actuacion": "Sentencia de Primera Instancia de Tutela",
+        "anotacion": "SE CONCEDIO LA TUTELA",
+        "cant": 1,
+        "codRegla": "00                              ",
+        "conDocumentos": false,
+        "consActuacion": 1,
+        "fechaActuacion": "2011-03-09T00:00:00",
+        "fechaFinal": "",
+        "fechaInicial": "",
+        "fechaRegistro": "2011-03-09T00:00:00",
+        "idRegActuacion": 1686213572,
+        "llaveProceso": "54001546887464684865"
+       }
+      ],
+      "cantFilas": -1,
+      "claseProceso": "Tutelas",
+      "contenidoRadicacion": "54001546887464684865",
+      "demandado": [
+       "Demandado de prueba"
+      ],
+      "demandante": [
+       "MIGUEL FERNANDO PEREZ GOMEZ"
+      ],
+      "departamento": "NORTE DE PRUEBA",
+      "despacho": "JUZGADO 004 PENAL MUNICIPAL DE PRUEBA ",
+      "detalle": true,
+      "esPrivado": false,
+      "estado_actuacion": "SI",
+      "fechaConsulta": "2023-09-07T16:47:43",
+      "fechaProceso": "2011-03-03T00:00:00",
+      "fechaUltimaActuacion": "2011-03-09T00:00:00",
+      "idConexion": 398,
+      "idProceso": 1584513,
+      "idRegProceso": 0,
+      "is_demandado": false,
+      "llaveProceso": "54001546887464684865",
+      "ponente": "",
+      "radicado": "54001546887464684865",
+      "recurso": "Sin Tipo de Recurso",
+      "subclaseProceso": "Sin Subclase de Proceso",
+      "sujetos": [
+       {
+        "cant": 0,
+        "esEmplazado": false,
+        "idRegSujeto": 0,
+        "identificacion": "",
+        "nombreRazonSocial": "MIGUEL FERNANDO PEREZ GOMEZ",
+        "tipoSujeto": "Demandante"
+       }
+      ],
+      "sujetosProcesales": "Demandante: MIGUEL FERNANDO PEREZ GOMEZ | Demandado: Demandado de prueba | Ministerio Publico: MINISTERIO PUBLICO ",
+      "tieneActuaciones": true,
+      "tipoProceso": "Especiales",
+      "ubicacion": "Despacho",
+      "ultimaActualizacion": ""
+     }
+    ],
+    "registraduria_certificado": {
+     "cedula": "111",
+     "estado": "VIGENTE",
+     "fecha_exp": "20 DE DICIEMBRE DE 1999",
+     "lugar_exp": "MEDELLIN - ANTIOQUIA",
+     "nombre": "MIGUEL FERNANDO PEREZ GOMEZ"
+    },
+    "relacionados": [
+     {
+      "empresa": {
+       "razon_social": "EMPRESA DE PRUEBA S.A.S.",
+       "representacion_legal_y_vinculos": [
+        {
+         "no identificación": "111",
+         "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+         "tipo de vinculo": "Representante Legal - Principal"
+        }
+       ]
+      },
+      "nit": 900539452
+     }
+    ],
+    "reputacional": {
+     "news": [
+      {
+       "description": "Se encontro que aparecio en una noticia de prueba",
+       "idioma": "",
+       "keyword": "MIGUEL FERNANDO PEREZ GOMEZ",
+       "link": "Link",
+       "rank": 2,
+       "sentimiento": "",
+       "source": "google",
+       "title": "Titulo de prueba"
+      }
+     ],
+     "notable": {},
+     "social": [
+      {
+       "description": "Ve el perfil de prueba de MIGUEL FERNANDO PEREZ GOMEZ",
+       "idioma": "",
+       "keyword": "MIGUEL FERNANDO PEREZ GOMEZ",
+       "link": "Link",
+       "rank": 1,
+       "sentimiento": "",
+       "source": "google",
+       "title": "Titulo de prueba"
+      }
+     ]
+    },
+    "rnbd": [
+     {
+      "detalle": [
+       {
+        "descripcion_finalidad": "Administración de información comercial de clientes",
+        "finalidad": "Gestión de clientes"
+       }
+      ],
+      "nombre": "Base de datos de clientes de prueba"
+     }
+    ],
+    "rndc": [
+     {
+      "Cedula Conductor": "111",
+      "Consecutivo": "300822183",
+      "Destino": "CIUDAD DE PRUEBA",
+      "Fecha Expedición": "2022/11/05",
+      "Fecha Hora Radicación": "2022/11/05 16:39:02",
+      "Nombre Empresa Transportadora": "EMPRESA TRANSPORTADORA DE PRUEBA",
+      "Nro de Radicado": "135415415",
+      "Origen": "CIUDAD DE PRUEBA DE ORIGEN",
+      "Placa": "WPT523",
+      "Placa Remolque": "S74236",
+      "Tipo Doc": "Manifiesto"
+     }
+    ],
+    "rnmc": {
+     "apelacion": "NO",
+     "articulo": "Art. 35 Comportamientos que afectan las relaciones entre las personas y las autoridades",
+     "departamento": "DEPARTAMENTO DE PRUEBA",
+     "expediente": "25-875-6-1538-123",
+     "expendiente": "25-875-6-1538-123",
+     "fecha": "30/04/2020 05:45:00 p. m.",
+     "formato": "25875114022",
+     "identificación": "123",
+     "infractor": "MIGUEL FERNANDO PEREZ GOMEZ",
+     "municipio": "MUNICIPIO DE PRUEBA"
+    },
+    "ruaf": {
+     "ARL": [
+      {
+       "Actividad Economica": "EMPRESAS DE PRUEBA DE TRANSPORTE URBANO",
+       "Administradora": "Seguros de Vida Ciudad de Prueba",
+       "Estado de Afiliación": "Activa",
+       "Fecha de Afiliación": "2022-05-01",
+       "Fecha de corte": "2022-11-04",
+       "Municipio Labora": "CIUDAD DE PRUEBA"
+      }
+     ],
+     "Basico": [
+      {
+       "Fecha de corte": "2022-11-04",
+       "Número de Identificación": "CC 123",
+       "Primer Apellido": "PEREZ",
+       "Primer Nombre": "MIGUEL",
+       "Segundo Apellido": "GOMEZ",
+       "Segundo Nombre": "FERNANDO",
+       "Sexo": "M"
+      }
+     ],
+     "Caja de compensación": [
+      {
+       "Administradora CF": "CAJA DE PRUEBA DE CIUDAD DE PRUEBA",
+       "Estado de Afiliación": "Inactivo",
+       "Fecha de Afiliación": "2017-07-21",
+       "Fecha de corte": "2022-11-04",
+       "Municipio Labora": "CIUDAD DE PRUEBA",
+       "Tipo de Afiliado": "Trabajador afiliado dependiente",
+       "Tipo de Miembro de la Población Cubierta": "Afiliado"
+      },
+      {
+       "Administradora CF": "CAJA DE PRUEBA DE CIUDAD DE PRUEBA",
+       "Estado de Afiliación": "Inactivo",
+       "Fecha de Afiliación": "2020-03-17",
+       "Fecha de corte": "2022-11-04",
+       "Municipio Labora": "CIUDAD DE PRUEBA",
+       "Tipo de Afiliado": "Trabajador afiliado dependiente",
+       "Tipo de Miembro de la Población Cubierta": "Afiliado"
+      }
+     ],
+     "Cesantías": [
+      {
+       "Cesantías": "No se encontraron afiliaciones",
+       "Fecha de corte": "2022-11-04"
+      }
+     ],
+     "Pensionado": [
+      {
+       "Fecha de corte": "2022-11-04",
+       "Pensionado": "No se encontraron afiliaciones"
+      }
+     ],
+     "Pensiones": [
+      {
+       "Administradora": "COMPAÑIA DE PRUEBA DE CIUDAD DE PRUEBA",
+       "Estado de Afiliación": "Activo cotizante",
+       "Fecha de Afiliación": "2007-03-01",
+       "Fecha de corte": "2022-11-04",
+       "Régimen": "PENSIONES: AHORRO INDIVIDUAL"
+      }
+     ],
+     "Programas de Asistencia Social": [
+      {
+       "Fecha de corte": "2022-11-04",
+       "Programas de Asistencia Social": "No se encontraron afiliaciones"
+      }
+     ],
+     "Salud": [
+      {
+       "Administradora": "ENTIDAD DE PRUEBA DE CIUDAD DE PRUEBA",
+       "Departamento -> Municipio": "CIUDAD DE PRUEBA",
+       "Estado de Afiliación": "Activo",
+       "Fecha Afiliacion": "31/05/2022",
+       "Fecha de corte": "2022-11-04",
+       "Régimen": "Contributivo",
+       "Tipo de Afiliado": "COTIZANTE"
+      }
+     ]
+    },
+    "rucom": [
+     {
+      "departamento": "CUNDINAMARCA",
+      "minerales": "Carbón",
+      "municipio": "BOGOTA D.C.",
+      "nombres": "MIGUEL FERNANDO PEREZ GOMEZ"
+     }
+    ],
+    "rues": true,
+    "ruia_sanciones_ambientales": [
+     {
+      "AUTORIDAD_AMBIENTAL": "CORPORACION AUTONOMA REGIONAL DE PRUEBA",
+      "CORREGIMIENTO_OCURRENCIA": "",
+      "DEPARTAMENTO_OCURRENCIA": "CUNDINAMARCA",
+      "DESCRIPCION_DESFIJACION_PUBLICACION": "",
+      "DESCRIPCION_NORMA_ESPECIFICA": "Vertimiento de residuos sin permiso",
+      "FECHA_CUMPLIMIENTO_EJECUCION_SANCION": "",
+      "FECHA_DESFIJACION": "",
+      "FECHA_EJECUTORIA_ACTO_IMPONE_SANCION": "2021-07-01",
+      "FECHA_EXPEDICION_ACTO_ADMINISTRATIVO": "2021-06-15",
+      "LUGAR_OCURRENCIA": "Zona industrial de prueba",
+      "MUNICIPIO_OCURRENCIA": "BOGOTA D.C.",
+      "NIT": "",
+      "NOMBRE_PERSONA_RAZON_SOCIAL": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "NRO_REGISTRO": "RUIA-2021-000123",
+      "NUMERO_ACTO_IMPONE_SANCION": "RES-789",
+      "NUMERO_EXPEDIENTE": "EXP-AMB-456",
+      "NUMERO_IDENTIFICACION": "111",
+      "OBSERVACIONES": "Sanción de multa por incumplimiento de normativa ambiental",
+      "PRIMER_APELLIDO": "PEREZ",
+      "PRIMER_NOMBRE": "MIGUEL",
+      "RAZON_SOCIAL": "",
+      "SEGUNDO_APELLIDO": "GOMEZ",
+      "SEGUNDO_NOMBRE": "FERNANDO",
+      "TIPO_DOCUMENTO": "CC",
+      "TIPO_FALTA_INFRACCION": "Incumplimiento de norma ambiental",
+      "TIPO_SANCION": "MULTA",
+      "TIPO_SANCION_ACCESORIA": "",
+      "VEREDA_OCURRENCIA": ""
+     }
+    ],
+    "runt_app": {
+     "exitoso": true,
+     "licencia": {
+      "licencias": [
+       {
+        "categoria": "A2",
+        "estado": "ACTIVA",
+        "fecha_expedicion": "16/07/2021",
+        "fecha_vencimiento": "16/07/2031",
+        "numero_licencia": "1082854555",
+        "sustrato": "LC02045482"
+       },
+       {
+        "categoria": "B1",
+        "estado": "ACTIVA",
+        "fecha_expedicion": "14/03/2018",
+        "fecha_vencimiento": "14/03/2028",
+        "numero_licencia": "1082854555",
+        "sustrato": "LC02045482"
+       }
+      ],
+      "totalLicencias": 2
+     },
+     "multa": {
+      "estado_cancelacion": "NO",
+      "estado_paz_salvo": "SI",
+      "estado_suspension": "",
+      "fecha_cancelacion": "No Reporta",
+      "fecha_suspension": "No Reporta",
+      "numero_comparendos": "0",
+      "numero_paz_salvo": "562454684875"
+     },
+     "nombres": "MIGUEL FERNANDO PEREZ GOMEZ"
+    },
+    "rut": "111-1",
+    "rut_estado": "REGISTRO ACTIVO",
+    "secop": [
+     {
+      "cuantia_proceso": "156526328",
+      "detalle_del_objeto_a_contratar": "Detalle de prueba.",
+      "estado_del_proceso": "Celebrado",
+      "fecha_de_firma_del_contrato": "27/06/2019",
+      "nom_raz_social_contratista": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "nombre_de_la_entidad": "ALCALDIA MUNICIPAL DE PRUEBA",
+      "nombre_del_represen_legal": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "ruta_proceso_en_secop_i": "Link",
+      "tipo_de_contrato": "Prestación de Servicios",
+      "tipo_de_proceso": "Contratación Directa (Ley 1150 de 2007)"
+     }
+    ],
+    "secop2": [
+     {
+      "anno_bpin": "2021",
+      "c_digo_bpin": "2021004689999",
+      "ciudad": "Ciudad Prueba",
+      "codigo_de_categoria_principal": "V1.99999999",
+      "codigo_entidad": "701515999",
+      "codigo_proveedor": "713213999",
+      "condiciones_de_entrega": "Según acuerdo ficticio",
+      "departamento": "Departamento Prueba",
+      "descripcion_del_proceso": "PRESTAR SERVICIOS DE APOYO EN EL DEPARTAMENTO DE PRUEBA",
+      "destino_gasto": "Inversión Prueba",
+      "dias_adicionados": "0",
+      "documento_proveedor": "1234567890",
+      "entidad_centralizada": "Centralizada",
+      "es_grupo": "No",
+      "es_pyme": "No",
+      "espostconflicto": "No",
+      "estado_bpin": "Válido",
+      "estado_contrato": "En prueba",
+      "fecha_de_fin_del_contrato": "2023-05-26T00:00:00.000",
+      "fecha_de_firma": "2022-12-27T17:12:41.000",
+      "fecha_de_inicio_del_contrato": "2022-12-27T00:00:00.000",
+      "fecha_fin_liquidacion": "2023-09-25 04:59:00",
+      "fecha_inicio_liquidacion": "2023-05-25 04:59:00",
+      "g_nero_representante_legal": "Hombre",
+      "habilita_pago_adelantado": "No",
+      "id_contrato": "CO1.PCCNTR.9999999",
+      "identificaci_n_representante_legal": "1234567890",
+      "justificacion_modalidad_de": "ServiciosFicticios",
+      "liquidaci_n": "Si",
+      "localizaci_n": "Ciudad Prueba,  Departamento Prueba ,  Ciudad Prueba",
+      "modalidad_de_contratacion": "Contratación ficticia",
+      "nacionalidad_representante_legal": "Prueba",
+      "nit_entidad": "890299999",
+      "nombre_entidad": "DEPARTAMENTO DE PRUEBA",
+      "nombre_representante_legal": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "objeto_del_contrato": "PRESTAR SERVICIOS DE APOYO EN EL DEPARTAMENTO DE PRUEBA",
+      "obligaci_n_ambiental": "No",
+      "obligaciones_postconsumo": "No",
+      "orden": "Territorial",
+      "origen_de_los_recursos": "Distribuido",
+      "pilares_del_acuerdo": "No aplica",
+      "presupuesto_general_de_la_nacion_pgn": "0",
+      "proceso_de_compra": "CO1.BDOS.9999999",
+      "proveedor_adjudicado": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "puntos_del_acuerdo": "No aplica",
+      "rama": "Ejecutivo",
+      "recursos_de_credito": "0",
+      "recursos_propios": "0",
+      "recursos_propios_alcald_as_gobernaciones_y_resguardos_ind_genas_": "99999999",
+      "referencia_del_contrato": "CO1.PCCNTR.9999999",
+      "reversion": "No",
+      "saldo_cdp": "9999999999",
+      "saldo_vigencia": "9999999999",
+      "sector": "Servicio Ficticio",
+      "sistema_general_de_participaciones": "0",
+      "sistema_general_de_regal_as": "0",
+      "tipo_de_contrato": "Servicio Ficticio",
+      "tipo_de_identificaci_n_representante_legal": "Cédula Ficticia",
+      "tipodocproveedor": "Cédula Ficticia",
+      "ultima_actualizacion": "2023-03-23T00:00:00.000",
+      "urlproceso": {
+       "url": "link"
+      },
+      "valor_amortizado": "0",
+      "valor_de_pago_adelantado": "0",
+      "valor_del_contrato": "99999999",
+      "valor_facturado": "99999999",
+      "valor_pagado": "99999999",
+      "valor_pendiente_de": "0",
+      "valor_pendiente_de_ejecucion": "0",
+      "valor_pendiente_de_pago": "0"
+     }
+    ],
+    "secop_s": [
+     {
+      "descripcion_contrato": "Descripccion de prueba",
+      "documento_contratista": "111",
+      "fecha_de_publicacion": "20-07-2023",
+      "municipio": "CIUDAD PRUEBA - PROVINCIA PRUEBA",
+      "nit_entidad": "999999999",
+      "nivel": "Nivel Ficticio",
+      "nombre_contratista": "MIGUEL FERNANDO PEREZ GOMEZ",
+      "nombre_entidad": "AGENCIA FICTICIA DE ESTRATEGIAS LEGALES (AFEL)",
+      "numero_de_contrato": "456-2023",
+      "numero_de_resolucion": "254-2023",
+      "numero_proceso": "5432",
+      "orden": "Orden Ficticio",
+      "ruta_de_proceso": "Link",
+      "tipo_documento": "Cc",
+      "tipo_incumplimiento": "Incumplimiento Ficticio",
+      "valor_sancion": "$9,999,999"
+     }
+    ],
+    "sena": [
+     {
+      "Certificación": "2023/07/31 12:47:14.0",
+      "Descarga": "Link",
+      "Estado de Certificación": "Firmado",
+      "Estado del Aprendiz": "Certificado",
+      "Programa": "2781092 - COMPLEMENTARIA VIRTUAL EN CERTIFICACION DE PRUEBA  Y  EL REGISTRO PARA LOCALIZACION Y CARACTERIZACION DE LAS PERSONAS CON ASUNTOS DE PRUEBAS",
+      "Registro": "9123002781092CC164168461E",
+      "Tipo": "Nota Especial"
+     }
+    ],
+    "sicaac": {
+     "conciliacion": [
+      {
+       "fecha_solicitud": "2023-05-12",
+       "nombre_entidad": "CENTRO DE CONCILIACION DE PRUEBA",
+       "tipo_parte": "CONVOCADO"
+      }
+     ],
+     "conciliacion_total": 1,
+     "insolvencia": [
+      {
+       "fecha_solicitud": "2022-11-03",
+       "nombre_entidad": "CENTRO DE CONCILIACION MERCANTIL DE PRUEBA",
+       "tipo_parte": "DEUDOR"
+      }
+     ],
+     "insolvencia_total": 1,
+     "max_registros": 50
+    },
+    "sigep": {
+     "Experiencia Laboral": [
+      {
+       "Rangos de salario por nivel": "Escala"
+      },
+      {
+       "Rangos de salario por nivel": "ASESOR"
+      },
+      {
+       "Rangos de salario por nivel": "ASESOR"
+      }
+     ],
+     "Formación Académica": [
+      "ONCE - NO APLICA - Graduado",
+      "PROFESIONAL - NO APLICA - Graduado"
+     ],
+     "Informacion basica": {
+      "cargo_funcionario": "No Reportado",
+      "dependencia_funcionario": "GRUPO DE VIGILANCIA DE PRUEBA",
+      "institucion_funcionario": "CONTRALORIA GENERAL DE PRUEBA",
+      "nombre_funcionario": "MIGUEL FERNANDO PEREZ GOMEZ"
+     }
+    },
+    "simit": {
+     "acuerdos_pagar": 0,
+     "acuerdos_pagos": [],
+     "cantidad_multas": 0,
+     "cursos": [
+      {
+       "centro_intruccion": "CENTRO DE PRUEBA",
+       "certificado": "26201",
+       "cuidad": "CIUDAD DE PRUEBA",
+       "estado": "No aplicado",
+       "fecha_comparendo": "",
+       "fecha_curso": "09/08/2011",
+       "fecha_reporte": "",
+       "numero_multa": "11001000000541564521"
+      }
+     ],
+     "multas": [],
+     "numero_documento": "111",
+     "paz_salvo": true,
+     "total_acuardos_por_pagar": 0,
+     "total_general": 0,
+     "total_multas": 0,
+     "total_multas_pagar": 0,
+     "total_pagar": 0
+    },
+    "simur": [
+     {
+      "Estado comparendo": "NO NOTIFICADO DEI",
+      "Fecha Infraccion": "09/07/2023",
+      "Intereses": "$000",
+      "No Comparendo": "11001000000039204546878",
+      "Placa": "WRM553",
+      "Saldo": "$522,90000",
+      "Tipo": "COMPARENDO -ELECTRONICO"
+     }
+    ],
+    "sirna": [
+     {
+      "apellidos": "PEREZ GOMEZ",
+      "codigo_de_estado_de_sancion": "9521354811",
+      "estado_de_la_sancion": "Sanción en Ejecución",
+      "fecha_de_finalizacion": "02/02/2024",
+      "fecha_de_inicio": "03/08/2023",
+      "nombres": "MIGUEL FERNANDO",
+      "numero_de_cedula": "111",
+      "tipo_de_sancion": "Suspensión"
+     }
+    ],
+    "sisben": {
+     "Actualizacion Ciudadano": "20/05/2019",
+     "Apellido": "PEREZ GOMEZ",
+     "Departamento": "DEPARTAMENTO DE PRUEBA",
+     "Estado": "Registro válido",
+     "Ficha": "1145312382135141",
+     "Grupo": "C3",
+     "Municipio": "MUNICIPIO DE PRUEBA",
+     "Nombre": "MIGUEL FERNANDO",
+     "Tipo de grupo": "Vulnerable"
+    },
+    "sisconmp": {
+     "Apellidos": "PEREZ GOMEZ",
+     "Clase": "",
+     "DCInstitucionEducativa": 3,
+     "DIVCODIGSede": "5000145412",
+     "DIVNOMBRSede": "CIUDAD DE PRUEBA",
+     "DescripcionClase": "",
+     "EntidadCertificadora": "MEN",
+     "FechaExpedicion": "2022/11/01",
+     "FechaExpedicionLicencia": "2017/09/15",
+     "FechaVencimiento": "2023/11/01",
+     "FechaVencimientoLicencia": "2029/09/13",
+     "Inactivo": "No",
+     "InstitucionEducativa": "CEA AUTO PRUEBA",
+     "NDI": "79765445485",
+     "NIDSede": "75182",
+     "NITInstitucionEducativa": 401235454,
+     "NombreArchivo": "",
+     "NombreCapacitacion": "ACTUALIZACION",
+     "NombreSede": "CEA AUTO PRUEBA",
+     "Nombres": "MIGUEL FERNANDO",
+     "NumeroLicencia": "4684874545",
+     "TDI": "CC",
+     "TipoCapacitacion": "CURSO BASICO",
+     "TipoVehiculo": "",
+     "ValorNumericoClase": 0
+    },
+    "supersociedades_sancionados": [
+     {
+      "ASUNTO": "Incumplimiento Programa SAGRILAFT / PTEE",
+      "FECHA": "2023-02-14",
+      "NIT": 900123456,
+      "NORMA": "Circular Externa 100-000016",
+      "RAZON_SOCIAL": "EMPRESA SANCIONADA SAGRILAFT DE PRUEBA S.A.S.",
+      "VERSION_PUBLICA_DOC": "https://www.supersociedades.gov.co/documents/resolucion-prueba.pdf"
+     }
+    ],
+    "transitobog": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "report_cc_sin_hallazgo": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/report_json/8188f7e8aa70102bf2053f32"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "cidob": {},
+    "contadores_s": [],
+    "contaduria": false,
+    "contaduria_pdf": false,
+    "contraloria": false,
+    "contraloria2": false,
+    "dest": "static/img/63776b99-4f26-4f11-b426-dcbbb124dfb8",
+    "dict_hallazgos": {
+     "altos": [],
+     "bajos": [],
+     "infos": [],
+     "medios": []
+    },
+    "error": false,
+    "errores": [],
+    "europol": [],
+    "fecha": "Este reporte fue generado el 4, Oct 2023 a las 10:00AM",
+    "fopep": {},
+    "garantias_mobiliarias": [],
+    "genero": "M",
+    "google": [],
+    "hallazgos": "",
+    "iadb": [],
+    "inmov_bog": [],
+    "inpec": {},
+    "interpol": false,
+    "juzgados_tyba": [],
+    "libretamilitar": {},
+    "lista_banco_mundial": {
+     "debarred_firms_individuals": [],
+     "others_sanctions": []
+    },
+    "lista_onu": false,
+    "monitoring_date": "Wed, 27 Sep 2023 00:00:00 GMT",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "nombre-procuraduria": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "ofac": false,
+    "ofac_nombre": false,
+    "peps": [],
+    "peps2": false,
+    "peps_denom": [],
+    "personeriabog": [],
+    "policia": false,
+    "procuraduria": {},
+    "profesion": {
+     "abogado": {},
+     "abogados_judicial": [],
+     "anec": {},
+     "colpsic": {},
+     "comvezcol": {},
+     "conalpe": {},
+     "conaltel": [],
+     "consejopro": {},
+     "copnia": {},
+     "cpae": {},
+     "cpbiol": {},
+     "cpiq": {},
+     "cpnt": {},
+     "cpqcol": {},
+     "jcc": {},
+     "rethus": {}
+    },
+    "proveedores_ficticios": false,
+    "rama": {
+     "armeniajepms": false,
+     "barranquillajepms": false,
+     "bogotajepms": false,
+     "bucaramangajepms": false,
+     "bugajepms": false,
+     "calijepms": false,
+     "cartagenajepms": false,
+     "florenciajepms": false,
+     "ibaguejepms": false,
+     "manizalesjepms": false,
+     "medellinjepms": false,
+     "monteriajepms": false,
+     "neivajepms": false,
+     "palmirajepms": false,
+     "pastojepms": false,
+     "pereirajepms": false,
+     "popayanjepms": false,
+     "quibdojepms": false,
+     "tunjajepms": false,
+     "villavicenciojepms": false
+    },
+    "rama_unificada": {},
+    "relacionados": [],
+    "reputacional": {
+     "news": [],
+     "notable": {},
+     "social": []
+    },
+    "rndc": [],
+    "rnmc": {},
+    "ruaf": {},
+    "rues": false,
+    "runt_app": {},
+    "rut": [],
+    "rut_estado": [],
+    "secop": [],
+    "secop2": [],
+    "secop_s": [],
+    "sena": [],
+    "sigep": {},
+    "simit": {},
+    "simur": [],
+    "sirna": [],
+    "sisben": {},
+    "sisconmp": {},
+    "transitobog": false
+   },
+   "tipo": "application/json"
+  }
+ },
+ "report_nit": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/report_json/5d9e05963817a56d989523c0"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "actividades_economicas": [
+     "7110    Actividades de arquitectura e ingenieria y otras actividades conexas de consultoria tecnica",
+     "4220 Construccion de proyectos de servicio publico"
+    ],
+    "categoria_matricula": "SOCIEDAD ó PERSONA JURIDICA PRINCIPAL ó ESAL",
+    "clase_identificacion": "NIT",
+    "codigo_camara": "04",
+    "codigo_estado": "",
+    "concordato": false,
+    "contaduria": false,
+    "contraloria": false,
+    "dest": "static/img/65cd648e-46e1-4a55-a725-abe7a7e7bb45",
+    "empresa_prestadora": "",
+    "estado": "ACTIVA",
+    "fecha": "Este reporte fue generado el 09, Oct 2019 a las 11:06AM",
+    "google": [
+     {
+      "description": "21 jun. 2019 - EMPRESA DE PRUEBAS SAS. Sociedad por Acciones. Simplificada.",
+      "keyword": "\"EMPRESA DE PRUEBAS S A S\"",
+      "link": "https://www.pagina.com",
+      "rank": 1,
+      "title": "Boletín Registro Mercantil Enero 2019 - Cámara de Comercio ..."
+     }
+    ],
+    "grupo_empresarial": [],
+    "identificacion": "NIT 900000152 - 8",
+    "informacion_del_establecimiento": "",
+    "informacion_financiera": {},
+    "juzgados_tyba": "",
+    "lista_onu": false,
+    "matricula": "0002499132",
+    "nit": 900000152,
+    "nombre_camara": "BOGOTA",
+    "ofac": false,
+    "organizacion_juridica": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+    "peps": false,
+    "peps_demon": false,
+    "peps_denom": false,
+    "procuraduria": false,
+    "propietario_o_establecimientos_agencias_sucursales": [],
+    "proveedores_ficticios": false,
+    "razon_social": "EMPRESA DE PRUEBAS S A S",
+    "registro_mercantil": {
+     "afiliado": "N",
+     "beneficiario_ley_1780?": "N",
+     "categoria_de_la_matricula": "SOCIEDAD ó PERSONA JURIDICA PRINCIPAL ó ESAL",
+     "correo_electrónico_comercial": "email@gmail.com",
+     "correo_electrónico_fiscal": "email@gmail.com",
+     "dirección_comercial": "CR 1 A NO. 1 19",
+     "dirección_fiscal": "CR 1 A NO. 1 19",
+     "empleados": "1",
+     "estado_de_la_matricula": "ACTIVA",
+     "fecha_de_cancelación": "",
+     "fecha_de_matricula": "20110117",
+     "fecha_de_renovacion": "20190330",
+     "fecha_de_vigencia": "Indefinida",
+     "municipio_comercial": "BOGOTA, D.C. BOGOTA",
+     "municipio_fiscal": "BOGOTA, D.C. BOGOTA",
+     "numero_de_matricula": "123",
+     "teléfono_comercial": "3001234567",
+     "teléfono_fiscal": "3001234567",
+     "tipo_de_organización": "SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS",
+     "tipo_de_sociedad": "SOCIEDAD COMERCIAL",
+     "último_año_renovado": "2019"
+    },
+    "registro_proponentes": "",
+    "renovaciones_anteriores": [
+     {
+      "años": "2016",
+      "fecha_renovación": "20160712"
+     },
+     {
+      "años": "2017",
+      "fecha_renovación": "20170317"
+     }
+    ],
+    "representacion_legal": "",
+    "representacion_legal_y_vinculos": [
+     {
+      "no identificación": "123",
+      "nombre": "MIGUEL PEREZ PEREZ",
+      "tipo de vinculo": "Representante Legal - Principal"
+     }
+    ],
+    "ruenol": "",
+    "rut": "900000152-8",
+    "rut_estado": "REGISTRO ACTIVO",
+    "secop2": false,
+    "secop_s": "",
+    "simit": false,
+    "simur": [],
+    "tipo": "SOCIEDAD COMERCIAL",
+    "transitobog": false
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_con_error": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/485e9823-df75-4b1e-9f64-58916a82dfd7"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "cedula": 113,
+    "error": true,
+    "errores": [
+     "cidob",
+     "concordato",
+     "contadores_s",
+     "contaduria",
+     "contraloria",
+     "delitos_sexuales",
+     "europol",
+     "fopep",
+     "garantias_mobiliarias",
+     "iadb",
+     "inmov_bog",
+     "inpec",
+     "interpol",
+     "juzgados_tyba",
+     "libretamilitar",
+     "lista_banco_mundial",
+     "lista_onu",
+     "ofac",
+     "ofac_nombre",
+     "offshoreleaks",
+     "peps",
+     "peps_denom",
+     "personeriabog",
+     "policia",
+     "procuraduria",
+     "profesion",
+     "proveedores_ficticios",
+     "rama",
+     "rama_unificada",
+     "registraduria_certificado",
+     "reputacional",
+     "rndc",
+     "rnmc",
+     "ruaf",
+     "rues",
+     "runt_app",
+     "rut",
+     "rut_estado",
+     "secop",
+     "secop2",
+     "secop_s",
+     "sena",
+     "sigep",
+     "simit",
+     "simur",
+     "sirna",
+     "sisben",
+     "sisconmp"
+    ],
+    "estado": "finalizado",
+    "hallazgo": false,
+    "hallazgos": "",
+    "id": "d9530d51473cf57e73945088",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "results": {
+     "Analisis Reputacional": "Error",
+     "Asociaciones Profesionales": "Error",
+     "CIDOB Peps nivel mundial": "Error",
+     "Concordato de Supersociedades": "Error",
+     "Consejo de Seguridad de la Naciones Unidas (ONU)": "Error",
+     "Contadores Sancionados": "Error",
+     "Contraloría General de la Republica (Consulta en Linea)": "Error",
+     "Contratación Pública en SECOP1 ": "Error",
+     "Contratación Pública en SECOP2 ": "Error",
+     "DIAN (Proveedores Ficticios)": "Error",
+     "Delitos sexuales contra menores de edad": "Error",
+     "Empresas y Personas Sancionadas Banco Interamericano de Desarrollo (IADB)": "Error",
+     "European Union Most Wanted List (EUROPOL)": "Error",
+     "Fondo de Pensiones Publicas (FOPEP)": "Error",
+     "Histórico de multas en Bogotá (SIMUR)": "Error",
+     "Instituto Nacional Penitenciario y Carcelario (INPEC)": "Error",
+     "Juzgados Tyba - Justicia XXI": "Error",
+     "Libreta Militar": "Error",
+     "Lista Clinton (OFAC), Busqueda por Documento (Consulta en Línea)": "Error",
+     "Lista Clinton (OFAC), Busqueda por Nombre (Consulta en Línea)": "Error",
+     "Listado del Banco Mundial de empresas e individuos no elegibles": "Error",
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Documento": "Error",
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Nombre": "Error",
+     "Offshore Leaks Database (ICJI)": "Error",
+     "Organización Internacional de Policía Criminal (INTERPOL)": "Error",
+     "Personeria de Bogota": "Error",
+     "Policia Nacional de Colombia": "Error",
+     "Procuraduría General de la Nación (Consulta en Linea)": "Error",
+     "RGM Registro de Garantías Mobiliarias": "Error",
+     "Rama Judicial Unificada, Busqueda por Nombre": "Error",
+     "Registraduría Nacional del Estado Civil": "Error",
+     "Registro Nacional de Carga (RNDC)": "Error",
+     "Registro Nacional de Medidas Correctivas (RNMC)": "Error",
+     "Registro Único Empresarial y Social (RUES)": "Error",
+     "Registro Único Nacional de Tránsito (RUNT)": "Error",
+     "Registro Único Tributario (RUT)": "Error",
+     "Sancionados contratación pública SECOP": "Error",
+     "Servicio Nacional de Aprendizaje (SENA)": "Error",
+     "Sistema Integrado de Multas y Sanciones de Transito (SIMIT)": "Error",
+     "Sistema de Información de Conductores que Transportan Mercancías Peligrosa (SISCONMP)": "Error",
+     "Sistema de Información del Registro Nacional de Abogados (SIRNA)": "Error",
+     "Sistema de Información y Gestión del Empleo Público (SIGEP)": "Error",
+     "Sistema de Seguridad Social Subsidiado (SISBEN)": "Error",
+     "Vehículos inmovilizados Bogotá": "Error"
+    },
+    "time": 42.67135,
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_con_hallazgo": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/6460fc34-4154-43db-9438-8c5a059304c0"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "cedula": 111,
+    "error": false,
+    "errores": [],
+    "estado": "finalizado",
+    "hallazgo": true,
+    "hallazgos": "Alto",
+    "id": "651c2ede72476080772781f5",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "results": {
+     "Analisis Reputacional": true,
+     "Asociaciones Profesionales": true,
+     "CIDOB Peps nivel mundial": true,
+     "Concordato de Supersociedades": true,
+     "Consejo de Seguridad de la Naciones Unidas (ONU)": true,
+     "Contadores Sancionados": true,
+     "Contraloría General de la Republica (Consulta en Linea)": true,
+     "Contratación Pública en SECOP1 ": true,
+     "Contratación Pública en SECOP2 ": true,
+     "DIAN (Proveedores Ficticios)": true,
+     "Delitos sexuales contra menores de edad": true,
+     "Empresas y Personas Sancionadas Banco Interamericano de Desarrollo (IADB)": true,
+     "European Union Most Wanted List (EUROPOL)": true,
+     "Fondo de Pensiones Publicas (FOPEP)": true,
+     "Histórico de multas en Bogotá (SIMUR)": true,
+     "Instituto Nacional Penitenciario y Carcelario (INPEC)": true,
+     "Juzgados Tyba - Justicia XXI": true,
+     "Libreta Militar": true,
+     "Lista Clinton (OFAC), Busqueda por Documento (Consulta en Línea)": true,
+     "Lista Clinton (OFAC), Busqueda por Nombre (Consulta en Línea)": true,
+     "Listado del Banco Mundial de empresas e individuos no elegibles": true,
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Documento": true,
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Nombre": true,
+     "Offshore Leaks Database (ICJI)": true,
+     "Organización Internacional de Policía Criminal (INTERPOL)": true,
+     "Personeria de Bogota": true,
+     "Policia Nacional de Colombia": true,
+     "Procuraduría General de la Nación (Consulta en Linea)": true,
+     "RGM Registro de Garantías Mobiliarias": true,
+     "Rama Judicial Unificada, Busqueda por Nombre": true,
+     "Registraduría Nacional del Estado Civil": true,
+     "Registro Nacional de Carga (RNDC)": true,
+     "Registro Nacional de Medidas Correctivas (RNMC)": true,
+     "Registro Único Empresarial y Social (RUES)": true,
+     "Registro Único Nacional de Tránsito (RUNT)": true,
+     "Registro Único Tributario (RUT)": true,
+     "Sancionados contratación pública SECOP": true,
+     "Servicio Nacional de Aprendizaje (SENA)": true,
+     "Sistema Integrado de Multas y Sanciones de Transito (SIMIT)": true,
+     "Sistema de Información de Conductores que Transportan Mercancías Peligrosa (SISCONMP)": true,
+     "Sistema de Información del Registro Nacional de Abogados (SIRNA)": true,
+     "Sistema de Información y Gestión del Empleo Público (SIGEP)": true,
+     "Sistema de Seguridad Social Subsidiado (SISBEN)": true,
+     "Vehículos inmovilizados Bogotá": true
+    },
+    "time": 42.67135,
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_inexistente": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/00000000-0000-0000-0000-000000000000"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 404,
+   "json": {
+    "estado": "error, tarea no valida"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_nit": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/e7451a5e-97ca-498e-a7f0-a352658cbc26"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "error": false,
+    "errores": [],
+    "estado": "finalizado",
+    "hallazgo": false,
+    "hallazgos": "info",
+    "id": "5d9e05963817a56d989523c0",
+    "nit": 900000152,
+    "nombre": "EMPRESA DE PRUEBAS S A S",
+    "results": {
+     "Contraloria": false,
+     "OFAC": false,
+     "ONU": false,
+     "Procesos TYBA": false,
+     "Procuraduria": false,
+     "Transito Bogota": false
+    },
+    "time": 36.322391,
+    "typedoc": "NIT"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_procesando": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/6769d210-3476-4c82-a044-045e9d5bc157"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 207,
+   "json": {
+    "estado": "procesando",
+    "results": {
+     "Contraloria": false,
+     "OFAC": false,
+     "ONU": false,
+     "Procesos TYBA": false,
+     "Procuraduria": false
+    }
+   },
+   "tipo": "application/json"
+  }
+ },
+ "results_sin_hallazgo": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/5c6c80c0-4dd3-41c9-9648-46871a7176ad"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "cedula": 112,
+    "error": false,
+    "errores": [],
+    "estado": "finalizado",
+    "hallazgo": false,
+    "hallazgos": "",
+    "id": "8188f7e8aa70102bf2053f32",
+    "nombre": "MIGUEL FERNANDO PEREZ GOMEZ",
+    "results": {
+     "Analisis Reputacional": false,
+     "Asociaciones Profesionales": false,
+     "CIDOB Peps nivel mundial": false,
+     "Concordato de Supersociedades": false,
+     "Consejo de Seguridad de la Naciones Unidas (ONU)": false,
+     "Contadores Sancionados": false,
+     "Contraloría General de la Republica (Consulta en Linea)": false,
+     "Contratación Pública en SECOP1 ": false,
+     "Contratación Pública en SECOP2 ": false,
+     "DIAN (Proveedores Ficticios)": false,
+     "Delitos sexuales contra menores de edad": false,
+     "Empresas y Personas Sancionadas Banco Interamericano de Desarrollo (IADB)": false,
+     "European Union Most Wanted List (EUROPOL)": false,
+     "Fondo de Pensiones Publicas (FOPEP)": false,
+     "Histórico de multas en Bogotá (SIMUR)": false,
+     "Instituto Nacional Penitenciario y Carcelario (INPEC)": false,
+     "Juzgados Tyba - Justicia XXI": false,
+     "Libreta Militar": false,
+     "Lista Clinton (OFAC), Busqueda por Documento (Consulta en Línea)": false,
+     "Lista Clinton (OFAC), Busqueda por Nombre (Consulta en Línea)": false,
+     "Listado del Banco Mundial de empresas e individuos no elegibles": false,
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Documento": false,
+     "Listas y PEPs (Personas Expuestas Políticamente), Busqueda por Nombre": false,
+     "Offshore Leaks Database (ICJI)": false,
+     "Organización Internacional de Policía Criminal (INTERPOL)": false,
+     "Personeria de Bogota": false,
+     "Policia Nacional de Colombia": false,
+     "Procuraduría General de la Nación (Consulta en Linea)": false,
+     "RGM Registro de Garantías Mobiliarias": false,
+     "Rama Judicial Unificada, Busqueda por Nombre": false,
+     "Registraduría Nacional del Estado Civil": false,
+     "Registro Nacional de Carga (RNDC)": false,
+     "Registro Nacional de Medidas Correctivas (RNMC)": false,
+     "Registro Único Empresarial y Social (RUES)": false,
+     "Registro Único Nacional de Tránsito (RUNT)": false,
+     "Registro Único Tributario (RUT)": false,
+     "Sancionados contratación pública SECOP": false,
+     "Servicio Nacional de Aprendizaje (SENA)": false,
+     "Sistema Integrado de Multas y Sanciones de Transito (SIMIT)": false,
+     "Sistema de Información de Conductores que Transportan Mercancías Peligrosa (SISCONMP)": false,
+     "Sistema de Información del Registro Nacional de Abogados (SIRNA)": false,
+     "Sistema de Información y Gestión del Empleo Público (SIGEP)": false,
+     "Sistema de Seguridad Social Subsidiado (SISBEN)": false,
+     "Vehículos inmovilizados Bogotá": false
+    },
+    "time": 42.67135,
+    "typedoc": "CC",
+    "validado": true
+   },
+   "tipo": "application/json"
+  }
+ },
+ "retry_cc": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/retry/7d1f10483800b5071688e101?typedoc=CC"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 404,
+   "json": {
+    "detail": "Not Found"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "sin_credenciales": {
+  "peticion": {
+   "cuerpo": null,
+   "metodo": "GET",
+   "ruta": "/api/results/6460fc34-4154-43db-9438-8c5a059304c0"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 401,
+   "json": {
+    "detail": "Not authenticated"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "verificar_ce": {
+  "peticion": {
+   "cuerpo": {
+    "ce": 960696,
+    "fecha_expedicion": "01/11/2001"
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch/verify/ce"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "data": {
+     "ce": 960696,
+     "estado": "VIGENTE",
+     "fecha_expedicion": "01/11/2001",
+     "fecha_nacimiento": "15/05/1990",
+     "fecha_vencimiento": "10/02/2030",
+     "nacionalidad": "VENEZUELA",
+     "nombre_completo": "NOMBRE APELLIDO"
+    },
+    "error": "",
+    "findings": [],
+    "status": "true"
+   },
+   "tipo": "application/json"
+  }
+ },
+ "verificar_nit": {
+  "peticion": {
+   "cuerpo": {
+    "nit": 900000152
+   },
+   "metodo": "POST",
+   "ruta": "/api/launch/verify/nit"
+  },
+  "respuesta": {
+   "encabezados": {},
+   "estado": 200,
+   "json": {
+    "data": {
+     "categoria_matricula": "SOCIEDAD ó PERSONA JURIDICA PRINCIPAL ó ESAL",
+     "clase_identificacion": "NIT",
+     "codigo_camara": "04",
+     "codigo_estado": "",
+     "estado": "ACTIVA",
+     "identificacion": "NIT 900000152 - 7",
+     "matricula": "0003043510",
+     "nit": 900000152,
+     "nombre_camara": "BOGOTA",
+     "razon_social": "DATA FACTUM SAS",
+     "tipo": "SOCIEDAD COMERCIAL"
+    },
+    "error": "",
+    "findings": [],
+    "status": "true"
+   },
+   "tipo": "application/json"
+  }
+ }
+}

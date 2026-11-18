@@ -1,2 +1,5 @@
 0388dc333835fca287ae3a9d71610ea393dcbb10:tests/unit/test_deploy_release.py:generic-api-key:323
 9848e62f596351f28d69fe60dcba89e8cebeca8d:tests/unit/test_deploy_release.py:generic-api-key:616
+cd3575baa5383913401fb971d32f2e7cb735d780:tests/persistencia_listas/test_administracion_f55.py:generic-api-key:37
+cd3575baa5383913401fb971d32f2e7cb735d780:tests/persistencia_listas/test_ofac_busqueda_f66.py:generic-api-key:82
+cd3575baa5383913401fb971d32f2e7cb735d780:tests/persistencia_listas/test_ofac_archivos.py:generic-api-key:82

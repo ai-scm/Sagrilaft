@@ -34,14 +34,17 @@ for (const environment of ['staging', 'prod'] as const) {
     ok(backendTask);
     const backendTaskRole = backendTask.Properties.TaskRoleArn['Fn::GetAtt'][0];
 
+    // CDK reparte una política grande entre la política en línea y políticas administradas
+    // de desbordamiento (OverflowPolicy); ECS también agrega su propia sentencia de ECS Exec.
+    // Se revisan ambas y se comparan las acciones únicas.
     const backendRolePolicies = Object.values(resources).filter((resource: any) =>
-      resource.Type === 'AWS::IAM::Policy'
-      && resource.Properties.Roles.some((role: any) => role.Ref === backendTaskRole)) as any[];
-    const actions = backendRolePolicies.flatMap((policy) =>
+      ['AWS::IAM::Policy', 'AWS::IAM::ManagedPolicy'].includes(resource.Type)
+      && (resource.Properties.Roles ?? []).some((role: any) => role.Ref === backendTaskRole)) as any[];
+    const actions = [...new Set(backendRolePolicies.flatMap((policy) =>
       policy.Properties.PolicyDocument.Statement.flatMap((statement: any) => {
         const statementActions = Array.isArray(statement.Action) ? statement.Action : [statement.Action];
         return statementActions.filter((action: string) => action.startsWith('ssmmessages:'));
-      })).sort();
+      })))].sort();
     deepStrictEqual(actions, ecsExecActions);
 
     const backendService = Object.values(resources).find((resource: any) =>

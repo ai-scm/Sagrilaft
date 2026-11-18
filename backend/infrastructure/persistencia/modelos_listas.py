@@ -386,6 +386,7 @@ class EvidenciaConsulta(IdentidadRegistro, Base):
     tamano_bytes: Mapped[int] = mapped_column(BigInteger)
     tipo_contenido: Mapped[str] = mapped_column(String(100))
     version_generador: Mapped[str] = mapped_column(String(64))
+    fuente_codigo: Mapped[str | None] = mapped_column(String(64))  # solo capturas del proveedor (migración n54c67d890eb)
 
 
 class RevisionCumplimiento(IdentidadRegistro, Base):
@@ -439,6 +440,34 @@ class BorradorConsulta(IdentidadRegistro, Base):
     informe_tamano: Mapped[int | None] = mapped_column(BigInteger)
 
 
+class ProgresoConsultaExterna(IdentidadRegistro, Base):
+    """Etapa del protocolo externo entre pasadas del trabajador (ver migración l32a45b678c9)."""
+    __tablename__ = "progreso_consulta_externa"
+    __table_args__ = (
+        CheckConstraint("etapa IN ('POR_LANZAR','LANZANDO','ESPERANDO','DESCARGANDO_PDF','TERMINADA')", name="ck_progreso_etapa"),
+        CheckConstraint("etapa <> 'ESPERANDO' OR jobid IS NOT NULL", name="ck_progreso_jobid"),
+        CheckConstraint("recargas >= 0", name="ck_progreso_recargas"),
+        CheckConstraint("huella_respuesta IS NULL OR length(huella_respuesta) = 64", name="ck_progreso_huella"),
+    )
+    consulta_id: Mapped[UUID] = mapped_column(ForeignKey("consulta_lista.id", ondelete="RESTRICT"), unique=True, nullable=False)
+    etapa: Mapped[str] = mapped_column(String(20), nullable=False)
+    jobid: Mapped[str | None] = mapped_column(String(64))
+    reporte_id: Mapped[str | None] = mapped_column(String(64))
+    recargas: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    vence_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    huella_respuesta: Mapped[str | None] = mapped_column(String(64))
+    respuesta_filtrada: Mapped[dict | None] = mapped_column(DATOS)
+    verificacion_documento: Mapped[dict | None] = mapped_column(DATOS)  # migración m43b56c789da
+
+
+class RitmoProveedor(Base):
+    """Último lanzamiento por proveedor, compartido entre trabajadores."""
+    __tablename__ = "ritmo_proveedor"
+    proveedor: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ultimo_lanzamiento: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 # Permite registrar únicamente estas tablas sin acoplar la migración a modelos futuros.
 TABLAS_LISTAS = tuple(clase.__table__ for clase in (
     FuenteLista, PoliticaListas, ArchivoFuente, EsquemaFuente, RecepcionFuente, VersionFuente,
@@ -447,4 +476,5 @@ TABLAS_LISTAS = tuple(clase.__table__ for clase in (
     FuenteVersionActiva, EventoActivacion, EventoVersion, ComprobacionFuente, ConsultaLista,
     ConsultaFuente, CoincidenciaLista, HallazgoProveedor, EvidenciaConsulta,
     RevisionCumplimiento, EventoConsulta, TrabajoConsulta, BorradorConsulta,
+    ProgresoConsultaExterna, RitmoProveedor,
 ))

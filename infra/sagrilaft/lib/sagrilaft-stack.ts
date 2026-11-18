@@ -89,15 +89,38 @@ export class SagrilaftStack extends cdk.Stack {
     // preparar la migración sin cambiar las imágenes de los servicios.
     const migrationImageTag = String(this.node.tryGetContext('migrationImageTag') ?? (imageTag || 'dev'));
     const bedrockModelId = String(this.node.tryGetContext('bedrockModelId') ?? DEFAULT_BEDROCK_MODEL_ID);
-    const proveedorListasCautela = String(
-      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'sagrilaft'),
+    // Modalidad de listas. Valores nuevos (simulado/externo) y heredados (dummy/sagrilaft)
+    // se guardan con el nombre heredado en PROVEEDOR_LISTAS_CAUTELA, que el backend traduce.
+    // Por defecto: simulado en staging y deshabilitado en el resto (antes prod caía en
+    // `sagrilaft` y el backend no arrancaba).
+    const equivalenciasListas: Record<string, string> = {
+      dummy: 'dummy', simulado: 'dummy', sagrilaft: 'sagrilaft', externo: 'sagrilaft', deshabilitado: 'deshabilitado',
+    };
+    const listasSolicitada = String(
+      this.node.tryGetContext('proveedorListasCautela') ?? (ambiente === 'staging' ? 'dummy' : 'deshabilitado'),
     ).toLowerCase();
+    const proveedorListasCautela = equivalenciasListas[listasSolicitada];
+    if (!proveedorListasCautela) {
+      throw new Error(`proveedorListasCautela desconocido: ${listasSolicitada}. Use deshabilitado, simulado (dummy) o externo (sagrilaft).`);
+    }
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
-    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '2');
+    // Tusdatos: producción usa HTTPS; el sandbox público (HTTP, sin créditos) solo fuera de prod.
+    const tusdatosUrl = String(this.node.tryGetContext('tusdatosUrl') ?? 'https://dash-board.tusdatos.co').replace(/\/+$/, '');
+    // Una copia por servicio: es lo que corre hoy en staging y producción (plan de
+    // release). En picos, el backend sube hasta backendMaxCapacity (2 por defecto).
+    const desiredCountRaw = String(this.node.tryGetContext('desiredCount') ?? '1');
     const desiredCount = Number.parseInt(desiredCountRaw, 10);
-    const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '4');
+    const backendMaxCapacityRaw = String(this.node.tryGetContext('backendMaxCapacity') ?? '2');
     const backendMaxCapacity = Number.parseInt(backendMaxCapacityRaw, 10);
     const habilitarNatEgress = String(this.node.tryGetContext('habilitarNatEgress') ?? 'false').toLowerCase() === 'true';
+    // Un trabajador de listas basta: los turnos y concesiones viven en PostgreSQL.
+    // Con las listas deshabilitadas no hay nada que procesar: no se enciende.
+    const listasWorkerPorDefecto = desiredCount > 0 && proveedorListasCautela !== 'deshabilitado' ? '1' : '0';
+    const listasWorkerCountRaw = String(this.node.tryGetContext('listasWorkerCount') ?? listasWorkerPorDefecto);
+    const listasWorkerCount = Number.parseInt(listasWorkerCountRaw, 10);
+    if (!Number.isInteger(listasWorkerCount) || listasWorkerCount < 0 || listasWorkerCount > 2) {
+      throw new Error(`listasWorkerCount invalido: ${listasWorkerCountRaw}. Use 0, 1 o 2.`);
+    }
 
     if (['staging', 'prod'].includes(ambiente) && !imageTag) {
       throw new Error(`El ambiente ${ambiente} requiere -c imageTag=<commit-sha>. No usar latest en despliegues controlados.`);
@@ -117,10 +140,19 @@ export class SagrilaftStack extends cdk.Stack {
     if (ambiente === 'prod' && proveedorListasCautela === 'dummy') {
       throw new Error('El ambiente prod no permite -c proveedorListasCautela=dummy.');
     }
-    if (['staging', 'prod'].includes(ambiente) && proveedorListasCautela === 'sagrilaft' && !sagrilaftApiUrl) {
+    if (!/^(https:\/\/[A-Za-z0-9.-]+|http:\/\/docs\.tusdatos\.co)$/.test(tusdatosUrl)) {
+      throw new Error('tusdatosUrl invalida: use https://<host> o el sandbox http://docs.tusdatos.co, sin ruta.');
+    }
+    if (ambiente === 'prod' && tusdatosUrl === 'http://docs.tusdatos.co') {
+      throw new Error('El ambiente prod no permite el sandbox de Tusdatos.');
+    }
+    if (proveedorListasCautela === 'sagrilaft' && ambiente === 'prod') {
+      // El backend (validar_entorno) también lo rechaza: habilitarlo es la decisión de la Fase 8.
+      throw new Error('El ambiente prod mantiene las listas deshabilitadas hasta aprobar su salida a producción.');
+    }
+    if (proveedorListasCautela === 'sagrilaft' && ['staging', 'prod'].includes(ambiente) && !habilitarNatEgress) {
       throw new Error(
-        `El ambiente ${ambiente} con proveedorListasCautela=sagrilaft requiere ` +
-        '-c sagrilaftApiUrl=<url-api-tusdatos>.',
+        'La modalidad externa necesita salida a Internet para llegar a Tusdatos: use -c habilitarNatEgress=true.',
       );
     }
     if (!Number.isInteger(desiredCount) || desiredCount < 0) {
@@ -167,6 +199,7 @@ export class SagrilaftStack extends cdk.Stack {
       bedrockModelId,
       proveedorListasCautela,
       sagrilaftApiUrl,
+      tusdatosUrl,
     });
 
     const database = new Database(this, 'Database', {
@@ -199,6 +232,8 @@ export class SagrilaftStack extends cdk.Stack {
       keycloakAdminSecret: secrets.keycloakAdminSecret,
       smtpSecret: secrets.smtpSecret,
       sagrilaftSecret: secrets.sagrilaftSecret,
+      tusdatosSecret: secrets.tusdatosSecret,
+      listasWorkerCount,
       configParameterNames: configParams.parameterNames,
       configParameterNameByKey: configParams.parameterNameByKey,
       configParameterByKey: configParams.parameterByKey,
@@ -285,6 +320,7 @@ export class SagrilaftStack extends cdk.Stack {
     new CfnOutput(this, 'AppSecretArn', { value: secrets.appSecret.secretArn, description: 'ARN del secreto SECRET_KEY de la aplicacion' });
     new CfnOutput(this, 'ZohoSecretArn', { value: secrets.zohoSecret.secretArn, description: 'ARN del secreto de credenciales Zoho' });
     new CfnOutput(this, 'SmtpSecretArn', { value: secrets.smtpSecret.secretArn, description: 'ARN del secreto de credenciales SMTP/SES' });
+    new CfnOutput(this, 'TusdatosSecretArn', { value: secrets.tusdatosSecret.secretArn, description: 'ARN del secreto de Tusdatos (token, o usuario y clave del sandbox) para la modalidad externa de listas' });
     new CfnOutput(this, 'SagrilaftSecretArn', { value: secrets.sagrilaftSecret.secretArn, description: 'ARN del secreto de credenciales de la API de listas de cautela (tusdatos.co)' });
     new CfnOutput(this, 'KeycloakAdminSecretArn', { value: secrets.keycloakAdminSecret.secretArn, description: 'ARN del secreto admin de Keycloak' });
     new CfnOutput(this, 'RuntimeConfigPrefix', { value: `/sagrilaft/${ambiente}/config/`, description: 'Prefijo SSM Parameter Store para runtime config no sensible' });

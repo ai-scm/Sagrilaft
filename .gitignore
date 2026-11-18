@@ -92,6 +92,11 @@ reset_entorno.sh
 # Los archivos de docs/ ya versionados siguen versionados (git ls-files docs).
 /docs/*
 !/docs/listas/
+# De docs/produccion/ solo se suma el detalle técnico de costos (lo enlazan la
+# arquitectura y scripts/aws/README.md). Lo demás de esa carpeta sigue fuera.
+!/docs/produccion/
+/docs/produccion/*
+!/docs/produccion/ESTIMACION_COSTOS_AWS.md
 tmp/
 PLAN.md
 

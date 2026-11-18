@@ -385,11 +385,15 @@ def load_config() -> AppConfig:
             raise RuntimeError(
                 f"S3_BUCKET es obligatorio en APP_ENV={cfg.entorno} con STORAGE_BACKEND=s3."
             )
-        if cfg.listas_cautela.proveedor == "sagrilaft" and not cfg.listas_cautela.configurado:
-            raise RuntimeError(
-                f"PROVEEDOR_LISTAS_CAUTELA=sagrilaft requiere SAGRILAFT_API_URL y "
-                f"SAGRILAFT_API_KEY en APP_ENV={cfg.entorno}."
-            )
+        if cfg.listas_cautela.implementacion == "externo":
+            # La modalidad externa usa la configuración propia de Tusdatos (LISTAS_TUSDATOS_*),
+            # no las variables SAGRILAFT_API_* del circuito retirado.
+            from domain.listas.puertos import ListasNoDisponibles
+            from infrastructure.listas.tusdatos.configuracion import ConfiguracionTusdatos
+            try:
+                ConfiguracionTusdatos.desde_entorno(cfg.entorno)
+            except ListasNoDisponibles as error:
+                raise RuntimeError(f"LISTAS_IMPLEMENTACION=externo en APP_ENV={cfg.entorno}: {error}") from None
         if not os.getenv("FRONTEND_URL"):
             raise RuntimeError(
                 f"FRONTEND_URL es obligatorio en APP_ENV={cfg.entorno}. "

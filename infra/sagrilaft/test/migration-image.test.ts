@@ -68,10 +68,10 @@ for (const environment of ['staging', 'prod']) {
     ), false);
   });
 
-  test(`${environment}: RDS uses the selected db.t3.medium instance class`, () => {
+  test(`${environment}: RDS uses the instance class selected for the environment`, () => {
     const database = Object.values(synth({ environment }).Resources)
       .find((resource: any) => resource.Type === 'AWS::RDS::DBInstance') as any;
-    equal(database.Properties.DBInstanceClass, 'db.t3.medium');
+    equal(database.Properties.DBInstanceClass, environment === 'prod' ? 'db.t3.small' : 'db.t4g.small');
     equal(database.Properties.MultiAZ, false);
     equal(database.Properties.BackupRetentionPeriod, 7);
   });
@@ -109,7 +109,7 @@ for (const environment of ['staging', 'prod']) {
     const template = synth({ environment, imageTag: 'bootstrap-placeholder', desiredCount: 0 });
     assertMigrationTag(template, 'bootstrap-placeholder');
     const services = Object.values(template.Resources).filter((resource: any) => resource.Type === 'AWS::ECS::Service') as any[];
-    equal(services.length, 4);
+    equal(services.length, 5);  // incluye el trabajador de listas
     for (const service of services) equal(service.Properties.DesiredCount, 0);
   });
 

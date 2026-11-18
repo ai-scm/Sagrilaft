@@ -27,9 +27,26 @@ export class Database extends Construct {
   constructor(scope: Construct, id: string, props: DatabaseProps) {
     super(scope, id);
 
-    const rdsComputeClass = ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MEDIUM);
+    // Medido del 3 al 16 de noviembre de 2026: CPU promedio 4%, ~0,9 GB de memoria
+    // usados y 11 conexiones como máximo en ambos ambientes. 2 GB sobran.
+    // Producción: db.t3.small (x86). Staging/dev: db.t4g.small (Graviton, más barata).
+    // Cambiarla en una instancia existente la reinicia (minutos sin base de datos).
+    const rdsComputeClass = props.ambiente === 'prod'
+      ? ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL)
+      : ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.SMALL);
 
-    this.instance = new rds.DatabaseInstance(this, 'Postgres', {
+    // Disco: producción conserva 100 GB. Fuera de producción, 20 GB gp3 (el mínimo de
+    // RDS), con crecimiento automático hasta 50 GB; los datos ocupan menos de 1 GB.
+    // RDS no permite achicar un disco, así que fuera de producción la instancia lleva
+    // otro id: CloudFormation crea una base nueva y vacía, y la anterior queda fuera de
+    // la pila (RETAIN) hasta borrarla a mano. Producción conserva su id y su base.
+    const esProd = props.ambiente === 'prod';
+    const disco: Partial<rds.DatabaseInstanceProps> = esProd
+      ? {}
+      : { allocatedStorage: 20, maxAllocatedStorage: 50, storageType: rds.StorageType.GP3 };
+
+    this.instance = new rds.DatabaseInstance(this, esProd ? 'Postgres' : 'PostgresDisco20', {
+      ...disco,
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_16,
       }),

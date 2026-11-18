@@ -1,6 +1,6 @@
 # Módulo de consultas a listas cautelares: arquitectura
 
-Estado verificado contra el código el 2026-11-12. Si este documento y el código
+Estado verificado contra el código el 2026-11-13. Si este documento y el código
 difieren, manda el código; corrige el documento en el mismo cambio.
 
 Documentos relacionados:
@@ -9,6 +9,8 @@ Documentos relacionados:
   se clasifican los candidatos (ALTA/MEDIA/BAJA) y qué casos lo comprueban.
 - [Operación, pruebas y pendientes](OPERACION_PRUEBAS_Y_PENDIENTES.md): cómo se
   configura, cómo se carga OFAC, cómo se prueba y qué falta antes de usarlo en serio.
+- [Consultas con Tusdatos](TUSDATOS.md): guía corta de la modalidad externa, pensada
+  para quien revisa resultados o atiende la operación.
 
 Convención de estado usada en los tres documentos:
 
@@ -66,7 +68,7 @@ no altera el historial.
 |---|---|---|---|
 | Dummy (simulador) | `simulado` | 2.0 | **Implementado.** `infrastructure/listas/simulado.py`. Devuelve un escenario fijo para todo el entorno (`LISTAS_SIMULACION_ESCENARIO`), no depende de los datos consultados. Todo resultado lleva la advertencia `SIMULADO` |
 | Local por archivos | `archivos` | 2.1 | **Implementado, solo en `development` y `test`.** `infrastructure/listas/consultor_archivos.py` y `services/listas/motor_busqueda.py`. Busca en versiones importadas por nosotros (hoy OFAC SDN Advanced) |
-| Proveedor externo | `externo` | 2.0 previsto | **Pendiente.** No hay adaptador. La fábrica responde «pendiente de implementación», el servicio común solo admite `simulado` y `archivos`, y el trabajador cierra cualquier consulta `externo` como `IMPLEMENTACION_NO_DISPONIBLE` |
+| Proveedor externo (Tusdatos) | `externo` | 2.0 | **Implementado y probado con el sandbox y respuestas grabadas; sin credenciales reales todavía.** `services/listas/modalidad_externa.py` e `infrastructure/listas/tusdatos/`. Producción sigue bloqueada por `validar_entorno` |
 | Deshabilitado | `deshabilitado` | — | **Implementado.** Rechaza nuevas consultas (HTTP 409); el historial sigue accesible |
 
 ### Circuito anterior (retirado)
@@ -336,6 +338,22 @@ modalidad al arrancar:
   `deshabilitado` y la administración habilitada. Habilitar producción exige cambiar
   esa regla, por decisión expresa.
 
+**Registro único de modalidades** (`backend/services/listas/modalidades.py`). La
+configuración solo elige el nombre; lo que significa cada modalidad lo declara su
+entrada en `MODALIDADES`: contrato (`2.0` o `2.1`), disponibilidad, admisión
+individual y de grupo, reconocimiento de reintentos y ejecución en el trabajador.
+
+- El servicio común, `GET /api/listas/disponibilidad` y el trabajador consultan el
+  registro; ninguno compara nombres de implementación.
+- `deshabilitado` o una modalidad sin entrada responden «no disponible»; nunca se
+  sustituyen por otra. `externo` sin `LISTAS_TUSDATOS_*` válidas tampoco está disponible.
+- El trabajador ejecuta cada consulta con la modalidad que la **admitió** (según lo
+  guardado en la consulta), no con la configurada ahora.
+- Un reintento con la misma `Idempotency-Key` se responde con la consulta original
+  aunque la configuración haya cambiado después.
+- `disponibilidad` devuelve `version_contrato`; el portal la usa para elegir el
+  contrato al crear la consulta.
+
 Restricciones adicionales por modalidad:
 
 | Modalidad | Requisitos | Entornos donde el código lo permite |
@@ -364,7 +382,7 @@ historial y revisar, y la modalidad activa. «Consultar» solo es verdadero en
 | Rol | Permisos |
 |---|---|
 | `listas_operador` | `listas.consultar`, `listas.ver_evidencias` |
-| `listas_revisor` | los anteriores + `listas.revisar` |
+| `listas_revisor` | los anteriores + `listas.revisar`, `listas.ver_pdf_proveedor` (PDF del proveedor) y `listas.forzar_actualizacion` (consulta externa nueva) |
 | `listas_cargador` | `listas.importar`, `listas.comparar`, `listas.ver_administracion` |
 | `listas_aprobador` | `listas.comparar`, `listas.ver_administracion`, `listas.aprobar_version`, `listas.activar_version` |
 | `listas_incidentes` | `listas.ver_administracion`, `listas.bloquear_version`, `listas.reconstruir_version` |
@@ -542,21 +560,152 @@ validador, lector, proyección y perfil de límites) y su lector de búsqueda en
 la importación, la administración y el motor no cambian. Los códigos propios de la
 fuente se interpretan en su adaptador, nunca en el núcleo.
 
-**Proveedor externo** (pendiente). Lo que ya existe:
+**Proveedor externo (Tusdatos, Fase 4).** No implementa `ConsultorListasV2.consultar`:
+esa interfaz es síncrona y Tusdatos tarda en promedio un minuto. La modalidad
+(`services/listas/modalidad_externa.py`) avanza una etapa por pasada del trabajador y
+libera la consulta entre pasadas (`posponer`):
 
-- `Implementacion.EXTERNO`, la restricción de base de datos, `hallazgo_proveedor` y los
-  tipos de evidencia `RESPUESTA_ORIGINAL` y `PDF_PROVEEDOR`.
-- La regla `INDETERMINADA` para llamadas inciertas y una prueba de contrato con un
-  adaptador externo de prueba (`tests/contracts/test_listas_v2.py`).
+    POR_LANZAR ─(turno de 5 s)─► LANZANDO ─► ESPERANDO ─► DESCARGANDO_PDF ─► TERMINADA
 
-Lo que falta:
+- **Progreso** en `progreso_consulta_externa` (migraciones `l32a45b678c9` y
+  `m43b56c789da`, que agrega `verificacion_documento`): etapa, `jobid`,
+  id del reporte, recargas, plazo, huella SHA-256 de la respuesta completa y el
+  subconjunto aprobado (`respuesta_filtrada`). Es hijo de la consulta: inmutable tras el cierre.
+- **Nunca se relanza sola.** LANZANDO se confirma antes de llamar a `launch`. Si el
+  trabajador cae ahí, o el proveedor no responde tras recibirlo, la consulta queda
+  `INDETERMINADA` con `EFECTO_EXTERNO_DESCONOCIDO`. `reclamar` solo retoma una consulta
+  externa si su progreso existe y no está en LANZANDO. Una falla de conexión antes de
+  enviar vuelve a POR_LANZAR.
+- **Ritmo:** `ritmo_proveedor` reparte los lanzamientos entre trabajadores (5 s).
+- **Plazo:** 15 minutos desde la admisión. Vencido esperando → `INDETERMINADA`
+  (`TIEMPO_AGOTADO_PROVEEDOR`); vencido sin lanzar → `FALLIDA`.
+- **Fuentes con error:** una recarga gratuita (`/api/retry`) y luego se cierra con lo que haya
+  (`PARCIAL` si falta una fuente requerida). Antes de recargar se consulta
+  `/api/v1/sources/status` (estado de hace 10 s como máximo): si alguna fuente con error
+  está `under_maintenance` o `source_down`, no se recarga todavía y se vuelve a mirar cada
+  60 s. Si vuelve, se recarga. Si faltan 3 minutos o menos para el plazo, se cierra sin
+  gastar la recarga (evento `RECARGA_OMITIDA_FUENTES_CAIDAS`), y esas fuentes quedan
+  fallidas con el motivo «caída o en mantenimiento». No aplica en el sandbox.
+- **CC en caché sin `jobid`:** se busca el reporte en el historial de la cuenta
+  (`GET /api/v1/checks`, gratis) por tipo y número de documento, desde hace 6 h. Se toma la
+  consulta más reciente con fecha y hora dentro de la ventana; sin zona horaria se toma la
+  hora de Colombia. El id sale de `check_id` o, si falta, del final de `url`. Con el reporte
+  se sigue el flujo normal, recarga incluida (evento `REPORTE_RECUPERADO_DE_HISTORIAL`). Si
+  no aparece, o el historial falla, se cierra como antes. El sandbox no tiene historial
+  (404): **por confirmar con credenciales reales.**
+- **Sin reporte:** titular que no autoriza (403), o CC en caché que tampoco está en el
+  historial, se cierran `FALLIDA`/`NO_CONCLUYENTE` con informe y advertencia
+  (`TITULAR_NO_AUTORIZA`, `RESULTADO_EN_CACHE_SIN_REFERENCIA`).
+- **PDF del proveedor:** se intenta dentro del plazo y se custodia como evidencia
+  `PDF_PROVEEDOR`; si no llega, se cierra igual con el evento `PDF_PROVEEDOR_NO_DISPONIBLE`.
+  Solo lo descarga quien tiene `listas.ver_pdf_proveedor`; cada lectura deja un evento
+  `EVIDENCIA_LEIDA` con el tipo y la evidencia.
+- **Capturas por fuente:** en la misma etapa, después del PDF, se pide
+  `https://static.tusdatos.co/static/img/<dest>/<captura>.jpg` para cada fuente del
+  manifiesto que genera captura (`FuenteSagrilaft.captura`; ONU se llama `onu.jpg`).
+  `dest` sale del reporte y se guarda en `respuesta_filtrada`. La petición va sin
+  credenciales (es otro host, público; ni la clave ni el token salen hacia él), sin
+  seguir redirecciones, y solo se acepta un JPEG. Cada imagen se custodia como evidencia
+  `CAPTURA_PROVEEDOR` con su `fuente_codigo` (columna nueva, migración
+  `n54c67d890eb`) y comparte el permiso del PDF. Una captura que falta (403/404) o
+  falla no detiene el cierre; queda el evento `CAPTURAS_PROVEEDOR_CUSTODIADAS`,
+  `CAPTURAS_PROVEEDOR_NO_DISPONIBLES` u `CAPTURAS_PROVEEDOR_OMITIDAS` (apagadas con
+  `LISTAS_TUSDATOS_CAPTURAS=false`, sin `dest` o con el plazo vencido). Si la misma imagen
+  ya es evidencia de otra consulta (la clave de custodia es única), no se vuelve a
+  registrar. El trabajador necesita salida a `static.tusdatos.co` además de
+  `dash-board.tusdatos.co`.
+- **Recuperación después del cierre** (`ModalidadExterna.revisar_pendientes`, la llama
+  `TrabajadorListas` cada 60 s). Mira las consultas externas cerradas en las últimas 24 h
+  que tienen id de reporte. No gasta créditos. Se apaga con `LISTAS_TUSDATOS_RECUPERAR=false`.
+  - *Recarga diferida:* si la consulta cerró `PARCIAL` o `FALLIDA` con alguna cobertura
+    `FALLIDA`, a los 10 min, 1 h y 4 h de cada cierre se admite una consulta nueva con
+    `consulta_previa_id` apuntando a la cerrada. Copia el expediente, el rol, el criterio, el
+    actor original y el manifiesto (con `recupera: {consulta_id, reporte_id, intento}`), y su
+    clave de idempotencia es `recuperacion:<id previa>`, así que dos trabajadores no la
+    duplican. Arranca con `/api/retry` sobre el reporte anterior en vez de `launch`, hereda la
+    verificación previa del documento y sigue el flujo normal (PDF y capturas incluidos). Su
+    resultado lleva la advertencia `RECUPERACION_AUTOMATICA`. No se admite si las fuentes
+    fallidas siguen caídas (se vuelve a mirar en la próxima revisión), si ya hay una consulta
+    más nueva del mismo documento en el expediente (otra recarga o una del usuario, bajo el
+    mismo candado de documento que la admisión), ni pasado el tercer intento. Si Tusdatos
+    rechaza el retry, la recarga cierra `FALLIDA` (`RECARGA_NO_ADMITIDA_PROVEEDOR`) y la
+    cadena se detiene. Eventos: `RECUPERACION_PROGRAMADA` en la previa y `ADMITIDA` con
+    `recupera` en la nueva. El historial del expediente devuelve `recupera` y el portal la
+    marca «recarga automática».
+  - *Evidencia tardía:* si falta el PDF, o las capturas quedaron `CAPTURAS_PROVEEDOR_OMITIDAS`,
+    se vuelven a pedir en esos mismos tiempos y se suman a la misma consulta cerrada
+    (`agregar_evidencia_tardia`: los triggers permiten insertar evidencia y eventos en una
+    consulta cerrada, no modificarlos). Cada intento deja `EVIDENCIA_PROVEEDOR_REINTENTADA`
+    (es el contador y el candado entre trabajadores) y cada objeto recuperado deja
+    `EVIDENCIA_PROVEEDOR_RECUPERADA`.
+  - Lo que gasta crédito no se repite solo: ni las consultas que no alcanzaron a lanzarse ni
+    las indeterminadas.
+- **Fuentes** (`infrastructure/listas/tusdatos/adaptador.py`): ofac, ofac_nombre,
+  lista_onu, interpol, europol, peps, peps_denom, peps_funcion_publica, cidob,
+  procuraduria, contraloria (+contraloria2) y policia. Persona: las 12; empresa (NIT):
+  ofac, lista_onu, peps, peps_denom, procuraduria y contraloria. `peps_internacionales`,
+  `listas_restrictivas` y `listas_vinculantes` son categorías de los registros PEP
+  (`categoria_sagrilaft`). Las fuentes se fijan en el manifiesto al admitir: una consulta
+  vieja conserva su lista aunque luego se agreguen fuentes.
+- **Cómo se decide el estado de cada fuente:** con registro → candidato; `true` sin
+  detalle → hallazgo para revisar; vacío o `false` → consultada sin registro; código en
+  `errores` o valor `"Error"` → fallida (también si el campo no vino); campo ausente →
+  no disponible. Los códigos de error siguen el catálogo `/api/catalogo-errores-fuentes`
+  (por ejemplo, ONU puede llegar como `lista_onu` u `onu`).
+- **PEP por función pública:** Tusdatos solo incluye `peps_funcion_publica` cuando hay
+  registro. Si no viene, queda como no disponible pero no impide concluir; si viene con
+  error, sí lo impide. Es una regla **provisional** hasta confirmarla con datos reales.
+- **Revisión previa (gratuita) antes de `launch`:** consulta `/api/v1/sources/status`
+  (reutilizado 60 s). Si una fuente fijada que bloquea el resultado está en
+  `under_maintenance` o `source_down`, la consulta se cierra `FALLIDA` con
+  `FUENTES_CAIDAS_PROVEEDOR`, sin lanzar ni gastar crédito; con `forzar` se lanza igual. Si
+  el estado no se puede leer, no bloquea. También lee `/api/plans`: publica la métrica
+  `TusdatosCreditosRestantes` y registra un aviso con `LISTAS_TUSDATOS_ALERTA_CREDITOS`
+  créditos o menos (100 por defecto); nunca bloquea. Ninguna de las dos corre contra el
+  sandbox, cuyo estado es fijo. La primera vez que lee el estado, el trabajador registra
+  qué fuentes aprobadas no aparecen en la respuesta y qué códigos sí trae. La
+  documentación no publica esos códigos, y el sandbox solo informa cuatro; con ese
+  registro se corrige `codigos_estado` si hace falta.
+- **Verificación previa del documento (NIT y CE):** después de la revisión de fuentes y
+  antes de `launch`, se llama `POST /api/launch/verify/nit` (`{"nit": <número>}`) o
+  `/api/launch/verify/ce` (`{"ce": <número>, "fecha_expedicion": "dd/mm/aaaa"}`). El
+  resultado queda en `progreso_consulta_externa.verificacion_documento` (migración
+  `m43b56c789da`) como `{tipo, resultado, estado, avisos}`, con `resultado` en
+  `VIGENTE`, `NO_VIGENTE`, `NO_ENCONTRADO`, `SIN_DATO` o `SIN_VERIFICAR`. Solo se
+  guardan el estado y los `findings`, no los datos personales. Se hace una vez por
+  consulta: si ya hay resultado guardado, no se repite (por ejemplo, tras esperar turno).
+  `NO_ENCONTRADO` («Nit no encontrado», también si llega en `error`) cierra `FALLIDA`
+  con `DOCUMENTO_NO_ENCONTRADO` sin lanzar. `NO_VIGENTE` (estado distinto de
+  ACTIVA/ACTIVO/VIGENTE, o «Cédula no vigente») lanza igual y agrega la advertencia
+  `DOCUMENTO_NO_VIGENTE`, que el portal resalta. Si la llamada falla o la respuesta no
+  se entiende, queda `SIN_VERIFICAR` (evento `VERIFICACION_DOCUMENTO_FALLIDA`) y se
+  lanza igual. No se reintenta nunca, porque puede costar crédito. Se apaga con
+  `LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Sí corre contra el sandbox, que responde
+  siempre ACTIVA o VIGENTE.
+- **Documento no encontrado:** un 400 de `launch` con «no encontrado» o «no se
+  encuentra» (NIT fuera de RUES, CE fuera de Migración) cierra `FALLIDA` con
+  `DOCUMENTO_NO_ENCONTRADO` y un mensaje por tipo de documento. El NIT se envía sin
+  dígito de verificación (se quita un `-d` final).
+- **Documento no validado:** si `results` trae `validado: false`, el resultado lleva la
+  advertencia `DOCUMENTO_NO_VALIDADO` (el portal la resalta). No cambia la conclusión: la
+  decide el revisor. Pasaporte y NIT no traen ese dato.
+- **Admisión:** exige CC, CE (con fecha de expedición), pasaporte (`PAS`/`PASAPORTE`, con
+  nombre) o NIT; si no, 422 sin gastar créditos. Se envía `force: false`.
 
-- El adaptador que implemente `ConsultorListasV2` (`capacidades`, `consultar`,
-  `obtener_evidencia`).
-- Que la fábrica, el servicio común (hoy fija `"simulador"` y los tipos CC/NIT/PASAPORTE)
-  y el trabajador lo seleccionen.
-- Renovar la concesión durante esperas largas, guardar la respuesta original como
-  evidencia, configuración y secretos propios, y habilitarlo en disponibilidad y portal.
+- **Bloquear y reutilizar (Fase 5):** si en el **mismo expediente** hay una consulta externa
+  del mismo documento (tipo y número sin separadores) de las últimas 6 horas, `PENDIENTE`,
+  `EN_CURSO`, `COMPLETADA` o `PARCIAL`, se devuelve esa con `reutilizada: true` y no se gasta
+  otro crédito. `FALLIDA` e `INDETERMINADA` no se reutilizan. Nunca se reutiliza entre
+  expedientes: expondría el resultado a quien no tiene acceso. Un bloqueo por expediente y
+  documento evita dos lanzamientos por clics simultáneos; el grupo aplica la misma regla
+  por sujeto. Un reintento con la misma `Idempotency-Key` devuelve su propia consulta.
+- **Forzar actualización (Fase 5):** `forzar_actualizacion: true` en la petición individual
+  exige `listas.forzar_actualizacion`, solo vale para la modalidad externa (422 en las
+  demás), omite la reutilización y envía `force: true`; queda en el manifiesto (`forzar`).
+  `GET /api/listas/disponibilidad` informa `forzar` y `ver_pdf_proveedor` al portal.
+
+Despliegue en staging (custodia S3, trabajador ECS, secreto y roles): ver
+[operación, «Antes de cualquier ambiente compartido»](OPERACION_PRUEBAS_Y_PENDIENTES.md#antes-de-cualquier-ambiente-compartido-staging).
 
 Reglas que deberá respetar:
 
@@ -566,18 +715,42 @@ Reglas que deberá respetar:
   desconocida; no se usa la fecha de consulta como fecha de actualización.
 - El riesgo que entregue el proveedor se guarda como dato de origen, no como decisión.
 
-**Referencia del cliente Tusdatos retirado** (`servicios_externos/sagrilaft/real.py`,
-supuestos no validados con un servicio contratado):
+**Cliente Tusdatos** (`backend/infrastructure/listas/tusdatos/`, Fase 3). Solo protocolo:
+no elige fuentes ni interpreta coincidencias; eso es del adaptador (Fase 4).
 
-- HTTP Basic con `usuario:contraseña` en `SAGRILAFT_API_KEY`.
-- `POST /api/launch` con `doc` y `typedoc`: `name` para INT/PP, `nombre` sin `doc`
-  para NOMBRE y `fechaE` para CE/PPT. Responde `jobid`; un 403 es bloqueo por Habeas Data.
-- Sondeo `GET /api/results/{jobid}` cada 5 s, hasta 18 veces.
-- `GET /api/report_json/{id}` con `dict_hallazgos` (`altos`/`medios`/`bajos`).
-- PDF en `GET /api/v2/report_pdf/{id}`; se supuso `/api/report_nit_pdf/{id}` para NIT.
+- Configuración: `LISTAS_TUSDATOS_URL` (solo esquema y host; HTTP únicamente para el
+  sandbox `docs.tusdatos.co`), `LISTAS_TUSDATOS_TOKEN` (API Token Bearer, obligatorio en
+  producción) o `LISTAS_TUSDATOS_USUARIO`/`LISTAS_TUSDATOS_CLAVE` (sandbox), y
+  `LISTAS_TUSDATOS_TIEMPO_CONEXION`/`_LECTURA`/`_PDF`. Producción rechaza el sandbox.
+- Flujo: `POST /api/launch` → `GET /api/results/{jobid}` (207 procesando, 200 finalizado,
+  404 vencido, 500 consulta fallida) → `GET /api/report_json/{id}`. PDF con `?async=true`
+  en `/api/v2/report_pdf/{id}` o `/api/v2/report_nit_pdf/{id}` (202 + `Retry-After`).
+  Recarga gratuita de fuentes con error en `/api/retry` o `/api/retry_nit`.
+- `lanzar` consume créditos y **nunca se reintenta solo**: si pudo llegar y no hubo
+  respuesta clara, levanta `EfectoDesconocido`. Las lecturas se reintentan (2 veces).
+  Un interruptor corta tras fallas seguidas. Errores y métricas (`Sagrilaft/Listas`)
+  no llevan documentos, nombres ni cuerpos de respuesta.
+- Alcance: CC, CE (exige fecha de expedición), PP (exige nombre) y NIT.
 
-Es síncrono y no encaja en el contrato 2.0; sirve como guía del flujo, no como base del
-código nuevo.
+Comportamiento observado en el sandbox (`tests/fixtures/tusdatos_sandbox/casos.json`,
+regrabable con `scripts/listas/grabar_sandbox_tusdatos.py`):
+
+- Una CC consultada en las últimas 6 h sin `force` responde `jobid: null` (y `doc: null`).
+  La documentación no dice cómo llegar a su reporte; el sistema lo busca en el historial
+  (`/api/v1/checks`), que en el sandbox responde 404 en cualquier forma de la ruta.
+- `dict_hallazgos` no incluye los aciertos de OFAC/ONU y viene nulo en NIT: hay que leer
+  el campo de cada fuente (`ofac`, `lista_onu`, `peps`…), que puede ser booleano, objeto,
+  lista o `"Error"`. `errores` usa esos mismos códigos; `results` usa nombres legibles
+  que cambian según el tipo de documento.
+- `peps_funcion_publica` solo aparece en el reporte con hallazgos; la cédula 125 es el
+  ejemplo de documento no validado.
+- Los PDF del sandbox no son PDF (devuelve un texto JSON) y `/api/retry` responde 404:
+  ambos solo se prueban con respuestas escritas a mano hasta tener credenciales reales.
+- `verify/nit` y `verify/ce` responden siempre ACTIVA o VIGENTE y repiten el número
+  enviado; los casos «no encontrado» y «no vigente» solo se prueban con respuestas
+  escritas a mano. `sources/status` informa solo cuatro fuentes con estado fijo.
+- `tests/contracts/test_cliente_tusdatos.py` incluye un flujo contra el sandbox real
+  que se activa con `LISTAS_TUSDATOS_SANDBOX=1`.
 
 ## 12. Registro de decisiones
 
@@ -614,6 +787,7 @@ versionado):
 | T01 | Primer formato: OFAC Advanced XML/ZIP con XSD fijado; Enhanced no se presume compatible | 2026-11-04 | Vigente |
 | T02 | PostgreSQL como autoridad de versiones e historial; sin motor de búsqueda externo | 2026-11-04 | Vigente |
 | T03 | Lotes con checkpoint y número de control; activación idempotente; cierre recuperable | 2026-11-04 | Vigente |
+| T06 | Tusdatos: lo incompleto se recupera después del cierre solo si es gratis (`/api/retry`, PDF, capturas); cada recarga es una consulta nueva enlazada (`consulta_previa_id`), máximo tres en 24 h | 2026-11-13 | Vigente |
 | T05 | Contrato común con dobles de prueba; sin llamadas ni credenciales externas en la primera entrega | 2026-11-04 | Vigente; el adaptador externo sigue pendiente |
 | — | Producción permanece deshabilitada | 2026-11-04 | Vigente; aplicada en el código |
 | — | Descarga de listas manual; nunca automática ni desde el buscador web de OFAC | 2026-11-04 | Vigente |

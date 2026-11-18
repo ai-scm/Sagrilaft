@@ -36,6 +36,9 @@ export interface EcsFargateProps {
   readonly keycloakAdminSecret: secretsmanager.Secret;
   readonly smtpSecret: secretsmanager.Secret;
   readonly sagrilaftSecret: secretsmanager.Secret;
+  readonly tusdatosSecret: secretsmanager.Secret;
+  /** Tareas del trabajador de listas (0 en bootstrap). */
+  readonly listasWorkerCount: number;
   readonly configParameterNames: string[];
   readonly configParameterNameByKey: Record<string, string>;
   readonly configParameterByKey: Record<string, ssm.IStringParameter>;
@@ -69,6 +72,7 @@ export class EcsFargate extends Construct {
   public readonly portal: AppService;
   public readonly backend: AppService;
   public readonly keycloak: AppService;
+  public readonly listasWorker: { readonly taskDefinition: ecs.FargateTaskDefinition; readonly service: ecs.FargateService; readonly logGroup: logs.LogGroup };
 
   constructor(scope: Construct, id: string, props: EcsFargateProps) {
     super(scope, id);
@@ -96,6 +100,43 @@ export class EcsFargate extends Construct {
     this.keycloak = this.buildKeycloakService(props);
     this.frontend = this.buildFrontendService(props);
     this.portal = this.buildPortalService(props);
+    this.listasWorker = this.buildListasWorkerService(props);
+  }
+
+  /**
+   * Trabajador de consultas de listas: procesa las consultas admitidas (simulado o
+   * externo/Tusdatos) por etapas. Sin puerto ni balanceador; comparte imagen, rol y
+   * configuración con el backend, pero tiene su propio rol. Los turnos y concesiones
+   * viven en PostgreSQL, así que un despliegue con dos tareas a la vez no duplica
+   * lanzamientos.
+   */
+  private buildListasWorkerService(props: EcsFargateProps) {
+    const logGroup = this.buildLogGroup('ListasWorkerLogGroup', props.ambiente, 'listas-worker', logs.RetentionDays.ONE_MONTH);
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'ListasWorkerTaskDefinition', {
+      cpu: 256,
+      memoryLimitMiB: 512,
+      executionRole: this.executionRole,
+      taskRole: this.buildListasWorkerRole(props),
+      family: `sagrilaft-${props.ambiente}-listas-worker`,
+    });
+    taskDefinition.addContainer('listas-worker', {
+      image: ecs.ContainerImage.fromEcrRepository(props.backendRepo, props.imageTag),
+      logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: 'listas-worker' }),
+      environment: this.backendEnvironment(props, logGroup, { RUN_MODE: 'listas-worker' }),
+      secrets: this.backendSecrets(props, 'ListasWorker'),
+      command: [
+        'sh',
+        '-c',
+        [
+          'export DATABASE_URL="postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@${DATABASE_HOST}:5432/${DATABASE_NAME}"',
+          'exec python -m infrastructure.listas.trabajador_servicio',
+        ].join('; '),
+      ],
+      stopTimeout: Duration.seconds(60),
+    });
+    const service = this.buildService('ListasWorkerService', props, taskDefinition, props.listasWorkerCount, undefined);
+    service.node.addDependency(props.db);
+    return { taskDefinition, service, logGroup };
   }
 
   private buildBackendService(props: EcsFargateProps): AppService {
@@ -342,6 +383,9 @@ export class EcsFargate extends Construct {
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       enableExecuteCommand: true,
+      // Las tareas heredan Project/Environment: sin esto, el costo de Fargate
+      // no aparece en Cost Explorer al filtrar por Project=sagrilaft.
+      propagateTags: ecs.PropagatedTagSource.SERVICE,
       circuitBreaker: { rollback: true },
       cloudMapOptions: cloudMapName ? { name: cloudMapName } : undefined,
     });
@@ -387,6 +431,9 @@ export class EcsFargate extends Construct {
       TRUSTED_PROXY_IPS: this.ssmSecret('TRUSTED_PROXY_IPS', props, idPrefix),
       PROVEEDOR_LISTAS_CAUTELA: this.ssmSecret('PROVEEDOR_LISTAS_CAUTELA', props, idPrefix),
       SAGRILAFT_API_URL: this.ssmSecret('SAGRILAFT_API_URL', props, idPrefix),
+      LISTAS_CUSTODIA_BACKEND: this.ssmSecret('LISTAS_CUSTODIA_BACKEND', props, idPrefix),
+      LISTAS_CUSTODIA_S3_PREFIJO: this.ssmSecret('LISTAS_CUSTODIA_S3_PREFIJO', props, idPrefix),
+      LISTAS_TUSDATOS_URL: this.ssmSecret('LISTAS_TUSDATOS_URL', props, idPrefix),
       KEYCLOAK_URL: this.ssmSecret('KEYCLOAK_URL', props, idPrefix),
       KEYCLOAK_REALM: this.ssmSecret('KEYCLOAK_REALM', props, idPrefix),
       KEYCLOAK_CLIENT_ID: this.ssmSecret('KEYCLOAK_CLIENT_ID', props, idPrefix),
@@ -425,6 +472,9 @@ export class EcsFargate extends Construct {
       SMTP_USER: ecs.Secret.fromSecretsManager(props.smtpSecret, 'username'),
       SMTP_PASSWORD: ecs.Secret.fromSecretsManager(props.smtpSecret, 'password'),
       SAGRILAFT_API_KEY: ecs.Secret.fromSecretsManager(props.sagrilaftSecret, 'api_key'),
+      LISTAS_TUSDATOS_TOKEN: ecs.Secret.fromSecretsManager(props.tusdatosSecret, 'token'),
+      LISTAS_TUSDATOS_USUARIO: ecs.Secret.fromSecretsManager(props.tusdatosSecret, 'usuario'),
+      LISTAS_TUSDATOS_CLAVE: ecs.Secret.fromSecretsManager(props.tusdatosSecret, 'clave'),
     };
   }
 
@@ -508,6 +558,17 @@ export class EcsFargate extends Construct {
     props.dbSecret.grantRead(role);
     props.keycloakAdminSecret.grantRead(role);
     this.grantParameterRead(role, props.configParameterNames);
+    return role;
+  }
+
+  /**
+   * Rol mínimo del trabajador de listas: solo la custodia en S3 (informes y PDF del
+   * proveedor bajo listas/custodia/). Secretos y parámetros los inyecta el rol de
+   * ejecución; las métricas salen por los logs (EMF). ECS Exec añade sus permisos.
+   */
+  private buildListasWorkerRole(props: EcsFargateProps): iam.Role {
+    const role = this.buildTaskRole('ListasWorkerTaskRole');
+    props.bucket.grantReadWrite(role, 'listas/custodia/*');
     return role;
   }
 

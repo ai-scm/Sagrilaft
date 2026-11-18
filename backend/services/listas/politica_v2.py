@@ -10,7 +10,10 @@ from infrastructure.config.configuracion import SagrilaftListasConfig
 # Roles propuestos: solo se interpretan tras validar la identidad. No se crean en Keycloak.
 PERMISOS_POR_ROL = {
     "listas_operador": frozenset({"listas.consultar", "listas.ver_evidencias"}),
-    "listas_revisor": frozenset({"listas.consultar", "listas.ver_evidencias", "listas.revisar"}),
+    # El equipo revisor también abre el PDF del proveedor (trae datos sensibles) y fuerza
+    # consultas nuevas (gastan créditos): decisión del 2026-11-12, sin rol exclusivo.
+    "listas_revisor": frozenset({"listas.consultar", "listas.ver_evidencias", "listas.revisar",
+                                 "listas.ver_pdf_proveedor", "listas.forzar_actualizacion"}),
     "listas_cargador": frozenset({"listas.importar", "listas.comparar", "listas.ver_administracion"}),
     "listas_aprobador": frozenset({"listas.comparar", "listas.ver_administracion", "listas.aprobar_version", "listas.activar_version"}),
     "listas_incidentes": frozenset({"listas.ver_administracion", "listas.bloquear_version", "listas.reconstruir_version"}),

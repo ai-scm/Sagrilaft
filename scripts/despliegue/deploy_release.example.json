@@ -24,9 +24,9 @@
     "bedrockModelId": "REEMPLAZAR",
     "zohoSecretYaExiste": true,
     "proveedorListasCautela": "deshabilitado",
-    "habilitarNatEgress": false,
+    "habilitarNatEgress": true,
     "snsAlertasSub": "REEMPLAZAR",
-    "backendMaxCapacity": 4
+    "backendMaxCapacity": 2
   },
   "smoke_command": ["REEMPLAZAR_EJECUTABLE_DE_SMOKE_APROBADO"]
 }

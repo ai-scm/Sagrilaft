@@ -11,6 +11,15 @@ import '../../modals/Modals.css';
 import './ConsultasListas.css';
 
 const pendientes = new Set(['PENDIENTE', 'EN_CURSO']);
+const AVISO_REUTILIZADA = 'Ya había una consulta de este documento en las últimas 6 horas en este expediente; se muestra esa y no se consumió otro crédito.';
+
+function avisoAdmision(respuesta, ambos) {
+  if (!ambos) return respuesta.reutilizada ? AVISO_REUTILIZADA : 'Consulta registrada.';
+  const partes = respuesta.no_consultados.map(s => `${s.sujeto_rol}: ${s.motivo}`);
+  const reutilizadas = respuesta.consultas.filter(c => c.reutilizada).map(c => c.sujeto_rol);
+  if (reutilizadas.length) partes.push(`${reutilizadas.join(' y ')}: se reutilizó una consulta de las últimas 6 horas`);
+  return partes.length ? partes.join('. ') : 'Consulta registrada.';
+}
 
 export default function ConsultasListas({ expediente, enModal = false }) {
   const [capacidades, setCapacidades] = useState({});
@@ -102,7 +111,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
 
   const consultar = useCallback(async function consultar(criterio, ambos) {
     setOcupado(true); setError(''); setAviso('');
-    const datos = { ...(capacidades.implementacion === 'archivos' ? { version_contrato: '2.1' } : {}), sujeto_rol: 'CONTRAPARTE', criterio };
+    const datos = { ...(capacidades.version_contrato === '2.1' ? { version_contrato: '2.1' } : {}), sujeto_rol: 'CONTRAPARTE', criterio };
     const operacion = ambos ? 'grupo' : JSON.stringify(datos);
     const almacenamiento = `listas-pendiente:${expediente.id}:${ambos ? 'grupo' : 'individual'}`;
     try {
@@ -111,7 +120,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       sessionStorage.setItem(almacenamiento, JSON.stringify({ operacion, clave }));
       const respuesta = ambos ? await listas.grupo(expediente.id, clave) : await listas.crear(expediente.id, datos, clave);
       sessionStorage.removeItem(almacenamiento);
-      setAviso(ambos && respuesta.no_consultados.length ? respuesta.no_consultados.map(s => `${s.sujeto_rol}: ${s.motivo}`).join('. ') : 'Consulta registrada.');
+      setAviso(avisoAdmision(respuesta, ambos));
       if (capacidades.historial) {
         await cargar();
         const id = ambos ? respuesta.consultas[0]?.consulta_id : respuesta.consulta_id;
@@ -119,7 +128,22 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       }
     } catch (e) { setError(e.message); }
     finally { setOcupado(false); }
-  }, [capacidades.implementacion, capacidades.historial, expediente.id, cargar, ver]);
+  }, [capacidades.version_contrato, capacidades.historial, expediente.id, cargar, ver]);
+
+  // Consulta nueva del mismo sujeto aunque haya una reciente: gasta un crédito del proveedor.
+  const forzarActualizacion = useCallback(async function forzarActualizacion(actual) {
+    if (!window.confirm('Se hará una consulta nueva en el proveedor y se consumirá un crédito. ¿Continuar?')) return;
+    setOcupado(true); setError(''); setAviso('');
+    try {
+      const respuesta = await listas.crear(expediente.id, {
+        sujeto_rol: actual.contexto.sujeto_rol, criterio: actual.criterio, forzar_actualizacion: true,
+      }, crypto.randomUUID());
+      setAviso('Consulta forzada registrada.');
+      await cargar();
+      await ver(respuesta.consulta_id);
+    } catch (e) { setError(e.message); }
+    finally { setOcupado(false); }
+  }, [expediente.id, cargar, ver]);
 
   const revisar = useCallback(async function revisar(datosRevision) {
     setOcupado(true); setError('');
@@ -131,7 +155,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
   }, [detalle, ver]);
 
   const descargar = useCallback(
-    id => listas.evidencia(seleccion.current, id).catch(err => setError(err.message)),
+    (id, tipo, fuente) => listas.evidencia(seleccion.current, id, tipo, fuente).catch(err => setError(err.message)),
     [],
   );
 
@@ -145,13 +169,14 @@ export default function ConsultasListas({ expediente, enModal = false }) {
     <h3 className="listas-panel__titulo">Consultas de listas cautelares</h3>
     <p className="listas-aviso">Las coincidencias requieren revisión humana. No determinan aprobación, rechazo ni nivel de riesgo.</p>
     {capacidades.implementacion === 'simulado' && <p className="listas-simulado"><strong>SIMULADO: datos ficticios, sin consulta OFAC.</strong></p>}
+    {capacidades.implementacion === 'externo' && <p className="listas-nota">Consulta en proveedor externo: cada consulta nueva consume créditos. Si el mismo documento se consultó en este expediente en las últimas 6 horas, se reutiliza esa consulta.</p>}
     {error && <p role="alert" className="listas-error">{error}</p>}{aviso && <p role="status" className="listas-ok">{aviso}</p>}
     {fallosSeguimiento > 0 && <p role="alert" className="listas-error">{fallosSeguimiento < 3
       ? 'No se pudo actualizar el seguimiento. Reintentaremos automáticamente.'
       : 'El seguimiento está pausado tras tres intentos fallidos. La consulta permanece registrada.'}</p>}
     {fallosSeguimiento >= 3 && <button type="button" className="btn-modal btn-modal-secondary listas-mas" onClick={() => setFallosSeguimiento(0)}>Reintentar seguimiento</button>}
     {capacidades.consultar && (
-      <ConsultaForm expediente={expediente} disabled={ocupado} onConsultar={consultar} />
+      <ConsultaForm expediente={expediente} disabled={ocupado} onConsultar={consultar} implementacion={capacidades.implementacion} />
     )}
     {!capacidades.consultar && <p className="listas-nota">Las nuevas consultas no están disponibles para esta sesión.</p>}
     {capacidades.historial && <>
@@ -161,6 +186,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       {!historial.length && <p className="listas-vacio">No hay consultas registradas en el módulo nuevo.</p>}
       <ul className="listas-historial">{paginacionHistorial.elementosPagina.map(c => <li key={c.consulta_id}><button type="button" className="listas-item" aria-current={consulta?.consulta_id === c.consulta_id} onClick={() => ver(c.consulta_id)}>
         {c.sujeto_rol} · <span className="listas-estado" data-estado={c.estado}>{etiquetas[c.estado]}</span> · {new Date(c.creado_en).toLocaleString()}
+        {c.recupera && <> · <span title="Tusdatos volvió a consultar, sin gastar crédito, las fuentes que fallaron en la consulta anterior">recarga automática</span></>}
       </button></li>)}</ul>
       <ControlsPaginacion
         {...paginacionHistorial}
@@ -175,7 +201,10 @@ export default function ConsultasListas({ expediente, enModal = false }) {
         <button type="button" className="btn-modal btn-modal-secondary" onClick={cerrarDetalle}>✕ Cerrar</button>
       </div>
       {pendientes.has(consulta.estado_ejecucion) && <p role="status" className="listas-progreso">La consulta se está procesando. Esta pantalla se actualiza sola.</p>}
-      <ResultadoConsultaListas consulta={consulta} descargar={descargar} />
+      <ResultadoConsultaListas consulta={consulta} descargar={descargar} puedeVerPdfProveedor={!!capacidades.ver_pdf_proveedor} />
+      {capacidades.forzar && consulta.implementacion === 'externo' && !pendientes.has(consulta.estado_ejecucion) && (
+        <button type="button" className="btn-modal btn-modal-secondary" disabled={ocupado} onClick={() => forzarActualizacion(consulta)}>Forzar actualización</button>
+      )}
       <h4>Revisiones humanas</h4>
       {!detalle.revisiones.length && <p className="listas-vacio">Aún no hay revisiones humanas registradas.</p>}
       <ul className="listas-revisiones">{detalle.revisiones.map(r => <li key={r.id}>{r.resultado}: {r.justificacion}{r.revision_previa_id && ' (corrección de revisión anterior)'}</li>)}</ul>

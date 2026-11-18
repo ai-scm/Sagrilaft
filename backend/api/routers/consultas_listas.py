@@ -11,6 +11,7 @@ from domain.excepciones import SinPermisoError
 from domain.listas.puertos import ListasNoDisponibles
 from api.dependencias_listas import servicio_listas
 from api.schemas.listas_v2 import SolicitudConsultaLista, SolicitudConsultaArchivos, RevisionLista, AdmisionLista, DetalleConsultaLista, AdmisionGrupo, DisponibilidadListas, RevisionRegistrada, HistorialListas
+from services.listas.modalidades import modalidad_disponible
 from services.listas.servicio_comun import ServicioComunListas
 
 
@@ -41,17 +42,13 @@ enrutador = APIRouter(prefix="/api", tags=["consultas de listas v2"], route_clas
 @enrutador.get("/listas/disponibilidad", response_model=DisponibilidadListas)
 def disponibilidad(servicio: ServicioComunListas = Depends(servicio_listas)):
     permisos = servicio.actor.permisos
-    archivos = False
-    if servicio.politica.config.implementacion == "archivos":
-        from infrastructure.listas.configuracion_archivos import ConfiguracionArchivosLocal
-        try:
-            ConfiguracionArchivosLocal.cargar(servicio.entorno)
-            archivos = True
-        except ListasNoDisponibles:
-            pass
-    return {"consultar": (servicio.politica.config.implementacion == "simulado" or archivos) and "listas.consultar" in permisos,
+    modalidad = modalidad_disponible(servicio.politica.config, servicio.entorno)
+    return {"consultar": modalidad is not None and "listas.consultar" in permisos,
             "historial": "listas.ver_evidencias" in permisos, "revisar": "listas.revisar" in permisos,
-            "implementacion": servicio.politica.config.implementacion}
+            "implementacion": servicio.politica.config.implementacion,
+            "version_contrato": modalidad.version_contrato if modalidad else None,
+            "forzar": bool(modalidad and modalidad.admite_forzar) and "listas.forzar_actualizacion" in permisos,
+            "ver_pdf_proveedor": "listas.ver_pdf_proveedor" in permisos}
 
 
 @enrutador.post("/expedientes/{expediente_id}/consultas-listas", status_code=202, response_model=AdmisionLista)
@@ -61,8 +58,10 @@ def crear(expediente_id: str, datos: SolicitudConsultaLista | SolicitudConsultaA
     modelo = CrearConsultaBusqueda if isinstance(datos, SolicitudConsultaArchivos) else CrearConsultaV2
     solicitud = modelo(version_contrato="2.1" if isinstance(datos, SolicitudConsultaArchivos) else "2.0", contexto={"tipo": "EXPEDIENTE", "expediente_id": expediente_id,
         "sujeto_rol": datos.sujeto_rol, "motivo": datos.motivo}, criterio=datos.criterio)
-    identificador = servicio.crear(expediente_id, solicitud, clave)
-    return {"consulta_id": identificador, "ubicacion": f"/api/consultas-listas/{identificador}"}
+    forzar = getattr(datos, "forzar_actualizacion", False)
+    admision = servicio.crear(expediente_id, solicitud, clave, forzar=forzar)
+    return {"consulta_id": admision.consulta_id, "ubicacion": f"/api/consultas-listas/{admision.consulta_id}",
+            "reutilizada": admision.reutilizada}
 
 
 @enrutador.post("/expedientes/{expediente_id}/consultas-listas/grupos", status_code=202, response_model=AdmisionGrupo)
@@ -84,8 +83,8 @@ def detalle(consulta_id: UUID, servicio: ServicioComunListas = Depends(servicio_
 
 @enrutador.get("/consultas-listas/{consulta_id}/evidencias/{evidencia_id}")
 def evidencia(consulta_id: UUID, evidencia_id: UUID, servicio: ServicioComunListas = Depends(servicio_listas)):
-    contenido = servicio.evidencia(consulta_id, evidencia_id)
-    return Response(contenido, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="listas_{consulta_id}.pdf"',
+    contenido, nombre, tipo_mime = servicio.evidencia(consulta_id, evidencia_id)
+    return Response(contenido, media_type=tipo_mime, headers={"Content-Disposition": f'attachment; filename="{nombre}"',
                                                                     "Cache-Control": "private, no-store"})
 
 

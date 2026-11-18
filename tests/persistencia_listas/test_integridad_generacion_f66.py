@@ -58,6 +58,10 @@ def test_f66_migracion_agrupada_revierte_y_reaplica_sin_cambiar_datos(busqueda, 
         anterior = conexion.scalar(text("SELECT pg_get_functiondef('listas_comprobar_generacion()'::regprocedure)"))
         assert "coalesce(t.nombres" not in anterior
     command.upgrade(configuracion,"head")
+    # Reaplicar recrea las tablas posteriores (p. ej. progreso_consulta_externa): se restauran
+    # los permisos del fixture, como en las demás pruebas que revierten, solo en /tmp.
+    with administracion_bd.begin() as conexion:
+        conexion.execute(text("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO aplicacion_listas"))
     with administracion_bd.connect() as conexion:
         actual = conexion.scalar(text("SELECT pg_get_functiondef('listas_comprobar_generacion()'::regprocedure)"))
         assert "coalesce(t.nombres" in actual

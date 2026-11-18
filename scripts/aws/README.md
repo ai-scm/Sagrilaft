@@ -5,6 +5,7 @@ Utilidades para revisar y sincronizar la configuración que vive en AWS: secreto
 ## Qué contiene
 
 - `sync_aws_runtime_assets.py`: escribe en Secrets Manager **solo las credenciales externas a CDK** (`zoho_credentials` y, solo con `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y una API key real, `sagrilaft_listas_cautela_credentials`). Nunca escribe `app_secret`, `db_credentials` ni `keycloak_admin`, que genera CDK. No imprime valores.
+- `staging_encendido.sh estado|apagar|encender`: apaga staging cuando nadie lo usa y lo vuelve a encender. Solo toca `sagrilaft-staging`. Instrucciones y precauciones en [Costos AWS](../../docs/produccion/ESTIMACION_COSTOS_AWS.md#encender-y-apagar-staging).
 - `audit_aws_secrets_safe.py`: hace un inventario de los secretos. Muestra metadatos, claves JSON, si un campo está vacío, su longitud y una huella SHA-256 corta por campo. Nunca muestra el valor.
 
 ## Uso de `sync_aws_runtime_assets.py`

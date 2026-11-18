@@ -18,6 +18,14 @@
       {
         "name": "acceso_proveedores",
         "description": "Acceso a expedientes de tipo PROVEEDOR"
+      },
+      {
+        "name": "listas_operador",
+        "description": "Listas cautelares: consultar y ver el historial y el informe interno"
+      },
+      {
+        "name": "listas_revisor",
+        "description": "Listas cautelares: además revisar coincidencias, abrir el PDF del proveedor y forzar consultas (gasta créditos)"
       }
     ]
   },

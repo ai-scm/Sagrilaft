@@ -9,7 +9,7 @@ from starlette.background import BackgroundTask
 from starlette.requests import ClientDisconnect
 from domain.listas.administracion import RecepcionPropuesta
 from api.routers.consultas_listas import RutaListas
-from api.dependencias_listas import sesiones_listas, custodia_listas
+from api.dependencias_listas import sesiones_listas, custodia_administrativa
 from api.middleware.autenticacion import portal_interno, _decodificar_jwt, UsuarioPortalInterno
 from services.listas.politica_v2 import ActorListas, PoliticaListasV2
 from services.listas.recepcion import ServicioRecepcionListas
@@ -19,7 +19,7 @@ from domain.utils.seguridad import sanitizar_log
 
 
 def servicio_recepcion(request: Request, usuario: UsuarioPortalInterno = Depends(portal_interno),
-                       sesiones=Depends(sesiones_listas), custodia=Depends(custodia_listas)):
+                       sesiones=Depends(sesiones_listas), custodia=Depends(custodia_administrativa)):
     configuracion = request.app.state.config
     actor = ActorListas.desde_identidad_validada(configuracion.keycloak.issuer, usuario.sub, tuple(usuario.roles))
     request.state.actor_recepcion = (actor.issuer, actor.sub)

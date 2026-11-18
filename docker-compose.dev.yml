@@ -181,6 +181,12 @@ services:
       LISTAS_ARCHIVOS_POLITICA_ID: ${LISTAS_ARCHIVOS_POLITICA_ID:-}
       LISTAS_ADMIN_POLITICA_ID: ${LISTAS_ADMIN_POLITICA_ID:-}
       LISTAS_CUSTODIA_DIRECTORIO: /app/uploads/listas
+      # Modalidad externa (LISTAS_IMPLEMENTACION=externo). Por defecto, el sandbox público de
+      # Tusdatos (respuestas fijas, sin créditos). Producción usa HTTPS y LISTAS_TUSDATOS_TOKEN.
+      LISTAS_TUSDATOS_URL: ${LISTAS_TUSDATOS_URL:-http://docs.tusdatos.co}
+      LISTAS_TUSDATOS_USUARIO: ${LISTAS_TUSDATOS_USUARIO:-pruebas}
+      LISTAS_TUSDATOS_CLAVE: ${LISTAS_TUSDATOS_CLAVE:-password}
+      LISTAS_TUSDATOS_TOKEN: ${LISTAS_TUSDATOS_TOKEN:-}
       LISTAS_BASE_LOCAL: ${POSTGRES_DB}
 
 

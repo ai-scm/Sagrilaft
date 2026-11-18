@@ -1,6 +1,6 @@
 # Módulo de listas cautelares: operación, pruebas y pendientes
 
-Estado verificado contra el código el 2026-11-12. Todo lo que se describe aquí funciona
+Estado verificado contra el código el 2026-11-13. Todo lo que se describe aquí funciona
 **solo en local** (`development`/`test`). Ningún ambiente compartido tiene el módulo
 v2 operativo, y producción está bloqueada por código.
 
@@ -455,6 +455,18 @@ Sirven como aviso para quien mantenga el módulo:
 | Usuario autenticado sin roles de carpeta provocaba una excepción en las rutas de listas | Ahora responde 403 |
 | El seguimiento del portal se detenía tras un error de red | Sondeo cada 2 s; tras un fallo espera 4 s y luego 8 s; tras tres fallos seguidos se pausa y ofrece «Reintentar seguimiento» |
 | El middleware aceptaba JWT sin `exp` | `exp` obligatorio para todo el portal |
+| Tusdatos puede informar la falla de ONU con el código `onu`, y solo se reconocía `lista_onu`: la fuente habría pasado como consultada sin registros | Se reconocen los dos códigos; una prueba compara las fuentes con el catálogo de errores de Tusdatos |
+| Se ignoraba `validado: false` (Tusdatos no pudo validar el documento) | El resultado lleva la advertencia `DOCUMENTO_NO_VALIDADO` y el portal la resalta |
+| Una fuente que no venía en el reporte pero sí en `errores` quedaba como «no disponible» | Ahora queda como fallida |
+| Un NIT inexistente (400 «Nit no encontrado») cerraba la consulta con el código técnico `SOLICITUD_RECHAZADA` | Se cierra con `DOCUMENTO_NO_ENCONTRADO` y un mensaje claro; lo mismo para la CE que no está en Migración |
+| Un NIT escrito con dígito de verificación («900123456-7») se enviaba como «9001234567» | Se quita el dígito antes de enviarlo |
+| Se gastaba un crédito aunque una fuente obligatoria estuviera caída en Tusdatos | Se revisa el estado de las fuentes antes de lanzar; la consulta se cierra sin gastar crédito, salvo con «Forzar actualización» |
+| La recarga gratuita se gastaba de inmediato aunque la fuente con error estuviera caída; Tusdatos indica que así no sirve | Antes de recargar se revisa el estado: se espera a que la fuente vuelva y, si no vuelve a tiempo, se cierra sin gastar la recarga y diciendo que estaba caída |
+| No se guardaban las capturas de pantalla que Tusdatos publica por fuente | Se custodian como evidencia `CAPTURA_PROVEEDOR` (OFAC, ONU, INTERPOL, EUROPOL, CIDOB, Procuraduría, Policía), sin credenciales hacia el host de estáticos y con el mismo permiso del PDF |
+| Un NIT inexistente gastaba una consulta de listas completa antes de saberse que no existía | Se verifica antes con `verify/nit` (y la CE con `verify/ce`). Si no existe, no se consultan listas; si no está vigente, se consulta igual con aviso |
+| Una CC en la caché de Tusdatos (`jobid: null`) se cerraba sin resultado | Se busca el reporte en el historial de la cuenta (`/api/v1/checks`); si no aparece, se cierra como antes |
+| Una consulta que cerraba con fuentes fallidas, o sin PDF, quedaba así: nadie volvía a intentarlo aunque recargar es gratis | El trabajador revisa cada minuto las consultas cerradas de las últimas 24 h. Recarga las fuentes fallidas cuando están operativas (10 min, 1 h y 4 h; cada recarga es una consulta nueva enlazada) y vuelve a pedir el PDF y las capturas que faltaron. Nada de esto gasta crédito |
+| `validate_envs.py` rechazaba `.env.dev.example` tras agregar las variables `LISTAS_*` (CI en rojo) | El validador y las tres plantillas declaran las variables nuevas |
 
 ## 7. Pendientes
 
@@ -470,27 +482,53 @@ Sirven como aviso para quien mantenga el módulo:
 
 ### Antes de cualquier ambiente compartido (staging)
 
-Hoy, en staging, `PROVEEDOR_LISTAS_CAUTELA=dummy` equivale a `simulado`, pero no hay
-custodia configurada ni trabajador desplegado en la infraestructura (CDK). Según el código,
-las rutas v2 responderían 503 por la custodia y las consultas admitidas no se procesarían.
-**No se ha comprobado en el ambiente.**
+**Preparado en código e infraestructura (Fase 7, sin desplegar ni comprobar en el
+ambiente):**
 
-- Custodia persistente compartida (el disco de ECS es efímero) y su copia o restauración
-  coordinada con SQL. Procedimiento **propuesto**, nunca ensayado:
+- Custodia en S3 (`LISTAS_CUSTODIA_BACKEND=s3`): informes y PDF del proveedor en el
+  bucket de la aplicación bajo `listas/custodia/<sha256>`, verificados al leer y entregados
+  solo por el backend. La administración de listas exige custodia local y responde 409 con S3.
+- Trabajador como servicio ECS (`sagrilaft-<ambiente>-listas-worker`,
+  `python -m infrastructure.listas.trabajador_servicio`): una tarea (`-c listasWorkerCount`,
+  0 en bootstrap), rol propio con acceso solo a `listas/custodia/*`, logs en
+  `/sagrilaft/<ambiente>/ecs/listas-worker` sin datos personales.
+- Parámetros SSM `LISTAS_CUSTODIA_BACKEND`, `LISTAS_CUSTODIA_S3_PREFIJO` y
+  `LISTAS_TUSDATOS_URL`, y el secreto `sagrilaft/<ambiente>/tusdatos_credentials`
+  (`token`, o `usuario` y `clave` del sandbox), inyectados al backend, la migración y el trabajador.
+- CDK: `-c proveedorListasCautela` acepta `simulado`/`dummy`, `externo`/`sagrilaft` y
+  `deshabilitado`. Externo exige `-c habilitarNatEgress=true`; producción por defecto
+  `deshabilitado` y rechaza externo y el sandbox. `-c tusdatosUrl` permite el sandbox fuera de prod.
+- Roles `listas_operador` y `listas_revisor` en `keycloak/realm-sagrilaft.json` (realms
+  nuevos) y `scripts/listas/crear_roles_listas_keycloak.sh` para el realm ya existente.
+
+**Activar Tusdatos en staging** (pasos manuales, en este orden):
+
+1. Desplegar con los cambios (los scripts de staging siguen en simulado) y comprobar que
+   el trabajador arranca y que una consulta simulada se cierra con informe en S3.
+2. Crear y asignar los roles con el script de Keycloak (ECS Exec en la tarea de Keycloak).
+3. Rellenar `sagrilaft/staging/tusdatos_credentials`: `token` (producción de Tusdatos) o
+   `usuario`/`clave` del sandbox con `-c tusdatosUrl=http://docs.tusdatos.co`. Con
+   `externo` y el secreto vacío, el backend no arranca.
+4. Desplegar con `-c proveedorListasCautela=externo -c habilitarNatEgress=true` (crea un
+   NAT Gateway, con costo mensual) y ejecutar una consulta real de prueba.
+
+Sigue pendiente:
+
+- Copia y restauración coordinada de SQL y custodia. Procedimiento **propuesto**, nunca ensayado:
   1. Detener admisiones y trabajos del módulo; identificar operaciones en curso y anotar
      la revisión de Alembic y el punto de corte de la copia SQL.
-  2. Copiar la base y un manifiesto de todos los archivos referenciados (originales,
-     evidencias, borradores) con clave, hash y tamaño; copiar esos archivos sin
+  2. Copiar la base y un manifiesto de todos los objetos referenciados (originales,
+     evidencias, borradores) con clave, hash y tamaño; copiar esos objetos sin
      sobrescribir y verificar el manifiesto completo.
-  3. Restaurar SQL y archivos en un entorno aislado con las consultas desactivadas, y
-     verificar restricciones, punteros, versiones, eventos y cada archivo. Un archivo
+  3. Restaurar SQL y objetos en un entorno aislado con las consultas desactivadas, y
+     verificar restricciones, punteros, versiones, eventos y cada objeto. Un objeto
      faltante o corrupto impide declarar la recuperación; nunca se reconstruye un
      informe consultando de nuevo.
   4. Revisar los trabajos pendientes: los que tienen borrador continúan; los externos
      sin resultado no se repiten automáticamente. Reanudar solo después de conciliar.
-- Despliegue y supervisión del trabajador, con concesiones y número de trabajadores.
-- Roles `listas_*` creados y asignados a cuentas nominales en Keycloak.
-- Variables `LISTAS_*` en SSM o CDK, que hoy no existen allí.
+- Retención del PDF del proveedor en S3 (hoy sin regla de ciclo de vida) y cifrado con
+  KMS propio si Cumplimiento lo exige (hoy SSE-S3, el cifrado del bucket).
+- Alarma si el trabajador se detiene o acumula consultas pendientes.
 - Migraciones revisadas contra la base del ambiente y su versión de PostgreSQL.
 - Rol de aplicación sin propiedad de tablas, DDL, `TRUNCATE` ni control de triggers.
 - Inventario de consumidores externos de las rutas antiguas, que responden 410.
@@ -511,17 +549,41 @@ las rutas v2 responderían 503 por la custodia y las consultas admitidas no se p
 
 ### Proveedor externo
 
-Integración por hacer, sin afectar a dummy ni a local (detalle de lo preparado y lo que
-falta en [arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)):
+Adaptador de Tusdatos implementado (Fases 2 a 5; ver
+[arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)
+y la guía corta [Consultas con Tusdatos](TUSDATOS.md)).
+Probado con el sandbox público y con respuestas grabadas
+(`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
+`tests/persistencia_listas/test_externo_tusdatos.py`). Falta:
 
-- Contrato comercial y documentación técnica del proveedor, ambiente de pruebas y
-  credenciales.
-- Adaptador `ConsultorListasV2`, selección en fábrica, servicio común y trabajador,
-  renovación de la concesión y evidencia `RESPUESTA_ORIGINAL`.
-- Configuración y secretos propios. El secreto `sagrilaft_listas_cautela_credentials`
-  (`SAGRILAFT_API_KEY`) y `SAGRILAFT_API_URL` pertenecen al circuito retirado.
-- Habilitar el modo `externo` en disponibilidad y en el portal; pruebas con respuestas
-  grabadas y regresión de las otras modalidades.
+- Fase 5 hecha: reutilización 6 h dentro del expediente, «Forzar actualización» y
+  descarga del PDF del proveedor para `listas_revisor`. Falta crear en Keycloak los roles
+  `listas_*` y asignarlos (ver «Antes de cualquier ambiente compartido»).
+- CC en caché (`jobid: null`): ya se intenta recuperar por `/api/v1/checks`, que el sandbox
+  no tiene. Con credenciales reales falta confirmar que la consulta en caché aparece en el
+  historial, el formato de `created_at` y que `check_id` es el id que recibe `report_json`.
+- Códigos de `sources/status` para las fuentes de listas (OFAC, ONU, PEP, CIDOB, INTERPOL,
+  EUROPOL): el catálogo `/api/fuentes-colombia` del sandbox trae los 12 códigos del sistema
+  escritos igual, así que lo más probable es que coincidan. Confirmarlo con el aviso
+  «sources/status no informa» del trabajador en la primera consulta real.
+- Tusdatos respondió que `verify/nit` y `verify/ce` no cobran y que el 400, el 403 y las
+  fallas sí (13-11-2026). Falta tenerlo por escrito.
+- Preguntas abiertas para Tusdatos (cobro en 400/403/fallas, historial, códigos de estado,
+  auto reintentos, retención de datos): lista completa y de dónde sale cada dato en
+  [TUSDATOS.md, «Qué sabemos y de dónde sale»](TUSDATOS.md#qué-sabemos-y-de-dónde-sale).
+  La propuesta comercial venció el 22-07-2026: hay que pedir una nueva.
+- Preguntar a Tusdatos por el «lanzamiento de fuente puntual» que menciona la nota de
+  `sources/status` (`/api/v1/sources/status/{job_id}`) y no aparece en su `openapi.json`.
+- Con credenciales reales: verificar el PDF, `/api/retry` (también horas después del
+  cierre, que es lo que usa la recarga automática) y la forma real de cada fuente
+  (en especial los textos de Policía y los registros PEP), confirmar que
+  `peps_funcion_publica` solo llega cuando hay registro y ver cómo llega `validado`.
+- Alarma de CloudWatch sobre la métrica `TusdatosCreditosRestantes` (hoy solo hay aviso en
+  los registros del trabajador).
+- Staging (Fase 7): preparado; falta ejecutar los pasos de activación (sección
+  «Antes de cualquier ambiente compartido»).
+- El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
+  `SAGRILAFT_API_URL` pertenecen al circuito retirado y ya no se usan para arrancar.
 - El seguimiento de contratación es la tarea P15 de
   [pendientes de producción](../produccion/PENDIENTES_PRODUCCION.md#p15).
 
@@ -538,6 +600,5 @@ falta en [arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-u
 | — | `servicios_externos/sagrilaft/deshabilitado.py` usa `ErrorConsultaListas` sin importarlo: `descargar_pdf` lanza `NameError` (código retirado) |
 | — | `.env.prod.example` sugiere activar con `sagrilaft`; eso hoy impide arrancar en producción |
 | — | El CDK (`infra/sagrilaft/lib/sagrilaft-stack.ts`) usa por defecto `proveedorListasCautela=sagrilaft` en prod si no se pasa el contexto; con ese valor el backend no arranca en producción. Hay que pasar siempre `-c proveedorListasCautela=deshabilitado` o corregir el valor por defecto |
-| — | `.env.dev.example` y `.env.staging.example` siguen usando solo `PROVEEDOR_LISTAS_CAUTELA` |
+| — | `.env.staging.example` sigue usando solo `PROVEEDOR_LISTAS_CAUTELA` |
 | — | Retirar el circuito anterior: `domain/puertos/consultor_listas_cautela.py`, `servicios_externos/sagrilaft/`, `ServicioVerificacionSagrilaft`, `ListaCautelaService`, `proveedores_simulados.py` y la ruta `/api/expedientes/sagrilaft/disponibilidad` |
-| — | El servicio común fija `"simulador"` y los tipos CC/NIT/PASAPORTE, en lugar de leer las capacidades del adaptador |
