@@ -37,6 +37,15 @@ export default function DetalleExpedienteHeader({
               {estaCerrado ? 'Cerrado' : 'Enviado'} {formatearFechaHora(expediente.updated_at)}
             </span>
           )}
+          {expediente.correo_destinatario && (
+            <span
+              className="badge badge-neutral"
+              title={`Correo del representante legal: ${expediente.correo_destinatario}`}
+              style={{ maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {expediente.correo_destinatario}
+            </span>
+          )}
         </div>
       </div>
       <div className="header-actions">

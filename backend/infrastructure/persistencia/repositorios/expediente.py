@@ -8,6 +8,7 @@ from domain.constantes import TIPO_DOCUMENTO_CERTIFICADO_SAGRILAFT
 from domain.contratos import DocumentoDatos
 from domain.formulario.entidades import FormularioDatos
 from infrastructure.persistencia.models import (
+    AccesoManual,
     AlertaInconsistencia,
     DocumentoAdjunto,
     Formulario,
@@ -105,6 +106,17 @@ class RepositorioExpedienteSQLAlchemy(RepositorioBase):
             .all()
         )
         return {fila.formulario_id: fila.total for fila in filas}
+
+    def correos_destinatario(self, ids_formularios: List[str]) -> Dict[str, str]:
+        """Correo al que se envió el acceso de cada formulario (si tiene acceso)."""
+        if not ids_formularios:
+            return {}
+        filas = (
+            self._sesion.query(AccesoManual.formulario_id, AccesoManual.correo_destinatario)
+            .filter(AccesoManual.formulario_id.in_(ids_formularios))
+            .all()
+        )
+        return {fila.formulario_id: fila.correo_destinatario for fila in filas}
 
     def actualizar_estado(self, formulario_id: str, estado: str) -> None:
         """Marca el nuevo estado en la sesión sin hacer commit.

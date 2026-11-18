@@ -113,11 +113,19 @@ class ExpedienteService:
     def _conteos_documentos_por_formulario(self, ids_formularios: list[str]) -> dict[str, int]:
         return self._repo.contar_documentos(ids_formularios)
 
-    def _serializar_resumen(self, formulario, cantidad_documentos: int) -> Dict[str, Any]:
+    @staticmethod
+    def _correo_contacto(formulario, correo_acceso: Optional[str]) -> Optional[str]:
+        """Correo del acceso (el que se escribe al crearlo); si no hay acceso, el del formulario."""
+        return correo_acceso or getattr(formulario, "correo_representante", None) or None
+
+    def _serializar_resumen(
+        self, formulario, cantidad_documentos: int, correo_acceso: Optional[str] = None
+    ) -> Dict[str, Any]:
         return {
             "formulario_id":         formulario.id,
             "codigo_peticion":       formulario.codigo_peticion,
             "razon_social":          formulario.razon_social,
+            "correo_destinatario":   self._correo_contacto(formulario, correo_acceso),
             "numero_identificacion": formulario.numero_identificacion,
             "tipo_contraparte":      formulario.tipo_contraparte,
             "tipo_persona":          formulario.tipo_persona,
@@ -141,8 +149,10 @@ class ExpedienteService:
         formularios = self._repo.listar(
             _ESTADOS_EXPEDIENTE, tipo_contraparte, busqueda, contrapartes_permitidas
         )
-        conteos = self._conteos_documentos_por_formulario([f.id for f in formularios])
-        return [self._serializar_resumen(f, conteos.get(f.id, 0)) for f in formularios]
+        ids = [f.id for f in formularios]
+        conteos = self._conteos_documentos_por_formulario(ids)
+        correos = self._repo.correos_destinatario(ids)
+        return [self._serializar_resumen(f, conteos.get(f.id, 0), correos.get(f.id)) for f in formularios]
 
     # ─── Detalle ──────────────────────────────────────────────────────────────
 
@@ -154,10 +164,12 @@ class ExpedienteService:
         formulario = self._buscar_formulario_expediente(formulario_id, contrapartes_permitidas)
         documentos = self._repo.listar_documentos(formulario_id)
         causal_cierre = self._obtener_causal_cierre(formulario_id) if formulario.estado == EstadoFormulario.CERRADO.value else None
+        correo_acceso = self._repo.correos_destinatario([formulario_id]).get(formulario_id)
         return {
             "formulario_id":     formulario.id,
             "codigo_peticion":   formulario.codigo_peticion,
             "razon_social":      formulario.razon_social,
+            "correo_destinatario": self._correo_contacto(formulario, correo_acceso),
             "tipo_contraparte":  formulario.tipo_contraparte,
             "tipo_persona":      formulario.tipo_persona,
             "tipo_solicitud":    formulario.tipo_solicitud,
