@@ -48,7 +48,7 @@ registra `complete: true` y los cuatro digests; sus campos y huellas de build fu
 verificados localmente. Ese manifiesto aislado no acreditaba activación ni actualización de BD.
 Después, el intento 3 del 6–7 de octubre completó migración c7→f8, activación
 y verificación de cuatro servicios/digests y aceptación manual;
-[evidencia y límites](../produccion/PENDIENTES_PRODUCCION.md#p20).
+[evidencia y límites](../produccion/PENDIENTES_PRODUCCION.md#p01).
 No se volvieron a consultar los recursos de staging en esta actualización.
 
 Consultas de solo lectura previas del mismo día, registradas en la sesión de trabajo
@@ -126,18 +126,6 @@ El catálogo de valores/configuración es
 [checklist-valores-staging-prod.md](../produccion/configuracion/checklist-valores-staging-prod.md).
 La preparación y ejecución se siguen exclusivamente en
 [PENDIENTES_PRODUCCION.md](../produccion/PENDIENTES_PRODUCCION.md#corte).
-
-## Laboratorio P20 — estado actualizado al 15 de octubre
-
-A, B y C cerrados formalmente con excepciones y evidencias propias, y locks
-liberados condicionalmente. C acreditó la incompatibilidad, la restauración del
-snapshot a una RDS nueva y un smoke backend aislado GET/PUT/GET con persistencia;
-los cuatro servicios ECS quedaron en 0/0/0. El cierre de recuperación no
-autoriza limpieza ni equivale a un corte productivo. El laboratorio se retiró el
-16 de octubre de 2026 y su infraestructura AWS fue eliminada ([retiro](../produccion/p20/RETIRO_P20.md)).
-[Plan y evidencias](../produccion/p20/PLAN_OPERATIVO_RECUPERACION_P20.md) y
-[procedimiento C](../produccion/p20/PROCEDIMIENTO_P20_ESCENARIO_C.md).
-Dominios nuevos, HTTPS de navegador y login no fueron requisitos de estos ensayos.
 
 ## Evidencia operativa
 

@@ -694,28 +694,12 @@ firma real descrita arriba, sin recargar la página.
 <a id="despliegue-coordinado"></a>
 ## Despliegue coordinado: diagnóstico y límites de recuperación
 
-**Laboratorio P20:** A/B/C no requieren dominios nuevos, HTTPS de navegador ni
-login. El lanzador corregido localmente impone el fixture sin DDL en los dos
-subcasos de A, incluida pérdida del observador; no usar el comando ordinario de
-migración para simular incertidumbre. Reconciliar el ARN existente y preservar
-el lock; no relanzar, recuperar ni liberarlo sin la autorización correspondiente.
-Usar únicamente `p20_operation=scenario-a-fixture` para estos subcasos; el
-flujo general rechaza fault injection. Sin `--execute` no toma lock ni lanza
-tareas. La ruta ejecutable retiene el lock incluso ante el fallo esperado;
-reconciliarlo requiere autorización separada y nunca borrado incondicional.
-La corrección se validó después en AWS: A cerrado con excepción externa propia;
-B cerrado con expansión, fallo de salud, rollback, smoke y liberación condicional
-comprobados, con excepción externa propia; C preparado solo localmente y no ejecutado. No repetir las pruebas completadas. Consultar restricciones,
-ENTRYPOINT/digest y evidencias en el [plan de A](../produccion/p20/PLAN_OPERATIVO_RECUPERACION_P20.md#preparación-específica-del-escenario-a).
-
-
 El orquestador local registra la evidencia por intento y usa el objeto
 `_deployment/<stack>.lock` en el bucket del stack. Ante fallo, timeout o interrupción,
 conserva el bloqueo; no inicia por sí solo una recuperación ni libera el lock
 por expiración. ECS/CloudFormation sí pueden hacer rollback automático del
-despliegue (comprobado en B); esto no revierte Alembic ni libera el lock.
-No inferir de ello autorización para reintentar. Su ensayo AWS se sigue en
-[P20](../produccion/PENDIENTES_PRODUCCION.md#p20).
+despliegue; esto no revierte Alembic ni libera el lock.
+No inferir de ello autorización para reintentar.
 
 Antes de decidir una recuperación, conservar plan, eventos, ARN/resultado de tarea,
 digests, evidencia Alembic y estado de CloudFormation/ECS. Determinar si la migración

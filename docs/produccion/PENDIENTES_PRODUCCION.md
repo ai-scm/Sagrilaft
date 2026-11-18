@@ -1,8 +1,7 @@
 # Pendientes para producción — registro único de tareas
-Evidencias originales P20: consultar el [índice del archivo P20](p20/EVIDENCIAS_P20_ARCHIVADAS.md); las rutas entre paréntesis son relativas a su contenido.
 
 Revisión documental: 2026-10-21 (P03: SMTP/Zoho y release de staging del 20 de octubre).
-Los demás pendientes conservan sus evidencias históricas (P20 y staging/bootstrap: 2026-10-16). Función única: registrar tareas, decisiones de cierre y
+Los demás pendientes conservan sus evidencias históricas (staging/bootstrap: 2026-10-16). Función única: registrar tareas, decisiones de cierre y
 criterios de aceptación. Los estados externos se basan en evidencias archivadas y revalidaciones
 fechadas por ejecución; esto no es una auditoría general actual de AWS/GitHub. [Mapa documental](../README.md#funciones).
 
@@ -22,7 +21,10 @@ Publicador SHA/manifiesto y protección de concurrencia implementados; ECR stagi
 inmutable. El intento 3 del 6–7 de octubre para SHA
 `6542326a67d664847b3ff99bd8ec3c82ca3a7c6b` completó migración c7→f8,
 activación y verificación de las cuatro imágenes/digests, cierre manual y
-liberación condicional del lock. [Evidencias y límites en P20](#p20).
+liberación condicional del lock. La migración ECS terminó con `ExitCode=0` y CloudFormation
+quedó en `UPDATE_COMPLETE`; las cuatro comprobaciones manuales quedaron aprobadas por el
+operador, sin capturas. Evidencia: `../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/`
+(la carpeta no está en el disco; revisado el 2026-11-18).
 El E2E anterior del 5–6 de octubre no se reasigna retroactivamente a ese SHA;
 el intento 3 conserva su aceptación manual sin capturas independientes.
 Falta fijar la release productiva, verificar sus imágenes/configuración y registrar
@@ -286,31 +288,6 @@ Acreditar invalidación de todos los accesos de prueba. La desaparición de aler
 **Estado:** 🟡 Parcial; mejora de cobertura.
 
 Automatizar los huecos enumerados en el [catálogo frontend](../../tests/README.md#cobertura), ejecutar migraciones/flujo PostgreSQL en CI y acreditar su resultado. La cobertura local ya se amplió a 28 revisiones y operaciones de repositorios sobre PG16.6 (44 passed / 3 xfailed históricos); no repetir esa ampliación como pendiente. Alcance en el harness. El [README del harness](../../tests/integration/README.md) define comandos/variables. Una prueba manual de staging no sustituye regresiones automáticas.
-
-<a id="p20"></a>
-### P20 — Validación del despliegue coordinado y recuperación
-
-**Estado:** 🟡 El ensayo normal de staging está verificado; los ensayos de
-recuperación aislada A, B y C están cerrados formalmente. Cada escenario tiene
-evidencia, aprobación, excepción y límites propios. A comprobó los dos fallos
-controlados antes de DDL; B comprobó expansión aditiva, rollback de activación
-y compatibilidad GET/PUT/GET; C comprobó incompatibilidad, restauración del
-snapshot a una RDS nueva y smoke aislado GET/PUT/GET con persistencia. Para C,
-CloudFormation quedó `UPDATE_COMPLETE`, los cuatro servicios ECS en `0/0/0` y
-el lock se liberó condicionalmente. Ver [plan operativo](p20/PLAN_OPERATIVO_RECUPERACION_P20.md)
-y los procedimientos [A](p20/PROCEDIMIENTO_P20_ESCENARIO_A.md),
-[B](p20/PROCEDIMIENTO_P20_ESCENARIO_B.md) y [C](p20/PROCEDIMIENTO_P20_ESCENARIO_C.md).
-
-El cierre de A/B/C no cierra los gates del despliegue productivo. El laboratorio
-se retiró el 16 de octubre de 2026: la infraestructura AWS P20 fue eliminada y la
-evidencia se conserva en archivo local ([retiro](p20/RETIRO_P20.md)). Dominios
-nuevos, HTTPS de navegador y login no fueron requisitos de recuperación A/B/C.
-
-El 6–7 de octubre de 2026 se ejecutó y cerró el intento 3 del despliegue coordinado para el SHA `6542326a67d664847b3ff99bd8ec3c82ca3a7c6b`. La preparación conservó los servicios anteriores; la migración ECS terminó con `ExitCode=0` y verificó Alembic desde `c7a1c1a65662` hasta `f8a9b0c1d2e3`; luego se activaron los cuatro servicios con los digests aprobados. CloudFormation quedó en `UPDATE_COMPLETE`, ECS verificó las tareas y digests, y el lock se liberó condicionalmente después del cierre manual. Las cuatro comprobaciones manuales fueron declaradas aprobadas por el operador y quedaron asentadas sin capturas ni secretos. La evidencia del intento está en [release de staging](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/), incluidos [eventos](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/events.jsonl), [verificación del esquema](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/schema-evidence.json), [servicios activos](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/active-services.json) y [cierre manual](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/manual-accepted.json).
-
-La cronología detallada del laboratorio (9–14 de octubre: restauraciones, digests, repoint e incidentes) está en el [plan operativo P20](p20/PLAN_OPERATIVO_RECUPERACION_P20.md#cronología-histórica-del-laboratorio). El laboratorio se retiró el 16 de octubre; ver [retiro](p20/RETIRO_P20.md).
-
-P04 sigue pendiente y conserva el primer corte productivo. El ensayo de staging no equivale a autorización ni ejecución en producción.
 
 <a id="cierres"></a>
 ## 4. Cierres y decisiones — fuera del backlog activo

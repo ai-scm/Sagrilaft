@@ -335,7 +335,7 @@ migración y activación verificadas, los 4 servicios activos. El lock de S3, qu
 conservó porque su propio cliente `cdk deploy` falló por un error de red después de que
 CloudFormation ya había completado el cambio, **se reconcilió y liberó el 2026-10-24** (verificación
 manual sin inconsistencias, borrado condicional por ETag). [Evidencia](../../evidencia/primer-corte-prod-20261021/README.md).
-Validación del flujo y recuperación: [P20](../PENDIENTES_PRODUCCION.md#p20); seguimiento:
+Trazabilidad de la release: [P01](../PENDIENTES_PRODUCCION.md#p01); seguimiento:
 [P04](../PENDIENTES_PRODUCCION.md#p04).
 
 ## Fase 6 — Validación antes de abrir a usuarios

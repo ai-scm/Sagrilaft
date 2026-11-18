@@ -163,7 +163,7 @@ ruta, retención, imagen o ambiente sigue sujeto a comparación estricta.
    borrar ni reintentar a ciegas. Ver [recuperación](../../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
 
 El cambio aislado de ECR no demuestra que el diff del próximo plan sea aceptable.
-Alcance validado y seguimiento: [P20](../PENDIENTES_PRODUCCION.md#p20).
+Alcance validado y seguimiento: [P01](../PENDIENTES_PRODUCCION.md#p01).
 
 <a id="smoke-manual"></a>
 ### Validación manual de staging
