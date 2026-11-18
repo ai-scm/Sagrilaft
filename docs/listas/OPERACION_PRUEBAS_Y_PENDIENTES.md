@@ -301,142 +301,64 @@ Fallos esperados conocidos: tres `xfail` estrictos de migraciones antiguas (MIG-
 
 ## 5. Resultados de referencia
 
-Totales de cada entrega local, en casos distintos y sin sumar repeticiones. Cada cifra es
-la selección de esa entrega; no se ejecutó nunca la suite completa del repositorio.
+Mediciones con el archivo OFAC real (publicación del 2026-11-06), hechas en una máquina de
+desarrollo con PostgreSQL desechable en tmpfs y un solo trabajador. No es un SLA ni una
+prueba de carga. Los archivos están en
+[`arquitectura/evidencias/`](../arquitectura/evidencias/README.md) (local, no versionado).
 
-| Entrega | Casos aprobados | Notas |
-|---|---|---|
-| F2 persistencia | 211 | 46 nuevas de persistencia; PostgreSQL 17.9 |
-| F3 simulador integrado | 287, y **293** tras corregir el seguimiento y exigir `exp` | 24 HTTP/navegador F3 |
-| F5.1 contratos | 318, y **337** tras la revisión | 44 propios de F5.1 |
-| F5.2 recepción | 362 → 373 → **374** con el ensayo SIGKILL | 37 casos de F5.2 |
-| F5.3 validación | **443** | 69 nuevos |
-| F5.4 importación | **470** | 27 nuevos (incluye 1.001 registros con lotes de 1.000) |
-| F5.5 administración | **511** | 41 nuevos; 4 ensayos SIGKILL |
-| F5.6 recorrido integrado | **517** | 6 nuevos |
-| Regla de un mismo usuario (`k21f34a567b8`) | 110 contratos + 114 de administración e historial + 3 de restauración | Verificación del 2026-11-08 |
-| Adaptador OFAC, primera entrega | **117** | 107 de formatos y seguridad + 10 de integración |
-| Ensayo OFAC completo | **44** | Con el archivo real; 22 de seguridad ZIP en el cierre |
-| F6.1 contratos 2.1 | **133** | 67 nuevas |
-| F6.2 representación | **316** | 39 nuevos |
-| F6.3 motor | **299** | 112 nuevas; 21 casos prioritarios de clasificación |
-| F6.4 integración | **341** | 28 nuevos |
-| F6.5 presentación | **358** | 17 nuevos; el portal compila |
-| F6.6 aceptación | **388** | 286 de contratos, 101 de SQL/HTTP/navegador, 1 con la copia oficial; 22 previas de integridad no se suman |
+Los resultados de las pruebas automáticas no se guardan aquí: se obtienen ejecutando la
+suite (ver sección 4).
 
-En todas se mantuvieron los tres `xfail` históricos (MIG-01–03) y los avisos de
-dependencias.
+### Carga completa de OFAC
 
-**Estado de aceptación:** F3, F5.1–F5.6, la integración local OFAC y F6.1–F6.5 tienen
-aceptación del usuario en su alcance local. **F6.6 está entregada sin aceptación formal
-registrada.**
-
-**Ensayo OFAC completo** (publicación 2026-11-06, XML de 128.630.615 bytes, ZIP de
-5.777.108 bytes con relación 22,27:1), en PostgreSQL desechable sobre tmpfs:
+Archivo: XML de 128.630.615 bytes o ZIP de 5.777.108 bytes. Las dos cargas dan la misma
+proyección (huella `57359e2a9369483a112bb5c7c8aa9bddd2421b37a26d87d9cfde0c689abc8077`).
 
 | Dato | Valor |
 |---|---|
-| Sujetos (UID únicos) | 19.563 (10.110 entidades, 7.541 personas, 1.912 transportes) |
-| Nombres / documentos / relaciones | 50.238 / 23.108 / 9.266 |
-| Direcciones | 23.385 ubicaciones distintas en el XML; 29.725 asociaciones, porque varios sujetos comparten ubicación |
-| Atributos conservados | 1.023.351 (incluye catálogos repetidos por sujeto; no son personas distintas) |
+| Sujetos | 19.563 |
+| Nombres / documentos / direcciones / relaciones | 50.238 / 23.108 / 29.725 / 9.266 |
+| Atributos | 1.023.351 (incluye catálogos repetidos por sujeto) |
 | Lotes | 196 de 100 registros |
-| Huella de la proyección | `57359e2a9369483a112bb5c7c8aa9bddd2421b37a26d87d9cfde0c689abc8077`, idéntica desde XML y ZIP |
 
-Tiempos y espacio de los tres ensayos completos. Cada uno con SIGKILL antes del segundo
-lote, espera real de la concesión y verificación completa:
+Cada carga incluye un SIGKILL antes del segundo lote y la espera real de la concesión.
 
-| Medición | XML sin índice | XML con índice | ZIP con índice |
-|---|---:|---:|---:|
-| Validación (incluye extracción del ZIP) | 43,212 s | 41,631 s | 40,717 s |
-| Espera real tras SIGKILL | 115,068 s | 115,715 s | 115,531 s |
-| Trabajador reanudado completo | 753,716 s | 704,298 s | 700,021 s |
-| Cotejo y sellado tras el último lote | ≈219,6 s | 185,153 s | 183,181 s |
-| Ensayo total | 976,040 s | 923,578 s | 917,654 s |
-| Base con índices y TOAST (sin WAL ni respaldos) | 758.298.291 B | 759.617.203 B | 759.764.659 B |
-| Custodia (original, esquema, informe) | 128.716.290 B | 128.716.290 B | 134.493.546 B |
-| Memoria máxima del trabajador reanudado | 310,68 MiB | 310,750 MiB | 310,984 MiB |
+| Medición | Desde XML | Desde ZIP |
+|---|---:|---:|
+| Validación | 41,6 s | 40,7 s |
+| Espera tras SIGKILL | 115,7 s | 115,5 s |
+| Trabajador reanudado | 704,3 s | 700,0 s |
+| Total | 923,6 s | 917,7 s |
+| Base de datos | 759,6 MB | 759,8 MB |
+| Custodia | 128,7 MB | 134,5 MB |
+| Memoria máxima del trabajador | 311 MiB | 311 MiB |
 
-El índice `h98c01d234e5` redujo el ensayo XML un 5,37 % (52,5 s). Con una sola muestra
-por configuración no se puede atribuirle toda la diferencia. PostgreSQL confirmó 19.563
-lecturas del índice durante el cotejo del ZIP. Las bases estaban en tmpfs: falta medir en
-disco persistente.
+El índice `h98c01d234e5` bajó la carga desde XML de 976,0 s a 923,6 s (5,4 %). Es una sola
+muestra por configuración, así que no se le puede atribuir toda la diferencia.
 
-Primera integración del adaptador (sin SQL): validación y proyección del XML completo en
-72,914 s. Los resúmenes de comparación ocupan 13.796.666 bytes por versión (27.593.332
-para dos), dentro del límite de 128 MiB.
+### Consultas sobre OFAC
 
-**Recorrido oficial F6.6** (ZIP → consulta, base desechable):
+Recorrido completo desde el ZIP hasta cuatro consultas: 1.011 s (16 min 51 s). La
+generación de búsqueda tiene 17.651 registros consultables, 1.912 excluidos y 68.731
+términos.
 
 | Etapa | Tiempo |
 |---|---:|
-| Recepción del ZIP | 0,043 s |
-| Validación | 42,930 s |
-| Importación y sellado | 723,819 s |
-| Activación local | 46,541 s |
-| Preparación y confirmación de la generación | 96,276 s |
-| Recorrido completo, con las cuatro consultas | 1.011,050 s (16 min 51 s) |
+| Recepción del ZIP | 0,04 s |
+| Validación | 42,9 s |
+| Importación y sellado | 723,8 s |
+| Activación | 46,5 s |
+| Generación de búsqueda | 96,3 s |
 
-| Ancla | Candidatos | Nivel del objetivo | Admisión | Trabajador + PDF | Descarga del PDF |
+| Consulta | Candidatos | Nivel | Admisión | Trabajador + PDF | PDF |
 |---|---:|---|---:|---:|---:|
-| R-01 nombre completo (UID 22790) | 3 | MEDIA | 7,220 s | 18,151 s | 0,033 s |
-| R-02 nombre + nacimiento (UID 22790) | 3 | MEDIA | 4,925 s | 16,460 s | 0,028 s |
-| R-03 alias completo (UID 17022) | 1 | MEDIA | 4,752 s | 15,302 s | 0,023 s |
-| R-04 «Rosneft» (UID 17022) | 159 | MEDIA | 5,591 s | 28,664 s | 0,049 s |
+| R-01 nombre completo | 3 | MEDIA | 7,2 s | 18,2 s | 30 KB |
+| R-02 nombre + nacimiento | 3 | MEDIA | 4,9 s | 16,5 s | 35 KB |
+| R-03 alias completo | 1 | MEDIA | 4,8 s | 15,3 s | 23 KB |
+| R-04 «Rosneft» | 159 | MEDIA | 5,6 s | 28,7 s | 741 KB |
 
-Otros datos del recorrido oficial:
-
-- La generación tiene 17.651 registros consultables, 1.912 excluidos y 68.731 términos.
-- La comprobación agrupada de la generación, con `EXPLAIN ANALYZE`, tardó 569,975 ms.
-- Base: 831.854.259 bytes, con fixtures incluidos. Custodia: 135.321.638 bytes.
-- Memoria máxima del proceso de pruebas: 1.224.640 KiB (sin contar PostgreSQL).
-- Los PDF ocuparon entre 22.618 y 740.688 bytes; se verificaron y se borraron con la
-  custodia.
-
-R-04 ilustra la carga de revisión de un nombre parcial: no se ocultan candidatos.
-
-**Consultas sintéticas** (74 consultas del recorrido final). Se ejecutaron mientras otro
-clúster importaba OFAC, con competencia de recursos:
-
-| Tramo | Mediana | p95 | Máximo |
-|---|---:|---:|---:|
-| Admisión HTTP | 0,0443 s | 0,0642 s | 0,0749 s |
-| Trabajador y PDF | 0,1765 s | 0,5041 s | 0,7642 s |
-| De la admisión al resultado y PDF | 0,2736 s | 0,6040 s | 0,8884 s |
-
-En el navegador, el resultado se mostró en unos 2,3 s (individual) y 2,2 s (grupo), por el
-intervalo de seguimiento. Son fuentes pequeñas y no representan OFAC completo.
-
-**Recorrido sintético de F5.6.** Dos variantes de 39 pasos cada una: XML en 7,3915 s con
-4.505 bytes custodiados, y ZIP en 7,5306 s con 5.080 bytes. Memoria acumulada de los
-procesos hijos: unos 375.400 KiB.
-
-**Ensayo SIGKILL de la recepción.** Archivo de 131.095 bytes, cortado a los 65.536 bytes;
-se recuperó reenviando el archivo completo con un único trabajo.
-
-Todas las mediciones son de una máquina de desarrollo con un solo trabajador. No hay SLA
-ni prueba de carga.
-
-**Dónde están las evidencias.** Los informes JUnit, JSON, capturas y PDF de cada
-entrega se conservan en `docs/arquitectura/evidencias/` (402 archivos, ignorados por
-Git). Cada carpeta guarda también los intentos fallidos previos, separados del cierre.
-Los PDF oficiales de F6.6 no se guardaron, porque contienen datos personales.
-
-| Carpeta | Entrega | Contenido principal |
-|---|---|---|
-| `f55/` | F5.5 administración de versiones | Regresión, repetición final, contratos, endpoints, JSON de SIGKILL, hashes del código |
-| `f56/` | F5.6 recorrido integrado | `resumen-final.json`, recorridos XML/ZIP, denegación auditada, intentos fallidos de F56-A01/A02 |
-| `ofac_local/` | Primera integración del adaptador OFAC | `archivo_real.json` (conteos y memoria del XML completo sin SQL), unidades e integración |
-| `ofac_volumen/` | Ensayo SQL completo del XML | `final/ensayo-ofac-completo.json`, avance del trabajador reanudado, conteo XML independiente, limpieza |
-| `ofac_cierre_local/` | Repetición con índice y ZIP oficial | Informes XML y ZIP, igualdad de proyección, uso del índice, seguridad ZIP |
-| `f61/` | Contratos 2.1 | Resumen, JUnit, compatibilidad 2.0 |
-| `f62/` | Representación de búsqueda | Contratos, regresión, lectura final, compatibilidad |
-| `f63/` | Motor | Clasificaciones sintéticas, calibración de 20 pares, versiones y parámetros |
-| `f64/` | Integración con el portal | JUnit, captura del portal, intentos previos |
-| `f65/` | Presentación | Captura, PDF sintéticos ALTA/MEDIA/BAJA |
-| `f66/` | Aceptación integrada | `resumen_final.json`, `regresion_final/aceptacion-f66.jsonl`, `rendimiento_sintetico_final.json`, `oficial/ofac-f66.json`, cierre SQL interrumpido |
-
-Las evidencias de F3, F5.1–F5.4 se guardaron en `/tmp` y ya no existen.
+R-04 muestra el costo de un nombre parcial: no se ocultan candidatos. Base al final:
+831,9 MB; custodia: 135,3 MB; memoria máxima del proceso: 1,2 GiB.
 
 ## 6. Incidencias encontradas y corregidas
 
@@ -472,6 +394,7 @@ Sirven como aviso para quien mantenga el módulo:
 
 ### Para operar en local sin ayudas de pruebas
 
+- Aceptación formal de F6.6: la entrega está hecha, pero la aceptación no está registrada.
 - Herramienta o procedimiento soportado para registrar la fuente `ofac_sdn` y una
   política administrativa (ver 3.1).
 - Pantalla de administración: hoy solo hay CLI.

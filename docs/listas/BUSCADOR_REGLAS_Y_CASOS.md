@@ -307,8 +307,7 @@ Estado de cada caso:
 | O-11 | Usuario sin permisos | 403/404 sin fuga de datos | 26P |
 | O-12 | Resultado ALTA y revisión humana | El expediente no cambia | 26P |
 
-Los resultados de la última ejecución de los 26 prioritarios están en
-[operación y pruebas](OPERACION_PRUEBAS_Y_PENDIENTES.md#5-resultados-de-referencia).
+Los 26 prioritarios se ejecutan con `tests/persistencia_listas/test_aceptacion_f66.py`.
 Pasar estos casos no prueba la ausencia de falsos positivos o negativos en general.
 
 ## 10. Pendiente antes de usar las reglas con datos reales
