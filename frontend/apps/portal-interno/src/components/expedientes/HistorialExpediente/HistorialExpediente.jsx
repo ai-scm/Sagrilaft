@@ -4,6 +4,42 @@ import { Clock, FileText, CheckCircle2, User, ArrowUp } from 'lucide-react';
 import { usePaginacion } from '../../../hooks/usePaginacion';
 import ControlsPaginacion from '../../ui/ControlsPaginacion';
 
+// Por encima de este largo el texto se recorta a dos líneas con "Ver más".
+const LARGO_JUSTIFICACION_CORTA = 140;
+
+// Cerrar sin informe y reabrir guardan el comentario en `justificacion`;
+// cerrar con informe final y la carga manual, en `upload_reason`.
+function justificacionDe(metadata) {
+  const valor = metadata?.justificacion || metadata?.upload_reason || '';
+  return typeof valor === 'string' ? valor.trim() : '';
+}
+
+function JustificacionEvento({ texto }) {
+  const [expandida, setExpandida] = useState(false);
+  if (!texto) return null;
+  const larga = texto.length > LARGO_JUSTIFICACION_CORTA;
+  const recorte = larga && !expandida
+    ? { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }
+    : {};
+
+  return (
+    <div style={{ marginTop: '4px', fontSize: '13px', color: '#4B5563', maxWidth: '640px' }}>
+      <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', ...recorte }}>
+        <strong>Justificación:</strong> {texto}
+      </div>
+      {larga && (
+        <button
+          type="button"
+          onClick={() => setExpandida(v => !v)}
+          style={{ background: 'none', border: 'none', padding: 0, marginTop: '2px', color: '#4F46E5', fontSize: '12px', cursor: 'pointer' }}
+        >
+          {expandida ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function HistorialExpediente({ formularioId }) {
   const [descargandoReporte, setDescargandoReporte] = useState(false);
   const [error, setError] = useState(null);
@@ -154,6 +190,7 @@ export default function HistorialExpediente({ formularioId }) {
                           }
                         </div>
                       )}
+                      <JustificacionEvento texto={justificacionDe(evento.metadata)} />
                     </div>
                     <div className="audit-meta">
                       <span>{formatearFecha(evento.created_at)}</span>
