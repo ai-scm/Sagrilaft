@@ -3,7 +3,7 @@
 #
 #   scripts/aws/staging_encendido.sh estado     # solo lectura
 #   scripts/aws/staging_encendido.sh apagar     # programas a 0 y base de datos detenida
-#   scripts/aws/staging_encendido.sh encender   # base de datos y programas arriba (~10 min)
+#   scripts/aws/staging_encendido.sh encender   # base de datos y programas arriba y sanos (~10 min)
 #
 # Solo actúa sobre el clúster sagrilaft-staging y su RDS. Nunca toca producción.
 # Apagado sigue cobrando: NAT, balanceador, WAF, IPs, disco de la base y secretos.
@@ -62,6 +62,17 @@ estado() {
   echo "Base de datos: $(db_estado "$(db_id)")"
 }
 
+esperar_balanceador() {
+  # ECS da un servicio por estable cuando su tarea corre, aunque el balanceador todavía
+  # no la vea sana (Keycloak tarda 2-3 minutos más en arrancar y responde 502 mientras).
+  local tg
+  for tg in $(aws cloudformation describe-stack-resources --stack-name SagrilaftStack-staging \
+      --query "StackResources[?ResourceType=='AWS::ElasticLoadBalancingV2::TargetGroup'].PhysicalResourceId" \
+      --output text); do
+    aws elbv2 wait target-in-service --target-group-arn "$tg"
+  done
+}
+
 esperar_servicios() {
   local lista
   lista="$(servicios | tr '\n' ' ')"
@@ -116,6 +127,8 @@ encender() {
     --min-capacity "$COPIAS_ENCENDIDO" --max-capacity "$BACKEND_MAX" >/dev/null
   echo "Esperando a que los programas estén sanos..."
   esperar_servicios
+  echo "Esperando a que el balanceador vea sanos los programas (Keycloak tarda unos minutos más)..."
+  esperar_balanceador
   estado
   echo "Staging encendido."
 }
