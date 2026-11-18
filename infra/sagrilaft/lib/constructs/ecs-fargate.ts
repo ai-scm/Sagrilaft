@@ -219,6 +219,13 @@ export class EcsFargate extends Construct {
       scaleInCooldown: Duration.seconds(300),
       scaleOutCooldown: Duration.seconds(60),
     });
+
+    // Con autoescalado, el número de copias lo decide el autoescalado (mínimo y
+    // máximo arriba). Si la plantilla fija DesiredCount, CloudFormation lo vuelve a
+    // aplicar en cada despliegue y apaga las copias que el autoescalado había
+    // agregado (pasó en prod el 2026-11-18: 2 -> 1). Sin la propiedad, un servicio
+    // existente conserva su número; uno nuevo arranca con 1, igual al mínimo.
+    (service.node.defaultChild as ecs.CfnService).addPropertyDeletionOverride('DesiredCount');
   }
 
   private buildMigrationTaskDefinition(props: EcsFargateProps): { taskDefinition: ecs.FargateTaskDefinition; logGroup: logs.LogGroup } {

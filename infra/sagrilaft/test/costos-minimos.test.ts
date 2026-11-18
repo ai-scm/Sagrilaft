@@ -50,10 +50,31 @@ test('sin NAT (red aislada) se mantienen los 9 endpoints de interfaz', () => {
   equal(endpoints(plantilla, 'Interface').length, 9);
 });
 
-test('por defecto cada servicio corre con una copia', () => {
+test('por defecto los servicios sin autoescalado corren con una copia fija', () => {
   const plantilla = synth({ environment: 'prod', habilitarNatEgress: 'true' });
-  for (const taskDef of ['BackendTaskDefinition', 'KeycloakTaskDefinition', 'FrontendTaskDefinition', 'PortalTaskDefinition']) {
+  for (const taskDef of ['KeycloakTaskDefinition', 'FrontendTaskDefinition', 'PortalTaskDefinition']) {
     equal(servicio(plantilla, taskDef).Properties.DesiredCount, 1, taskDef);
+  }
+});
+
+for (const environment of ['staging', 'prod']) {
+  test(`${environment}: CDK no fija las copias del backend cuando tiene autoescalado`, () => {
+    // Si la plantilla fijara DesiredCount, cada despliegue bajaría el backend al
+    // mínimo aunque el autoescalado lo hubiera subido por carga.
+    const plantilla = synth({ environment, habilitarNatEgress: 'true' });
+    equal('DesiredCount' in servicio(plantilla, 'BackendTaskDefinition').Properties, false);
+    const [objetivo] = recursos(plantilla, 'AWS::ApplicationAutoScaling::ScalableTarget');
+    equal(objetivo.Properties.MinCapacity, 1);
+    equal(objetivo.Properties.MaxCapacity, 2);
+  });
+}
+
+test('sin autoescalado el backend conserva su número fijo de copias', () => {
+  // Bootstrap (0 copias) o máximo igual al mínimo: no hay quien decida el número.
+  for (const [desiredCount, backendMaxCapacity] of [['0', '2'], ['1', '1']]) {
+    const plantilla = synth({ environment: 'prod', habilitarNatEgress: 'true', desiredCount, backendMaxCapacity });
+    equal(recursos(plantilla, 'AWS::ApplicationAutoScaling::ScalableTarget').length, 0);
+    equal(servicio(plantilla, 'BackendTaskDefinition').Properties.DesiredCount, Number(desiredCount));
   }
 });
 
