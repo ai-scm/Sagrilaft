@@ -47,7 +47,9 @@ function clasificar(stack: Stack) {
   };
 }
 
-// Tipos que CloudFormation no permite etiquetar. Si aparece uno nuevo, esta lista
+// Tipos que no admiten etiquetas en la plantilla. Algunos (listeners, sus reglas y
+// el ScalableTarget) reciben igual las etiquetas del stack que CloudFormation les
+// copia al desplegar, pero nunca Component. Si aparece un tipo nuevo, esta lista
 // obliga a revisar si de verdad no admite etiquetas antes de aceptarlo.
 const TIPOS_NO_ETIQUETABLES = [
   'AWS::ApplicationAutoScaling::ScalableTarget',

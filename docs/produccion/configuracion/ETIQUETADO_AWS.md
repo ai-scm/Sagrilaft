@@ -59,10 +59,17 @@ ni los etiqueta:
   del stack, pero Route 53 no admite etiquetas en registros);
 - rol de despliegue de GitHub y recursos de bootstrap de CDK.
 
-**Tipos que AWS no permite etiquetar:** rutas, reglas de grupos de seguridad,
-asociaciones de subred y de WAF, políticas IAM, listeners y sus reglas, registros
-DNS, suscripciones SNS, objetivos y políticas de autoescalado. Se identifican por el
-stack `SagrilaftStack-<ambiente>` al que pertenecen.
+**Tipos que no admiten etiquetas en la plantilla.** CloudFormation no deja ponerles
+etiquetas propias, así que no llevan `Component`. Hay dos casos:
+
+- **Listeners del balanceador, sus reglas y el objetivo de autoescalado del backend.**
+  Reciben igual las etiquetas del stack (`Project`, `Environment` y `ManagedBy=cdk`),
+  que CloudFormation les copia. Su función se deduce del balanceador o del servicio
+  al que pertenecen.
+- **Rutas, reglas de grupos de seguridad, asociaciones de subred y de WAF, políticas
+  IAM, registros DNS, suscripciones SNS y políticas de autoescalado.** No llevan
+  ninguna etiqueta. Se identifican por el stack `SagrilaftStack-<ambiente>` al que
+  pertenecen.
 
 ## Recursos fuera de CDK
 
@@ -76,8 +83,20 @@ stack `SagrilaftStack-<ambiente>` al que pertenecen.
 | Logs de Container Insights y zonas `sagrilaft-<ambiente>.local` | ECS y Cloud Map; copian etiquetas solo al crearse | — |
 | Tareas ECS en ejecución | Heredan las del servicio al arrancar | heredado |
 
-Las filas `manual` y `autoescalado` se etiquetan con un procedimiento aparte del
-despliegue de CDK.
+Estos recursos se etiquetan con
+[`scripts/aws/etiquetar_fuera_de_cdk.py`](../../../scripts/aws/etiquetar_fuera_de_cdk.py),
+aparte del despliegue de CDK. El script solo agrega etiquetas y por defecto solo
+simula. Conviene repetirlo después de cada despliegue, porque AWS recrea las alarmas
+del autoescalado (a esas les pone `Component=backend`).
+
+```bash
+# Ver qué haría (no escribe nada)
+python3 scripts/aws/etiquetar_fuera_de_cdk.py --env <ambiente> --profile <perfil>
+
+# Aplicar (en prod además --confirmo-prod)
+python3 scripts/aws/etiquetar_fuera_de_cdk.py --env <ambiente> --profile <perfil> \
+  --apply --expected-account <cuenta>
+```
 
 ## Snapshots de RDS
 
