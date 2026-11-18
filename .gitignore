@@ -97,6 +97,10 @@ reset_entorno.sh
 !/docs/produccion/
 /docs/produccion/*
 !/docs/produccion/ESTIMACION_COSTOS_AWS.md
+# Criterio de etiquetado AWS: lo enlazan infra/sagrilaft/lib/etiquetas.ts y el runbook.
+!/docs/produccion/configuracion/
+/docs/produccion/configuracion/*
+!/docs/produccion/configuracion/ETIQUETADO_AWS.md
 tmp/
 PLAN.md
 

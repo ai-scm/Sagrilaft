@@ -19,6 +19,7 @@ import { ObservabilidadAlarmas } from './constructs/observabilidad-alarmas';
 import { DashboardTecnico } from './constructs/dashboard-tecnico';
 import { DashboardNegocio } from './constructs/dashboard-negocio';
 import { DEFAULT_BEDROCK_MODEL_ID, SAGRILAFT_DB_NAME } from './deployment-constants';
+import { etiquetarComponente, etiquetarSistema } from './etiquetas';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dominios productivos actuales.
@@ -163,8 +164,7 @@ export class SagrilaftStack extends cdk.Stack {
         `backendMaxCapacity invalido: ${backendMaxCapacityRaw}. Debe ser un entero >= desiredCount (${desiredCount}).`,
       );
     }
-    cdk.Tags.of(this).add('Project', 'sagrilaft');
-    cdk.Tags.of(this).add('Environment', ambiente);
+    etiquetarSistema(this, ambiente);
 
     const hostedZone = hostedZoneName && hostedZoneId
       ? route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
@@ -286,6 +286,47 @@ export class SagrilaftStack extends cdk.Stack {
     const dashboardNegocio = new DashboardNegocio(this, 'DashboardNegocio', {
       ambiente,
     });
+
+    // ── Etiqueta Component: función de cada recurso (ver lib/etiquetas.ts) ──
+    // Solo agrega etiquetas; no cambia ninguna otra propiedad de los recursos.
+    etiquetarComponente('red', networking);
+    etiquetarComponente('almacenamiento', storage);
+    etiquetarComponente('secretos', secrets);
+    etiquetarComponente('notificaciones', notifications);
+    etiquetarComponente('configuracion', configParams);
+    etiquetarComponente('base-datos', database);
+    etiquetarComponente('balanceador', lb, certificado);
+    etiquetarComponente('cortafuegos-web', cortafuegos);
+    etiquetarComponente('observabilidad', alarmas, dashboardTecnico, dashboardNegocio);
+    // Dentro de ECS: el cluster, el rol de ejecución compartido y Cloud Map son
+    // plataforma; cada servicio lleva su propio componente, igual que su repositorio ECR.
+    etiquetarComponente('plataforma-contenedores', ecsFargate);
+    const serviciosPorComponente = [
+      ['backend', ecsFargate.backend, ecrRepos.backendRepo],
+      ['formulario-publico', ecsFargate.frontend, ecrRepos.formularioPublicoRepo],
+      ['portal-interno', ecsFargate.portal, ecrRepos.portalInternoRepo],
+      ['keycloak', ecsFargate.keycloak, ecrRepos.keycloakRepo],
+    ] as const;
+    for (const [componente, servicio, repositorio] of serviciosPorComponente) {
+      etiquetarComponente(
+        componente,
+        servicio.service,
+        servicio.taskDefinition,
+        servicio.taskDefinition.taskRole,
+        servicio.logGroup,
+        servicio.targetGroup,
+        repositorio,
+      );
+    }
+    etiquetarComponente(
+      'listas-worker',
+      ecsFargate.listasWorker.service,
+      ecsFargate.listasWorker.taskDefinition,
+      ecsFargate.listasWorker.taskDefinition.taskRole,
+      ecsFargate.listasWorker.logGroup,
+    );
+    // La migración reutiliza el rol del backend, que conserva Component=backend.
+    etiquetarComponente('migraciones', ecsFargate.migrationTaskDefinition, ecsFargate.migrationLogGroup);
 
     if (hostedZone) {
       const albTarget = route53.RecordTarget.fromAlias(new targets.LoadBalancerTarget(lb.alb));
