@@ -465,6 +465,13 @@ detectada. El procedimiento productivo y su RTO se siguen en
 [P10](../produccion/PENDIENTES_PRODUCCION.md#p10); el tamaño/clase de instancia
 puede diferir de este simulacro.
 
+### Snapshots manuales
+
+Un snapshot manual (por ejemplo antes de una migración) se crea con las cuatro
+etiquetas explícitas y `ManagedBy=manual`, para no confundirlo con los automáticos,
+que heredan `ManagedBy=cdk` de la base. Comando y verificación en
+[Etiquetado de recursos AWS](../produccion/configuracion/ETIQUETADO_AWS.md#snapshots-de-rds).
+
 <a id="herramientas"></a>
 ## 7. Notas operativas / bugs de herramientas conocidos
 
