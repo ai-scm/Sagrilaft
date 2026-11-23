@@ -554,7 +554,9 @@ Hay dos fuentes:
   avisos de seguridad (`RATE_LIMIT_EXCEEDED`, `CREDENTIALS_INVALID`, `ACCESS_DENIED`,
   `AUTH_FAILED`) traen `ip=` con la IP real del visitante. Si en vez de eso aparece una
   dirección `10.0.x.x`, el backend no está leyendo la IP real: revisar que
-  `TRUSTED_PROXY_IPS` sea la red de la VPC.
+  `TRUSTED_PROXY_IPS` sea la red de la VPC. Ojo: las líneas de acceso del servidor web
+  (`INFO:     10.0.x.x:puerto - "POST /api/..."`) siempre muestran la IP del balanceador;
+  eso es normal y no indica ningún fallo.
 - **Registros de acceso del balanceador** (bucket `Lb/RegistrosAcceso` del stack,
   carpeta `alb/`). Son independientes de la aplicación y guardan cada petición: fecha,
   IP real, dirección pedida y respuesta. Llegan cada 5 minutos y se borran solos a los
