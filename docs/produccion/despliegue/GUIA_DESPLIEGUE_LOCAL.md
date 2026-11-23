@@ -145,10 +145,12 @@ Se requiere un único escritor por directorio de evidencia.
 Revisar las plantillas preparadas y la evidencia antes de autorizar otra fase.
 Rechaza cambios ajenos a las transiciones admitidas: separarlos, no omitir el control.
 Excepción aprobada para staging y prod: `APPROVED_UNICODE_PAIRS` en el orquestador
-admite 22 pares completos de texto en rutas exactas (cuatro descripciones de
-LifecyclePolicyText ECR, 16 descripciones de alarmas, el filtro que cuenta correos
-fallidos y el fragmento del título del dashboard). Si se cambia el texto de una
-alarma con tildes, hay que actualizar su par o el preflight se detendrá. GetTemplate devuelve `?` donde los recursos directos conservan tildes;
+admite cinco pares completos de texto en rutas exactas (cuatro descripciones de
+LifecyclePolicyText ECR y el fragmento del título del dashboard). Esas cinco son
+anteriores a noviembre de 2026 y no deben crecer: los textos que llegan a AWS
+(descripciones de alarmas, filtros de registros, títulos) se escriben sin tildes
+ni «ñ», y una prueba de infraestructura lo exige para alarmas y filtros.
+GetTemplate devuelve `?` donde los recursos directos conservan tildes;
 se verificó el mismo comportamiento en `SagrilaftStack-prod` el 2026-10-21.
 La equivalencia solo se aplica a copias para comparación: no cambia las assemblies,
 no omite propiedades ni normaliza Unicode de forma general. Cualquier otro texto,
