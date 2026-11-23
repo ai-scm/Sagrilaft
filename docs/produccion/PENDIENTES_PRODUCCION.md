@@ -1,14 +1,19 @@
-# Pendientes para producción — registro único de tareas
-Evidencias originales P20: consultar el [índice del archivo P20](p20/EVIDENCIAS_P20_ARCHIVADAS.md); las rutas entre paréntesis son relativas a su contenido.
+# Pendientes de producción
 
-Revisión documental: 2026-10-21 (P03: SMTP/Zoho y release de staging del 20 de octubre).
-Los demás pendientes conservan sus evidencias históricas (P20 y staging/bootstrap: 2026-10-16). Función única: registrar tareas, decisiones de cierre y
-criterios de aceptación. Los estados externos se basan en evidencias archivadas y revalidaciones
-fechadas por ejecución; esto no es una auditoría general actual de AWS/GitHub. [Mapa documental](../README.md#funciones).
+Lista única de tareas de SAGRILAFT. Cada tarea tiene un código (P01, P02…) que no
+cambia; los demás documentos enlazan ese código en vez de copiar su estado.
 
-Cada tarea tiene un ID estable. Los demás documentos enlazan ese ID; no mantienen
-otra casilla, prioridad o estado para la misma tarea. Las instrucciones están
-en checklist/guía/runbook; los valores en el catálogo por ambiente.
+- **Estado actual de los ambientes:** [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md).
+- **Cómo se hace algo:** [guía de despliegue](despliegue/GUIA_DESPLIEGUE_LOCAL.md) o [runbook](../operacion/RUNBOOK_OPERATIVO.md).
+- **Valores de configuración:** [Configuración en AWS](configuracion/MATRIZ_AWS_CONFIG.md).
+
+Revisado el 2026-11-23: P01, P04, P05, P06, P07, P11, P12, P15 y P21 se contrastaron
+ese día con AWS, git y GitHub. El resto conserva la fecha de su última revisión. La
+evidencia que ya no existe y su fuente alternativa están en el
+[índice de evidencia](../evidencia/README.md#no-conservada).
+
+Para cerrar una tarea: anotar fecha, ambiente y evidencia, cambiar su estado y dejar
+su código (no se renumera).
 
 <a id="corte"></a>
 ## 1. Corte productivo
@@ -16,17 +21,26 @@ en checklist/guía/runbook; los valores en el catálogo por ambiente.
 <a id="p01"></a>
 ### P01 — Release y trazabilidad
 
-**Estado:** 🟡 Parcial; release coordinada de staging acreditada, release productiva pendiente.
+**Estado:** 🟡 Parcial: las releases se hacen y se verifican; falta marcar cada versión con un tag y sus notas.
 
 Publicador SHA/manifiesto y protección de concurrencia implementados; ECR staging
 inmutable. El intento 3 del 6–7 de octubre para SHA
 `6542326a67d664847b3ff99bd8ec3c82ca3a7c6b` completó migración c7→f8,
 activación y verificación de las cuatro imágenes/digests, cierre manual y
-liberación condicional del lock. [Evidencias y límites en P20](#p20).
+liberación condicional del lock ([evidencia no conservada](../evidencia/README.md#release-staging-6542326)).
 El E2E anterior del 5–6 de octubre no se reasigna retroactivamente a ese SHA;
 el intento 3 conserva su aceptación manual sin capturas independientes.
 Falta fijar la release productiva, verificar sus imágenes/configuración y registrar
 tag/notas finales. No repetir publicación o ensayo staging ya completados.
+
+**Actualización 2026-11-23 (verificado en ECS, `/health` y git).** Ya hay releases productivas;
+la vigente es `972f993`. El historial y la evidencia de cada una están en
+[Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md#producción).
+
+**Pendiente:** crear el tag de versión (`vX.Y.Z`) sobre el SHA que se apruebe en el Go (hoy
+`972f993`) y sus notas en un `CHANGELOG.md`, que todavía no existe, según la
+[guía](despliegue/GUIA_DESPLIEGUE_LOCAL.md#release). El repositorio no tiene ningún tag
+(verificado el 2026-11-23).
 
 <a id="p02"></a>
 ### P02 — Go/No-Go y riesgo de correo
@@ -90,45 +104,21 @@ Riesgos conocidos, sin cambios de código: el valor vacío fijo de `smtp_credent
 
 Evidencia (fuera del repositorio, sin valores): `~/evidencia-secretos-prod-6897920dec80b02171c83e3446d8f6afce14512d/antes.json` y `dry-run.txt`.
 
-Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cierre: resultados productivos archivados sin secretos. Consultar [valores](configuracion/checklist-valores-staging-prod.md) y [contrato de configuración](configuracion/MATRIZ_AWS_CONFIG.md).
+Pendiente técnico: verificar S3/SSM, DNS/TLS, Keycloak y Bedrock desde ECS. Cierre: resultados productivos archivados sin secretos. Consultar [valores](configuracion/MATRIZ_AWS_CONFIG.md) y [contrato de configuración](configuracion/MATRIZ_AWS_CONFIG.md).
 
 <a id="p04"></a>
 ### P04 — Primer despliegue productivo
 
-**Estado:** 🟡 Parcial; migración y activación completadas y verificadas; lock de S3 liberado (2026-10-24); falta el cierre formal.
+**Estado:** 🟢 Hecho. El tag y las notas de la versión se siguen en [P01](#p01).
 
-El bootstrap base de `SagrilaftStack-prod` se completó el 2026-10-07 con el código del commit `4f7543123adea6a7da9ebbde187760a930fb1b4e`; la evidencia está en [bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). SMTP y Zoho ya están conciliados (P03, 2026-10-20) y el drift de SNS está corregido (2026-10-21, ver [P06](#p06)).
+Resumen (detalle en la evidencia enlazada):
+- **Bootstrap (2026-10-07):** `SagrilaftStack-prod` creado con el commit `4f7543123adea6a7da9ebbde187760a930fb1b4e` y los servicios en 0 ([evidencia no conservada](../evidencia/README.md#bootstrap-prod-20261007)).
+- **Primer corte (2026-10-21, `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`):** antes se resolvieron dos bloqueos del preflight de producción (tildes en la plantilla que devuelve AWS y falta de un `smoke_command` automático; fusionados en `6897920`). Migración de `[]` a `f8a9b0c1d2e3` y activación de los 4 servicios verificadas. El cliente `cdk deploy` falló por red (`ECONNRESET`) después de que CloudFormation terminara, así que la verificación se hizo a mano (12/12) y el lock quedó tomado. [Evidencia del primer corte](../evidencia/primer-corte-prod-20261021/README.md).
+- **Lock liberado (2026-10-24):** verificación manual sin inconsistencias y borrado condicional por ETag. [Registro](../evidencia/primer-corte-prod-20261021/lock-reconciliation-20261024.json).
+- **Verificación desde el contenedor `backend` (2026-10-27):** con el rol de la tarea responden DNS/TLS, SSM, S3 y Bedrock. Bedrock no respondió en el primer intento y luego respondió en 0,82 s dos veces; no es un bloqueante.
+- **Releases posteriores:** cuatro más, la última `972f993` el 2026-11-23, con el lock libre (verificado ese día). Historial en [P01](#p01) y en [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md#producción).
 
-**Bloqueos del 2026-10-21, resueltos antes de publicar imágenes:**
-1. **Preflight de producción.** `GetTemplate` de `SagrilaftStack-prod` devolvía `?` donde el código tiene tildes; la equivalencia `STAGING_UNICODE_PAIRS` de `deploy_release.py` solo cubría staging. **Resuelto y fusionado a `main`** (commit `5de2035`, dentro de `6897920`): ahora `APPROVED_UNICODE_PAIRS` cubre `staging` y `prod`; cualquier otro ambiente, texto o ruta sigue estricto. 52 pruebas nuevas.
-2. **`smoke_command` automático.** No existía ninguno para producción (el modo manual es solo de staging). **Resuelto y fusionado**: [scripts/despliegue/smoke_readonly.py](../../scripts/despliegue/smoke_readonly.py), de solo `GET`. 48 pruebas unitarias.
-3. Fase 2 (secretos): **cerrada sin `--apply`** el mismo día, ver más abajo.
-
-**Publicación de imágenes (2026-10-21).** Las cuatro imágenes del SHA `f8d9dcf06dcfee43d6b885827444ffcee9f2007b` quedaron publicadas y verificadas en ECR (manifiesto `complete: true`, digests coincidentes, los 4 repositorios `IMMUTABLE`). Verificado también: cuenta y región, Python 3.12, Docker disponible, `.env.prod` con permisos `600`.
-
-**Migración y activación (2026-10-21, ejecutadas con `deploy_release.py --execute`):**
-- **Migración:** tarea ECS verificada con `exitCode=0`; revisión Alembic pasó de `[]` a `f8a9b0c1d2e3`, la esperada.
-- **Activación:** CloudFormation terminó en `UPDATE_COMPLETE`; los 4 servicios en `ACTIVE`, `desired=1 running=1`, con los digests aprobados. Target groups del ALB, los 4 `healthy`. Smoke externo manual, 12/12 comprobaciones (HTTPS, HSTS, redirección, `/health` con commit y base de datos, OIDC de Keycloak).
-- **Incidente sin impacto en AWS:** el cliente `cdk deploy` falló con `TimeoutError: read ECONNRESET` justo después de que CloudFormation completara. El orquestador se detuvo antes de sus propias verificaciones (no llegó a `services()` ni al smoke automático) y **conserva el lock de S3** sin liberar. La verificación posterior fue manual, independiente del orquestador. [Evidencia completa](../evidencia/primer-corte-prod-20261021/README.md).
-
-**Lock de S3 reconciliado y liberado (2026-10-24).** Verificación manual previa, replicando las
-mismas funciones del orquestador (`comparison_template`, `services()`): cuenta activa, stack
-`UPDATE_COMPLETE` sin cambios desde la activación, plantilla desplegada idéntica a la `activate`
-aprobada, los 4 servicios con digests/estado correctos, y `planHash` de `lock.json` coincidente
-con el evento `plan_validated` del mismo intento. Sin inconsistencias. Borrado condicional
-(`delete-object --if-match` con el ETag exacto), confirmado con `404` posterior. No existe hoy
-una herramienta automática de reconciliación para producción (solo para `smoke_mode=manual`,
-exclusivo de staging); se hizo a mano, con el mismo rigor. Evidencia:
-`execute-1/lock-reconciliation-20261024.json` (fuera del repositorio).
-
-**Pendiente para cerrar P04:**
-1. ~~Reconciliar y liberar el lock de S3~~ (hecho el 2026-10-24).
-2. Registrar el cierre formal (tag/notas de release, según la [guía](despliegue/GUIA_DESPLIEGUE_LOCAL.md#release)).
-3. **Verificar S3/SSM, DNS/TLS y Bedrock (2026-10-27, desde dentro del contenedor `backend`, con el rol IAM de la tarea, vía `ecs execute-command` + `boto3`):**
-   - DNS/TLS: ✅ ambos dominios resuelven; certificado válido.
-   - SSM: ✅ `get_parameter` responde (~16s) con el valor correcto; los parámetros de configuración son consistentes.
-   - S3: ✅ `list_objects_v2` responde; bucket existe, coincide con `S3_BUCKET`, vacío (0 objetos, esperado sin P07 ejecutado).
-   - Bedrock: en el primer intento, `invoke_model` no respondió en 21 minutos (timeout de inactividad de la sesión, sin error de permisos). Se repitió la prueba dos veces más: ✅ respuesta real del modelo en 0.82s y consistente. **Conclusión: no es un bloqueante.** El cuelgue inicial fue un evento aislado; Bedrock funciona de forma estable desde el rol de la tarea.
+ El repositorio no tiene ningún tag (verificado el 2026-11-23).
 
 <a id="p05"></a>
 ### P05 — Firma automática en producción
@@ -136,6 +126,13 @@ exclusivo de staging); se hizo a mano, con el mismo rigor. Evidencia:
 **Estado:** 🟡 Parcial.
 
 Cuenta/OAuth/webhook preparados y probados en staging. Falta un expediente productivo firmado que el webhook complete sin consulta manual, con PDF en S3 y auditoría. Cierra el criterio 2 del Go/No-Go referido. Procedimiento y antecedentes: [runbook, sección 9](../operacion/RUNBOOK_OPERATIVO.md#zoho).
+
+**Bloqueo verificado el 2026-11-23: la cuenta de Zoho Sign no tiene créditos de API.** El único
+intento de firma en producción (2026-11-03, 17:09 UTC) fue rechazado por Zoho con
+`code 12000` («Compre créditos de Zoho Sign para enviar documentos a través de la API»). Desde
+entonces no hubo más intentos ni llamadas al webhook de producción (registros del backend). Ese
+intento probablemente dejó un borrador en Zoho ([P16](#p16)). No se pudo consultar el saldo actual
+de créditos: hay que revisarlo en la consola de Zoho.
 
 <a id="p06"></a>
 ### P06 — Alarma productiva de extremo a extremo
@@ -157,7 +154,13 @@ El 2026-10-07 se ejecutó una prueba controlada de la acción de la alarma 5xx: 
 3. Provocar una alarma por métrica real con los servicios activos y verificar que el aviso llegue a la lista definitiva (hoy, solo `Bryan.Ariza@blend360.com`) en menos de cinco minutos. Pendiente de ejecutar.
 4. Registrar cada paso en la evidencia de la fecha correspondiente.
 
-[Evidencia de la actualización de hoy](../evidencia/sns-alertas-prod-20261021/README.md). [Evidencia de la prueba temporal](../evidencia/sns-prueba-temporal-prod-20261007.json). [Procedimiento](../operacion/RUNBOOK_OPERATIVO.md#alarmas). [Evidencia de creación](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md).
+**Actualización 2026-11-23 (verificado en CloudWatch y SNS).** Producción pasó de 3 a 16 alarmas;
+todas estaban en `OK` ese día y avisan por SNS al fallar y al recuperarse. La lista y qué hacer
+con cada una están en el [runbook](../operacion/RUNBOOK_OPERATIVO.md#que-hacer-alarma). El tema
+sigue con una sola suscripción de correo confirmada. Los puntos 1 (destinatarios) y 3 (prueba con
+una métrica real) siguen pendientes.
+
+[Evidencia de la actualización de hoy](../evidencia/sns-alertas-prod-20261021/README.md). [Evidencia de la prueba temporal](../evidencia/README.md#sns-prueba-temporal-20261007) (no conservada). [Procedimiento](../operacion/RUNBOOK_OPERATIVO.md#alarmas). [Evidencia de creación](../evidencia/README.md#bootstrap-prod-20261007) (no conservada).
 
 <a id="p07"></a>
 ### P07 — Smoke funcional y correo productivos
@@ -168,12 +171,15 @@ Crear un acceso real, recibir el correo y recorrer guardado, adjuntos/IA, descar
 
 **Prerrequisito de usuarios (2026-10-21, cumplido el 2026-10-27):** el realm de Keycloak importado no trae ningún usuario (solo el cliente `sagrilaft-portal` y los roles `acceso_clientes`/`acceso_proveedores`), así que había que crearlos a mano desde la consola de administración de producción. **El 2026-10-27 el responsable técnico informó que los usuarios internos ya están creados en producción**, configurados a mano en lugar de importarlos desde staging (el export parcial de la consola no incluye usuarios). **Revisión de inventario (2026-10-27, en la consola de producción de Keycloak, solo lectura):** el realm `sagrilaft` tiene los usuarios internos esperados y los roles y grupos de acceso están configurados. No se modificó ningún usuario, grupo ni asignación. Los correos y nombres de usuario no se registran en este documento. El código lee roles de realm desde `realm_access.roles` ([autenticacion.py](../../backend/api/middleware/autenticacion.py#L212)), así que el acceso depende de que los grupos aporten esos roles al token. **Verificado el 2026-10-27 (Fase 2, pasos 1 y 2):** con la herramienta de evaluación de tokens de Keycloak, un usuario de cada grupo recibe en `realm_access.roles` exactamente el rol de su membresía. **Pendiente en staging:** alinear el secreto de administración de Keycloak con su valor real. Con los usuarios y roles verificados, P07 ya puede ejecutarse.
 
+**Antes de ejecutar P07 (2026-11-23):** el bucket de producción ya tiene archivos de pruebas
+anteriores; decidir qué hacer con ellos en [P21](#p21) para no mezclar la ejecución de P07 con esos datos.
+
 <a id="p08"></a>
 ### P08 — Observación HSTS
 
 **Estado:** 🟢 Verificado en producción (2026-10-21).
 
-Staging reportó HSTS desactivado; esa observación ya no se reproduce (se confirmó HSTS presente en los tres dominios de staging al probar `smoke_readonly.py`). El bootstrap productivo aplicó en el listener HTTPS del ALB `Strict-Transport-Security: max-age=31536000`. Tras activar los 4 servicios, el smoke externo manual confirmó, en los tres dominios de producción: redirección HTTP→HTTPS, respuesta HTTPS correcta y encabezado HSTS presente. [Evidencia](../evidencia/primer-corte-prod-20261021/README.md). [Bootstrap de producción](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md). [Observación original en staging](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
+Staging reportó HSTS desactivado; esa observación ya no se reproduce (se confirmó HSTS presente en los tres dominios de staging al probar `smoke_readonly.py`). El bootstrap productivo aplicó en el listener HTTPS del ALB `Strict-Transport-Security: max-age=31536000`. Tras activar los 4 servicios, el smoke externo manual confirmó, en los tres dominios de producción: redirección HTTP→HTTPS, respuesta HTTPS correcta y encabezado HSTS presente. [Evidencia](../evidencia/primer-corte-prod-20261021/README.md). [Bootstrap de producción](../evidencia/README.md#bootstrap-prod-20261007) (no conservada). [Observación original en staging](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md).
 
 **Hallazgo relacionado (2026-10-24), exposición de la consola admin de Keycloak.** La URL
 `https://login-sagrilaft.ia.blend360.com/admin/master/console/` es alcanzable desde internet. TLS y HSTS
@@ -228,10 +234,19 @@ Para el primer corte se aceptó el riesgo de RDS descrito en [P02](despliegue/P0
 
 **Pendiente de corrección:** crear un rol dedicado a SAGRILAFT, con confianza limitada a este repositorio y permisos mínimos para publicar imágenes, y migrar `AWS_ROLE_TO_ASSUME` a ese rol. No bloquea el deploy manual, pero es una brecha de seguridad real en la cuenta compartida. [Workflow](../../.github/workflows/ci.yml).
 
+**CI en rojo (verificado el 2026-11-23).** Las últimas seis ejecuciones del workflow en `main`
+(18 y 23 de noviembre) fallan en «Publish immutable SHA images» con «AWS ssm/get-parameters
+falló»: el rol no tiene ese permiso. Las pruebas del backend y gitleaks pasan. No afecta a los
+despliegues, que son manuales, pero el rojo constante oculta fallos reales. Se corrige con el rol
+dedicado de este punto o desactivando la publicación automática. Ya existe una propuesta del
+permiso mínimo de lectura de SSM para el CI:
+[`infra/sagrilaft/policies/github-build-ssm.template.json`](../../infra/sagrilaft/policies/github-build-ssm.template.json)
+(hay que sustituir sus marcadores y revisar límites y políticas antes de aplicarla).
+
 <a id="p12"></a>
 ### P12 — Protección de main
 
-**Estado:** 🔴 Confirmado sin protección (2026-10-28).
+**Estado:** 🔴 Confirmado sin protección (2026-10-28; vuelto a verificar el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets).
 
 `GET branches/main/protection` y `GET rulesets` devuelven 404 / lista vacía: **`main` no tiene ninguna regla de protección**, ni clásica ni por ruleset.
 **Pendiente:** un administrador del repositorio debe activar branch protection en `main` exigiendo PR + al menos 1 revisión y el check `Run Backend Tests` en verde antes de mergear. Hasta entonces, los cambios pueden llegar a `main` sin revisión.
@@ -255,7 +270,15 @@ Se registraron WebsiteURL/UseCaseDescription de otro proyecto y ticket interno a
 
 **Estado:** 🔴 Diferido; no bloquea el corte acordado.
 
-Contratar proveedor, obtener URL/credenciales y validar integración real cuando se active. La decisión de arrancar deshabilitado ya está tomada; no equivale a contratarlo. Activarlo **requiere desarrollo**: el módulo de listas v2 no tiene adaptador externo y el código obliga a `deshabilitado` en producción. Trabajo pendiente en [Operación del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#proveedor-externo).
+Contratar proveedor, obtener URL/credenciales y validar integración real cuando se active. La decisión de arrancar deshabilitado ya está tomada; no equivale a contratarlo. Trabajo pendiente en [Operación del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#proveedor-externo).
+
+**Actualización 2026-11-23 (verificado en el código y en AWS).** El texto anterior decía que no
+había adaptador externo; eso ya no es cierto. El adaptador de Tusdatos existe
+(`backend/infrastructure/listas/tusdatos/`) y está desplegado desde `d4cdb84` (2026-11-18). Activarlo
+todavía requiere tres cosas: el contrato; credenciales reales (el secreto
+`sagrilaft/prod/tusdatos_credentials` existe con sus tres campos vacíos); y un cambio de código,
+porque `configuracion.py` rechaza en producción cualquier proveedor distinto de `deshabilitado`. En
+producción, `PROVEEDOR_LISTAS_CAUTELA=deshabilitado` y el trabajador de listas está en 0 tareas.
 
 **Pendiente de confirmar:** si existe la aprobación de Cumplimiento para operar temporalmente sin proveedor de listas. La plantilla local refleja `deshabilitado`; no modifica la configuración efectiva de producción.
 
@@ -287,30 +310,22 @@ Acreditar invalidación de todos los accesos de prueba. La desaparición de aler
 
 Automatizar los huecos enumerados en el [catálogo frontend](../../tests/README.md#cobertura), ejecutar migraciones/flujo PostgreSQL en CI y acreditar su resultado. La cobertura local ya se amplió a 28 revisiones y operaciones de repositorios sobre PG16.6 (44 passed / 3 xfailed históricos); no repetir esa ampliación como pendiente. Alcance en el harness. El [README del harness](../../tests/integration/README.md) define comandos/variables. Una prueba manual de staging no sustituye regresiones automáticas.
 
-<a id="p20"></a>
-### P20 — Validación del despliegue coordinado y recuperación
+<a id="p21"></a>
+### P21 — Datos de prueba en producción
 
-**Estado:** 🟡 El ensayo normal de staging está verificado; los ensayos de
-recuperación aislada A, B y C están cerrados formalmente. Cada escenario tiene
-evidencia, aprobación, excepción y límites propios. A comprobó los dos fallos
-controlados antes de DDL; B comprobó expansión aditiva, rollback de activación
-y compatibilidad GET/PUT/GET; C comprobó incompatibilidad, restauración del
-snapshot a una RDS nueva y smoke aislado GET/PUT/GET con persistencia. Para C,
-CloudFormation quedó `UPDATE_COMPLETE`, los cuatro servicios ECS en `0/0/0` y
-el lock se liberó condicionalmente. Ver [plan operativo](p20/PLAN_OPERATIVO_RECUPERACION_P20.md)
-y los procedimientos [A](p20/PROCEDIMIENTO_P20_ESCENARIO_A.md),
-[B](p20/PROCEDIMIENTO_P20_ESCENARIO_B.md) y [C](p20/PROCEDIMIENTO_P20_ESCENARIO_C.md).
+**Estado:** 🔴 Requiere decisión antes de abrir (registrado el 2026-11-23).
 
-El cierre de A/B/C no cierra los gates del despliegue productivo. El laboratorio
-se retiró el 16 de octubre de 2026: la infraestructura AWS P20 fue eliminada y la
-evidencia se conserva en archivo local ([retiro](p20/RETIRO_P20.md)). Dominios
-nuevos, HTTPS de navegador y login no fueron requisitos de recuperación A/B/C.
+El bucket de documentos de producción tiene 29 objetos de pruebas hechas en producción (subidos
+el 30 y 31 de octubre, el 3 de noviembre y el 18 de noviembre), en carpetas de clientes y
+proveedores; una de ellas lleva el nombre de una empresa. No se revisó el contenido de la base de
+datos ni de los archivos. La copia `sagrilaft-prod-base-pre-pruebas-20261123` se tomó el
+2026-11-23, después de esas pruebas, así que también los contiene: no es una base limpia.
 
-El 6–7 de octubre de 2026 se ejecutó y cerró el intento 3 del despliegue coordinado para el SHA `6542326a67d664847b3ff99bd8ec3c82ca3a7c6b`. La preparación conservó los servicios anteriores; la migración ECS terminó con `ExitCode=0` y verificó Alembic desde `c7a1c1a65662` hasta `f8a9b0c1d2e3`; luego se activaron los cuatro servicios con los digests aprobados. CloudFormation quedó en `UPDATE_COMPLETE`, ECS verificó las tareas y digests, y el lock se liberó condicionalmente después del cierre manual. Las cuatro comprobaciones manuales fueron declaradas aprobadas por el operador y quedaron asentadas sin capturas ni secretos. La evidencia del intento está en [release de staging](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/), incluidos [eventos](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/events.jsonl), [verificación del esquema](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/schema-evidence.json), [servicios activos](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/active-services.json) y [cierre manual](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/deploy-intento-3/manual-accepted.json).
+Decidir, antes de P07 y de la apertura:
+1. Si son datos ficticios o de personas o empresas reales (en ese caso, también es un tema de protección de datos).
+2. Si se limpian, con un procedimiento que trate base de datos y S3 juntos (la auditoría limita los borrados), o si se conservan marcados como prueba.
 
-La cronología detallada del laboratorio (9–14 de octubre: restauraciones, digests, repoint e incidentes) está en el [plan operativo P20](p20/PLAN_OPERATIVO_RECUPERACION_P20.md#cronología-histórica-del-laboratorio). El laboratorio se retiró el 16 de octubre; ver [retiro](p20/RETIRO_P20.md).
-
-P04 sigue pendiente y conserva el primer corte productivo. El ensayo de staging no equivale a autorización ni ejecución en producción.
+No hay procedimiento de limpieza escrito; crearlo es parte de este pendiente.
 
 <a id="cierres"></a>
 ## 4. Cierres y decisiones — fuera del backlog activo
@@ -320,7 +335,7 @@ en la evidencia enlazada. Un cierre solo cubre el alcance indicado.
 
 | Cierre / decisión | Fecha / alcance | Fuente de evidencia |
 |---|---|---|
-| ECR staging inmutable | 6 octubre, 15:54:14 Bogotá; cuatro repositorios, solo mutabilidad, stack UPDATE_COMPLETE | Informe no archivado en el repositorio; ver [evidencia de la release](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/README.md) |
+| ECR staging inmutable | 6 octubre, 15:54:14 Bogotá; cuatro repositorios, solo mutabilidad, stack UPDATE_COMPLETE | Informe no archivado en el repositorio; ver [evidencia de la release](../evidencia/README.md#release-staging-6542326) (no conservada) |
 | Puesta en marcha de staging y migración ECS | Registro previo; staging | [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md) |
 | Flujo completo, firma, auditoría y cierre | 5–6 octubre; AWS staging | [E2E](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md), [PDF](../evidencia/e2e-staging/auditoria_74d14aad.pdf) |
 | Carga v1/v2 y fix de concurrencia S3 | 21–22 septiembre; 0 errores 500/2207 requests en v2 | [Runbook, sección 3](../operacion/RUNBOOK_OPERATIVO.md#carga) |
