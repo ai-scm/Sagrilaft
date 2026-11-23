@@ -76,7 +76,7 @@ etiquetas propias, así que no llevan `Component`. Hay dos casos:
 | Recurso | Origen | `ManagedBy` |
 |---|---|---|
 | Secreto `sagrilaft/prod/zoho_credentials` | Creado a mano; el stack de prod lo importa | `manual` |
-| Parámetro `/sagrilaft/prod/config/PORTAL_URL` | Creado a mano; se conserva ([decisión](VARIABLES_DE_ENTORNO.md)) | `manual` |
+| Parámetro `/sagrilaft/prod/config/PORTAL_URL` | Creado a mano; se conserva ([decisión](MATRIZ_AWS_CONFIG.md#parámetro-creado-a-mano)) | `manual` |
 | Alarmas `TargetTracking-service/sagrilaft-<ambiente>/…` | Las crea el autoescalado del backend; se recrean al cambiar la política | `autoescalado` |
 | Snapshots manuales de RDS | Tomados a mano (por ejemplo antes de una migración) | `manual` |
 | Snapshots automáticos de RDS | Los crea RDS y heredan las etiquetas de la base | `cdk` (heredado) |

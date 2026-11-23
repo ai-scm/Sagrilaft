@@ -29,7 +29,7 @@ Precios de lista en `us-east-1`, sin impuestos. Un mes son 730 horas.
   - Las IPs públicas.
   - Bedrock, con la métrica propia `Sagrilaft/Negocio`.
 
-### Producción hoy: ~327 USD
+### Producción antes del 18-nov: ~327 USD
 
 | Servicio | USD al mes |
 |---|---|
@@ -91,6 +91,9 @@ que se cobran por hora encendidos. El NAT, el ALB y el WAF se dejan: borrarlos y
 crearlos de nuevo exige un `cdk deploy` cada vez, y cambian el DNS y la IP de salida.
 
 ## Arquitectura que sostiene estos costos
+
+Resumen de lo que determina el costo. La arquitectura completa está en
+[Arquitectura en AWS](../arquitectura/DOCUMENTACION_ARQUITECTURA.md).
 
 - **Red:**
   - Las tareas ECS están en subredes privadas y salen por el NAT Gateway. Por ahí van
@@ -188,31 +191,23 @@ Si hubiera que repetirlo (por ejemplo, para recrear staging desde cero):
 5. **Probar** (tabla de pruebas, columna staging).
 6. **Apagar staging:** `scripts/aws/staging_encendido.sh apagar`.
 
-### Producción: pendiente
+### Producción: hecho el 18-nov-2026
 
-Producción conserva su base de datos y sus datos. Sigue con el disco de 100 GB; lo único
-que cambia en la base es la clase de instancia.
+Producción conservó su base de datos y sus datos, con el disco de 100 GB.
 
-1. **Llevar el cambio a `main`** con un merge del PR. El CI solo construye imágenes de
-   producción desde `main`.
-2. **Revisar el lock de release de producción en S3.** Quedó tomado en el primer corte
-   (ver [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md)).
-3. **Comparar con lo desplegado:** `npm run diff:prod`. Debe salir:
-   - la eliminación de los 9 endpoints;
-   - el cambio de clase de RDS a `db.t3.small`, sin reemplazo;
-   - el servicio del trabajador de listas, en 0 copias;
-   - `PropagateTags` y el máximo de autoescalado en 2.
-4. **Desplegar** con el release en modo `compatible` y en una ventana de mantenimiento.
-   RDS se reinicia unos minutos. Al quitar los endpoints se cortan las conexiones
-   abiertas hacia AWS, y los programas se reconectan por el NAT.
-5. **Probar** (tabla de pruebas, columna producción).
-6. **A los 2 o 3 días,** comprobar en Cost Explorer que Fargate aparece con
-   `Project=sagrilaft`. Al cerrar el mes, comparar la factura con lo estimado.
+- **Infraestructura (18-nov):** `cdk deploy` quitó los 9 endpoints de interfaz, creó el
+  trabajador de listas en 0 copias y dejó el autoescalado del backend en 1 a 2 copias
+  (registro en `tmp/despliegue-prod-20261118/deploy_prod_infra.log`).
+- **Release `d4cdb84` (18-nov):** terminó bien, con la migración del módulo de listas.
+- **Verificado el 2026-11-23:** la base de datos es `db.t3.small` con 14 días de copias
+  y el backend tiene 2 GB de memoria.
+- **Pendiente:** confirmar en Cost Explorer que Fargate aparece con `Project=sagrilaft` y,
+  al cerrar diciembre, comparar la factura con lo estimado.
 
 | Prueba | Qué valida | Staging (17-nov) | Producción |
 |---|---|---|---|
-| Las tareas arrancan y `/health` responde | Descarga de imágenes, secretos y SSM por el NAT | Pasó | Por hacer |
-| Registros en CloudWatch | Logs por el NAT | Pasó | Por hacer |
+| Las tareas arrancan y `/health` responde | Descarga de imágenes, secretos y SSM por el NAT | Pasó | Pasó (comprobado el 23-nov) |
+| Registros en CloudWatch | Logs por el NAT | Pasó | Pasó (comprobado el 23-nov) |
 | Inicio de sesión en el portal con OTP | Keycloak y su base de datos | Pasó | Por hacer |
 | Subir y descargar documentos | S3 por el endpoint gateway | Pasó | Por hacer, con un expediente de prueba |
 | Lectura de un documento con IA | Bedrock por el NAT | Pasó | Por hacer, un documento |
@@ -223,6 +218,8 @@ que cambia en la base es la clase de instancia.
 | Bloqueo tras 5 intentos fallidos de inicio de sesión | Protección contra fuerza bruta | Pasó | Por hacer |
 | Usuario con un solo tipo de contraparte | Filtro por rol | Pasó | No |
 | `staging_encendido.sh apagar`, `estado` y `encender` | Procedimiento de encendido | Pasó | No aplica |
+
+Las pruebas de producción que faltan son parte de la prueba completa de producción ([P07](PENDIENTES_PRODUCCION.md#p07)).
 
 ## Encender y apagar staging
 

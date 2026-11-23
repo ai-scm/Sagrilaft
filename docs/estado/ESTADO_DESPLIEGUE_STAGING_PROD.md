@@ -1,12 +1,82 @@
 # Estado de staging y producción
 
-Última revisión documental: 2026-10-21 (credenciales SMTP/Zoho y release del 20 de
+Función única: resumir la situación de los ambientes y enlazar sus evidencias.
+No contiene backlog ([Pendientes](../produccion/PENDIENTES_PRODUCCION.md)) ni
+instrucciones de despliegue ([guía](../produccion/despliegue/GUIA_DESPLIEGUE_LOCAL.md)).
+
+## Estado actual — verificado el 2026-11-23
+
+Verificado con consultas de solo lectura a AWS, `/health` y git el 2026-11-23
+(después de la release de la tarde). No es una consulta en vivo: si pasó tiempo,
+volver a verificar antes de decidir.
+
+### Producción
+
+**Activa, sin abrir a usuarios reales.** Falta el Go final (P02) y las pruebas
+productivas P05, P06 y P07 ([Pendientes](../produccion/PENDIENTES_PRODUCCION.md#corte)).
+
+| Componente | Estado | Cómo se verificó |
+|---|---|---|
+| Versión | `972f99312050e13e759b1d6d8562d7707386c7d9` (release del 2026-11-23) | `/health` y definiciones de tarea ECS |
+| Esquema de base de datos | Revisión Alembic `n54c67d890eb` (sin cambios en la release del 23-nov) | Registro de la release (`release_execute.log`) |
+| Stack `SagrilaftStack-prod` | `UPDATE_COMPLETE` (2026-11-23 20:05 UTC) | `describe-stacks` |
+| Servicios ECS | backend, formulario, portal y Keycloak con 1 tarea cada uno; el trabajador de listas existe desde el 2026-11-18 y está en 0 | `describe-services` |
+| Backend | 2 GB de memoria (desde el 2026-11-23); autoescalado entre 1 y 2 copias | Definición de tarea `backend:8` y `describe-scalable-targets` |
+| Base de datos | `db.t3.small`, PostgreSQL 16.13, una sola zona, 14 días de copias automáticas, cifrada, no pública, protección contra borrado activa | `describe-db-instances` |
+| Copias manuales | `sagrilaft-prod-base-pre-pruebas-20261123` y `sagrilaft-prod-pre-ip-cliente-20261123` | `describe-db-snapshots` |
+| Lock de despliegue (S3) | Libre | `head-object` sin objeto |
+| Alarmas | 16, todas en `OK`; avisan por SNS al fallar y al recuperarse | `describe-alarms` |
+| Destinatarios de alertas | 1 suscripción de correo, confirmada | `list-subscriptions-by-topic` |
+| IP real del cliente | `TRUSTED_PROXY_IPS=10.0.0.0/16`; dos intentos de prueba se registraron con la IP real | Parámetro SSM y registros del backend |
+| Proveedor de listas | `deshabilitado` (el código no permite otro valor en producción) | Parámetro SSM y `backend/infrastructure/config/configuracion.py` |
+| Firma Zoho | Sin firmas en producción. Único intento: 2026-11-03 17:09 UTC, rechazado por falta de créditos de API. Sin llamadas al webhook | Registros del backend (se guardan 30 días) |
+| Tags de release en git | Ninguno | `git tag` y `git ls-remote --tags` |
+
+**Historial de releases de producción** (de las definiciones de tarea del backend en ECS):
+
+| Fecha | Versión | Evidencia disponible |
+|---|---|---|
+| 2026-10-07 | Bootstrap (imagen provisional, servicios en 0) | No conservada; queda el registro de CloudFormation ([detalle](../evidencia/README.md#bootstrap-prod-20261007)) |
+| 2026-10-21 | `f8d9dcf` — primer corte, migración a `f8a9b0c1d2e3` | [Recuperada](../evidencia/primer-corte-prod-20261021/README.md) |
+| 2026-10-30 | `58125cb` — corrige el arranque de nginx en los frontends | Sin evidencia archivada; quedan ECS y las versiones del lock en S3 ([detalle](../evidencia/README.md#sin-evidencia)) |
+| 2026-11-03 | `84ca98e` — mensaje claro cuando Zoho no tiene créditos | Sin evidencia archivada; quedan ECS y las versiones del lock en S3 ([detalle](../evidencia/README.md#sin-evidencia)) |
+| 2026-11-18 | `d4cdb84` — adaptador de listas y migración a `n54c67d890eb` | `tmp/despliegue-prod-20261118/` (fuera del control de versiones) |
+| 2026-11-23 | `972f993` — IP real del cliente y 13 alarmas nuevas, sin migración | `tmp/despliegue-prod-20261123/RESUMEN.md` (fuera del control de versiones) |
+
+Cambios de infraestructura sin release de imagen: etiquetado y autoescalado
+(2026-11-18), 2 GB de memoria y 14 días de copias (2026-11-23).
+
+### Staging
+
+**Apagado** desde el 2026-11-23: servicios en 0 y base de datos detenida
+(`describe-services`, `describe-db-instances`). Última release: `02d3ea9`
+(2026-11-23), que probó la IP real y las alarmas antes de producción
+(`tmp/ip-cliente-staging-20261123/RESUMEN.md`). Base de datos `db.t4g.small`,
+7 días de copias. Se enciende y apaga con `scripts/aws/staging_encendido.sh`.
+
+## Decisiones de operación vigentes
+
+- El despliegue CDK sigue siendo manual por decisión del 2026-09-29.
+- Se prepara producción con listas deshabilitadas hasta contratar proveedor;
+  lo que falta para activarlo está en los [pendientes del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#7-pendientes).
+- La aceptación operativa del riesgo Outlook fue registrada el 2026-10-06.
+  El registro formal y su seguimiento se gestionan en [P02](../produccion/PENDIENTES_PRODUCCION.md#p02).
+
+## Histórico (registros hasta el 2026-10-24)
+
+Lo que sigue es el registro original, sin cambios de contenido. Describe el estado
+en esas fechas, no el actual. Las evidencias del primer corte y de SNS del 21 de octubre
+se recuperaron; las del bootstrap y la release de staging `6542326` no se conservan
+y sus enlaces llevan a la explicación con las fuentes alternativas
+([índice de evidencia](../evidencia/README.md)).
+
+*Encabezado original:* Última revisión documental: 2026-10-21 (credenciales SMTP/Zoho y release del 20 de
 octubre); el resto se basa en evidencias archivadas del 15–16 de octubre y
 referencias acreditadas posteriores al registro inicial del 6 de octubre. Función única: resumir la situación
 acreditada de los ambientes y enlazar sus evidencias. No contiene un backlog
 ni instrucciones de despliegue. No es una consulta en vivo de AWS.
 
-## Staging
+### Staging
 
 **Operativo y validado funcionalmente.** Bootstrap, infraestructura, secretos,
 S3, imágenes y migración ECS fueron registrados como realizados; la migración
@@ -17,7 +87,7 @@ acredita el recorrido desde acceso hasta firma, auditoría y cierre. La
 [validación PostgreSQL local](../evidencia/e2e-staging/VALIDACION_STAGING_E2E.md)
 es una evidencia distinta, con dobles para integraciones externas.
 
-### Release del 20 de octubre de 2026 — `767b3acdc36044869d07980210e2ff212311474e`
+#### Release del 20 de octubre de 2026 — `767b3acdc36044869d07980210e2ff212311474e`
 
 Desplegada con `deploy_release.py` (modo `compatible`, sin migración nueva: misma
 revisión Alembic `f8a9b0c1d2e3` antes y después). Corrige que el portal interno no
@@ -35,20 +105,20 @@ El NAT Gateway que se había reactivado para esta validación se apagó el mismo
 `deleted`, stack `UPDATE_COMPLETE`, los 4 servicios ECS `ACTIVE`/`COMPLETED` sin
 interrupción, `/health` respondiendo en el mismo commit tras el cambio.
 
-### Actualización del 6 de octubre de 2026
+#### Actualización del 6 de octubre de 2026
 
 ECR quedó en `IMMUTABLE` para backend, formulario público, portal interno y Keycloak.
 El stack terminó en `UPDATE_COMPLETE` a las 15:54:14 de Bogotá; eventos y plantilla
 final acreditan únicamente los cuatro cambios de mutabilidad. Retención intacta.
-El informe y la evidencia JSON de esa actualización no están archivados en el repositorio; la release posterior se documenta en [la carpeta de evidencia de la release](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/README.md).
+El informe y la evidencia JSON de esa actualización no están archivados en el repositorio; la release posterior se documenta en [la carpeta de evidencia de la release](../evidencia/README.md#release-staging-6542326) (no conservada).
 La actualización aislada de ECR no publicó imágenes ni ejecutó migraciones.
 Posteriormente, el operador publicó las cuatro imágenes candidatas con SHA
-`6542326a67d664847b3ff99bd8ec3c82ca3a7c6b`. El [manifiesto archivado](../evidencia/release-staging-6542326a67d664847b3ff99bd8ec3c82ca3a7c6b/ecr-manifest-intento-1.json)
+`6542326a67d664847b3ff99bd8ec3c82ca3a7c6b`. El [manifiesto archivado](../evidencia/README.md#release-staging-6542326) (no conservada)
 registra `complete: true` y los cuatro digests; sus campos y huellas de build fueron
 verificados localmente. Ese manifiesto aislado no acreditaba activación ni actualización de BD.
 Después, el intento 3 del 6–7 de octubre completó migración c7→f8, activación
-y verificación de cuatro servicios/digests y aceptación manual;
-[evidencia y límites](../produccion/PENDIENTES_PRODUCCION.md#p20).
+y verificación de cuatro servicios/digests y aceptación manual
+([evidencia no conservada](../evidencia/README.md#release-staging-6542326)).
 No se volvieron a consultar los recursos de staging en esta actualización.
 
 Consultas de solo lectura previas del mismo día, registradas en la sesión de trabajo
@@ -67,7 +137,7 @@ Consultas de solo lectura previas del mismo día, registradas en la sesión de t
 Estas observaciones no acreditan el estado futuro ni sustituyen la revalidación
 previa a una ejecución. El cambio ECR no modificó ese esquema ni la release activa.
 
-### Trazabilidad de versiones
+#### Trazabilidad de versiones
 
 | Registro histórico | Alcance |
 |---|---|
@@ -75,10 +145,10 @@ previa a una ejecución. El cambio ECR no modificó ese esquema ni la release ac
 | `ef4024fe579a9e0827daf3c8099ecf26e1e2d2e7` | Deploy registrado el 2026-09-23, duración 693,17 s; `/health` reportó ese commit y `database=ok`, `sns_alertas=ok`. |
 | E2E del 5–6 de octubre | Evidencia funcional posterior sin asociación inequívoca al SHA de las imágenes. Seguimiento: [P01](../produccion/PENDIENTES_PRODUCCION.md#p01). |
 
-## Producción
+### Producción
 
 **Migración y activación completadas y verificadas (2026-10-21); apertura a usuarios aún no acreditada.**
-El [bootstrap del 7 de octubre](../evidencia/bootstrap-prod-4f7543123adea6a7da9ebbde187760a930fb1b4e/README.md)
+El [bootstrap del 7 de octubre](../evidencia/README.md#bootstrap-prod-20261007) (no conservada)
 registró CREATE_COMPLETE, RDS disponible y cuatro servicios en 0/0/0.
 
 **Actualización del 2026-10-21 (primer corte).** Con el SHA `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`,
@@ -86,7 +156,7 @@ registró CREATE_COMPLETE, RDS disponible y cuatro servicios en 0/0/0.
 y activó los cuatro servicios (`desired=1 running=1`, digests aprobados coincidentes). CloudFormation
 terminó en `UPDATE_COMPLETE`. El cliente `cdk deploy` falló después por un error de red
 (`ECONNRESET`), no por un fallo real; el orquestador se detuvo antes de sus propias verificaciones
-y **el lock de S3 sigue tomado, sin reconciliar**. La verificación se hizo de forma independiente:
+y **el lock de S3 quedó tomado, sin reconciliar** (se reconcilió y liberó el 2026-10-24; ver [P04](../produccion/PENDIENTES_PRODUCCION.md#p04)). La verificación se hizo de forma independiente:
 CloudFormation, los 4 servicios ECS, los target groups del ALB y un smoke externo manual
 (12/12 comprobaciones: HTTPS, HSTS, redirección, `/health` y OIDC) confirman que producción está
 activa y saludable. [Evidencia completa](../evidencia/primer-corte-prod-20261021/README.md).
@@ -119,41 +189,21 @@ Verificado el 2026-10-16 con lecturas de solo metadatos y comparación de iguald
 **Actualización del 2026-10-21 (SNS de alertas).** `SagrilaftStack-prod` se actualizó a `UPDATE_COMPLETE` con el código `2b0b844e66d8efafcd89fd815a179a6cf14a04dc`: se agregó la suscripción de `Bryan.Ariza@blend360.com` (confirmada) y se actualizó el parámetro `ALERTAS_EMAIL_DESTINATARIO` a 12 correos. Las alarmas de producción están en `OK`. Las once suscripciones originales siguen en CloudFormation pero no existen en SNS (drift); no se ha enviado invitación a esos destinatarios. Decisión del mismo día: la lista de alertas queda solo con `Bryan.Ariza@blend360.com` (SNS y SES) hasta autorizar a los otros once. Esa decisión se aplicó en un segundo `cdk deploy` (`UPDATE_COMPLETE`, 12:24 UTC): los once recursos obsoletos se eliminaron de CloudFormation sin errores, SSM quedó con un solo correo y los servicios siguen en 0/0/0. El SHA del repositorio en ese momento era `a1b1a5cda6635d681c1785d64ea84a2198d10963`. Detalle: [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md) y [P06](../produccion/PENDIENTES_PRODUCCION.md#p06).
 
 Release, migración, activación y smoke productivos: ver la actualización del 2026-10-21 arriba.
-El SHA vigente del corte es `f8d9dcf06dcfee43d6b885827444ffcee9f2007b`; el del bootstrap original
+El SHA del primer corte fue `f8d9dcf06dcfee43d6b885827444ffcee9f2007b` (ya no es el vigente: ver «Estado actual»); el del bootstrap original
 fue `4f7543123adea6a7da9ebbde187760a930fb1b4e`.
 
 El catálogo de valores/configuración es
-[checklist-valores-staging-prod.md](../produccion/configuracion/checklist-valores-staging-prod.md).
+[Configuración en AWS](../produccion/configuracion/MATRIZ_AWS_CONFIG.md).
 La preparación y ejecución se siguen exclusivamente en
 [PENDIENTES_PRODUCCION.md](../produccion/PENDIENTES_PRODUCCION.md#corte).
 
-## Laboratorio P20 — estado actualizado al 15 de octubre
-
-A, B y C cerrados formalmente con excepciones y evidencias propias, y locks
-liberados condicionalmente. C acreditó la incompatibilidad, la restauración del
-snapshot a una RDS nueva y un smoke backend aislado GET/PUT/GET con persistencia;
-los cuatro servicios ECS quedaron en 0/0/0. El cierre de recuperación no
-autoriza limpieza ni equivale a un corte productivo. El laboratorio se retiró el
-16 de octubre de 2026 y su infraestructura AWS fue eliminada ([retiro](../produccion/p20/RETIRO_P20.md)).
-[Plan y evidencias](../produccion/p20/PLAN_OPERATIVO_RECUPERACION_P20.md) y
-[procedimiento C](../produccion/p20/PROCEDIMIENTO_P20_ESCENARIO_C.md).
-Dominios nuevos, HTTPS de navegador y login no fueron requisitos de estos ensayos.
-
-## Evidencia operativa
+### Evidencia operativa
 
 Los incidentes corregidos, simulacros y resultados de integraciones están en
 el [runbook](../operacion/RUNBOOK_OPERATIVO.md): SNS (sección 1), Zoho/reintentos
 (2 y 9), carga (3), autoscaling observado (4), ECS (5), RDS (6) y SES (8).
 El [registro de cierres](../produccion/PENDIENTES_PRODUCCION.md#cierres)
 identifica qué salió del backlog sin duplicar esos relatos.
-
-## Decisiones de operación vigentes
-
-- El despliegue CDK sigue siendo manual por decisión del 2026-09-29.
-- Se prepara producción con listas deshabilitadas hasta contratar proveedor;
-  lo que falta para activarlo está en los [pendientes del módulo de listas](../listas/OPERACION_PRUEBAS_Y_PENDIENTES.md#7-pendientes).
-- La aceptación operativa del riesgo Outlook fue registrada el 2026-10-06.
-  El registro formal y su seguimiento se gestionan en [P02](../produccion/PENDIENTES_PRODUCCION.md#p02).
 
 Este documento cambia cuando una nueva evidencia modifica el estado de un
 ambiente. La prioridad y el cierre de tareas se actualizan en el backlog.
