@@ -19,7 +19,7 @@ export interface DatabaseProps {
  * Usa VPC, subnets y SG de la red compartida para alojar RDS.
  *
  * Configurada con encriptación, protección contra eliminación,
- * y backups automáticos de 7 días.
+ * y backups automáticos de 14 días en producción y 7 fuera de ella.
  */
 export class Database extends Construct {
   public readonly instance: rds.DatabaseInstance;
@@ -61,7 +61,10 @@ export class Database extends Construct {
       multiAz: false, // Diseño de producción elegido; recuperación Multi-AZ no está habilitada.
       storageEncrypted: true,
       deletionProtection: true,
-      backupRetention: Duration.days(7), // Acorde a la arquitectura de producción
+      // Producción guarda 14 días para detectar a tiempo problemas que aparecen días
+      // después de un despliegue. Staging no tiene datos que importen: 7 días bastan.
+      // Cambiar entre valores distintos de 0 no reinicia la instancia.
+      backupRetention: Duration.days(esProd ? 14 : 7),
       removalPolicy: RemovalPolicy.RETAIN,
     });
   }

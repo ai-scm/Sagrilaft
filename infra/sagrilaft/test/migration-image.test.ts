@@ -73,7 +73,7 @@ for (const environment of ['staging', 'prod']) {
       .find((resource: any) => resource.Type === 'AWS::RDS::DBInstance') as any;
     equal(database.Properties.DBInstanceClass, environment === 'prod' ? 'db.t3.small' : 'db.t4g.small');
     equal(database.Properties.MultiAZ, false);
-    equal(database.Properties.BackupRetentionPeriod, 7);
+    equal(database.Properties.BackupRetentionPeriod, environment === 'prod' ? 14 : 7);
   });
 
   test(`${environment}: all four ECR repositories are immutable without exclusions`, () => {

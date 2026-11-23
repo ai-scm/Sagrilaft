@@ -472,6 +472,30 @@ etiquetas explícitas y `ManagedBy=manual`, para no confundirlo con los automát
 que heredan `ManagedBy=cdk` de la base. Comando y verificación en
 [Etiquetado de recursos AWS](../produccion/configuracion/ETIQUETADO_AWS.md#snapshots-de-rds).
 
+### Estrategia de respaldos (desde el 2026-11-24)
+
+Acordada el 2026-11-23, antes de las pruebas y la salida a producción. Hasta ese día
+las bases solo tenían datos de prueba.
+
+- **Automáticos:** 14 días en producción y 7 en staging
+  ([database.ts](../../infra/sagrilaft/lib/constructs/database.ts)). No se borran a
+  mano: RDS los elimina al vencer la retención.
+- **Base limpia:** `sagrilaft-prod-base-pre-pruebas-20261123`, tomada antes de las
+  pruebas. Sirve para volver a un estado limpio antes de abrir a usuarios o si una
+  prueba daña la base. Se borra cuando exista el snapshot de salida a producción.
+- **Antes de cada despliegue con migración:** un snapshot manual. Se borra cuando el
+  siguiente despliegue con migración esté verificado. No debe haber más de 1 o 2
+  manuales de este tipo a la vez.
+- **Salida a producción:** limpiar los datos de prueba, tomar
+  `sagrilaft-prod-pre-salida-produccion-<AAAAMMDD>` y conservarlo de 30 a 90 días.
+  Ensayar su restauración en una instancia temporal ([P10](../produccion/PENDIENTES_PRODUCCION.md#p10)).
+- **Staging:** sin snapshots manuales; no tiene datos que importen.
+- **Pendiente:** cuando haya datos reales, confirmar con cumplimiento el plazo de
+  conservación de la información de SAGRILAFT antes de definir cualquier purga.
+- **Limpieza del 2026-11-23:** se borraron `sagrilaft-prod-preteardown-20261007` (de
+  la instancia anterior, ya eliminada) y `sagrilaft-prod-pre-migracion-f8d9dcf-20261021`
+  (base recién creada, sin datos), con aprobación del usuario.
+
 <a id="herramientas"></a>
 ## 7. Notas operativas / bugs de herramientas conocidos
 
