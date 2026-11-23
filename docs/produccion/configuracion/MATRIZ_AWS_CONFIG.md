@@ -1,325 +1,237 @@
-# Matriz AWS Config
-
-Función única: contrato de configuración (nombre, origen, destino y consumo).
-Los valores por ambiente están en el [catálogo](checklist-valores-staging-prod.md),
-y su verificación se gestiona en [P03](../PENDIENTES_PRODUCCION.md#p03).
-
-## Credenciales AWS por ambiente (no secretos de aplicación)
-
-**Actualizado 2026-10-20.** `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` **no existen**
-en ningún ambiente, ni siquiera en `.env` local — no son parte de esta matriz de
-secretos de aplicación porque no viven en Secrets Manager en ningún caso:
-
-- **Staging/producción (ECS):** credenciales temporales del Task Role (`backendTaskRole`
-  en `infra/sagrilaft/lib/constructs/ecs-fargate.ts`). Sin cambios.
-- **Local:** sesión SSO del desarrollador (`aws sso login --profile <perfil>`), definida
-  en `AWS_PROFILE` (`.env`) y montada en el contenedor por `docker-compose.dev.yml`
-  (`~/.aws/config` y `~/.aws/sso`, de solo lectura; `~/.aws/credentials` nunca se monta).
-  Antes, local usaba claves estáticas en `.env` — se eliminaron por buenas prácticas
-  (sin credenciales de larga duración en archivos) y porque la clave que había ya no
-  era válida en AWS.
-- **`BEDROCK_MODEL_ID` en local:** debe apuntar a una cuenta donde el perfil SSO usado
-  tenga acceso real a Bedrock. Verificado el 2026-10-20 con el perfil
-  `PS-PowerUserAccess-<CUENTA_AWS>`: `claude-sonnet-4-6` falla con
-  `AccessDeniedException` (permisos de AWS Marketplace); `us.amazon.nova-pro-v1:0` sí
-  funciona (invocación real probada) y además coincide con el valor ya documentado para
-  staging/producción en el [catálogo](checklist-valores-staging-prod.md).
-- **Decisión 2026-10-20:** staging y producción usan `amazon.nova-pro-v1:0`. Claude Sonnet
-  4.6 tiene mayor precisión al extraer datos de documentos.
-- **Staging ya corre con `amazon.nova-pro-v1:0` (verificado en SSM).** No fue un cambio
-  deliberado y aislado: ocurrió como efecto colateral del `cdk deploy` que activó el NAT
-  Gateway ese mismo día — el script `deploy:staging` de `infra/sagrilaft/package.json`
-  trae `-c bedrockModelId=${BEDROCK_MODEL_ID:-amazon.nova-pro-v1:0}`, y como no se exportó
-  `BEDROCK_MODEL_ID` en esa sesión, tomó el valor por defecto. Antes, staging corría
-  `claude-sonnet-4-6` en vivo (ver discrepancia documentada en
-  [VARIABLES_DE_ENTORNO.md](VARIABLES_DE_ENTORNO.md)). `.env.staging` ya se corrigió para
-  reflejar el valor real.
-- **Producción ya tenía `amazon.nova-pro-v1:0` en SSM desde el bootstrap del 2026-10-07**
-  (el comando de bootstrap en `CHECKLIST_CORTE_PRODUCCION.md` ya pasaba ese valor por
-  contexto); no es un cambio de esta sesión. Es irrelevante en la práctica porque
-  producción sigue con `desiredCount=0` — ningún contenedor lo está usando todavía.
-
-### Procedimiento: sesión SSO para desarrollo local
-
-1. `aws sso login --profile PS-PowerUserAccess-<CUENTA_AWS>` (o el perfil que te hayan
-   asignado). Abre el navegador para autenticar.
-2. En `.env`, define `AWS_PROFILE=<ese perfil>`.
-3. Levanta el backend normalmente: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate backend`.
-4. Verificar que tomó la sesión: `docker exec solucion-backend-1 python3 -c "import boto3; print(boto3.Session().get_credentials().method)"` debe imprimir `sso`.
-5. La sesión SSO expira sola (unas horas); cuando expire, repetir el paso 1 y recrear el
-   backend.
-
-## Secrets Manager
-
-Estos valores son sensibles y no deben quedar como runtime final en archivos
-locales cuando staging/prod ya existan en AWS.
-
-Regla de escritura: CDK crea todos los secretos. Son **externos** (CDK los crea
-vacíos o los importa, y se cargan con `sync_aws_runtime_assets.py --apply`):
-`zoho_credentials` y `sagrilaft_listas_cautela_credentials`. `smtp_credentials` también es externo a CDK, pero se carga a mano en la consola de AWS, no desde `.env*`.
-Son **administrados por CDK** y nunca se escriben desde `.env*`: `app_secret`,
-`db_credentials`, `keycloak_admin`.
-
-### `sagrilaft/{env}/app_secret`
-
-- `secret_key`
-
-Origen: generado por CDK en Secrets Manager. ECS consume este secreto.
-Es administrado por CDK: `sync_aws_runtime_assets.py` **no lo escribe**. El
-La clave `SECRET_KEY` se eliminó de `.env.prod` el 2026-10-19: ningún script local la lee y el valor de ECS es el generado.
-Última escritura esperada: 2026-10-07 08:00:34 (-05:00), creación por CloudFormation.
-
-### `sagrilaft/{env}/zoho_credentials`
-
-- `client_id`
-- `client_secret`
-- `refresh_token`
-- `webhook_secret`
-
-Fuente vigente en AWS: carga manual (cuenta oficial de Legal), última escritura el
-2026-09-24 a las 13:03 (-05:00). Confirmada como fuente final el 2026-10-20: el
-`client_id`/`client_secret` coinciden con el único Self Client de la cuenta Zoho revisada
-en API Console ([P03](../PENDIENTES_PRODUCCION.md#p03)).
-
-Nota (2026-10-20): `staging` y `prod` comparten el mismo `client_id`/`client_secret`/
-`refresh_token` en AWS — un solo Self Client sirve a ambos ambientes. Solo
-`webhook_secret` es distinto entre los dos secretos (cada ambiente tiene su propio
-webhook en Zoho Sign). Esto difiere de la intención original documentada en el
-[catálogo](checklist-valores-staging-prod.md#clientes-oauth-zoho) de tener dos clientes
-OAuth separados (`Sagrilaft_Staging`/`Sagrilaft_Produccion`); no se corrigió porque
-funciona así desde la migración de cuenta y no bloquea nada.
-
-Origen en archivos locales:
-
-- `.env.staging` -> `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`,
-  `ZOHO_WEBHOOK_SECRET`. Reconciliado con `sagrilaft/staging/zoho_credentials` el 2026-10-20.
-- `.env.prod` -> mismos campos. Reconciliado con `sagrilaft/prod/zoho_credentials` el
-  2026-10-20.
-- `.env` (local) -> mismos campos, con el valor de `sagrilaft/staging/zoho_credentials`
-  (local reutiliza la credencial de staging, igual que SMTP). `ZOHO_REDIRECT_URI` de local
-  sigue siendo distinto (`localhost`) porque Zoho no puede llamar a un webhook local.
-
-### `sagrilaft/{env}/smtp_credentials`
-
-- `username`
-- `password`
-
-Fuente vigente en AWS: `sagrilaft-ses-smtppp` (staging) y `ses-smtp-prod-sagrilaft`
-(producción). Se cargan y se rotan en la consola de Secrets Manager; ECS las inyecta
-como `secrets:`. No se declaran en `.env.staging` ni `.env.prod`, y
-`sync_aws_runtime_assets.py` no las lee.
-
-**Adenda 2026-10-20 — separación confirmada por ambiente.** `sagrilaft/staging/smtp_credentials`
-corresponde al usuario IAM `sagrilaft-ses-smtppp` (no `sagrilaft-ses-smtpp` como se había
-identificado el 2026-10-16); probado end-to-end (login + envío real). Esta misma credencial
-se reutiliza en desarrollo local. `sagrilaft/prod/smtp_credentials` corresponde a un usuario
-IAM distinto, `ses-smtp-prod-sagrilaft`, exclusivo de producción; también probado
-exitosamente y ya reconciliado con `.env.prod`. `sagrilaft-ses-smtpp` (doble "p") no está en
-uso confirmado por ningún ambiente.
-
-Origen en archivos locales:
-
-- `.env` (desarrollo local) -> `SMTP_USER`, `SMTP_PASSWORD`, pasadas al backend por Docker
-  Compose. Debe reutilizar el valor de `sagrilaft/staging/smtp_credentials`, no una
-  credencial propia.
-- `.env.staging` y `.env.prod` -> sin `SMTP_USER` ni `SMTP_PASSWORD`. Validado por
-  `scripts/validacion/validate_envs.py`, que rechaza esas claves en estos archivos.
-
-### `sagrilaft/{env}/keycloak_admin`
-
-- `username`
-- `password`
-
-Estado esperado:
-
-- `username=admin`
-- `password` generado por CDK (32 caracteres).
-- Última escritura esperada: 2026-10-07 08:00:35 (-05:00), creación por CloudFormation.
-
-Nota:
-
-- Administrado por CDK. `sync_aws_runtime_assets.py` **no lo escribe**: reemplazar
-  la contraseña desde `.env.*` desincroniza la de Keycloak.
-- `KEYCLOAK_ADMIN_PASSWORD` de `.env.staging` no es el valor de runtime. En `.env.prod` se eliminó el 2026-10-19 (sin consumidor local); la fuente vigente es el secreto `keycloak_admin`.
-
-### `sagrilaft/{env}/db_credentials`
-
-Claves que usa la aplicación:
-
-- `username`: usuario de PostgreSQL. ECS lo inyecta en `DB_USER` y `KC_DB_USERNAME`.
-- `password`: contraseña de PostgreSQL. ECS la inyecta en `DB_PASSWORD` y `KC_DB_PASSWORD`.
-
-Solo estas dos claves son necesarias para conectar y migrar. `DATABASE_HOST` y
-`DATABASE_NAME` no vienen del secreto: CDK los pasa como variables de entorno del task.
-
-Claves que agrega AWS, no la aplicación:
-
-En producción el secreto tiene además `host`, `port`, `dbname`, `engine` y
-`dbInstanceIdentifier`. Los escribe el recurso `SecretTargetAttachment` cuando CDK
-asocia el secreto con la instancia RDS. Ningún script ni variable de entorno los lee.
-
-Estado por ambiente:
-
-- **Producción:** 7 claves. Creado el 2026-10-07 08:00:35 (-05:00). Las 5 claves de
-  metadatos quedaron escritas en el attachment del 2026-10-07 08:13:19 (-05:00).
-- **Staging:** 2 claves. Historial de versiones:
-  - 2026-08-18 12:12:23: creación por CloudFormation. `username` y `password` (32 caracteres).
-  - 2026-08-18 12:21:03: escritura del `SecretTargetAttachment`, que agrega las 5 claves
-    de metadatos. Coincide con el fin del recurso en CloudFormation (12:21, -05:00).
-  - 2026-08-18 16:56:49: edición manual desde la consola. El secreto vuelve a tener solo
-    `username` y `password`, y la contraseña pasa a 64 caracteres. Esta versión
-    reemplazó a la del attachment.
-  - 2026-08-18 16:59:50: `ModifyDBInstance` manual sobre RDS con `masterUserPassword`
-    y `applyImmediately`, sin errores.
-  - 2026-10-28 14:39:14: nueva edición manual. La contraseña pasa a 65 caracteres.
-  - 2026-10-28 14:56:42: `ModifyDBInstance` manual sobre RDS, igual que el 18 de agosto.
-- Las dos versiones que conserva AWS (`AWSCURRENT` y `AWSPREVIOUS`) solo tienen
-  `username` y `password`. La del attachment ya no existe como versión activa, pero
-  se pudo leer solo para comprobar sus nombres de claves.
-- Producción no tuvo ediciones manuales. Su contraseña sigue siendo la generada por CDK
-  (32 caracteres).
-- Verificación del 2026-11-03: el backend y la tarea de migración conectaron a
-  la base en el primer intento, con la contraseña actual del secreto.
-
-Regla para cambios de contraseña:
-
-- Cambiar la contraseña en Secrets Manager no cambia la de RDS. Hay que actualizar
-  ambas en la misma ventana y comprobar la conexión después. En staging se hizo así dos
-  veces: el secreto se editó primero y RDS después (3 minutos el 2026-08-18, 17 minutos
-  el 2026-10-28). Entre ambos pasos, un despliegue nuevo habría usado una contraseña que
-  RDS todavía no aceptaba.
-- `sync_aws_runtime_assets.py` **no lo escribe**.
-- Si Keycloak usa credenciales separadas sobre RDS, ese dato debe quedar
-  documentado aparte o resolverse con el usuario final definido para Keycloak.
-
-### `sagrilaft/{env}/sagrilaft_listas_cautela_credentials`
-
-- `api_key`
-
-Origen actual:
-
-- `.env.staging` -> `SAGRILAFT_API_KEY`
-- `.env.prod` -> `SAGRILAFT_API_KEY`
-
-Nota:
-
-- el valor final en ECS debe venir desde Secrets Manager. No debe quedar como
-  variable no sensible en SSM.
-- Solo se escribe si `PROVEEDOR_LISTAS_CAUTELA=sagrilaft` y `SAGRILAFT_API_KEY` tiene
-  un valor real (no vacío ni `REPLACE_*`). Con `deshabilitado` el script lo omite.
-  Requiere que CDK haya creado el secreto antes. Procedimiento:
-  [secretos externos](../despliegue/CHECKLIST_CORTE_PRODUCCION.md#secretos-externos).
-
-## SSM Parameter Store
-
-Estos valores son configuracion no sensible de runtime.
-
-Prefijo:
-
-- staging: `/sagrilaft/staging/config/`
-- prod: `/sagrilaft/prod/config/`
-
-### Backend / runtime general
-
-- `APP_ENV`
-- `AWS_REGION`
-- `FRONTEND_URL`
-- `PORTAL_INTERNO_URL`
-- `UVICORN_WORKERS`
-- `TRUSTED_PROXY_IPS`
-- `STORAGE_BACKEND`
-- `S3_BUCKET`
-- `BEDROCK_MODEL_ID`
-- `BEDROCK_MAX_TOKENS`
-- `BEDROCK_TEMPERATURE`
-- `BEDROCK_CONNECT_TIMEOUT_SECONDS`
-- `BEDROCK_READ_TIMEOUT_SECONDS`
-- `BEDROCK_MAX_ATTEMPTS`
-- `BEDROCK_PDF_MAX_PAGES`
-- `BEDROCK_DEFAULT_CONFIDENCE`
-- `BEDROCK_RESPONSE_LOG_CHARS`
-
-### Listas de cautela / proveedor SAGRILAFT
-
-- `PROVEEDOR_LISTAS_CAUTELA`
-- `SAGRILAFT_API_URL`
-
-### Zoho
-
-- `ZOHO_REDIRECT_URI`
-- `ZOHO_WEBHOOK_SIGNATURE_HEADER`
-- `ZOHO_SIGN_TESTING`
-- `ZOHO_REFRESH_MARGIN_SECONDS`
-- `ZOHO_TOKEN_EXPIRATION_DEFAULT_SECONDS`
-- `ZOHO_HTTP_MAX_ATTEMPTS`
-- `ZOHO_HTTP_INITIAL_RETRY_WAIT_SECONDS`
-- `ZOHO_HTTP_BACKOFF_FACTOR`
-- `ZOHO_TOKEN_TIMEOUT_SECONDS`
-- `ZOHO_STATUS_TIMEOUT_SECONDS`
-- `ZOHO_CANCEL_TIMEOUT_SECONDS`
-- `ZOHO_CREATE_REQUEST_TIMEOUT_SECONDS`
-- `ZOHO_SUBMIT_REQUEST_TIMEOUT_SECONDS`
-- `ZOHO_DOWNLOAD_TIMEOUT_SECONDS`
-- `ZOHO_SIGN_REQUEST_EXPIRATION_DAYS`
-
-### Correo / notificaciones
-
-- `SMTP_HOST`
-- `SMTP_PORT`
-- `SMTP_FROM`
-- `SMTP_REPLY_TO`
-- `SES_EMAIL_ORIGEN`
-- `SES_NOTIFICACIONES_ENABLED`
-- `ALERTAS_EMAIL_DESTINATARIO`
-- `SNS_NOTIFICACIONES_ENABLED`
-
-### Keycloak
-
-- `KEYCLOAK_HOSTNAME`
-- `KEYCLOAK_URL`
-- `KEYCLOAK_REALM`
-- `KEYCLOAK_CLIENT_ID`
-- `KEYCLOAK_ISSUER_URL`
-
-### Frontend build-time que hoy viven en `.env.staging` y `.env.prod`
-
-Estos no son secretos, pero tampoco se consumen como runtime del backend. Se usan
-al construir las imagenes de frontend antes de subirlas a ECR.
-
-- `VITE_BACKEND_URL`
-- `VITE_PORTAL_INTERNO_URL`
-- `VITE_KEYCLOAK_URL`
-- `VITE_KEYCLOAK_REALM`
-- `VITE_KEYCLOAK_CLIENT_ID`
-- `VITE_RAZON_SOCIAL`
-- `VITE_CORREO_DATOS`
-
-## No Debe Ir A AWS Runtime
-
-Estos valores pueden existir en `.env` local, pero no deben quedar como runtime
-final de staging/prod en ECS.
-
-- `DATABASE_URL`
-- `POSTGRES_DB`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `PORT_PUBLICO`
-- `PORT_PORTAL`
-- `PORTAL_AUTH_DISABLED`
-- `KEYCLOAK_DB_URL`
-
-## Inyección de destinatarios CDK
-
-`snsAlertasSub` determina las suscripciones SNS y `ALERTAS_EMAIL_DESTINATARIO`
-en SSM. CDK no lee ese dato de `.env.prod` automáticamente. La lista se mantiene
-en el [catálogo](checklist-valores-staging-prod.md#destinatarios); los comandos
-la pasan mediante el [contexto común](../despliegue/CHECKLIST_CORTE_PRODUCCION.md#contexto).
-`SNS_NOTIFICACIONES_ENABLED=false` desactiva el adaptador de alertas del backend,
-no las alarmas CloudWatch conectadas directamente al topic.
-
-## Insumos privados
-
-Los `.env.*` privados sirven como insumo local; no son runtime AWS. Los secretos
-se cargan en Secrets Manager y nunca se copian en documentación. Las plantillas
-`.env.*.example` solo declaran nombres. El inventario seguro puede realizarse
-con [audit_aws_secrets_safe.py](../../../scripts/aws/audit_aws_secrets_safe.py).
+# Configuración en AWS: parámetros y secretos
+
+Este documento dice qué configuración usa SAGRILAFT en AWS, cuánto vale en cada
+ambiente, quién la escribe y dónde se guarda. Es la única fuente para esos datos:
+los demás documentos enlazan aquí.
+
+Los archivos `.env` de cada computador se explican aparte, en
+[Variables de entorno](VARIABLES_DE_ENTORNO.md).
+
+Verificado el 2026-11-23 de dos formas: contra el código
+(`infra/sagrilaft/lib/constructs/config-parameters.ts`, `secrets.ts` y
+`sagrilaft-stack.ts`) y leyendo los parámetros reales de SSM en los dos ambientes.
+Todos los valores de las tablas coinciden con lo que hay en AWS.
+
+## Dos lugares para la configuración
+
+- **Parameter Store (SSM):** valores que no son secretos, como direcciones web,
+  tiempos de espera o el modelo de IA. Están en `/sagrilaft/<ambiente>/config/`.
+- **Secrets Manager:** contraseñas y llaves, como las de la base de datos, el correo
+  o Zoho. Se guardan cifradas y nunca se copian en documentos ni en git.
+
+Los contenedores reciben ambos al arrancar. Si cambia un valor, hay que reiniciar
+las tareas para que lo tomen (una release nueva lo hace).
+
+**Quién escribe los parámetros:** CDK, desde `config-parameters.ts`. Para cambiar un
+valor se cambia el código o el contexto de CDK y se despliega la infraestructura
+([guía](../despliegue/GUIA_DESPLIEGUE_LOCAL.md#infraestructura)). Si se edita a mano
+en la consola, el siguiente `cdk deploy` lo deja como estaba.
+
+## Datos de la cuenta
+
+| Dato | Valor |
+|---|---|
+| Cuenta AWS | `<CUENTA_AWS>` (compartida con otros proyectos: ver [etiquetado](ETIQUETADO_AWS.md)) |
+| Región | `us-east-1` |
+| Zona DNS | `ia.blend360.com` (`<HOSTED_ZONE_ID>`), compartida |
+| Certificado | Comodín de ACM, compartido (`<ARN_CERTIFICADO_ACM>`) |
+
+| Dominio | Staging | Producción |
+|---|---|---|
+| Formulario público (y la API en `/api`) | `forms-staging-sagrilaft.ia.blend360.com` | `forms-sagrilaft.ia.blend360.com` |
+| Portal interno | `staging-sagrilaft.ia.blend360.com` | `sagrilaft.ia.blend360.com` |
+| Inicio de sesión (Keycloak) | `login-staging-sagrilaft.ia.blend360.com` | `login-sagrilaft.ia.blend360.com` |
+
+## Parámetros (SSM)
+
+Cuando staging y producción usan el mismo valor, aparece una sola vez.
+
+### Generales
+
+| Parámetro | Para qué sirve | Staging | Producción |
+|---|---|---|---|
+| `APP_ENV` | Nombre del ambiente que ve la aplicación | `staging` | `production` |
+| `AWS_REGION` | Región | `us-east-1` | igual |
+| `FRONTEND_URL` | Orígenes web permitidos (CORS): formulario y portal | los dos dominios de staging | los dos dominios de producción |
+| `PORTAL_INTERNO_URL` | Dirección del portal, para enlaces en correos | `https://staging-sagrilaft.ia.blend360.com` | `https://sagrilaft.ia.blend360.com` |
+| `UVICORN_WORKERS` | Procesos del backend por copia | `4` | `4` |
+| `TRUSTED_PROXY_IPS` | Red interna desde la que se acepta la IP real del visitante (la del balanceador). Ver [runbook](../../operacion/RUNBOOK_OPERATIVO.md#ip-real) | `10.0.0.0/16` (CDK lo toma de la red) | igual |
+| `STORAGE_BACKEND` | Dónde se guardan los archivos | `s3` | igual |
+| `S3_BUCKET` | Bucket de documentos | lo crea CDK | lo crea CDK |
+
+### IA (Bedrock)
+
+| Parámetro | Para qué sirve | Valor |
+|---|---|---|
+| `BEDROCK_MODEL_ID` | Modelo que lee los documentos | `amazon.nova-pro-v1:0` en los dos ambientes (decidido el 2026-10-20) |
+| `BEDROCK_MAX_TOKENS` | Largo máximo de la respuesta | `4096` |
+| `BEDROCK_TEMPERATURE` | Variación de la respuesta (0 = siempre igual) | `0.0` |
+| `BEDROCK_CONNECT_TIMEOUT_SECONDS` / `BEDROCK_READ_TIMEOUT_SECONDS` | Tiempos de espera | `10` / `90` |
+| `BEDROCK_MAX_ATTEMPTS` | Reintentos | `3` |
+| `BEDROCK_PDF_MAX_PAGES` | Páginas de cada PDF que se envían a la IA | `7` |
+| `BEDROCK_DEFAULT_CONFIDENCE` | Confianza que se asume si el modelo no la da | `0.90` |
+| `BEDROCK_RESPONSE_LOG_CHARS` | Caracteres de la respuesta que se guardan en registros | `800` |
+
+### Inicio de sesión (Keycloak)
+
+| Parámetro | Valor |
+|---|---|
+| `KEYCLOAK_URL` | Dirección interna: `http://keycloak.sagrilaft-<ambiente>.local:8080` |
+| `KEYCLOAK_REALM` / `KEYCLOAK_CLIENT_ID` | `sagrilaft` / `sagrilaft-portal` |
+| `KEYCLOAK_ISSUER_URL` y `KEYCLOAK_HOSTNAME` | El dominio de inicio de sesión del ambiente |
+
+### Correo y alertas
+
+| Parámetro | Para qué sirve | Valor |
+|---|---|---|
+| `SMTP_HOST` / `SMTP_PORT` | Servidor de correo de AWS (SES) | `email-smtp.us-east-1.amazonaws.com` / `587` |
+| `SMTP_FROM` y `SES_EMAIL_ORIGEN` | Remitente | `no-reply-sagrilaft@ia.blend360.com` |
+| `SMTP_REPLY_TO` | A quién llegan las respuestas | `legal@blend360.com` |
+| `SES_NOTIFICACIONES_ENABLED` | Avisos internos por correo | `true` |
+| `ALERTAS_EMAIL_DESTINATARIO` | Quién recibe esos avisos; los mismos correos se suscriben a las alarmas | Se pasa al desplegar (`snsAlertasSub`). No se publica aquí; ver [destinatarios](#destinatarios) |
+| `SNS_NOTIFICACIONES_ENABLED` | Envío de avisos de la aplicación por SNS. Apagado: las alarmas de CloudWatch usan SNS por su cuenta | `false` |
+
+### Firma (Zoho Sign)
+
+| Parámetro | Para qué sirve | Staging | Producción |
+|---|---|---|---|
+| `ZOHO_SIGN_TESTING` | Modo de pruebas de Zoho (no gasta créditos) | `true` | `false` |
+| `ZOHO_REDIRECT_URI` | Dirección para obtener el permiso de Zoho | `https://<portal>/oauth/zoho/callback` | igual, con su dominio |
+| `ZOHO_WEBHOOK_SIGNATURE_HEADER` | Cabecera con la firma de los avisos de Zoho | `X-ZS-WEBHOOK-SIGNATURE` | igual |
+| `ZOHO_SIGN_REQUEST_EXPIRATION_DAYS` | Días que tiene la contraparte para firmar | `15` | igual |
+| Tiempos y reintentos | `ZOHO_REFRESH_MARGIN_SECONDS` 300, `ZOHO_TOKEN_EXPIRATION_DEFAULT_SECONDS` 3600, `ZOHO_HTTP_MAX_ATTEMPTS` 3, `ZOHO_HTTP_INITIAL_RETRY_WAIT_SECONDS` 1.0, `ZOHO_HTTP_BACKOFF_FACTOR` 2, `ZOHO_TOKEN_TIMEOUT_SECONDS` 15, `ZOHO_STATUS_TIMEOUT_SECONDS` 15, `ZOHO_CANCEL_TIMEOUT_SECONDS` 15, `ZOHO_CREATE_REQUEST_TIMEOUT_SECONDS` 30, `ZOHO_SUBMIT_REQUEST_TIMEOUT_SECONDS` 30, `ZOHO_DOWNLOAD_TIMEOUT_SECONDS` 60 | | igual |
+
+### Listas cautelares
+
+| Parámetro | Para qué sirve | Staging | Producción |
+|---|---|---|---|
+| `PROVEEDOR_LISTAS_CAUTELA` | Cómo se consultan las listas | `dummy` (simulado) | `deshabilitado`: el código no permite otro valor en producción |
+| `SAGRILAFT_API_URL` | Dirección del proveedor antiguo; sin uso con estos valores | `dummy://listas-cautela` | igual |
+| `LISTAS_TUSDATOS_URL` | Dirección de Tusdatos (proveedor externo) | `https://dash-board.tusdatos.co` | igual |
+| `LISTAS_CUSTODIA_BACKEND` / `LISTAS_CUSTODIA_S3_PREFIJO` | Dónde se guardan los informes de las consultas | `s3` / `listas/custodia/` | igual |
+
+Activar el proveedor externo en producción requiere contrato, credenciales y un cambio
+de código: ver [P15](../PENDIENTES_PRODUCCION.md#p15).
+
+### Parámetro creado a mano
+
+`/sagrilaft/prod/config/PORTAL_URL` vale `https://portal.sagrilaft.ia.blend360.com`, un
+dominio que no es el del portal. No lo crea CDK ni lo lee el código (revisado el
+2026-11-23). El 2026-11-03 se decidió conservarlo porque no se descartó que algo
+externo lo use; esa decisión quedó en la versión anterior de
+[Variables de entorno](VARIABLES_DE_ENTORNO.md) (historial de git). Está etiquetado como
+`manual` ([etiquetado](ETIQUETADO_AWS.md)). Staging no lo tiene.
+
+## Valores de los frontends (al construir las imágenes)
+
+El formulario y el portal reciben estos valores al construir su imagen, no al
+arrancar. El publicador de imágenes los toma de los parámetros del ambiente o usa
+estos valores por defecto (`scripts/despliegue/build_and_push_ecr_images.py`).
+
+| Valor | De dónde sale |
+|---|---|
+| `VITE_BACKEND_URL` | Vacío: el navegador llama a `/api` en el mismo dominio y el balanceador lo envía al backend |
+| `VITE_PORTAL_INTERNO_URL` | `PORTAL_INTERNO_URL` |
+| `VITE_KEYCLOAK_URL`, `VITE_KEYCLOAK_REALM`, `VITE_KEYCLOAK_CLIENT_ID` | Los parámetros de Keycloak |
+| `VITE_RAZON_SOCIAL` / `VITE_CORREO_DATOS` | `HIGH TECH SOFTWARE S.A.S` / `administrativocol@blend360.com` (datos legales del formulario) |
+
+## Secretos (Secrets Manager)
+
+Todos se llaman `sagrilaft/<ambiente>/<nombre>`.
+
+| Secreto | Campos | Quién lo escribe | Notas |
+|---|---|---|---|
+| `db_credentials` | `username`, `password` (la aplicación solo usa estos dos) | CDK lo genera | Llegan como `DB_USER`/`DB_PASSWORD` al backend y `KC_DB_USERNAME`/`KC_DB_PASSWORD` a Keycloak. En producción AWS agrega `host`, `port`, `dbname`, `engine` y `dbInstanceIdentifier`, que nadie lee |
+| `app_secret` | `secret_key` | CDK lo genera | Llave con la que se sella (HMAC) el reporte PDF de auditoría |
+| `keycloak_admin` | `username`, `password` | CDK lo genera | Usuario administrador de Keycloak (`username` es `admin`). No cambiarlo desde `.env`: se desincroniza con Keycloak |
+| `zoho_credentials` | `client_id`, `client_secret`, `refresh_token`, `webhook_secret` | Se carga a mano (externo) | En producción CDK lo importa: desplegar siempre con `-c zohoSecretYaExiste=true` |
+| `smtp_credentials` | `username`, `password` | Se carga a mano en la consola | Cada ambiente usa su propio usuario de SES (ver abajo) |
+| `tusdatos_credentials` | `usuario`, `clave`, `token` | Se carga a mano cuando haya contrato | Hoy vacío en producción (verificado el 2026-11-23) |
+| `sagrilaft_listas_cautela_credentials` | `api_key` | Se carga a mano | Llega al backend como `SAGRILAFT_API_KEY`; sin uso mientras las listas estén deshabilitadas |
+
+**Correo (SMTP).** Staging y desarrollo local comparten el usuario IAM
+`sagrilaft-ses-smtppp`; producción usa uno exclusivo, `ses-smtp-prod-sagrilaft`
+(verificado el 2026-11-23: cada secreto usa la llave activa de su usuario). Hay
+un tercer usuario, `sagrilaft-ses-smtpp`, sin uso confirmado: no se borra hasta
+confirmarlo. Estas credenciales nunca van en `.env.staging` ni en `.env.prod`
+(`scripts/validacion/validate_envs.py` lo rechaza).
+
+**Zoho.** Staging y producción comparten la misma aplicación de Zoho (mismos
+`client_id`, `client_secret` y `refresh_token`); solo `webhook_secret` cambia, porque
+cada ambiente tiene su propio webhook (verificado el 2026-11-23 comparando huellas, sin
+leer los valores). La idea original era tener dos aplicaciones
+separadas; se dejó así porque funciona y no bloquea nada.
+
+**Contraseña de la base de datos.** Cambiarla en Secrets Manager no la cambia en la
+base. Hay que cambiar las dos en la misma ventana y comprobar la conexión. En staging
+se cambió a mano el 2026-08-18 y el 2026-10-28 (por eso su secreto solo tiene dos
+campos); producción conserva la generada por CDK.
+
+**Cómo cargar un secreto externo** (Zoho o un proveedor de listas):
+
+1. Poner el valor en el archivo privado del ambiente (`.env.staging` o `.env.prod`).
+2. Ver qué haría, sin escribir nada:
+   `python3 scripts/aws/sync_aws_runtime_assets.py --env-file .env.prod --environment prod --region us-east-1`
+3. Revisar que solo aparezca el secreto esperado y ningún `ERROR`.
+4. Escribir: el mismo comando con `--apply --expected-account <CUENTA_AWS>`.
+5. Desplegar una release o reiniciar las tareas para que lo tomen.
+
+El script nunca escribe los secretos que genera CDK. SMTP se carga en la consola.
+Para comprobar si un secreto cambió, comparar la versión vigente (`AWSCURRENT`), no la
+fecha de modificación: el etiquetado del 2026-11-18 cambió esa fecha en todos sin
+tocar sus valores.
+
+## Zoho Sign: aplicación y webhook
+
+Zoho está en Estados Unidos (`accounts.zoho.com`, `sign.zoho.com`; la aplicación se
+administra en `api-console.zoho.com`). El permiso que se pide es `ZohoSign.documents.ALL`:
+el backend crea solicitudes, consulta su estado, las cancela y descarga los PDF firmados.
+No usa plantillas de Zoho (`ZohoSign.templates.ALL` solo haría falta si se usaran).
+
+| | Staging | Producción |
+|---|---|---|
+| Nombre del webhook en Zoho | `Sagrilaft-Staging` | `Sagrilaft-Produccion` |
+| Dirección del webhook | `https://forms-staging-sagrilaft.ia.blend360.com/api/webhooks/zoho-sign` | `https://forms-sagrilaft.ia.blend360.com/api/webhooks/zoho-sign` |
+
+Configuración del webhook en Zoho:
+
+- **Eventos marcados:** «Completados por todos», «Expira», «Retirado», «Rechazado» y «Duro rebotado».
+- **Eventos apagados:** «Enviados», «Viendo», «Firmados por un destinatario», «Aprobados por un destinatario» y «Reasignados».
+- **Seguridad:** firma HMAC SHA-256 en la cabecera `X-ZS-WEBHOOK-SIGNATURE`, con la clave
+  `webhook_secret` del secreto. Sin Basic Auth ni mTLS.
+
+Según el registro del 2026-10-20, los dos webhooks se recrearon ese día con firma HMAC;
+eso se configura en la consola de Zoho y no se puede comprobar desde AWS. El de
+producción no ha recibido ningún aviso (verificado en los registros del backend el
+2026-11-23; ver [P05](../PENDIENTES_PRODUCCION.md#p05)).
+
+<a id="destinatarios"></a>
+## Destinatarios de alertas
+
+La lista se pasa al desplegar como `snsAlertasSub` (correos separados por coma) y
+queda en `ALERTAS_EMAIL_DESTINATARIO`. No se publica en el repositorio.
+
+Desde el 2026-10-21 producción tiene un solo destinatario: un correo en SSM y una
+suscripción confirmada en SNS (verificado el 2026-11-23). Staging también tiene uno. Los once destinatarios originales no se han vuelto a invitar; hacerlo
+requiere autorización ([P06](../PENDIENTES_PRODUCCION.md#p06)). Para desplegar se lee
+el valor vigente de SSM, para no cambiar la lista sin querer.
+
+## Credenciales de AWS
+
+Ningún ambiente usa llaves de acceso fijas (`AWS_ACCESS_KEY_ID`):
+
+- **En AWS**, cada contenedor usa los permisos temporales de su rol.
+- **En un computador**, se usa una sesión SSO:
+  1. `aws sso login --profile PS-PowerUserAccess-<CUENTA_AWS>` (abre el navegador).
+  2. En `.env`, `AWS_PROFILE=<ese perfil>`.
+  3. Levantar el backend: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate backend`.
+  4. Comprobar que el contenedor usa la sesión:
+   `docker exec solucion-backend-1 python3 -c "import boto3; print(boto3.Session().get_credentials().method)"`
+   debe imprimir `sso`.
+5. La sesión caduca en unas horas; entonces se repite el paso 1.
+
+## Lo que no debe llegar a AWS
+
+Solo sirven en desarrollo local: `DATABASE_URL`, `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `PORT_PUBLICO`, `PORT_PORTAL`, `PORTAL_AUTH_DISABLED` y
+`KEYCLOAK_DB_URL`.
