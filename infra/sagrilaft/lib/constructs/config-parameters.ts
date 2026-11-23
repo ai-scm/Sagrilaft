@@ -16,6 +16,13 @@ export interface ConfigParametersProps {
   readonly proveedorListasCautela: string;
   readonly sagrilaftApiUrl: string;
   readonly tusdatosUrl: string;
+  /**
+   * Redes desde las que el backend acepta X-Forwarded-For (TRUSTED_PROXY_IPS).
+   * Es el CIDR de la VPC: el ALB vive en sus subredes públicas y es lo único
+   * que alcanza al backend (Security Group). La aplicación lee aquí la IP real
+   * del cliente (backend/api/ip_cliente.py).
+   */
+  readonly redesProxyConfiables: string;
 }
 
 export class ConfigParameters extends Construct {
@@ -73,7 +80,9 @@ export class ConfigParameters extends Construct {
       ZOHO_DOWNLOAD_TIMEOUT_SECONDS: '60',
       ZOHO_SIGN_REQUEST_EXPIRATION_DAYS: '15',
       UVICORN_WORKERS: '4',
-      TRUSTED_PROXY_IPS: '172.0.0.0/8',
+      // Antes '172.0.0.0/8': no cubría la VPC (10.0.0.0/16) y el backend veía
+      // la IP del ALB como cliente.
+      TRUSTED_PROXY_IPS: props.redesProxyConfiables,
       // Staging: dummy (simulado) o sagrilaft (externo, Tusdatos). Produccion: deshabilitado.
       PROVEEDOR_LISTAS_CAUTELA: props.proveedorListasCautela,
       SAGRILAFT_API_URL: sagrilaftApiUrl,

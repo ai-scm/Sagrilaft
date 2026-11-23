@@ -63,6 +63,9 @@ const TIPOS_NO_ETIQUETABLES = [
   'AWS::IAM::ManagedPolicy',
   'AWS::IAM::Policy',
   'AWS::Route53::RecordSet',
+  // Política del bucket de registros de acceso del ALB (permiso de escritura del
+  // ALB y exigencia de TLS). El tipo no tiene propiedad Tags en CloudFormation.
+  'AWS::S3::BucketPolicy',
   'AWS::SNS::Subscription',
   'AWS::SecretsManager::SecretTargetAttachment',
   'AWS::WAFv2::WebACLAssociation',

@@ -200,6 +200,7 @@ export class SagrilaftStack extends cdk.Stack {
       proveedorListasCautela,
       sagrilaftApiUrl,
       tusdatosUrl,
+      redesProxyConfiables: networking.vpc.vpcCidrBlock,
     });
 
     const database = new Database(this, 'Database', {
