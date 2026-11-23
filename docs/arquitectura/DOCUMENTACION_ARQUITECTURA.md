@@ -1,152 +1,182 @@
-# Documentación de Arquitectura Cloud y Despliegue - SAGRILAFT
+# Arquitectura en AWS
 
-Función única: topología, recursos, permisos y fundamentos AWS. Estado en [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md); ejecución en [Checklist](../produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md).
+Cómo está montado SAGRILAFT en AWS, por qué se eligió cada pieza y qué permisos
+tiene cada parte. Cómo funciona la aplicación por dentro (estados del expediente,
+firma, auditoría) está en [Arquitectura de la aplicación](ARQUITECTURA_CORE.md). Qué
+versión corre hoy en cada ambiente está en [Estado](../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md).
 
-Este documento explica la infraestructura del sistema, cómo está desplegado, qué componentes tecnológicos utilizamos y, lo más importante, **por qué** tomamos cada decisión arquitectónica basándonos en los requisitos de negocio, seguridad y estabilización para Producción.
+Revisado el 2026-11-23 contra el código de infraestructura (`infra/sagrilaft/lib`) y,
+en lo que se indica, contra AWS. Las razones de diseño vienen de la documentación
+anterior. Si este documento y el código no coinciden, manda el código.
 
----
+## En una frase
 
-## 1. Visión General de la Arquitectura
-El sistema SAGRILAFT es una plataforma **100% Serverless y Contenerizada** que vive dentro de la nube de AWS.
-Esto significa que no tenemos un servidor tradicional (computadora) encendido en una oficina al que haya que darle mantenimiento, sino que empaquetamos nuestro código en contenedores (Docker) y le decimos a AWS: *"Toma, ejecuta esto en tu nube y danos la memoria y procesador necesarios"*.
+SAGRILAFT corre en contenedores administrados por AWS (no hay servidores propios
+que mantener), detrás de un balanceador con cortafuegos, con una base de datos
+PostgreSQL, y toda la infraestructura está escrita como código (CDK), de modo que
+se puede revisar y volver a crear igual.
 
-**¿Por qué lo hicimos así?**
-Para lograr escalabilidad masiva, eliminar el mantenimiento de hardware y garantizar que el ambiente local de los programadores sea **exactamente igual** al entorno de Producción (Staging/Prod).
+## Las piezas
 
----
+### Contenedores (ECS Fargate)
 
-## 2. Componentes Principales de la Infraestructura (IaaC)
+Hay cinco servicios. AWS los arranca, los vigila y reemplaza el que falle.
 
-Toda la red está programada en código (usando AWS CDK en `infra/sagrilaft/lib`). Si borramos todo por error, podemos recrear la arquitectura completa idéntica en 15 minutos.
+| Servicio | Qué hace | Copias |
+|---|---|---|
+| Backend (FastAPI) | La API: formularios, documentos, IA, firma y correos | 1 a 2: se añade una segunda copia sola si la CPU pasa del 60 % o la memoria del 70 % |
+| Formulario público | La página que llena la contraparte | 1 |
+| Portal interno | La aplicación del equipo interno | 1 |
+| Keycloak | Inicio de sesión del equipo interno | 1. No escala: tener varias copias exigiría configurar que compartan sesiones |
+| Trabajador de listas | Procesa las consultas a listas cautelares | 0 mientras las listas estén deshabilitadas (producción); 1 si están activas |
 
-### A. AWS ECS Fargate (El Cerebro Computacional)
-Aquí viven nuestros 4 componentes de software: El Backend (FastAPI), el Portal Interno, el Formulario Público y el gestor de usuarios (Keycloak).
-*   **¿Por qué Fargate?** Porque es *Serverless*. AWS gestiona los fierros. Si un contenedor se daña, AWS lanza otro automáticamente.
-*   **Decisión Core:** el valor se configura por ambiente mediante CDK. Staging se desplegó con `desiredCount=1` para validar el flujo con un costo controlado; producción también corre con 1 copia por servicio. El valor por defecto del código es `1`; para más copias hay que pedirlas con `-c desiredCount`. El valor efectivo debe comprobarse en la salida del despliegue, no inferirse del diagrama.
-*   **Autoscaling (actualizado 2026-07-30):** Solo el servicio **Backend** escala automáticamente (`service.autoScaleTaskCount`, target tracking en CPU 60% / memoria 70%, hasta `backendMaxCapacity` tasks, 2 por defecto). Es el único de los 4 con carga variable real (extracción con Bedrock, generación de PDF). Portal/Formulario Público se quedan con capacidad fija por ser contenedores estáticos de bajo costo, y Keycloak se deja fuera a propósito porque escalarlo requeriría configurar clustering de sesiones (JGroups/Infinispan) primero.
+Hay además una tarea de **migración**, que no es un servicio: se lanza en cada
+release para actualizar la base de datos y termina.
 
-### B. Application Load Balancer (ALB) + AWS WAF (El Portero y el Guardaespaldas)
-Todo el tráfico de internet golpea primero el ALB por el puerto seguro 443 (HTTPS).
-*   **¿Por qué ALB?** Reparte las peticiones equitativamente entre nuestros contenedores. Además, lo configuramos con un "Timeout" enorme (300 segundos) para no cortarle la cara a los usuarios mientras Amazon Bedrock analiza PDFs complejos.
-*   **¿Por qué AWS WAF?** Le pusimos un Firewall en frente. Bloquea ataques de hackers (Inyecciones SQL), IPs maliciosas y bots antes de que toquen nuestros servidores. Tu servidor web solo procesa tráfico legítimo.
-*   **Límite de tasa global por IP (actualizado 2026-07-30):** El WAF también bloquea a cualquier IP que supere 2000 peticiones en 5 minutos (`RateBasedStatement`). Esto es necesario porque el rate-limiting a nivel de aplicación (`slowapi`, en el backend) mantiene su contador en memoria de cada task de ECS — con 2+ tasks detrás del mismo ALB, un cliente que reparte tráfico entre tasks podía multiplicar su límite real. El WAF ve el tráfico agregado antes de repartirlo, así que aquí el límite sí es global.
+Al desplegar una versión nueva, AWS arranca las copias nuevas, comprueba que estén
+sanas y solo entonces apaga las viejas. Si las nuevas no arrancan, vuelve solo a la
+versión anterior (circuit breaker).
 
-### C. Amazon RDS PostgreSQL (La Memoria Incorruptible)
-*   **¿Por qué PostgreSQL?** Necesitábamos integridad de datos relacional. Como viste en la estabilización, el sistema es propenso a errores de "doble clic" si dos analistas gestionan un proveedor a la vez. PostgreSQL nos permite usar **Bloqueo Pesimista**, creando una "fila" automática de peticiones que nos asegura que los datos jamás se van a sobreescribir.
+### Balanceador (ALB) y cortafuegos (WAF)
 
-### D. Ecosistema AWS Seguro (S3, Secrets Manager y Cloud Map)
-*   **Amazon S3:** Guarda los PDFs que suben los proveedores. Es barato y aislado de los servidores web.
-*   **Secrets Manager:** Todas las contraseñas (Base de datos, API TusDatos, Zoho Sign) están cifradas aquí. **Por qué:** Cumplimiento de seguridad. Si el código se filtra, los hackers no tendrán ninguna contraseña.
-*   **AWS Cloud Map:** Un directorio de red interno. Solo Keycloak se registra en el namespace privado; el backend lo consume mediante `keycloak.sagrilaft-{ambiente}.local`, sin usar el dominio público. Backend, frontend y portal no tienen registros Cloud Map porque el repositorio no identifica consumidores de esos nombres.
+Todo el tráfico entra por HTTPS al balanceador, que lo reparte según el dominio
+(los nombres de cada ambiente están en [Configuración en AWS](../produccion/configuracion/MATRIZ_AWS_CONFIG.md#datos-de-la-cuenta)):
 
----
+| Dominio | Va a |
+|---|---|
+| Formulario público | El formulario; lo que empieza por `/api` va al backend |
+| Portal interno | El portal |
+| Inicio de sesión | Keycloak |
 
-## 3. Flujo de Integración y Despliegue (Scripts y Docker)
+- **Espera de hasta 300 segundos** por respuesta, porque leer documentos con IA puede tardar.
+- **Fuerza HTTPS** (HSTS de un año). Verificado en producción el 2026-10-21 ([P08](../produccion/PENDIENTES_PRODUCCION.md#p08)).
+- **Registros de acceso:** cada visita queda guardada 90 días en un bucket propio, con la
+  IP real del visitante (comprobado en staging y producción el 2026-11-23).
+- **El cortafuegos** bloquea ataques comunes con reglas administradas por AWS y,
+  además, cualquier IP que pase de 2.000 peticiones en 5 minutos, o de 200 en 5
+  minutos contra la consola de administración de Keycloak. El límite general vive en
+  el cortafuegos porque el backend cuenta los intentos en la memoria de cada copia:
+  solo el cortafuegos ve el total.
 
-No subimos el código arrastrando carpetas. Automatizamos el proceso mediante la carpeta `/scripts`.
+### Base de datos (RDS PostgreSQL 16)
 
-*   **Paso 1 (Docker):** El script `build_and_push_ecr_images.py` empaca el Frontend y el Backend en imágenes de Docker y les pega la estampilla del Commit actual (`git rev-parse HEAD`).
-*   **Paso 2 (ECR):** Sube esas imágenes al "repositorio seguro de contenedores" de AWS (Elastic Container Registry). **Actualizado 2026-07-30:** el script valida `.env`, Docker y credenciales AWS antes de empezar, y si falla la construcción de alguna de las 4 imágenes se detiene (fail-fast) e imprime un resumen ✅/❌/⏭ explícito por imagen, dejando claro que no debe continuarse al Paso 3 hasta tener las 4 en ✅. Antes, una falla a mitad de camino dejaba el tag incompleto en ECR sin ningún aviso.
-*   **Paso 3 (CDK Deploy):** Se ejecuta el comando de despliegue y AWS baja las nuevas imágenes, enciende los nuevos contenedores, verifica que estén sanos y, cuando comprueba que sirven, apaga los viejos. **Por qué:** Esto se llama *Despliegue Azul/Verde (Rolling Update)*. El portal nunca se cae mientras estamos actualizando el sistema.
+Una sola base, `sagrilaft`, para la aplicación y para Keycloak. Se eligió PostgreSQL
+porque permite bloquear un expediente mientras alguien lo modifica: así dos personas
+no se pisan los cambios.
 
----
+| | Producción | Staging |
+|---|---|---|
+| Tamaño | `db.t3.small`, 100 GB | `db.t4g.small`, 20 GB (crece hasta 50) |
+| Zonas | Una | Una |
 
-## 4. Estabilizaciones de Diseño Recientes (Core)
+Copias de seguridad (cuántos días se guardan y cuándo se toma una manual): ver la
+[estrategia de respaldos del runbook](../operacion/RUNBOOK_OPERATIVO.md#restauracion).
 
-Para garantizar un Go-Live tranquilo, adaptamos la arquitectura con:
-1.  **Optimización Bedrock (PDFs):** Instalamos `pypdf` para recortar localmente documentos a un máximo configurable de páginas (`BEDROCK_PDF_MAX_PAGES`, default 7) antes de enviarlos a IA, ahorrando la mitad del tiempo de servidor y reduciendo drásticamente la factura de *Tokens* de Amazon.
-2.  **Backoff Exponencial:** Los contenedores están diseñados para reintentar inteligentemente si Zoho Sign o Bedrock no responden a la primera, absorbiendo los fallos de red sin mostrarle pantallas rojas a los usuarios.
-3.  **Observabilidad Dual (EMF y Dashboards AWS):** Separamos el monitoreo en dos tableros (Técnico y de Negocio). El backend de Python inyecta logs en formato AWS EMF para medir silenciosamente el costo de IA (Tokens Bedrock), latencia de proveedores (TusDatos, Zoho) y el embudo de aprobaciones, convirtiéndolos automáticamente en gráficas sin costo adicional.
-4.  **Límite de tamaño de archivos subidos (2026-07-30):** Antes, el backend leía cualquier archivo subido completo a memoria de una sola vez (`archivo.read()`), sin ningún límite — un solo archivo gigante podía agotar la memoria del proceso sin necesitar volumen de tráfico (DoS de un solo tiro). Ahora el backend lee en bloques de 1 MiB y aborta apenas se supera `MAX_UPLOAD_SIZE_MB` (default 15 MB, configurable por entorno), devolviendo HTTP 413. Se evaluó resolverlo en AWS WAF, pero WAF solo inspecciona hasta 64 KB del cuerpo de la petición — insuficiente para archivos de varios MB — por lo que el control tenía que vivir en la aplicación.
-5.  **`FRONTEND_URL` obligatorio y plantillas `.env.example` (2026-07-30):** `load_config()` ahora exige `FRONTEND_URL` en staging/producción (antes caía en silencio a `http://localhost:5173`, arriesgando una configuración de CORS incorrecta sin aviso). Además se crearon `.env.dev.example`, `.env.staging.example` y `.env.prod.example` en la raíz — ya existía `scripts/validacion/validate_envs.py` esperándolos (con la lista completa de variables por entorno) pero nunca se habían creado los archivos; los 3 entornos ya pasan la validación (`APROBADO`), y ese script quedó conectado como paso temprano en `.github/workflows/ci.yml`.
-6.  **Trazabilidad de versión desplegada (2026-07-30):** antes no había forma rápida de saber, durante un incidente, qué versión exacta corría en un ambiente. `GET /health` y `GET /` ahora responden con `commit` (el `GIT_SHA`, igual al tag de la imagen en ECR — ver `ecs-fargate.ts`), inyectado como variable de entorno desde el mismo `imageTag` que usa el CDK. El registro de versión y notas de release se mantiene en la [guía](../produccion/despliegue/GUIA_DESPLIEGUE_LOCAL.md#release).
+Cifrada, no accesible desde internet y protegida contra borrado. Estar en una sola
+zona y no haber ensayado la restauración en producción son riesgos aceptados
+([P02](../produccion/despliegue/P02_GO_NO_GO_ROLLBACK.md), [P10](../produccion/PENDIENTES_PRODUCCION.md#p10)).
 
-## 5. Diagramas para explicar la solución
+### Archivos, secretos y configuración
 
-Las vistas visuales se mantienen en `diagramas/`. `infraestructura-sagrilaft.puml` y `infraestructura-sagrilaft.drawio` representan el despliegue y sus dependencias; `flujo-producto-sagrilaft.puml` representa el recorrido funcional del expediente. Las diferencias por ambiente (réplicas, modelo de Bedrock y proveedor de listas) se documentan en `docs/arquitectura/DIAGRAMAS_ARQUITECTURA.md`.
+- **S3:** guarda los documentos que suben las contrapartes, los PDF y los informes de
+  listas. En producción guarda versiones anteriores de cada archivo.
+- **Secrets Manager:** contraseñas y llaves. **Parameter Store (SSM):** configuración no
+  secreta. Detalle en [Configuración en AWS](../produccion/configuracion/MATRIZ_AWS_CONFIG.md).
+- **Imágenes (ECR):** un repositorio por servicio (`sagrilaft-<ambiente>-backend`,
+  `-formulario-publico`, `-portal-interno` y `-keycloak`; el trabajador de listas usa la
+  imagen del backend). Cada versión se guarda con el identificador de su commit, no se
+  puede sobrescribir y se conservan las últimas 30.
 
-## Referencia de recursos, red y permisos
-
-Los identificadores de cuenta, certificado y dominios se mantienen en el
-[catálogo por ambiente](../produccion/configuracion/checklist-valores-staging-prod.md).
-
-### Recursos gestionados por CDK
-
-| Construct | Recurso AWS | Tipo | Propósito |
-|-----------|------------|------|-----------|
-| `Networking` | VPC `10.0.0.0/16`, subnets públicas/privadas, SGs, NAT Gateway y endpoint gateway de S3 | VPC | Red privada para ECS/RDS. El NAT da la salida a internet y a las APIs de AWS; S3 va por su endpoint gratuito. Los endpoints de interfaz solo se crean si un ambiente se despliega sin NAT. Ver [Costos AWS](../produccion/ESTIMACION_COSTOS_AWS.md). |
-| `Storage` | Bucket S3 de uploads | S3 | Documentos, PDFs y temporales. Versionado en `prod`. |
-| `Secrets` | Secretos por ambiente | Secrets Manager | DB credentials, `SECRET_KEY`, Zoho, SMTP y Keycloak admin. |
-| `ConfigParameters` | `/sagrilaft/{env}/config/*` | SSM | Configuracion no sensible e URLs publicas. |
-| `Notifications` | SES EmailIdentity + SNS Topic | SES + SNS | Alertas internas al equipo de analistas. |
-| `Ecr` | Repos por servicio | ECR | Imagenes Docker privadas para backend, formulario, portal y Keycloak. |
-| `Database` | RDS PostgreSQL 16, `db.t3.small` con 100 GB en producción y `db.t4g.small` con 20 GB gp3 en staging/dev, una AZ, backups de 7 días | RDS | Base `sagrilaft` usada por backend y Keycloak. La recuperación productiva aún no se ha ensayado; el riesgo está aceptado para el primer corte y P10 sigue abierto. |
-| `EcsFargate` | Cluster, task definitions, services, roles, logs, target groups | ECS | Runtime productivo de los cuatro servicios. |
-| `LoadBalancer` | ALB + ACM Certificate | ALB + ACM | Enrutamiento HTTPS por hostname/path hacia ECS; el CDK prepara `Strict-Transport-Security: max-age=31536000` en respuestas HTTPS. La verificación productiva sigue pendiente (P08). |
-
-### Arquitectura de Red
+### Red
 
 ```text
 Internet
   |
   v
-ALB publico (sgAlb: TCP 80/443)
-  |-- sagrilaft.dominio.com/      -> ECS formulario-publico:8080
-  |-- portal.dominio.com/         -> ECS portal-interno:8080
-  |-- auth.dominio.com/           -> ECS keycloak:8080
-  |-- /api/* y /health            -> ECS backend:8000
-
-VPC 10.0.0.0/16 - 2 AZs
-|-- Subnets publicas
-|   `-- ALB
-`-- Subnets privadas (salida por NAT)
-    |-- ECS Fargate services
-    |-- RDS PostgreSQL
-    |-- S3 Gateway endpoint (gratuito, siempre)
-    `-- Solo sin NAT: VPC Endpoints de interfaz ECR API/Docker, CloudWatch Logs,
-        Secrets Manager, SSM, ssmmessages (ECS Exec), SES API/SMTP y Bedrock Runtime
-
-NAT Gateway: activo en staging y producción. Es la salida hacia Zoho Sign,
-Tusdatos y las APIs de AWS.
+Balanceador (subredes públicas) ── cortafuegos
+  |
+  v
+Subredes privadas (2 zonas, red 10.0.0.0/16)
+  ├── los cinco servicios y la tarea de migración
+  ├── la base de datos
+  └── salida:
+        ├── a S3 por un acceso privado gratuito (endpoint gateway)
+        └── a internet y a las demás APIs de AWS por un NAT
 ```
 
-### Permisos IAM - Roles ECS
+El NAT está encendido en los dos ambientes: es la salida hacia Zoho Sign, Tusdatos,
+Bedrock, SES y las demás APIs de AWS. Había además nueve accesos privados de pago a
+servicios de AWS; se quitaron en staging el 17-nov-2026 y en producción el 18-nov-2026
+porque hacían lo mismo que el NAT ([costos](../produccion/ESTIMACION_COSTOS_AWS.md)). El código solo los crea si un
+ambiente se despliega sin NAT.
 
-| Rol | Permisos principales |
-|-----|----------------------|
-| Task Execution Role | Pull desde ECR, escritura CloudWatch Logs, lectura Secrets/SSM para inyeccion de runtime. |
-| Backend Task Role | S3 read/write, Secrets, SSM, SES, SNS, Bedrock, CloudWatch Metrics y permisos `ssmmessages` de ECS Exec. |
-| Frontend/Portal Task Roles | Lectura de parámetros de configuración SSM y permisos `ssmmessages` de ECS Exec. Las variables `VITE_*` se consumen en build time y no se publican como parámetros SSM de runtime. |
-| Keycloak Task Role | Lectura de parámetros SSM, credenciales DB y secreto admin Keycloak, además de permisos `ssmmessages` de ECS Exec. |
+Keycloak tiene además un nombre interno (`keycloak.sagrilaft-<ambiente>.local`, con
+Cloud Map) para que el backend lo consulte sin salir a internet.
 
-> Los contenedores ECS no usan access keys estaticas. El SDK AWS obtiene credenciales temporales del Task Role. Los wildcards en Bedrock y SES se mantienen por limitaciones de permisos por recurso en esos servicios. El resto queda restringido por recursos CDK cuando aplica.
+### Correo y avisos
 
-### Integración SES y SNS
+- **SES** envía los correos a las contrapartes y los avisos internos (en HTML y texto plano;
+  las plantillas están en el código).
+- **SNS** reparte los avisos de las alarmas por correo. Solo en producción: en
+  staging las alarmas existen pero no avisan.
+- **Alarmas:** 16, definidas en `observabilidad-alarmas.ts`. La lista y qué hacer con cada
+  una están en el [runbook](../operacion/RUNBOOK_OPERATIVO.md#que-hacer-alarma).
+- **Tableros:** uno técnico y uno de negocio en CloudWatch (`dashboard-tecnico.ts` y
+  `dashboard-negocio.ts`). El backend escribe métricas de negocio en sus registros con
+  formato EMF (espacio `Sagrilaft/Negocio`). Qué muestra cada gráfico no se revisó en esta
+  actualización.
 
-**Amazon SES** es el canal principal de alertas internas. El backend llama directamente a `boto3 ses.send_email()` con emails `multipart/alternative` (HTML + texto plano). Los templates HTML están versionados en código y se despliegan con la imagen Docker.
+### Registros (CloudWatch Logs)
 
-**Amazon SNS** existe como canal secundario. El backend puede consultar el topic en health check y publicar alertas si se habilita por configuracion.
+Cada servicio escribe en `/sagrilaft/<ambiente>/ecs/<servicio>`. Backend, trabajador
+de listas y migración los guardan 30 días; Keycloak, formulario y portal, 14.
 
-`SNS_TOPIC_ARN`, `SES_EMAIL_ORIGEN` y flags de notificacion se inyectan en ECS desde CDK/SSM/Secrets Manager.
+## Permisos de cada servicio
 
-### Observabilidad (CloudWatch)
+Ningún contenedor tiene llaves fijas: cada uno recibe permisos temporales de su rol. Los
+cinco servicios tienen activada la consola remota (ECS Exec; verificado en producción el
+2026-11-23), y CDK da a cada rol el permiso que esta necesita.
 
-Cada servicio ECS envia stdout/stderr a un Log Group propio:
+| Rol | Puede |
+|---|---|
+| Ejecución (común) | Descargar imágenes, escribir registros y leer los secretos y parámetros que necesita al arrancar |
+| Backend (y la tarea de migración, que usa el mismo rol) | Leer y escribir en el bucket, leer sus secretos y parámetros, enviar correos (SES), publicar en SNS, usar Bedrock y escribir métricas |
+| Trabajador de listas | Solo leer y escribir los informes de listas (`listas/custodia/` del bucket) |
+| Formulario y portal | Leer su configuración |
+| Keycloak | Leer su configuración, la contraseña de la base y el secreto de administrador |
 
-- `/sagrilaft/{env}/ecs/backend`
-- `/sagrilaft/{env}/ecs/frontend`
-- `/sagrilaft/{env}/ecs/portal`
-- `/sagrilaft/{env}/ecs/keycloak`
+Bedrock y SES usan permisos sin restringir a un recurso concreto porque esos
+servicios no lo permiten bien; el resto se limita a los recursos de SAGRILAFT.
 
-ECS deployment circuit breaker queda habilitado con rollback automatico ante fallos de despliegue.
+## Cómo llega una versión nueva
 
-### Repositorios de Contenedores (ECR)
+1. Se construyen las cuatro imágenes con el identificador del commit y se suben a ECR.
+2. El script de releases actualiza la base de datos (si hace falta) y después los servicios.
+3. `GET /health` responde con el commit que está corriendo.
 
-Las imagenes de produccion se almacenan en repositorios ECR privados. El ciclo de vida retiene las ultimas 30 imagenes por repositorio:
+Paso a paso: [guía de despliegue](../produccion/despliegue/GUIA_DESPLIEGUE_LOCAL.md).
 
-| Repositorio | Uso |
-|-------------|-----|
-| `sagrilaft-prod-backend` | API Python |
-| `sagrilaft-prod-formulario-publico` | Frontend publico |
-| `sagrilaft-prod-portal-interno` | Portal interno |
-| `sagrilaft-prod-keycloak` | Imagen Keycloak productiva |
+## Decisiones de diseño que siguen vigentes
+
+- **Leer menos páginas con IA:** cada PDF se recorta a 7 páginas antes de enviarlo a
+  Bedrock; ahorra tiempo y costo.
+- **Reintentos con espera creciente** cuando Zoho o Bedrock no responden a la primera.
+- **Tamaño máximo de archivo (15 MB):** el backend lee los archivos por partes y corta
+  apenas se pasa del límite. No se hace en el cortafuegos porque este solo revisa los
+  primeros 64 KB de cada petición.
+- **`FRONTEND_URL` obligatorio** en staging y producción, para no abrir CORS por error.
+
+## Diagramas
+
+Las fuentes editables están en `diagramas/` (en la raíz del repositorio):
+
+- `infraestructura-sagrilaft.puml` y `.drawio`: dónde corre cada pieza en AWS y cómo se conecta.
+- `flujo-producto-sagrilaft.puml`: el recorrido del expediente, desde el formulario hasta la firma y el cierre.
+
+Al dibujar o presentar: el modelo de IA es «el configurado en el ambiente»; las listas
+cautelares son opcionales (simuladas en staging, deshabilitadas en producción); Zoho
+habla en los dos sentidos (el backend lo llama y Zoho avisa al webhook
+`/api/webhooks/zoho-sign`, protegido con firma HMAC). No hay guía de presentación
+([detalle](../evidencia/README.md#guia-presentacion)). Si un diagrama no coincide con el
+código, se corrige el diagrama. Los diagramas no se revisaron contra el código en esta
+actualización.

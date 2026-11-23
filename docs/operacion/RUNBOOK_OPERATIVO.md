@@ -36,8 +36,9 @@ Producción ya tiene el topic y las alarmas. El 2026-10-07 se probó de forma
 controlada la acción de la alarma 5xx con `SetAlarmState`: CloudWatch invocó
 SNS al pasar a `ALARM` y al volver a `OK`, y el operador confirmó ambos
 correos. Esta prueba valida la acción configurada y su entrega, pero no la
-evaluación de un umbral a partir de métricas reales. La evidencia está en
-`docs/evidencia/sns-prueba-temporal-prod-20261007.json`.
+evaluación de un umbral a partir de métricas reales. El archivo de evidencia
+(`sns-prueba-temporal-prod-20261007.json`) no se conserva; queda el registro de
+CloudTrail ([evidencia no conservada](../evidencia/README.md#sns-prueba-temporal-20261007)).
 
 <a id="que-hacer-alarma"></a>
 ### Qué alarma llegó y qué hacer
@@ -103,8 +104,8 @@ CloudWatch avisa cuando una alarma recién creada confirma que todo está bien.
   conservara (drift); no se les envió invitación. Decisión del mismo día: la
   lista efectiva es solo ese correo hasta autorizar a los otros once, y quedó
   aplicada y verificada en un despliegue posterior (CloudFormation, SNS y SSM
-  alineados). La carpeta con la evidencia de ese día ya no se conserva; este
-  resumen es el registro que queda.
+  alineados). Evidencia de ese día (recuperada el 2026-11-23):
+  [sns-alertas-prod-20261021](../evidencia/sns-alertas-prod-20261021/README.md).
 - Para cerrar P06, con las suscripciones autorizadas confirmadas y los
   servicios activos, provocar una condición métrica aprobada que cruce un
   umbral real y verificar que el aviso llegue a la lista definitiva en menos
@@ -777,29 +778,12 @@ firma real descrita arriba, sin recargar la página.
 <a id="despliegue-coordinado"></a>
 ## Despliegue coordinado: diagnóstico y límites de recuperación
 
-**Laboratorio P20:** A/B/C no requieren dominios nuevos, HTTPS de navegador ni
-login. El lanzador corregido localmente impone el fixture sin DDL en los dos
-subcasos de A, incluida pérdida del observador; no usar el comando ordinario de
-migración para simular incertidumbre. Reconciliar el ARN existente y preservar
-el lock; no relanzar, recuperar ni liberarlo sin la autorización correspondiente.
-Usar únicamente `p20_operation=scenario-a-fixture` para estos subcasos; el
-flujo general rechaza fault injection. Sin `--execute` no toma lock ni lanza
-tareas. La ruta ejecutable retiene el lock incluso ante el fallo esperado;
-reconciliarlo requiere autorización separada y nunca borrado incondicional.
-La corrección se validó después en AWS: A cerrado con excepción externa propia;
-B cerrado con expansión, fallo de salud, rollback, smoke y liberación condicional
-comprobados, con excepción externa propia; C preparado solo localmente y no ejecutado. No repetir las pruebas completadas. El plan detallado del
-laboratorio P20 (restricciones, ENTRYPOINT/digest y evidencias) se eliminó junto
-con el laboratorio; este resumen es el registro que queda.
-
-
 El orquestador local registra la evidencia por intento y usa el objeto
 `_deployment/<stack>.lock` en el bucket del stack. Ante fallo, timeout o interrupción,
 conserva el bloqueo; no inicia por sí solo una recuperación ni libera el lock
 por expiración. ECS/CloudFormation sí pueden hacer rollback automático del
-despliegue (comprobado en B); esto no revierte Alembic ni libera el lock.
-No inferir de ello autorización para reintentar. Su ensayo AWS se sigue en
-[P20](../produccion/PENDIENTES_PRODUCCION.md#p20).
+despliegue; esto no revierte Alembic ni libera el lock.
+No inferir de ello autorización para reintentar.
 
 Antes de decidir una recuperación, conservar plan, eventos, ARN/resultado de tarea,
 digests, evidencia Alembic y estado de CloudFormation/ECS. Determinar si la migración
