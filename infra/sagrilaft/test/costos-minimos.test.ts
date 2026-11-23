@@ -93,6 +93,27 @@ test('los comandos de staging y producción activan el NAT', () => {
   }
 });
 
+test('tamaño de cada tarea: solo el backend tiene 2 GB', () => {
+  // Ver docs/produccion/ESTIMACION_COSTOS_AWS.md: cada GB de Fargate es ~3,2 USD al mes por copia.
+  const plantilla = synth({ environment: 'prod', habilitarNatEgress: 'true' });
+  const tareas = Object.entries(plantilla.Resources as Record<string, any>)
+    .filter(([, r]) => r.Type === 'AWS::ECS::TaskDefinition');
+  const esperado: Record<string, [string, string]> = {
+    EcsFargateBackendTaskDefinition: ['512', '2048'],
+    EcsFargateKeycloakTaskDefinition: ['512', '1024'],
+    EcsFargateMigrationTaskDefinition: ['512', '1024'],
+    EcsFargateFrontendTaskDefinition: ['256', '512'],
+    EcsFargatePortalTaskDefinition: ['256', '512'],
+    EcsFargateListasWorkerTaskDefinition: ['256', '512'],
+  };
+  equal(tareas.length, Object.keys(esperado).length);
+  for (const [id, r] of tareas) {
+    const prefijo = Object.keys(esperado).find(p => id.startsWith(p));
+    equal(prefijo !== undefined, true, `tarea no prevista: ${id}`);
+    equal(`${r.Properties.Cpu}/${r.Properties.Memory}`, esperado[prefijo!].join('/'), id);
+  }
+});
+
 test('el backend escala de 1 a 2 copias como máximo', () => {
   const plantilla = synth({ environment: 'prod', habilitarNatEgress: 'true' });
   const objetivos = recursos(plantilla, 'AWS::ApplicationAutoScaling::ScalableTarget');

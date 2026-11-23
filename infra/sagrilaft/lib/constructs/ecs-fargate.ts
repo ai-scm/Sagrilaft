@@ -141,9 +141,13 @@ export class EcsFargate extends Construct {
 
   private buildBackendService(props: EcsFargateProps): AppService {
     const logGroup = this.buildLogGroup('BackendLogGroup', props.ambiente, 'backend', logs.RetentionDays.ONE_MONTH);
+    // 2 GB: con 1 GB los 4 workers ocupan ~62% en reposo, y cada subida de documento
+    // (hasta 15 MB, leída a memoria y enviada a Bedrock) suma varias veces su tamaño.
+    // Unas pocas subidas grandes simultáneas podían agotar la memoria y tumbar la copia
+    // entera. El GB extra cuesta ~3,2 USD al mes por copia (decisión 2026-11-23).
     const taskDefinition = new ecs.FargateTaskDefinition(this, 'BackendTaskDefinition', {
       cpu: 512,
-      memoryLimitMiB: 1024,
+      memoryLimitMiB: 2048,
       executionRole: this.executionRole,
       taskRole: this.backendTaskRole,
       family: `sagrilaft-${props.ambiente}-backend`,

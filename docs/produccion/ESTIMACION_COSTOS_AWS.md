@@ -9,8 +9,8 @@ la dirección está en `COSTOS_AWS_DIRECCION.md`, que no se versiona: se entrega
 | Ambiente | Configuración en AWS | Costo al mes | Qué falta |
 |---|---|---|---|
 | Staging | La nueva, desplegada y probada el 17-nov-2026 | ~84 USD estimado (apagado salvo unas 40 h de pruebas) | Confirmarlo con la factura de diciembre |
-| Producción | La anterior | ~327 USD (factura) | Desplegar la nueva: queda en ~172 USD |
-| **Total** | | **~411 USD hoy** | **~256 USD** cuando producción tenga la nueva |
+| Producción | La nueva, desplegada el 18-nov-2026. Backend con 2 GB desde el 23-nov-2026 | ~175 USD estimado (la anterior costaba ~327 USD según factura) | Confirmarlo con la factura de diciembre |
+| **Total** | | **~259 USD** | |
 
 Las cifras de la configuración nueva son estimaciones con precios de lista. Pasan a ser
 firmes cuando las confirme una factura completa. La de noviembre mezcla las dos
@@ -61,19 +61,19 @@ lugar.
 
 ## Configuración nueva
 
-### Producción: ~172 USD
+### Producción: ~175 USD
 
 | Servicio | Configuración | USD al mes |
 |---|---|---|
-| ECS Fargate | Backend, Keycloak (0,5 vCPU, 1 GB), formulario y portal (0,25 vCPU, 0,5 GB), con una copia cada uno. El backend escala de 1 a 2 copias (CPU 60%, memoria 70%) | 54 |
-| RDS PostgreSQL | `db.t3.small`, una zona, 100 GB, copias de seguridad de 7 días | 38 |
+| ECS Fargate | Backend (0,5 vCPU, 2 GB), Keycloak (0,5 vCPU, 1 GB), formulario y portal (0,25 vCPU, 0,5 GB), con una copia cada uno. El backend escala de 1 a 2 copias (CPU 60%, memoria 70%) | 57 |
+| RDS PostgreSQL | `db.t3.small`, una zona, 100 GB, copias de seguridad de 14 días | 38 |
 | NAT Gateway | Un NAT, con salida a internet y a las APIs de AWS | 33 |
 | ALB e IPs públicas | HTTPS por dominio hacia los cuatro servicios | 28 |
 | WAF | Reglas administradas de AWS, límite por IP y regla para la consola de Keycloak | 9 |
 | CloudWatch, secretos, ECR, S3, SES, SNS, Cloud Map, Bedrock | | 10 |
 
 Lo que puede variar según el uso:
-- **Segunda copia del backend:** se enciende sola con carga alta. Hasta 18 USD al mes si
+- **Segunda copia del backend:** se enciende sola con carga alta. Hasta 21 USD al mes si
   estuviera encendida todo el mes.
 - **Trabajador de listas:** 0 mientras las listas estén deshabilitadas; 9 USD al mes al
   activarlas.
@@ -113,10 +113,23 @@ crearlos de nuevo exige un `cdk deploy` cada vez, y cambian el DNS y la IP de sa
   - Código: [database.ts](../../infra/sagrilaft/lib/constructs/database.ts).
 - **Capacidad** ([sagrilaft-stack.ts](../../infra/sagrilaft/lib/sagrilaft-stack.ts)):
   - Una copia por servicio por defecto (`desiredCount=1`).
-  - Backend de 1 a 2 copias (`backendMaxCapacity=2`).
+  - Backend de 1 a 2 copias (`backendMaxCapacity=2`). El número de copias lo decide
+    el autoescalado: la plantilla no lo fija, para que un despliegue no apague la
+    segunda copia.
+  - Tamaño de cada tarea ([ecs-fargate.ts](../../infra/sagrilaft/lib/constructs/ecs-fargate.ts)):
+    backend 0,5 vCPU y 2 GB; Keycloak y migraciones 0,5 vCPU y 1 GB; formulario,
+    portal y trabajador de listas 0,25 vCPU y 0,5 GB.
+  - Por qué el backend tiene 2 GB (23-nov-2026): con 1 GB, sus 4 workers ocupaban
+    ~62% en reposo, y cada documento que se sube (hasta 15 MB) se lee completo a
+    memoria y se envía a Bedrock en la misma petición. Unas pocas subidas grandes
+    simultáneas podían agotar la memoria y reiniciar la copia entera. El GB extra
+    cuesta ~3,2 USD al mes por copia; una segunda copia entera, ~21 USD.
   - Trabajador de listas en 0 si `proveedorListasCautela=deshabilitado`.
 - **Etiquetas:**
-  - Todo lo que crea CDK lleva `Project=sagrilaft` y `Environment`.
+  - Todo lo que crea CDK lleva `Project=sagrilaft`, `Environment`, `Component` y
+    `ManagedBy`; lo que vive fuera de CDK se etiqueta con un script
+    ([ETIQUETADO_AWS.md](configuracion/ETIQUETADO_AWS.md)). Las cuatro claves ya están
+    activas en Cost Explorer, así que se puede filtrar el costo por componente.
   - Las tareas de Fargate las heredan del servicio (`propagateTags: SERVICE` en
     [ecs-fargate.ts](../../infra/sagrilaft/lib/constructs/ecs-fargate.ts)).
 - **Pruebas:** [costos-minimos.test.ts](../../infra/sagrilaft/test/costos-minimos.test.ts)
