@@ -6,6 +6,14 @@ registra progreso mediante casillas: cada resultado se registra en el ID de
 Los ejemplos se ejecutan en Bash desde la raíz del proyecto, salvo los bloques
 que entran explícitamente a `infra/sagrilaft` mediante un subshell.
 
+> **Vigencia (revisado el 2026-11-23).** Las fases 0 a 5 describen el primer corte, que ya se
+> ejecutó el 2026-10-21. Se conservan como registro y no se repiten: para releases nuevas usar la
+> [guía de despliegue](GUIA_DESPLIEGUE_LOCAL.md). Siguen vigentes las fases 6 y 7 (validación
+> antes de abrir y decisión final). El estado actual de producción está en
+> [Estado](../../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md). Desde el 2026-11-18 hay un quinto
+> servicio ECS (trabajador de listas, en 0 tareas); las menciones a «4 servicios» de este
+> documento son correctas para la fecha en que se escribieron.
+
 Secuencia revisada contra los scripts el 2026-10-16 (credenciales actualizadas el 2026-10-20). Estado de AWS verificado el 2026-10-16:
 la infraestructura de producción **ya existe** (`SagrilaftStack-prod`, `CREATE_COMPLETE` desde el
 2026-10-07, con `desiredCount=0`). No hay servicios activos ni migración ejecutada; el primer
@@ -26,7 +34,7 @@ Los criterios que requieren un stack se comprueban antes de abrir el servicio
 a usuarios reales; no confundir aprobación previa con Go/No-Go final.
 
 Verificar identidad AWS, cuenta y región contra el
-[catálogo](../configuracion/checklist-valores-staging-prod.md), disponibilidad de Docker y del
+[catálogo](../configuracion/MATRIZ_AWS_CONFIG.md), disponibilidad de Docker y del
 archivo privado `.env.prod`. Fijar `SHA_ACTUAL` al commit aprobado (no asumir
 que HEAD es la release). Preparar SMTP para cargarlo después del bootstrap.
 El riesgo aceptado de la RDS de producción (clase, una sola AZ, retención de
@@ -45,8 +53,8 @@ once exige autorización y un nuevo despliegue, que enviará sus invitaciones.
 ## Contexto común de CDK
 
 Definir en la misma sesión Bash, usando los valores del
-[catálogo](../configuracion/checklist-valores-staging-prod.md), incluida su
-[lista de destinatarios](../configuracion/checklist-valores-staging-prod.md#destinatarios):
+[catálogo](../configuracion/MATRIZ_AWS_CONFIG.md), incluida su
+[lista de destinatarios](../configuracion/MATRIZ_AWS_CONFIG.md#destinatarios):
 
 ```bash
 export SHA_ACTUAL='<SHA_APROBADO>'
@@ -69,7 +77,7 @@ CONTEXTO_PROD=(
 `AWS_PROFILE` es obligatorio: el perfil `default` no tiene credenciales, y ni
 `audit_aws_secrets_safe.py` ni `sync_aws_runtime_assets.py` aceptan `--profile`. Todos
 los comandos AWS de esta sesión dependen de esa variable. `CUENTA_AWS` es el valor
-confirmado en el [catálogo](../configuracion/checklist-valores-staging-prod.md#criterios-confirmados).
+confirmado en el [catálogo](../configuracion/MATRIZ_AWS_CONFIG.md#datos-de-la-cuenta).
 
 Reemplazar los marcadores de SHA, modelo y destinatarios antes de ejecutar. Reutilizar
 este contexto en **todas** las invocaciones de CDK: CDK no persiste flags entre comandos.
@@ -183,7 +191,7 @@ descartada. `.env.prod` y `.env.staging` se corrigieron para coincidir con sus r
 secretos (`sagrilaft/prod/zoho_credentials` y `sagrilaft/staging/zoho_credentials`),
 comparación por hash verificada campo a campo. Los webhooks de Zoho Sign
 (`Sagrilaft-Produccion` y `Sagrilaft-Staging`), que se habían borrado, se recrearon con la
-configuración documentada en el [catálogo](../configuracion/checklist-valores-staging-prod.md).
+configuración documentada en el [catálogo](../configuracion/MATRIZ_AWS_CONFIG.md).
 
 **Ambas condiciones de la tabla de bloqueo quedan cerradas.** `sync_aws_runtime_assets.py
 --apply` ya no está bloqueado por esta condición — sigue aplicando el resto del
@@ -208,6 +216,16 @@ externos deben tener estas fechas de último cambio:
 | `zoho_credentials` | 2026-09-24 13:03:11 (-05:00) | Carga manual de la cuenta oficial |
 
 Cualquier fecha distinta en CDK indica un cambio no explicado y detiene el corte.
+
+> **Esta línea base ya no sirve tal cual (verificado el 2026-11-23).** El etiquetado del
+> 2026-11-18 cambió el `LastChangedDate` de los cinco secretos (18-nov, 18:18 y 18:27 de
+> Bogotá) sin crear versiones nuevas. La versión vigente (`AWSCURRENT`) de cada uno conserva
+> su fecha de creación original: `app_secret`, `keycloak_admin` y `db_credentials` del
+> 2026-10-07; `zoho_credentials` del 2026-09-24; y `smtp_credentials` del 2026-10-20 13:41,
+> que es el cambio registrado en P03. Con la comparación de abajo, los tres de CDK darían
+> `REVISAR` sin haber cambiado, y los dos externos darían `OK` por tener una fecha posterior
+> aunque su valor tampoco cambió. Si se vuelve a usar este paso, comparar el identificador de la
+> versión `AWSCURRENT` (el auditor ya lo entrega en `version_stages`) en lugar de la fecha.
 
 **1. Identidad y cuenta.** Confirmar que la cuenta activa es la del catálogo, con el perfil
 exportado en el contexto común:
@@ -335,7 +353,7 @@ migración y activación verificadas, los 4 servicios activos. El lock de S3, qu
 conservó porque su propio cliente `cdk deploy` falló por un error de red después de que
 CloudFormation ya había completado el cambio, **se reconcilió y liberó el 2026-10-24** (verificación
 manual sin inconsistencias, borrado condicional por ETag). [Evidencia](../../evidencia/primer-corte-prod-20261021/README.md).
-Validación del flujo y recuperación: [P20](../PENDIENTES_PRODUCCION.md#p20); seguimiento:
+Seguimiento:
 [P04](../PENDIENTES_PRODUCCION.md#p04).
 
 ## Fase 6 — Validación antes de abrir a usuarios

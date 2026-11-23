@@ -1,9 +1,19 @@
-# Guía de Despliegue Local (Staging / Prod)
+# Guía de despliegue (staging y producción)
 
-Función única: despliegue rutinario desde local sobre un ambiente existente,
-build/push compartido y registro de release. El primer corte se ejecuta con el
-[procedimiento específico](CHECKLIST_CORTE_PRODUCCION.md). Para incidentes usar
-el [runbook](../../operacion/RUNBOOK_OPERATIVO.md#ecs). Estado y tareas no se registran aquí.
+Cómo publicar una versión nueva y cómo cambiar la infraestructura, desde un computador,
+sobre un ambiente que ya existe. Es la única guía de despliegue vigente: el
+[procedimiento del primer corte](CHECKLIST_CORTE_PRODUCCION.md) se conserva solo como
+registro. Para incidentes, el [runbook](../../operacion/RUNBOOK_OPERATIVO.md#ecs). El estado
+de cada ambiente y las tareas no se registran aquí.
+
+Hay dos tipos de despliegue y no se mezclan:
+
+- **Release (versión nueva del código):** se publican las imágenes y el script
+  `deploy_release.py` actualiza la base de datos y los servicios. Pasos 1 a 4.
+- **Cambio de infraestructura** (alarmas, parámetros, red, capacidad): `cdk deploy` con
+  el contexto completo del ambiente. Ver [Cambios de infraestructura](#infraestructura).
+  `deploy_release.py` rechaza a propósito cualquier cambio que no sea de imagen, así que
+  un cambio de infraestructura va siempre antes y por separado.
 
 ## El Concepto Clave: Consistencia de Etiquetas (Tags)
 La arquitectura actual en CDK exige que **los 4 contenedores de la plataforma (Frontend, Backend, Portal y Keycloak)** utilicen exactamente la misma etiqueta de imagen (el SHA aprobado para la release).
@@ -166,12 +176,13 @@ ruta, retención, imagen o ambiente sigue sujeto a comparación estricta.
    borrar ni reintentar a ciegas. Ver [recuperación](../../operacion/RUNBOOK_OPERATIVO.md#despliegue-coordinado).
 
 El cambio aislado de ECR no demuestra que el diff del próximo plan sea aceptable.
-Alcance validado y seguimiento: [P20](../PENDIENTES_PRODUCCION.md#p20).
 
 <a id="smoke-manual"></a>
 ### Validación manual de staging
 
-Modalidad implementada localmente; todavía no acredita un ensayo real. El plan usa
+Según el registro histórico de [Estado](../../estado/ESTADO_DESPLIEGUE_STAGING_PROD.md), se
+usó en staging para la release del 2026-10-20 (firma real y cierre con `--close-manual`).
+El plan usa
 `"smoke_mode": "manual"`, `"smoke_command": []` y `"manual_checks":
 ["release_sha", "crear_y_leer_correo", "guardar_y_recuperar", "borrador_con_correo"]`.
 Solo staging la admite. Los planes sin `smoke_mode` conservan el smoke automático.
@@ -231,8 +242,8 @@ El cierre usa bloqueo local POSIX; no ejecutar cierres concurrentes desde copias
 Esperar `UPDATE_COMPLETE`, verificar tareas ECS y target groups saludables, y
 comprobar el endpoint del ambiente. CloudFormation completo no sustituye los smoke tests.
 
-Definir `PORTAL_VALIDACION` con la URL del portal del ambiente en el
-[catálogo](../configuracion/checklist-valores-staging-prod.md) y ejecutar:
+Definir `PORTAL_VALIDACION` con la URL del portal del ambiente
+([dominios](../configuracion/MATRIZ_AWS_CONFIG.md#datos-de-la-cuenta)) y ejecutar:
 
 ```bash
 curl -fsS "${PORTAL_VALIDACION}/health"
@@ -251,7 +262,7 @@ versiones (no solo *qué commit* corre), después de un deploy exitoso a
 producción:
 
 ```bash
-# 1. Crear CHANGELOG.md si todavía no existe; mover "Sin publicar" a una sección
+# 1. Crear CHANGELOG.md (todavía no existe, revisado el 2026-11-23); mover "Sin publicar" a una sección
 #    nueva con el número de versión, y actualizar _VERSION_SERVICIO en
 #    backend/main.py si corresponde.
 
@@ -259,6 +270,39 @@ producción:
 git tag -a v2.1.0 -m "Descripción corta del release" $SHA_ACTUAL
 git push origin v2.1.0
 ```
+
+<a id="infraestructura"></a>
+## Cambios de infraestructura (`cdk deploy`)
+
+Así se desplegaron las alarmas y la corrección de la IP real en staging y producción el
+2026-11-23. Un `cdk deploy` no ejecuta migraciones y, si solo cambian alarmas,
+parámetros o atributos del balanceador, no reinicia los servicios.
+
+1. **Partir del último plan de release ejecutado en ese ambiente**, que tiene el contexto
+   completo (dominios, certificado, zona, modelo de IA, proveedor de listas, NAT,
+   capacidad). El tag de imagen debe ser el que corre hoy (`/health`), para no cambiar
+   la versión sin querer.
+2. **Leer la lista de destinatarios vigente de SSM** (`ALERTAS_EMAIL_DESTINATARIO`) y
+   pasarla como `snsAlertasSub`, sin imprimirla. Si se pasa otra, cambian las
+   suscripciones.
+3. **Variables:** `AWS_PROFILE`, `AWS_REGION=us-east-1` y `CUENTA_AWS` (la aplicación CDK
+   la exige).
+4. **En zsh, pasar el contexto como arreglo** (`"${CTX[@]}"`). Si se pasa como texto,
+   CDK ignora los `-c` y el diff sale falso (por ejemplo, propone borrar el NAT o crear
+   un certificado).
+5. **Revisar `cdk diff`** del stack (`SagrilaftStack-<ambiente>`). Solo debe aparecer lo
+   que se quiere cambiar. Cualquier cambio en servicios ECS, IAM o la base de datos
+   exige revisarlo antes.
+6. **Tomar una copia manual de la base de datos** en producción (filtrando por el prefijo
+   `sagrilaftstack-prod-`: la cuenta tiene bases de otros proyectos).
+7. **Desplegar** con `cdk deploy SagrilaftStack-<ambiente> --require-approval never` y los
+   mismos argumentos del diff. Comparar las tareas ECS antes y después.
+8. **Después**, desplegar la release si hace falta. Si se cambió el texto de una alarma u
+   otro recurso con tildes, el preflight de la release se detiene: por eso los textos
+   nuevos se escriben sin tildes.
+
+Registro de lo ejecutado el 2026-11-23 (plan con el contexto, despliegue y resultado):
+`tmp/despliegue-prod-20261123/` (fuera del control de versiones).
 
 ---
 
