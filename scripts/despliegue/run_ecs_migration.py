@@ -98,7 +98,11 @@ def run_migration(aws, emit=print, sleep=time.sleep, clock=time.monotonic):
                      "logRegion": log_options.get("awslogs-region")}))
     response = aws("ecs", "run-task", "--cluster", cluster_arn,
                    "--launch-type", "FARGATE", "--count", "1", "--task-definition", definition,
-                   "--client-token", token, "--network-configuration",
+                   "--client-token", token,
+                   # La tarea hereda Project/Environment/Component/ManagedBy de su
+                   # definición, igual que las tareas de los servicios.
+                   "--propagate-tags", "TASK_DEFINITION",
+                   "--network-configuration",
                    json.dumps({"awsvpcConfiguration": {"subnets": subnets, "securityGroups": [group],
                                                        "assignPublicIp": "DISABLED"}}))
     tasks = response.get("tasks", [])

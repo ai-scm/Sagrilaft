@@ -74,8 +74,8 @@ evaluación de un umbral a partir de métricas reales. La evidencia está en
   conservara (drift); no se les envió invitación. Decisión del mismo día: la
   lista efectiva es solo ese correo hasta autorizar a los otros once, y quedó
   aplicada y verificada en un despliegue posterior (CloudFormation, SNS y SSM
-  alineados). Ver
-  [evidencia del 2026-10-21](../evidencia/sns-alertas-prod-20261021/README.md).
+  alineados). La carpeta con la evidencia de ese día ya no se conserva; este
+  resumen es el registro que queda.
 - Para cerrar P06, con las suscripciones autorizadas confirmadas y los
   servicios activos, provocar una condición métrica aprobada que cruce un
   umbral real y verificar que el aviso llegue a la lista definitiva en menos
@@ -736,8 +736,9 @@ tareas. La ruta ejecutable retiene el lock incluso ante el fallo esperado;
 reconciliarlo requiere autorización separada y nunca borrado incondicional.
 La corrección se validó después en AWS: A cerrado con excepción externa propia;
 B cerrado con expansión, fallo de salud, rollback, smoke y liberación condicional
-comprobados, con excepción externa propia; C preparado solo localmente y no ejecutado. No repetir las pruebas completadas. Consultar restricciones,
-ENTRYPOINT/digest y evidencias en el [plan de A](../produccion/p20/PLAN_OPERATIVO_RECUPERACION_P20.md#preparación-específica-del-escenario-a).
+comprobados, con excepción externa propia; C preparado solo localmente y no ejecutado. No repetir las pruebas completadas. El plan detallado del
+laboratorio P20 (restricciones, ENTRYPOINT/digest y evidencias) se eliminó junto
+con el laboratorio; este resumen es el registro que queda.
 
 
 El orquestador local registra la evidencia por intento y usa el objeto

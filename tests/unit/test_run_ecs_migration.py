@@ -77,7 +77,8 @@ def test_success_preserves_identity_token_and_reports_only_safe_evidence(setup):
     assert run[run.index("--client-token") + 1] == "staging-release-new-attempt-1"
     assert run[run.index("--task-definition") + 1] == DEFINITION
     assert run[run.index("--cluster") + 1] == CLUSTER
-    network = json.loads(run[run.index("--network-configuration") + 1])["awsvpcConfiguration"]
+    assert run[run.index("--propagate-tags") + 1] == "TASK_DEFINITION"
+    network =json.loads(run[run.index("--network-configuration") + 1])["awsvpcConfiguration"]
     assert network["assignPublicIp"] == "DISABLED"
     assert network["subnets"] == ["subnet-123abc", "subnet-456def"]
     result = json.loads(events[-1])
