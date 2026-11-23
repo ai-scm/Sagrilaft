@@ -16,6 +16,7 @@ from slowapi.errors import RateLimitExceeded
 
 from infrastructure.config.configuracion import entorno_actual, entorno_es_productivo, load_config
 from infrastructure.storage.backend import crear_storage
+from api.ip_cliente import ip_cliente, redes_confiables
 from api.limitador import limitador
 from domain.excepciones import (
     AccesoExpiradoError,
@@ -165,7 +166,7 @@ def _registrar_manejadores_excepcion(app: FastAPI) -> None:
         return _inner
 
     def _ip(req: Request) -> str:
-        return req.client.host if req.client else "unknown"
+        return ip_cliente(req)
 
     def handler_seguridad(status_code: int, evento: str, detalle: str):
         def _inner(req: Request, exc: Exception) -> JSONResponse:
@@ -281,8 +282,12 @@ def _crear_app() -> FastAPI:
         **_rutas_documentacion_api(),
     )
 
+    # Falla al arrancar si TRUSTED_PROXY_IPS trae un valor inválido, en vez de
+    # descubrirlo con la primera petición.
+    redes_confiables()
+
     def _handler_rate_limit(req: Request, exc: RateLimitExceeded) -> JSONResponse:
-        _log_seg.warning("SECURITY event=RATE_LIMIT_EXCEEDED ip=%s path=%s", req.client and req.client.host, req.url.path)
+        _log_seg.warning("SECURITY event=RATE_LIMIT_EXCEEDED ip=%s path=%s", ip_cliente(req), req.url.path)
         return JSONResponse(status_code=429, content={"detail": "Demasiadas solicitudes. Intente más tarde."})
 
     app.state.limiter = limitador

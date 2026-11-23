@@ -86,8 +86,11 @@ echo "[entrypoint] Iniciando Uvicorn (workers=${UVICORN_WORKERS:-4})..."
 #   --host 0.0.0.0: Acepta conexiones de cualquier interfaz de red (necesario para Nginx/frontend en Docker).
 #   --port 8000: Puerto donde escucha la API.
 #   --workers: Número de procesos paralelos.
-#   --proxy-headers: Activa la lectura de cabeceras HTTP de proxies.
-#   --forwarded-allow-ips: Rango de IPs permitidas para confiar en cabeceras de proxy.
+#   --no-proxy-headers: Uvicorn NO reescribe la IP del cliente con X-Forwarded-For.
+#     La IP real la calcula la aplicación (api/ip_cliente.py) a partir de
+#     TRUSTED_PROXY_IPS, que admite rangos CIDR; uvicorn 0.30 solo admite IP
+#     exactas y, con "*", tomaría la primera entrada de la cabecera, que puede
+#     escribir el propio cliente.
 #   --timeout-keep-alive: Segundos que Uvicorn mantiene una conexión keep-alive abierta.
 #     Debe ser mayor al idleTimeout del ALB (300 s) para evitar la race condition en la
 #     que Uvicorn cierra el socket TCP justo antes de que el ALB lea la respuesta.
@@ -95,6 +98,5 @@ exec uvicorn main:app \
     --host 0.0.0.0 \
     --port 8000 \
     --workers "${UVICORN_WORKERS:-4}" \
-    --proxy-headers \
-    --forwarded-allow-ips "${TRUSTED_PROXY_IPS:-127.0.0.1}" \
+    --no-proxy-headers \
     --timeout-keep-alive 310
