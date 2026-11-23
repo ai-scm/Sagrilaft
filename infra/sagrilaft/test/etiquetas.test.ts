@@ -62,7 +62,13 @@ const TIPOS_NO_ETIQUETABLES = [
   'AWS::ElasticLoadBalancingV2::ListenerRule',
   'AWS::IAM::ManagedPolicy',
   'AWS::IAM::Policy',
+  // Filtros que cuentan firmas y correos fallidos en los registros del backend.
+  // El tipo no tiene propiedad Tags en CloudFormation.
+  'AWS::Logs::MetricFilter',
   'AWS::Route53::RecordSet',
+  // Política del bucket de registros de acceso del ALB (permiso de escritura del
+  // ALB y exigencia de TLS). El tipo no tiene propiedad Tags en CloudFormation.
+  'AWS::S3::BucketPolicy',
   'AWS::SNS::Subscription',
   'AWS::SecretsManager::SecretTargetAttachment',
   'AWS::WAFv2::WebACLAssociation',

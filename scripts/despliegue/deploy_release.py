@@ -106,7 +106,7 @@ def strip_metadata(value):
     return value
 
 
-# Excepción aprobada para staging y prod: ocho rutas y pares completos, no reglas Unicode.
+# Excepción aprobada para staging y prod: cinco rutas y pares completos, no reglas Unicode.
 # GetTemplate devuelve `?` donde el código sintetizado conserva tildes; se verificó el
 # mismo comportamiento en ambos stacks. Solo afecta a copias de comparación; nunca a
 # assemblies ni recursos AWS. Cualquier otro ambiente, ruta o texto sigue siendo estricto.
@@ -116,9 +116,6 @@ APPROVED_UNICODE_PAIRS = (
     (('Resources', 'EcrFormularioPublicoRepo71B2173B', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
     (('Resources', 'EcrPortalInternoRepo64131791', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
     (('Resources', 'EcrKeycloakRepoD812844A', 'Properties', 'LifecyclePolicy', 'LifecyclePolicyText'), '{"rules":[{"rulePriority":1,"description":"Mantener las últimas 30 imágenes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}', '{"rules":[{"rulePriority":1,"description":"Mantener las ?ltimas 30 im?genes para ahorrar costos","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}'),
-    (('Resources', 'AlarmasCriticasAlarmaErroresServidor05DAF4B7', 'Properties', 'AlarmDescription'), 'Alarma Crítica: Se detectaron más de 5 errores HTTP 5xx en el servidor backend durante los últimos 5 minutos.', 'Alarma Cr?tica: Se detectaron m?s de 5 errores HTTP 5xx en el servidor backend durante los ?ltimos 5 minutos.'),
-    (('Resources', 'AlarmasCriticasAlarmaSaturacionCpu3C8591DA', 'Properties', 'AlarmDescription'), 'Alarma de Rendimiento: El uso de CPU del servicio Backend superó el 85% de su capacidad.', 'Alarma de Rendimiento: El uso de CPU del servicio Backend super? el 85% de su capacidad.'),
-    (('Resources', 'AlarmasCriticasAlarmaSaturacionMemoria42793BCD', 'Properties', 'AlarmDescription'), 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend superó el 85% de su capacidad.', 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend super? el 85% de su capacidad.'),
     (('Resources', 'DashboardNegocio53ADAF63', 'Properties', 'DashboardBody', 'Fn::Join', 1, 0), '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de Éxito: Decisiones de Expedientes","region":"', '{"widgets":[{"type":"metric","width":24,"height":6,"x":0,"y":0,"properties":{"view":"bar","title":"Tasas de ?xito: Decisiones de Expedientes","region":"'),
 )
 

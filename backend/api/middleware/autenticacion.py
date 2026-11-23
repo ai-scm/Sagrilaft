@@ -28,6 +28,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKSet
 from jwt.exceptions import PyJWTError
 
+from api.ip_cliente import ip_cliente
 from infrastructure.config.configuracion import KeycloakConfig, entorno_actual
 from domain.utils.seguridad import sanitizar_log
 
@@ -149,7 +150,7 @@ async def _obtener_jwks(config: KeycloakConfig) -> dict:
 
 
 async def _decodificar_jwt(token: str, config: KeycloakConfig, request: Request) -> UsuarioPortalInterno:
-    ip = request.client.host if request.client else "unknown"
+    ip = ip_cliente(request)
     # A09:2025 - CWE-117: sanitizar user-agent y path para prevenir log injection
     user_agent = sanitizar_log(request.headers.get("user-agent", "unknown"))
     path = sanitizar_log(request.url.path)
@@ -267,7 +268,7 @@ async def portal_interno(
         )
 
     if credenciales is None:
-        ip = request.client.host if request.client else "unknown"
+        ip = ip_cliente(request)
         path = sanitizar_log(request.url.path)
         _registrar_fallo_ip(ip)
         _log.warning(

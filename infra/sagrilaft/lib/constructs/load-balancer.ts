@@ -1,8 +1,17 @@
-import { Duration } from 'aws-cdk-lib';
+import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
+
+/**
+ * Días que se conservan los registros de acceso del ALB. Son la única fuente
+ * independiente de la aplicación con la IP real de cada petición. Ajustar si
+ * Cumplimiento exige otro plazo.
+ */
+export const DIAS_RETENCION_REGISTROS_ACCESO = 90;
+export const PREFIJO_REGISTROS_ACCESO = 'alb';
 
 export interface LoadBalancerProps {
   readonly vpc: ec2.Vpc;
@@ -32,6 +41,7 @@ export interface LoadBalancerProps {
  */
 export class LoadBalancer extends Construct {
   public readonly alb: elbv2.ApplicationLoadBalancer;
+  public readonly registrosAcceso: s3.Bucket;
 
   constructor(scope: Construct, id: string, props: LoadBalancerProps) {
     super(scope, id);
@@ -46,6 +56,24 @@ export class LoadBalancer extends Construct {
       // mientras Bedrock aún procesa el PDF → HTTP 504 en el frontend.
       idleTimeout: Duration.seconds(300),
     });
+
+    // Registros de acceso del ALB: IP real, fecha, ruta y código de cada
+    // petición, independientes de la aplicación (trazabilidad de accesos).
+    // El ALB solo escribe en buckets con SSE-S3 (no admite KMS propio).
+    // Se conserva el bucket si se elimina el stack: es evidencia.
+    this.registrosAcceso = new s3.Bucket(this, 'RegistrosAcceso', {
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+      lifecycleRules: [
+        {
+          id: 'expirar-registros-acceso',
+          expiration: Duration.days(DIAS_RETENCION_REGISTROS_ACCESO),
+        },
+      ],
+    });
+    this.alb.logAccessLogs(this.registrosAcceso, PREFIJO_REGISTROS_ACCESO);
 
     // HTTPS listener con enrutamiento por host y 404 por defecto
     const listenerHttps = this.alb.addListener('Https', {

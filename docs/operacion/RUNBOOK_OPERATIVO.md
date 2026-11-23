@@ -24,10 +24,10 @@ Estado de simulacros:
 
 ### Contexto y limitación conocida
 
-Las 3 alarmas críticas de CloudWatch (`AlarmaErroresServidor` ≥5 5xx/5min,
-`AlarmaSaturacionCpu` ≥85%, `AlarmaSaturacionMemoria` ≥85%, definidas en
-`infra/sagrilaft/lib/constructs/observabilidad-alarmas.ts`) **solo despachan
-al topic SNS cuando `ambiente === 'prod'`**. Es una decisión deliberada del
+Las alarmas de CloudWatch están definidas en
+`infra/sagrilaft/lib/constructs/observabilidad-alarmas.ts` (lista completa y qué
+hacer con cada una en [Qué alarma llegó y qué hacer](#que-hacer-alarma)). **Solo
+envían correo en producción**; en staging existen pero no avisan. Es una decisión deliberada del
 código para no generar ruido en staging (ver comentario en el mismo archivo:
 "Esto evita fatiga de alarmas en Staging donde es normal que los
 desarrolladores causen errores 500").
@@ -38,6 +38,35 @@ SNS al pasar a `ALARM` y al volver a `OK`, y el operador confirmó ambos
 correos. Esta prueba valida la acción configurada y su entrega, pero no la
 evaluación de un umbral a partir de métricas reales. La evidencia está en
 `docs/evidencia/sns-prueba-temporal-prod-20261007.json`.
+
+<a id="que-hacer-alarma"></a>
+### Qué alarma llegó y qué hacer
+
+Cada alarma manda un correo cuando algo falla y otro cuando se normaliza. El
+asunto trae el nombre de la alarma; el cuerpo explica qué pasa. Las de la segunda
+parte de la tabla se agregaron en noviembre de 2026.
+
+| Alarma | Qué significa | Qué hacer |
+|---|---|---|
+| `AlarmaErroresServidor` | 5 o más errores del servidor en 5 minutos. | Buscar `Traceback` en los registros del backend. |
+| `AlarmaSaturacionCpu` / `AlarmaSaturacionMemoria` | El backend usa más del 85 % de su CPU o memoria. | El autoescalado agrega una copia; si persiste, ver [sección 4](#autoscaling). |
+| `AlarmaSinCopiasSanas<servicio>` | El servicio (backend, formulario público, portal interno o Keycloak) lleva 3 minutos sin ninguna copia funcionando. **Los usuarios no pueden usarlo.** Si es Keycloak, nadie del equipo interno puede iniciar sesión. | En ECS, abrir el servicio y mirar la pestaña de eventos y los registros de la última tarea detenida. Si fue un despliegue, ver [sección 5](#ecs). |
+| `AlarmaCopiasNoSanas<servicio>` | Una copia lleva 5 minutos fallando su revisión de salud. Si hay otra sana, el servicio sigue funcionando con menos capacidad. | Revisar los registros de esa copia. Si coincide con un despliegue, puede estar trabado. |
+| `AlarmaEspacioBaseDatos` | A la base de datos le quedan menos de 10 GB libres (2 GB en staging). Si se llena, deja de guardar formularios. | Ampliar el disco en RDS (no reinicia la base) y averiguar qué creció. |
+| `AlarmaCpuBaseDatos` | La CPU de la base lleva 15 minutos por encima del 80 % (lo normal es 4 %). Todo se vuelve lento. | Revisar en RDS qué consulta la está ocupando. |
+| `AlarmaConexionesBaseDatos` | La base tiene 120 conexiones o más desde hace 10 minutos (lo normal son unas 10). Cerca de 190 empieza a rechazar nuevas. | Ver si alguna copia del backend o Keycloak quedó atascada; reiniciarla desde ECS. |
+| `AlarmaFirmaFallida` | Zoho Sign rechazó o no respondió al enviar, cancelar o descargar una firma. | Lo más común: la cuenta de Zoho se quedó sin créditos de API o cambiaron las credenciales. Revisar la cuenta y la [sección 9](#zoho). |
+| `AlarmaCorreoFallido` | No salió un correo a una contraparte (credenciales de acceso, devolución, rechazo o reapertura). La contraparte no se enteró. | Buscar `Error al enviar notificación` en los registros del backend para ver a quién y por qué. Revisar SES. Reenviar desde el portal si hace falta. |
+
+Cómo se detectan las dos últimas: el backend solo responde con código 502 cuando
+falla Zoho, y escribe «Error al enviar notificación» cuando un correo no sale. Un
+filtro cuenta esas líneas en los registros del backend. El filtro busca
+«Error al enviar notificaci» (sin la tilde final) porque los textos que se envían
+a AWS van sin tildes; como busca un fragmento, igual encuentra el mensaje completo. Si algún día el backend
+empieza a usar 502 para otra cosa, hay que ajustar el filtro.
+
+Al desplegar las alarmas nuevas llega un correo «OK» por cada una: es normal,
+CloudWatch avisa cuando una alarma recién creada confirma que todo está bien.
 
 ### Simulacro ejecutado — SNS → correo (2026-09-19)
 
@@ -517,6 +546,29 @@ las bases solo tenían datos de prueba.
   del harness — así el proceso sigue corriendo en el sistema aunque la sesión
   del agente se interrumpa, y los resultados se pueden recuperar del log
   después.
+
+<a id="ip-real"></a>
+### Saber desde qué IP se hizo una petición
+
+Hay dos fuentes:
+
+- **Registros de la aplicación** (CloudWatch, `/sagrilaft/<ambiente>/ecs/backend`). Los
+  avisos de seguridad (`RATE_LIMIT_EXCEEDED`, `CREDENTIALS_INVALID`, `ACCESS_DENIED`,
+  `AUTH_FAILED`) traen `ip=` con la IP real del visitante. Si en vez de eso aparece una
+  dirección `10.0.x.x`, el backend no está leyendo la IP real: revisar que
+  `TRUSTED_PROXY_IPS` sea la red de la VPC. Ojo: las líneas de acceso del servidor web
+  (`INFO:     10.0.x.x:puerto - "POST /api/..."`) siempre muestran la IP del balanceador;
+  eso es normal y no indica ningún fallo.
+- **Registros de acceso del balanceador** (bucket `Lb/RegistrosAcceso` del stack,
+  carpeta `alb/`). Son independientes de la aplicación y guardan cada petición: fecha,
+  IP real, dirección pedida y respuesta. Llegan cada 5 minutos y se borran solos a los
+  90 días. Sirven para auditorías y para investigar un intento de acceso indebido aunque
+  la aplicación haya fallado.
+
+Si alguien reporta «Demasiadas solicitudes. Intente más tarde.», es el límite de
+intentos por persona: esperar un minuto y repetir. Si se repite con muchas personas a
+la vez, revisar los registros de la aplicación: todos los avisos con la misma IP
+`10.0.x.x` indican que se perdió la IP real.
 
 <a id="ses"></a>
 ## 8. Salida de sandbox SES y entregabilidad de correo (DKIM, Outlook/Microsoft)
