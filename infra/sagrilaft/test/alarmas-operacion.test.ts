@@ -38,6 +38,15 @@ function alarma(resources: Record<string, any>, fragmentoId: string) {
 
 const SERVICIOS = ['Backend', 'FormularioPublico', 'PortalInterno', 'Keycloak'];
 
+test('las descripciones con tildes son iguales en staging y prod (preflight de deploy_release.py)', () => {
+  // GetTemplate devuelve `?` en lugar de tildes y el preflight solo acepta textos exactos
+  // de APPROVED_UNICODE_PAIRS, que son los mismos para los dos ambientes.
+  const textos = (env: 'staging' | 'prod') => Object.fromEntries(
+    alarmas(synth(env)).map((a) => [a.id, a.AlarmDescription]),
+  );
+  deepStrictEqual(textos('staging'), textos('prod'));
+});
+
 for (const environment of ['staging', 'prod'] as const) {
   const resources = synth(environment);
 

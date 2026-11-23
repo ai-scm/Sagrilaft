@@ -199,8 +199,11 @@ export class ObservabilidadAlarmas extends Construct {
       evaluationPeriods: 2,
       comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      // Mismo texto en todos los ambientes: el preflight de deploy_release.py compara
+      // las descripciones con tildes contra una lista exacta (APPROVED_UNICODE_PAIRS).
       alarmDescription:
-        `Poco disco: a la base de datos le quedan menos de ${umbralDisco.toGibibytes()} GB libres. ` +
+        'Poco disco: a la base de datos le quedan menos de 10 GB libres en producción ' +
+        '(2 GB en staging). ' +
         'Si se llena, deja de guardar formularios. Ampliar el disco en RDS (no reinicia) y ' +
         'revisar qué tabla creció.',
     }));
