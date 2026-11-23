@@ -274,6 +274,14 @@ export class SagrilaftStack extends cdk.Stack {
       servicioBackend: ecsFargate.backend.service,
       topicAlertas: notifications.alertasTopic,
       ambiente,
+      servicios: [
+        { nombre: 'backend', targetGroup: ecsFargate.backend.targetGroup },
+        { nombre: 'formulario-publico', targetGroup: ecsFargate.frontend.targetGroup },
+        { nombre: 'portal-interno', targetGroup: ecsFargate.portal.targetGroup },
+        { nombre: 'keycloak', targetGroup: ecsFargate.keycloak.targetGroup },
+      ],
+      baseDatos: database.instance,
+      registrosBackend: ecsFargate.backend.logGroup,
     });
 
     const dashboardTecnico = new DashboardTecnico(this, 'DashboardTecnico', {
