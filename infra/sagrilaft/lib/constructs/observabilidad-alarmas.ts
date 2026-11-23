@@ -33,10 +33,12 @@ export function umbralEspacioLibreBaseDatos(ambiente: string): Size {
 /**
  * Filtros sobre los registros del backend. El backend solo responde 502 cuando falla
  * Zoho Sign (sin créditos, credenciales o caída del proveedor; ver backend/main.py),
- * y escribe «Error al enviar notificación» cuando un correo a la contraparte no sale.
+ * y escribe «Error al enviar notificación a ...» cuando un correo a la contraparte no sale.
+ * El filtro busca el fragmento sin la «ón» final: CloudWatch busca fragmentos de texto,
+ * así que encuentra igual el mensaje con tilde, y el filtro queda sin tildes.
  */
 export const FILTRO_FIRMA_FALLIDA = '[nivel, cliente, guion, peticion, codigo=502, ...]';
-export const FILTRO_CORREO_FALLIDO = '"Error al enviar notificación"';
+export const FILTRO_CORREO_FALLIDO = '"Error al enviar notificaci"';
 
 export interface ObservabilidadAlarmasProps {
   /** Balanceador de carga para monitorear errores de la capa de red y ruteo */
@@ -90,7 +92,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaErrores5xx,
       threshold: 5,
       evaluationPeriods: 1, // 1 periodo de 5 minutos
-      alarmDescription: 'Alarma Crítica: Se detectaron más de 5 errores HTTP 5xx en el servidor backend durante los últimos 5 minutos.',
+      alarmDescription: 'Alarma critica: se detectaron 5 o mas errores HTTP 5xx en el servidor backend durante los ultimos 5 minutos.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
@@ -105,7 +107,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaCpuBackend,
       threshold: 85,
       evaluationPeriods: 1,
-      alarmDescription: 'Alarma de Rendimiento: El uso de CPU del servicio Backend superó el 85% de su capacidad.',
+      alarmDescription: 'Alarma de rendimiento: el uso de CPU del servicio backend supero el 85 por ciento de su capacidad.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
@@ -120,7 +122,7 @@ export class ObservabilidadAlarmas extends Construct {
       metric: metricaMemoriaBackend,
       threshold: 85,
       evaluationPeriods: 1,
-      alarmDescription: 'Alarma de Rendimiento: El uso de Memoria RAM del servicio Backend superó el 85% de su capacidad.',
+      alarmDescription: 'Alarma de rendimiento: el uso de memoria RAM del servicio backend supero el 85 por ciento de su capacidad.',
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
@@ -164,9 +166,9 @@ export class ObservabilidadAlarmas extends Construct {
         // Sin datos también es grave: el balanceador dejó de informar sobre el servicio.
         treatMissingData: cloudwatch.TreatMissingData.BREACHING,
         alarmDescription:
-          `Servicio caído: ${servicio.nombre} lleva 3 minutos sin ninguna copia sana. ` +
-          'Los usuarios ven errores. Revisar en ECS por qué se detienen las tareas ' +
-          '(eventos del servicio y sus registros) y en el runbook, sección de alarmas.',
+          `Servicio caido: ${servicio.nombre} lleva 3 minutos sin ninguna copia sana. ` +
+          'Los usuarios ven errores. Revisar en ECS por que se detienen las tareas ' +
+          '(eventos del servicio y sus registros) y el runbook, seccion de alarmas.',
       }));
 
       this.alarmas.push(new cloudwatch.Alarm(this, `AlarmaCopiasNoSanas${id}`, {
@@ -180,7 +182,7 @@ export class ObservabilidadAlarmas extends Construct {
         treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
         alarmDescription:
           `Copia con fallas: ${servicio.nombre} tiene al menos una copia que no pasa la ` +
-          'revisión de salud desde hace 5 minutos. Si es durante un despliegue, puede estar ' +
+          'revision de salud desde hace 5 minutos. Si es durante un despliegue, puede estar ' +
           'trabado; si no, revisar los registros de esa copia.',
       }));
     }
@@ -199,13 +201,11 @@ export class ObservabilidadAlarmas extends Construct {
       evaluationPeriods: 2,
       comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.BREACHING,
-      // Mismo texto en todos los ambientes: el preflight de deploy_release.py compara
-      // las descripciones con tildes contra una lista exacta (APPROVED_UNICODE_PAIRS).
       alarmDescription:
-        'Poco disco: a la base de datos le quedan menos de 10 GB libres en producción ' +
+        'Poco disco: a la base de datos le quedan menos de 10 GB libres en produccion ' +
         '(2 GB en staging). ' +
         'Si se llena, deja de guardar formularios. Ampliar el disco en RDS (no reinicia) y ' +
-        'revisar qué tabla creció.',
+        'revisar que tabla crecio.',
     }));
 
     this.alarmas.push(new cloudwatch.Alarm(this, 'AlarmaCpuBaseDatos', {
@@ -218,8 +218,8 @@ export class ObservabilidadAlarmas extends Construct {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
-        `Base de datos saturada: la CPU lleva 15 minutos por encima del ${UMBRAL_CPU_BASE_DATOS} %. ` +
-        'Las pantallas se vuelven lentas. Revisar en RDS (Performance Insights) qué consulta la ocupa.',
+        `Base de datos saturada: la CPU lleva 15 minutos por encima del ${UMBRAL_CPU_BASE_DATOS} por ciento. ` +
+        'Las pantallas se vuelven lentas. Revisar en RDS (Performance Insights) que consulta la ocupa.',
     }));
 
     this.alarmas.push(new cloudwatch.Alarm(this, 'AlarmaConexionesBaseDatos', {
@@ -232,9 +232,9 @@ export class ObservabilidadAlarmas extends Construct {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
-        `Demasiadas conexiones: la base de datos tiene ${UMBRAL_CONEXIONES_BASE_DATOS} o más conexiones ` +
+        `Demasiadas conexiones: la base de datos tiene ${UMBRAL_CONEXIONES_BASE_DATOS} o mas conexiones ` +
         'abiertas desde hace 10 minutos (lo normal son unas 10). Cerca de 190 empieza a ' +
-        'rechazar nuevas. Revisar si alguna copia del backend o Keycloak está atascada.',
+        'rechazar nuevas. Revisar si alguna copia del backend o Keycloak esta atascada.',
     }));
   }
 
@@ -258,9 +258,9 @@ export class ObservabilidadAlarmas extends Construct {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
-        'Firma fallida: Zoho Sign rechazó o no respondió al enviar, cancelar o descargar una firma. ' +
-        'Causas habituales: la cuenta se quedó sin créditos de API, credenciales vencidas o ' +
-        'Zoho caído. El usuario vio el motivo en pantalla. Revisar la cuenta de Zoho y el runbook, sección Zoho.',
+        'Firma fallida: Zoho Sign rechazo o no respondio al enviar, cancelar o descargar una firma. ' +
+        'Causas habituales: la cuenta se quedo sin creditos de API, credenciales vencidas o ' +
+        'Zoho caido. El usuario vio el motivo en pantalla. Revisar la cuenta de Zoho y el runbook, seccion Zoho.',
     }));
 
     const correo = new logs.MetricFilter(this, 'FiltroCorreoFallido', {
@@ -279,10 +279,10 @@ export class ObservabilidadAlarmas extends Construct {
       comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
-        'Correo no enviado: falló el envío de un correo a una contraparte (credenciales, ' +
-        'devolución, rechazo o reapertura). La contraparte no recibió el aviso. Revisar los ' +
-        'registros del backend («Error al enviar notificación») y el estado de SES; reenviar ' +
-        'desde el portal si hace falta.',
+        'Correo no enviado: fallo el envio de un correo a una contraparte (credenciales, ' +
+        'devolucion, rechazo o reapertura). La contraparte no recibio el aviso. Revisar en los ' +
+        'registros del backend los mensajes "Error al enviar notificacion" y el estado de SES; ' +
+        'reenviar desde el portal si hace falta.',
     }));
   }
 }

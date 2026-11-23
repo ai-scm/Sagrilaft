@@ -60,7 +60,9 @@ parte de la tabla se agregaron en noviembre de 2026.
 
 Cómo se detectan las dos últimas: el backend solo responde con código 502 cuando
 falla Zoho, y escribe «Error al enviar notificación» cuando un correo no sale. Un
-filtro cuenta esas líneas en los registros del backend. Si algún día el backend
+filtro cuenta esas líneas en los registros del backend. El filtro busca
+«Error al enviar notificaci» (sin la tilde final) porque los textos que se envían
+a AWS van sin tildes; como busca un fragmento, igual encuentra el mensaje completo. Si algún día el backend
 empieza a usar 502 para otra cosa, hay que ajustar el filtro.
 
 Al desplegar las alarmas nuevas llega un correo «OK» por cada una: es normal,

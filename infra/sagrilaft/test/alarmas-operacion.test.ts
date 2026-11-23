@@ -38,14 +38,22 @@ function alarma(resources: Record<string, any>, fragmentoId: string) {
 
 const SERVICIOS = ['Backend', 'FormularioPublico', 'PortalInterno', 'Keycloak'];
 
-test('las descripciones con tildes son iguales en staging y prod (preflight de deploy_release.py)', () => {
-  // GetTemplate devuelve `?` en lugar de tildes y el preflight solo acepta textos exactos
-  // de APPROVED_UNICODE_PAIRS, que son los mismos para los dos ambientes.
-  const textos = (env: 'staging' | 'prod') => Object.fromEntries(
-    alarmas(synth(env)).map((a) => [a.id, a.AlarmDescription]),
-  );
-  deepStrictEqual(textos('staging'), textos('prod'));
-});
+// Al leer la plantilla desplegada, AWS cambia cada tilde por `?` y el preflight de
+// deploy_release.py lo toma como un cambio no autorizado. Por eso todas las alarmas
+// y filtros se escriben sin tildes.
+const soloAscii = (texto: string) => /^[\x20-\x7E]*$/.test(texto);
+
+for (const environment of ['staging', 'prod'] as const) {
+  test(`${environment}: las alarmas y los filtros no llevan tildes ni caracteres especiales`, () => {
+    const resources = synth(environment);
+    for (const a of alarmas(resources)) {
+      ok(soloAscii(a.AlarmDescription), `${a.id}: ${a.AlarmDescription}`);
+    }
+    const filtros = Object.entries(resources).filter(([, r]) => r.Type === 'AWS::Logs::MetricFilter');
+    equal(filtros.length, 2);
+    for (const [id, f] of filtros) ok(soloAscii(f.Properties.FilterPattern), `${id}: ${f.Properties.FilterPattern}`);
+  });
+}
 
 for (const environment of ['staging', 'prod'] as const) {
   const resources = synth(environment);
