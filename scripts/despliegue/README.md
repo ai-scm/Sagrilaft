@@ -37,15 +37,15 @@ planes de releases posteriores deben reflejar `dummy` para conservarla.
 ### Preparar el Change Set sin introducir cambios Unicode
 
 No reutilizar directamente la respuesta de `GetTemplate` como plantilla de
-actualización: en este stack devuelve ocho textos con tildes sustituidas por
-`?`. Reenviarlos introduce cambios reales en cuatro políticas ECR, tres
-descripciones de alarmas y un dashboard. CloudFormation propaga esos cambios a
+actualización: en este stack devuelve 22 textos con tildes sustituidas por
+`?`. Reenviarlos introduce cambios reales en cuatro políticas ECR, 16
+descripciones de alarmas, un filtro de registros y un dashboard. CloudFormation propaga esos cambios a
 otros recursos dependientes, incluyendo definiciones de tareas y servicios ECS.
 
 Usar el artefacto original de la última release ejecutada, disponible en el
 bucket de assets CDK y referenciado por `stackTemplateAssetObjectUrl` en su
 `manifest.json`. Verificar que coincide con la plantilla activa salvo por las
-ocho diferencias Unicode conocidas, sin ignorar ninguna otra diferencia. Las
+22 diferencias Unicode conocidas, sin ignorar ninguna otra diferencia. Las
 equivalencias de `comparison_template` sirven para verificar esa comparación;
 no son una autorización para reconstruir una plantilla mediante sustituciones
 de texto o para aceptar recursos adicionales en el Change Set.

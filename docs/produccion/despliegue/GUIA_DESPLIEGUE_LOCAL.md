@@ -145,9 +145,10 @@ Se requiere un único escritor por directorio de evidencia.
 Revisar las plantillas preparadas y la evidencia antes de autorizar otra fase.
 Rechaza cambios ajenos a las transiciones admitidas: separarlos, no omitir el control.
 Excepción aprobada para staging y prod: `APPROVED_UNICODE_PAIRS` en el orquestador
-admite ocho pares completos de texto en rutas exactas (cuatro descripciones de
-LifecyclePolicyText ECR, tres AlarmDescription y el fragmento del título del
-dashboard). GetTemplate devuelve `?` donde los recursos directos conservan tildes;
+admite 22 pares completos de texto en rutas exactas (cuatro descripciones de
+LifecyclePolicyText ECR, 16 descripciones de alarmas, el filtro que cuenta correos
+fallidos y el fragmento del título del dashboard). Si se cambia el texto de una
+alarma con tildes, hay que actualizar su par o el preflight se detendrá. GetTemplate devuelve `?` donde los recursos directos conservan tildes;
 se verificó el mismo comportamiento en `SagrilaftStack-prod` el 2026-10-21.
 La equivalencia solo se aplica a copias para comparación: no cambia las assemblies,
 no omite propiedades ni normaliza Unicode de forma general. Cualquier otro texto,

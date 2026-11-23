@@ -615,14 +615,15 @@ def merge_templates(a, b):
 
 @pytest.mark.parametrize('env', ['staging', 'prod'])
 def test_all_approved_pairs_together_match_the_deployed_template(env):
-    # Hallazgo del 2026-10-21: GetTemplate sustituye las tildes por `?` en las ocho rutas.
-    # Con las ocho a la vez, la plantilla desplegada debe equivaler a la sintetizada; sin
+    # Hallazgo del 2026-10-21: GetTemplate sustituye las tildes por `?` en estas rutas.
+    # Con todas a la vez, la plantilla desplegada debe equivaler a la sintetizada; sin
     # la equivalencia (ambiente desconocido) el preflight las rechazaría.
     synthesized, deployed = {}, {}
     for path, original, observed in release.APPROVED_UNICODE_PAIRS:
         synthesized = merge_templates(synthesized, unicode_template(path, original))
         deployed = merge_templates(deployed, unicode_template(path, observed))
-    assert len(release.APPROVED_UNICODE_PAIRS) == 8
+    # 8 originales + 14 de las alarmas de noviembre de 2026.
+    assert len(release.APPROVED_UNICODE_PAIRS) == 22
     assert release.comparison_template(deployed, env) == release.comparison_template(synthesized, env)
     assert release.comparison_template(deployed, None) != release.comparison_template(synthesized, None)
 
