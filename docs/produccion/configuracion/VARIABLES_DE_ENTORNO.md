@@ -52,7 +52,7 @@ personal o de infraestructura; — no sensible).
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | **Eliminadas en los tres ambientes (2026-10-20).** Ya no existen en `.env`, `docker-compose.yml` ni en staging/prod. | — | — | Prohibidas en los tres ambientes (`validate_envs.py`, `check_staging_readiness.py`) | — |
 | `AWS_PROFILE` | Perfil de AWS CLI/SSO que usa el backend en local. Reemplaza las claves estáticas. | `boto3` (cadena de credenciales por defecto) | Dev: `.env` (`PS-PowerUserAccess-<CUENTA_AWS>` al 2026-10-20). AWS: no aplica (Task Role) | Opc. en dev (default `default`, sin credenciales → IA deshabilitada). No existe en staging/prod | ⚠️ (nombre de perfil con ID de cuenta) |
 | `UVICORN_WORKERS` | Número de procesos Uvicorn. | `backend/entrypoint.sh` (`--workers`) | Dev: compose fija `1`. CDK local prepara `2` en staging y `4` en producción; lo consultado en AWS era `4` en ambos. | Opc. (default 4) | — |
-| `TRUSTED_PROXY_IPS` | IPs/CIDR de proxies de confianza para `X-Forwarded-*`. | `entrypoint.sh` (`--forwarded-allow-ips`) | Dev: compose fija `172.0.0.0/8`. AWS: CDK fija `172.0.0.0/8` | Opc. (default del script `127.0.0.1`; compose base `172.0.0.0/8`) | ⚠️ |
+| `TRUSTED_PROXY_IPS` | Red interna desde la que llegan las visitas a través del balanceador. Solo si una conexión viene de esa red, el backend lee la IP real del visitante que el balanceador le adjunta. Con esa IP se cuentan los intentos por persona y se anota quién hizo cada cosa en los registros de seguridad. Admite una o varias redes separadas por coma (por ejemplo `10.0.0.0/16`). Si el valor está mal escrito, el backend no arranca. | `backend/api/ip_cliente.py` | Local: `172.0.0.0/8` (red de Docker). AWS: la red de la VPC (`10.0.0.0/16`), que CDK toma sola | Opc. (default `127.0.0.1`) | ✅ |
 | `SECRET_KEY` | Clave HMAC-SHA256 para firmar reportes de auditoría. | `AppConfig.secret_key` (`os.environ["SECRET_KEY"]`); compose base la exige | Dev: `.env`. `.env.prod`: eliminada el 2026-10-19 (sin consumidor local). AWS: secreto `app_secret.secret_key` (CDK lo genera de 64 caracteres) | **Obl.** (sin default; `KeyError` si falta) | 🔒 |
 | `MAX_UPLOAD_SIZE_MB` | Tope de tamaño de archivos subidos. | `AppConfig.max_upload_mb` | AWS: CDK fija `15` en `ecs-fargate.ts`. Dev: **no se inyecta** (ver §9.1, hallazgo 7) | Opc. (default 15) | — |
 | `JWKS_CACHE_TTL_SECONDS` | Segundos de caché de las claves JWKS de Keycloak. | `api/middleware/autenticacion.py:84` | Solo documentada en `.env.dev.example` (vacía) y **no inyectada por compose ni CDK** | Opc. (default 300). Vacía rompe el arranque (ver §9.1, hallazgo 6) | — |
@@ -197,7 +197,7 @@ prod `*sagrilaft.ia.blend360.com`.
 | `SMTP_FROM` / `SES_EMAIL_ORIGEN` | `no-responder@localhost` / vacío | ejemplo: no-reply; archivo local: SMTP no-reply y SES correo personal | no-reply |
 | `SMTP_REPLY_TO` | vacío | ejemplo: `legal@…`; ausente del archivo local consultado | ejemplo: `legal@…`; ausente del archivo local consultado |
 | `UVICORN_WORKERS` | `1` (`.env`: 4; compose dev fija 1) | CDK local `2`; AWS consultado `4` | CDK local y AWS consultado `4` |
-| `TRUSTED_PROXY_IPS` | vacío (compose fija `172.0.0.0/8`) | `REPLACE_*` en ejemplo; real `172.0.0.0/8` | ídem |
+| `TRUSTED_PROXY_IPS` | vacío (compose fija `172.0.0.0/8`) | `REPLACE_*` en ejemplo; real: la red de la VPC (`10.0.0.0/16`) | ídem |
 | `BEDROCK_MODEL_ID` | opcional en local | ejemplo: marcador; `.env.staging`: perfil de inferencia; decisión: identificador directo | ejemplo: marcador; `.env.prod`: identificador directo |
 | `PORTAL_AUTH_DISABLED` | `false` | `false` | `false` |
 | `AWS_ACCESS_KEY_ID`/`SECRET` | eliminadas (2026-10-20) | prohibidas | prohibidas |
@@ -266,7 +266,14 @@ los archivos locales pueden haber cambiado. Las diferencias revisadas aparecen e
 - `docker-compose.yml` base default `APP_ENV=production` vs `entrypoint.sh` default
   `development` vs backend sin default.
 - `docker-compose.yml` base default `PROVEEDOR_LISTAS_CAUTELA=dummy` y
-  `TRUSTED_PROXY_IPS=172.0.0.0/8` vs default del `entrypoint.sh` `127.0.0.1`.
+  `TRUSTED_PROXY_IPS=172.0.0.0/8` vs default de la aplicación `127.0.0.1`.
+- Error corregido en noviembre de 2026: en AWS `TRUSTED_PROXY_IPS` valía `172.0.0.0/8`,
+  una red que no es la de la VPC, y además el servidor web no sabía leer redes, solo
+  direcciones exactas. Resultado: el backend creía que todas las visitas venían del
+  balanceador. Todos los usuarios compartían el mismo cupo de intentos y los registros
+  de seguridad no tenían la IP real. Ahora es la aplicación la que lee la IP real
+  (`backend/api/ip_cliente.py`). Usa siempre la última dirección que agrega el
+  balanceador, porque las anteriores las puede inventar el propio visitante.
 - Variables fuera de los `.env` que influyen: `UPLOAD_DIR`, `DATABASE_HOST`,
   `KEYCLOAK_FORMULARIO_URL`, `KEYCLOAK_PORTAL_URL` (build de Keycloak; el publicador puede derivarlas de las URL de formulario y portal, incluso cuando lee SSM). No están en los `.example`.
 

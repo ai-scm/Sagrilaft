@@ -101,7 +101,7 @@ Prefijo esperado: `/sagrilaft/staging/config/`
 | `ZOHO_DOWNLOAD_TIMEOUT_SECONDS` | `60` |
 | `ZOHO_SIGN_REQUEST_EXPIRATION_DAYS` | `15` |
 | `UVICORN_WORKERS` | `2` |
-| `TRUSTED_PROXY_IPS` | `172.0.0.0/8` |
+| `TRUSTED_PROXY_IPS` | La red de la VPC (`10.0.0.0/16`); CDK la toma sola |
 
 ### Secrets Manager
 
@@ -175,7 +175,7 @@ Prefijo esperado: `/sagrilaft/prod/config/`
 | `ZOHO_DOWNLOAD_TIMEOUT_SECONDS` | `60` |
 | `ZOHO_SIGN_REQUEST_EXPIRATION_DAYS` | `15` |
 | `UVICORN_WORKERS` | `4` |
-| `TRUSTED_PROXY_IPS` | `172.0.0.0/8` |
+| `TRUSTED_PROXY_IPS` | La red de la VPC (`10.0.0.0/16`); CDK la toma sola |
 
 ### Secrets Manager
 
