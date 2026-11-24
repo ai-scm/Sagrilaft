@@ -126,19 +126,24 @@ al momento de la copia.
 <a id="p11"></a>
 ### P11 — GitHub sin acceso a AWS
 
-**Estado:** 🟡 Parcial (CI nuevo en la rama `ci/ci-basico-sin-aws`, 2026-11-24, sin unir a `main`).
+**Estado:** 🟡 Parcial. Solo falta borrar un ambiente vacío, y no bloquea nada.
 
 El CI ya no entra a AWS: solo corre pruebas ([qué revisa](despliegue/GUIA_DESPLIEGUE_LOCAL.md#ci)).
 Antes publicaba imágenes con el rol compartido `GithubActionsOIDC-DeployRole`, que acepta
 cualquier repositorio de la organización y tiene permisos de más, y fallaba desde el 18 de
-noviembre porque ese rol no lee SSM.
+noviembre porque ese rol no lee SSM. El cambio se unió a `main` el 2026-11-24 (PR #3), y
+el CI de `main` volvió a verde.
 
-Falta, después de unir la rama, que un administrador del repositorio borre en GitHub lo que
-ya nadie usa (*Settings → Secrets and variables → Actions* y *Settings → Environments*):
+Limpieza en GitHub del 2026-11-24:
 
-- Variables `AWS_ROLE_TO_ASSUME`, `AWS_ACCOUNT_ID`, `HOSTED_ZONE_ID` y `CERTIFICATE_ARN`.
-- Secreto `ALERTAS_STAGING`.
-- Los ambientes `production` y `staging` que creaba el workflow anterior, si no tienen otro uso.
+- Se borraron las variables `AWS_ROLE_TO_ASSUME`, `AWS_ACCOUNT_ID`, `HOSTED_ZONE_ID` y
+  `CERTIFICATE_ARN`. El secreto `ALERTAS_STAGING` no existía.
+- Se borraron los secretos `VITE_KEYCLOAK_CLIENT_ID`, `VITE_KEYCLOAK_REALM`,
+  `VITE_KEYCLOAK_URL` y `VITE_PORTAL_INTERNO_URL`, de junio de 2026. Ningún workflow los
+  usó nunca: las imágenes toman esos valores de SSM o del `.env` del ambiente.
+- Falta borrar el ambiente `production` de *Settings → Environments*. Lo creó solo el CI
+  anterior, que lo mencionaba; está vacío y el CI nuevo no lo vuelve a crear. Borrarlo
+  requiere ser administrador del repositorio.
 
 El rol compartido no se toca en AWS: lo pueden usar otros repositorios. Si más adelante se
 quiere publicar en staging desde GitHub, hay un rol propio preparado, limitado a staging
