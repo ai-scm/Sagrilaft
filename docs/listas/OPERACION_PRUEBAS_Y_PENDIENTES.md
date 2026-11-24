@@ -1,8 +1,9 @@
 # Módulo de listas cautelares: operación, pruebas y pendientes
 
-Estado verificado contra el código el 2026-11-13. Todo lo que se describe aquí funciona
-**solo en local** (`development`/`test`). Ningún ambiente compartido tiene el módulo
-v2 operativo, y producción está bloqueada por código.
+Estado verificado contra el código el 2026-11-24. Las secciones 1 a 6 describen el
+trabajo en local (`development`/`test`). En AWS, staging tiene el módulo con listas
+simuladas desde el 2026-11-17 y producción lo tiene deshabilitado por código (ver
+[En AWS](#en-aws)).
 
 Documentos relacionados: [arquitectura](ARQUITECTURA_LISTAS.md) (componentes,
 contratos, rutas, decisiones) y [reglas de búsqueda](BUSCADOR_REGLAS_Y_CASOS.md)
@@ -301,35 +302,10 @@ Fallos esperados conocidos: tres `xfail` estrictos de migraciones antiguas (MIG-
 
 ## 5. Resultados de referencia
 
-Totales de cada entrega local, en casos distintos y sin sumar repeticiones. Cada cifra es
-la selección de esa entrega; no se ejecutó nunca la suite completa del repositorio.
-
-| Entrega | Casos aprobados | Notas |
-|---|---|---|
-| F2 persistencia | 211 | 46 nuevas de persistencia; PostgreSQL 17.9 |
-| F3 simulador integrado | 287, y **293** tras corregir el seguimiento y exigir `exp` | 24 HTTP/navegador F3 |
-| F5.1 contratos | 318, y **337** tras la revisión | 44 propios de F5.1 |
-| F5.2 recepción | 362 → 373 → **374** con el ensayo SIGKILL | 37 casos de F5.2 |
-| F5.3 validación | **443** | 69 nuevos |
-| F5.4 importación | **470** | 27 nuevos (incluye 1.001 registros con lotes de 1.000) |
-| F5.5 administración | **511** | 41 nuevos; 4 ensayos SIGKILL |
-| F5.6 recorrido integrado | **517** | 6 nuevos |
-| Regla de un mismo usuario (`k21f34a567b8`) | 110 contratos + 114 de administración e historial + 3 de restauración | Verificación del 2026-11-08 |
-| Adaptador OFAC, primera entrega | **117** | 107 de formatos y seguridad + 10 de integración |
-| Ensayo OFAC completo | **44** | Con el archivo real; 22 de seguridad ZIP en el cierre |
-| F6.1 contratos 2.1 | **133** | 67 nuevas |
-| F6.2 representación | **316** | 39 nuevos |
-| F6.3 motor | **299** | 112 nuevas; 21 casos prioritarios de clasificación |
-| F6.4 integración | **341** | 28 nuevos |
-| F6.5 presentación | **358** | 17 nuevos; el portal compila |
-| F6.6 aceptación | **388** | 286 de contratos, 101 de SQL/HTTP/navegador, 1 con la copia oficial; 22 previas de integridad no se suman |
-
-En todas se mantuvieron los tres `xfail` históricos (MIG-01–03) y los avisos de
-dependencias.
-
 **Estado de aceptación:** F3, F5.1–F5.6, la integración local OFAC y F6.1–F6.5 tienen
 aceptación del usuario en su alcance local. **F6.6 está entregada sin aceptación formal
-registrada.**
+registrada.** En todas las entregas se mantuvieron los tres `xfail` históricos
+(MIG-01–03).
 
 **Ensayo OFAC completo** (publicación 2026-11-06, XML de 128.630.615 bytes, ZIP de
 5.777.108 bytes con relación 22,27:1), en PostgreSQL desechable sobre tmpfs:
@@ -417,26 +393,10 @@ se recuperó reenviando el archivo completo con un único trabajo.
 Todas las mediciones son de una máquina de desarrollo con un solo trabajador. No hay SLA
 ni prueba de carga.
 
-**Dónde están las evidencias.** Los informes JUnit, JSON, capturas y PDF de cada
-entrega se conservan en `docs/arquitectura/evidencias/` (402 archivos, ignorados por
-Git). Cada carpeta guarda también los intentos fallidos previos, separados del cierre.
-Los PDF oficiales de F6.6 no se guardaron, porque contienen datos personales.
-
-| Carpeta | Entrega | Contenido principal |
-|---|---|---|
-| `f55/` | F5.5 administración de versiones | Regresión, repetición final, contratos, endpoints, JSON de SIGKILL, hashes del código |
-| `f56/` | F5.6 recorrido integrado | `resumen-final.json`, recorridos XML/ZIP, denegación auditada, intentos fallidos de F56-A01/A02 |
-| `ofac_local/` | Primera integración del adaptador OFAC | `archivo_real.json` (conteos y memoria del XML completo sin SQL), unidades e integración |
-| `ofac_volumen/` | Ensayo SQL completo del XML | `final/ensayo-ofac-completo.json`, avance del trabajador reanudado, conteo XML independiente, limpieza |
-| `ofac_cierre_local/` | Repetición con índice y ZIP oficial | Informes XML y ZIP, igualdad de proyección, uso del índice, seguridad ZIP |
-| `f61/` | Contratos 2.1 | Resumen, JUnit, compatibilidad 2.0 |
-| `f62/` | Representación de búsqueda | Contratos, regresión, lectura final, compatibilidad |
-| `f63/` | Motor | Clasificaciones sintéticas, calibración de 20 pares, versiones y parámetros |
-| `f64/` | Integración con el portal | JUnit, captura del portal, intentos previos |
-| `f65/` | Presentación | Captura, PDF sintéticos ALTA/MEDIA/BAJA |
-| `f66/` | Aceptación integrada | `resumen_final.json`, `regresion_final/aceptacion-f66.jsonl`, `rendimiento_sintetico_final.json`, `oficial/ofac-f66.json`, cierre SQL interrumpido |
-
-Las evidencias de F3, F5.1–F5.4 se guardaron en `/tmp` y ya no existen.
+**Dónde están las evidencias.** Las mediciones con el archivo OFAC real están en
+[`docs/evidencia/listas-ofac/`](../evidencia/listas-ofac/README.md) (fuera de git). Los
+informes de cada entrega (JUnit, capturas, PDF sintéticos) no se conservan: los
+resultados se obtienen otra vez ejecutando las pruebas.
 
 ## 6. Incidencias encontradas y corregidas
 
@@ -480,39 +440,40 @@ Sirven como aviso para quien mantenga el módulo:
 - Conciliación operativa de originales huérfanos y temporales: la ruta solo los cuenta
   y no hay limpieza.
 
-### Antes de cualquier ambiente compartido (staging)
+<a id="en-aws"></a>
+### En AWS
 
-**Preparado en código e infraestructura (Fase 7, sin desplegar ni comprobar en el
-ambiente):**
+**Desplegado** (staging el 2026-11-17, producción el 2026-11-18):
 
-- Custodia en S3 (`LISTAS_CUSTODIA_BACKEND=s3`): informes y PDF del proveedor en el
-  bucket de la aplicación bajo `listas/custodia/<sha256>`, verificados al leer y entregados
-  solo por el backend. La administración de listas exige custodia local y responde 409 con S3.
-- Trabajador como servicio ECS (`sagrilaft-<ambiente>-listas-worker`,
-  `python -m infrastructure.listas.trabajador_servicio`): una tarea (`-c listasWorkerCount`,
-  0 en bootstrap), rol propio con acceso solo a `listas/custodia/*`, logs en
-  `/sagrilaft/<ambiente>/ecs/listas-worker` sin datos personales.
-- Parámetros SSM `LISTAS_CUSTODIA_BACKEND`, `LISTAS_CUSTODIA_S3_PREFIJO` y
-  `LISTAS_TUSDATOS_URL`, y el secreto `sagrilaft/<ambiente>/tusdatos_credentials`
-  (`token`, o `usuario` y `clave` del sandbox), inyectados al backend, la migración y el trabajador.
+- Custodia en S3 (`LISTAS_CUSTODIA_BACKEND=s3`): informes y PDF del proveedor en el bucket
+  de la aplicación, bajo `listas/custodia/<sha256>`. Solo el backend los entrega, después
+  de verificarlos. La administración de listas exige custodia local y responde 409 con S3.
+- Trabajador como servicio de ECS (`sagrilaft-<ambiente>-listas-worker`,
+  `python -m infrastructure.listas.trabajador_servicio`), con un rol que solo accede a
+  `listas/custodia/*` y registros en `/sagrilaft/<ambiente>/ecs/listas-worker`. Corre con
+  una tarea si las listas están activas y con 0 si están deshabilitadas
+  (`-c listasWorkerCount` lo cambia).
+- Parámetros `LISTAS_CUSTODIA_BACKEND`, `LISTAS_CUSTODIA_S3_PREFIJO` y `LISTAS_TUSDATOS_URL`,
+  y el secreto `sagrilaft/<ambiente>/tusdatos_credentials` (vacío en los dos ambientes).
 - CDK: `-c proveedorListasCautela` acepta `simulado`/`dummy`, `externo`/`sagrilaft` y
-  `deshabilitado`. Externo exige `-c habilitarNatEgress=true`; producción por defecto
-  `deshabilitado` y rechaza externo y el sandbox. `-c tusdatosUrl` permite el sandbox fuera de prod.
-- Roles `listas_operador` y `listas_revisor` en `keycloak/realm-sagrilaft.json` (realms
-  nuevos) y `scripts/listas/crear_roles_listas_keycloak.sh` para el realm ya existente.
+  `deshabilitado` (sin contexto: `dummy` en staging y `deshabilitado` en producción).
+  Externo exige `-c habilitarNatEgress=true`; producción rechaza externo y el sandbox.
+  `-c tusdatosUrl` permite el sandbox fuera de producción.
+- Roles `listas_operador` y `listas_revisor`: vienen en `keycloak/realm-sagrilaft.json`
+  para realms nuevos; para uno existente, `scripts/listas/crear_roles_listas_keycloak.sh`.
 
-**Activar Tusdatos en staging** (pasos manuales, en este orden):
+En staging, la consulta simulada con informe en S3 y revisión humana pasó el 2026-11-17
+([pruebas de esa fecha](../produccion/ESTIMACION_COSTOS_AWS.md#staging-hecho-el-17-nov-2026)).
 
-1. Desplegar con los cambios (los scripts de staging siguen en simulado) y comprobar que
-   el trabajador arranca y que una consulta simulada se cierra con informe en S3.
-2. Crear y asignar los roles con el script de Keycloak (ECS Exec en la tarea de Keycloak).
-3. Rellenar `sagrilaft/staging/tusdatos_credentials`: `token` (producción de Tusdatos) o
-   `usuario`/`clave` del sandbox con `-c tusdatosUrl=http://docs.tusdatos.co`. Con
+**Activar Tusdatos en staging** (pendiente; requiere credenciales):
+
+1. Rellenar `sagrilaft/staging/tusdatos_credentials`: `token` (producción de Tusdatos) o
+   `usuario` y `clave` del sandbox con `-c tusdatosUrl=http://docs.tusdatos.co`. Con
    `externo` y el secreto vacío, el backend no arranca.
-4. Desplegar con `-c proveedorListasCautela=externo -c habilitarNatEgress=true` (crea un
-   NAT Gateway, con costo mensual) y ejecutar una consulta real de prueba.
+2. Desplegar con `-c proveedorListasCautela=externo` (staging ya tiene NAT) y hacer una
+   consulta real de prueba.
 
-Sigue pendiente:
+**Sigue pendiente:**
 
 - Copia y restauración coordinada de SQL y custodia. Procedimiento **propuesto**, nunca ensayado:
   1. Detener admisiones y trabajos del módulo; identificar operaciones en curso y anotar
@@ -529,7 +490,6 @@ Sigue pendiente:
 - Retención del PDF del proveedor en S3 (hoy sin regla de ciclo de vida) y cifrado con
   KMS propio si Cumplimiento lo exige (hoy SSE-S3, el cifrado del bucket).
 - Alarma si el trabajador se detiene o acumula consultas pendientes.
-- Migraciones revisadas contra la base del ambiente y su versión de PostgreSQL.
 - Rol de aplicación sin propiedad de tablas, DDL, `TRUNCATE` ni control de triggers.
 - Inventario de consumidores externos de las rutas antiguas, que responden 410.
 - Pruebas de persistencia del módulo integradas en CI (hoy se saltan).
@@ -549,43 +509,15 @@ Sigue pendiente:
 
 ### Proveedor externo
 
-Adaptador de Tusdatos implementado (Fases 2 a 5; ver
-[arquitectura, sección 11](ARQUITECTURA_LISTAS.md#11-cómo-se-añade-una-fuente-o-un-proveedor)
-y la guía corta [Consultas con Tusdatos](TUSDATOS.md)).
-Probado con el sandbox público y con respuestas grabadas
-(`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
-`tests/persistencia_listas/test_externo_tusdatos.py`). Falta:
+El adaptador de Tusdatos está implementado y probado con el sandbox y con respuestas
+grabadas (`tests/contracts/test_cliente_tusdatos.py`, `test_adaptador_tusdatos.py`,
+`tests/persistencia_listas/test_externo_tusdatos.py`). Lo que falta confirmar con
+credenciales reales, las preguntas abiertas a Tusdatos y la alarma de créditos están en
+[TUSDATOS.md](TUSDATOS.md#pendiente). La contratación se sigue en
+[P15](../produccion/PENDIENTES_PRODUCCION.md#p15).
 
-- Fase 5 hecha: reutilización 6 h dentro del expediente, «Forzar actualización» y
-  descarga del PDF del proveedor para `listas_revisor`. Falta crear en Keycloak los roles
-  `listas_*` y asignarlos (ver «Antes de cualquier ambiente compartido»).
-- CC en caché (`jobid: null`): ya se intenta recuperar por `/api/v1/checks`, que el sandbox
-  no tiene. Con credenciales reales falta confirmar que la consulta en caché aparece en el
-  historial, el formato de `created_at` y que `check_id` es el id que recibe `report_json`.
-- Códigos de `sources/status` para las fuentes de listas (OFAC, ONU, PEP, CIDOB, INTERPOL,
-  EUROPOL): el catálogo `/api/fuentes-colombia` del sandbox trae los 12 códigos del sistema
-  escritos igual, así que lo más probable es que coincidan. Confirmarlo con el aviso
-  «sources/status no informa» del trabajador en la primera consulta real.
-- Tusdatos respondió que `verify/nit` y `verify/ce` no cobran y que el 400, el 403 y las
-  fallas sí (13-11-2026). Falta tenerlo por escrito.
-- Preguntas abiertas para Tusdatos (cobro en 400/403/fallas, historial, códigos de estado,
-  auto reintentos, retención de datos): lista completa y de dónde sale cada dato en
-  [TUSDATOS.md, «Qué sabemos y de dónde sale»](TUSDATOS.md#qué-sabemos-y-de-dónde-sale).
-  La propuesta comercial venció el 22-07-2026: hay que pedir una nueva.
-- Preguntar a Tusdatos por el «lanzamiento de fuente puntual» que menciona la nota de
-  `sources/status` (`/api/v1/sources/status/{job_id}`) y no aparece en su `openapi.json`.
-- Con credenciales reales: verificar el PDF, `/api/retry` (también horas después del
-  cierre, que es lo que usa la recarga automática) y la forma real de cada fuente
-  (en especial los textos de Policía y los registros PEP), confirmar que
-  `peps_funcion_publica` solo llega cuando hay registro y ver cómo llega `validado`.
-- Alarma de CloudWatch sobre la métrica `TusdatosCreditosRestantes` (hoy solo hay aviso en
-  los registros del trabajador).
-- Staging (Fase 7): preparado; falta ejecutar los pasos de activación (sección
-  «Antes de cualquier ambiente compartido»).
-- El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
-  `SAGRILAFT_API_URL` pertenecen al circuito retirado y ya no se usan para arrancar.
-- El seguimiento de contratación es la tarea P15 de
-  [pendientes de producción](../produccion/PENDIENTES_PRODUCCION.md#p15).
+El secreto `sagrilaft_listas_cautela_credentials` (`SAGRILAFT_API_KEY`) y
+`SAGRILAFT_API_URL` pertenecen al circuito retirado y ya no se usan para arrancar.
 
 ### Deuda técnica
 
@@ -598,7 +530,4 @@ Probado con el sandbox público y con respuestas grabadas
 | DEP-02 | `datetime.utcnow()` en el dummy retirado |
 | DEP-03 | Avisos de Uvicorn y `websockets.legacy` |
 | — | `servicios_externos/sagrilaft/deshabilitado.py` usa `ErrorConsultaListas` sin importarlo: `descargar_pdf` lanza `NameError` (código retirado) |
-| — | `.env.prod.example` sugiere activar con `sagrilaft`; eso hoy impide arrancar en producción |
-| — | El CDK (`infra/sagrilaft/lib/sagrilaft-stack.ts`) usa por defecto `proveedorListasCautela=sagrilaft` en prod si no se pasa el contexto; con ese valor el backend no arranca en producción. Hay que pasar siempre `-c proveedorListasCautela=deshabilitado` o corregir el valor por defecto |
-| — | `.env.staging.example` sigue usando solo `PROVEEDOR_LISTAS_CAUTELA` |
 | — | Retirar el circuito anterior: `domain/puertos/consultor_listas_cautela.py`, `servicios_externos/sagrilaft/`, `ServicioVerificacionSagrilaft`, `ListaCautelaService`, `proveedores_simulados.py` y la ruta `/api/expedientes/sagrilaft/disponibilidad` |

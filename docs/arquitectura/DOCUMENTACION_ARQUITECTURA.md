@@ -171,12 +171,11 @@ Paso a paso: [guía de despliegue](../produccion/despliegue/GUIA_DESPLIEGUE_LOCA
 Las fuentes editables están en `diagramas/` (en la raíz del repositorio):
 
 - `infraestructura-sagrilaft.puml` y `.drawio`: dónde corre cada pieza en AWS y cómo se conecta.
-- `flujo-producto-sagrilaft.puml`: el recorrido del expediente, desde el formulario hasta la firma y el cierre.
+- `flujo-producto-sagrilaft.puml`: el recorrido del expediente y todas sus transiciones de estado.
 
 Al dibujar o presentar: el modelo de IA es «el configurado en el ambiente»; las listas
 cautelares son opcionales (simuladas en staging, deshabilitadas en producción); Zoho
 habla en los dos sentidos (el backend lo llama y Zoho avisa al webhook
 `/api/webhooks/zoho-sign`, protegido con firma HMAC). No hay guía de presentación
 ([detalle](../evidencia/README.md#guia-presentacion)). Si un diagrama no coincide con el
-código, se corrige el diagrama. Los diagramas no se revisaron contra el código en esta
-actualización.
+código, se corrige el diagrama. Los tres se revisaron contra el código el 2026-11-24.

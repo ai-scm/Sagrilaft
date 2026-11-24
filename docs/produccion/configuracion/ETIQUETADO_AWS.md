@@ -1,6 +1,6 @@
 # Etiquetado de recursos AWS
 
-Función única: criterio para identificar en AWS a qué sistema, ambiente y función
+Criterio para identificar en AWS a qué sistema, ambiente y función
 pertenece cada recurso de SAGRILAFT, y cómo se administra. La cuenta es compartida
 con otros proyectos: estas etiquetas son la forma de separar lo nuestro.
 

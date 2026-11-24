@@ -34,13 +34,17 @@ Requisitos de sesión: `AWS_PROFILE` debe apuntar a la cuenta objetivo. El perfi
 no tiene credenciales y el script no acepta `--profile`. En producción:
 `export AWS_PROFILE=PS-PowerUserAccess-<CUENTA_AWS>`.
 
-Orden en el primer corte (procedimiento completo en el [checklist de corte](../../docs/produccion/despliegue/CHECKLIST_CORTE_PRODUCCION.md#secretos-externos)):
+Cómo cargar un secreto externo (paso a paso en
+[Configuración en AWS](../../docs/produccion/configuracion/MATRIZ_AWS_CONFIG.md#secretos-secrets-manager)):
 
-1. La infraestructura de producción ya existe (`SagrilaftStack-prod`, bootstrap del 2026-10-07). No repetir el bootstrap; comprobar diferencias con `cdk diff` y los mismos argumentos.
-2. `zoho_credentials` ya existe. El script no crea secretos.
-3. **Bloqueo:** no ejecutar `--apply` mientras las credenciales de Zoho en `.env.prod` no coincidan con la fuente aprobada. El dry-run no compara valores (ver la sección de limitaciones del checklist). Las claves de BD y Keycloak admin ya no están en `.env.prod` y el script no las lee. `smtp_credentials` no pasa por este script: se carga en la consola de AWS Secrets Manager y `SMTP_USER`/`SMTP_PASSWORD` no se declaran en `.env.staging` ni `.env.prod`.
-4. Cuando el bloqueo esté resuelto: dry-run, revisión del plan y después `--apply --expected-account <cuenta>`.
-5. Comprobación posterior con `audit_aws_secrets_safe.py` contra la línea base de la sección "Línea base esperada" del checklist: los secretos de CDK no deben cambiar.
+1. Comprobar que el valor en `.env.prod` (o `.env.staging`) es el aprobado. El dry-run no
+   compara valores: un archivo desactualizado sobrescribiría el secreto correcto.
+2. `smtp_credentials` no pasa por este script: se carga en la consola de Secrets Manager.
+   Las claves de BD y del administrador de Keycloak no están en `.env.prod` y el script
+   no las lee.
+3. Dry-run, revisión del plan y después `--apply --expected-account <cuenta>`.
+4. Comprobar con `audit_aws_secrets_safe.py` antes y después: los secretos que genera CDK
+   no deben cambiar.
 
 Ver también [Matriz AWS](../../docs/produccion/configuracion/MATRIZ_AWS_CONFIG.md).
 

@@ -1,6 +1,6 @@
 # Buscador por archivos: reglas de clasificación y casos de aceptación
 
-Estado verificado contra el código el 2026-11-12. Reglas funcionales aprobadas
+Estado verificado contra el código el 2026-11-24. Reglas funcionales aprobadas
 como **AF-F6-01** (2026-11-08). Implementación: `services/listas/motor_busqueda.py`
 (reglas `clasificacion-f63-v1`, algoritmo `recuperacion-f63-v1`, catálogo
 `motor-f63-v1`) y los comparadores de `domain/listas/comparacion_*.py`.
