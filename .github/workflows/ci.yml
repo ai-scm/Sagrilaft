@@ -8,14 +8,15 @@ on:
   pull_request:
   push:
     branches:
-      - main
+      - dev   # integración: llegan los PR de feature/* y fix/*
+      - main  # estable: solo llegan PR desde dev
   workflow_dispatch:
 
 # Lectura del repositorio y nada más (sin id-token: no puede pedir credenciales de AWS).
 permissions:
   contents: read
 
-# Un push nuevo al mismo PR cancela la revisión anterior; en main cada commit se revisa entero.
+# Un push nuevo al mismo PR cancela la revisión anterior; en dev y main cada commit se revisa entero.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

@@ -126,34 +126,41 @@ al momento de la copia.
 <a id="p11"></a>
 ### P11 — GitHub sin acceso a AWS
 
-**Estado:** 🟡 Parcial (CI nuevo en la rama `ci/ci-basico-sin-aws`, 2026-11-24, sin unir a `main`).
+**Estado:** 🟡 Parcial. Solo falta borrar un ambiente vacío, y no bloquea nada.
 
 El CI ya no entra a AWS: solo corre pruebas ([qué revisa](despliegue/GUIA_DESPLIEGUE_LOCAL.md#ci)).
 Antes publicaba imágenes con el rol compartido `GithubActionsOIDC-DeployRole`, que acepta
 cualquier repositorio de la organización y tiene permisos de más, y fallaba desde el 18 de
-noviembre porque ese rol no lee SSM.
+noviembre porque ese rol no lee SSM. El cambio se unió a `main` el 2026-11-24 (PR #3), y
+el CI de `main` volvió a verde.
 
-Falta, después de unir la rama, que un administrador del repositorio borre en GitHub lo que
-ya nadie usa (*Settings → Secrets and variables → Actions* y *Settings → Environments*):
+Limpieza en GitHub del 2026-11-24:
 
-- Variables `AWS_ROLE_TO_ASSUME`, `AWS_ACCOUNT_ID`, `HOSTED_ZONE_ID` y `CERTIFICATE_ARN`.
-- Secreto `ALERTAS_STAGING`.
-- Los ambientes `production` y `staging` que creaba el workflow anterior, si no tienen otro uso.
+- Se borraron las variables `AWS_ROLE_TO_ASSUME`, `AWS_ACCOUNT_ID`, `HOSTED_ZONE_ID` y
+  `CERTIFICATE_ARN`. El secreto `ALERTAS_STAGING` no existía.
+- Se borraron los secretos `VITE_KEYCLOAK_CLIENT_ID`, `VITE_KEYCLOAK_REALM`,
+  `VITE_KEYCLOAK_URL` y `VITE_PORTAL_INTERNO_URL`, de junio de 2026. Ningún workflow los
+  usó nunca: las imágenes toman esos valores de SSM o del `.env` del ambiente.
+- Falta borrar el ambiente `production` de *Settings → Environments*. Lo creó solo el CI
+  anterior, que lo mencionaba; está vacío y el CI nuevo no lo vuelve a crear. Borrarlo
+  requiere ser administrador del repositorio.
 
 El rol compartido no se toca en AWS: lo pueden usar otros repositorios. Si más adelante se
 quiere publicar en staging desde GitHub, hay un rol propio preparado, limitado a staging
 ([pasos](../../infra/sagrilaft/policies/github-staging/README.md)).
 
 <a id="p12"></a>
-### P12 — Proteger la rama `main`
+### P12 — Proteger las ramas `dev` y `main`
 
-**Estado:** 🔴 Sin protección (verificado el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets).
+**Estado:** 🔴 Sin protección (verificado el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets). `dev` existe desde el 2026-11-24.
 
-Un administrador del repositorio debe exigir PR, al menos una revisión y las cuatro
-revisiones del CI en verde. Se puede hacer en *Settings → Branches* o con:
+Un administrador del repositorio debe proteger las dos ramas del
+[flujo](despliegue/GUIA_DESPLIEGUE_LOCAL.md#ramas): exigir PR, al menos una revisión y las
+cuatro revisiones del CI en verde. Se puede hacer en *Settings → Branches* o con:
 
 ```bash
-gh api -X PUT repos/ai-scm/Sagrilaft/branches/main/protection --input - <<'JSON'
+for rama in dev main; do
+gh api -X PUT repos/ai-scm/Sagrilaft/branches/$rama/protection --input - <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
@@ -164,10 +171,15 @@ gh api -X PUT repos/ai-scm/Sagrilaft/branches/main/protection --input - <<'JSON'
   "restrictions": null
 }
 JSON
+done
 ```
 
-Los nombres deben coincidir con los de los jobs de `ci.yml`; GitHub solo los ofrece después
-de que el CI nuevo haya corrido una vez. Si cambian, hay que cambiarlos aquí también.
+Los nombres deben coincidir con los de los jobs de `ci.yml`. Si cambian, hay que cambiarlos
+aquí también.
+
+También en *Settings → General*: dejar `dev` como rama por defecto, para que los PR nuevos
+apunten ahí, y activar *Automatically delete head branches*, para que GitHub borre la rama
+al unir su PR.
 
 <a id="p14"></a>
 ### P14 — Caso de uso de SES ante AWS
