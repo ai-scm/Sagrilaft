@@ -317,13 +317,16 @@ def test_missing_configuration_fails_before_publication():
         publisher.builds({})
 
 
-def test_workflow_uses_shared_publisher_and_preserves_partial_evidence():
-    workflow = (publisher.ROOT / ".github/workflows/ci.yml").read_text()
-    assert "scripts/despliegue/build_and_push_ecr_images.py" in workflow
-    assert ":latest" not in workflow
-    assert "docker push" not in workflow and "docker build" not in workflow
-    assert "if: always()" in workflow and "actions/upload-artifact@v4" in workflow
-    assert '--tag "$IMAGE_TAG"' in workflow and "${{ github.sha }}" in workflow
+def test_staging_workflow_sketch_uses_shared_publisher_and_preserves_partial_evidence():
+    # El CI ya no publica (tests/contracts/test_ci_sin_aws.py). El esquema preparado para
+    # automatizar staging debe seguir usando este mismo script, con SHA y manifiesto.
+    sketch = (publisher.ROOT / "infra/sagrilaft/policies/github-staging/README.md").read_text()
+    assert "scripts/despliegue/build_and_push_ecr_images.py" in sketch
+    assert "--environment staging --from-ssm" in sketch
+    assert ":latest" not in sketch
+    assert "docker push" not in sketch and "docker build" not in sketch
+    assert "if: always()" in sketch and "actions/upload-artifact@v4" in sketch
+    assert '--tag "$GITHUB_SHA"' in sketch
 
 
 def test_snapshot_contains_only_committed_inputs(tmp_path, monkeypatch):

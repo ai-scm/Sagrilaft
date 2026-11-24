@@ -193,7 +193,6 @@ def check_migration_task() -> Check:
 
 def check_keycloak_build_args() -> Check:
     dockerfile = read("keycloak/Dockerfile")
-    workflow = read(".github/workflows/ci.yml")
     build_script = read("scripts/despliegue/build_and_push_ecr_images.py")
     ok = all(
         item in dockerfile
@@ -201,7 +200,7 @@ def check_keycloak_build_args() -> Check:
     ) and all(
         item in build_script
         for item in ["KEYCLOAK_PORTAL_URL", "KEYCLOAK_FORMULARIO_URL"]
-    ) and "--from-ssm" in workflow
+    ) and "--from-ssm" in build_script
     return Check("keycloak-build-args", ok, "Keycloak realm URLs are build-time parameters" if ok else "Keycloak build args missing")
 
 
@@ -411,14 +410,13 @@ def check_zoho_webhook_hmac_contract() -> Check:
 def check_frontend_legal_build_args() -> Check:
     dockerfile = read("frontend/apps/formulario-publico/Dockerfile")
     build_script = read("scripts/despliegue/build_and_push_ecr_images.py")
-    workflow = read(".github/workflows/ci.yml")
 
     required = {
         "Dockerfile recibe VITE_RAZON_SOCIAL": "ARG VITE_RAZON_SOCIAL" in dockerfile and "ENV VITE_RAZON_SOCIAL=" in dockerfile,
         "Dockerfile recibe VITE_CORREO_DATOS": "ARG VITE_CORREO_DATOS" in dockerfile and "ENV VITE_CORREO_DATOS=" in dockerfile,
         "script local pasa razon social": "VITE_RAZON_SOCIAL" in build_script,
         "script local pasa correo datos": "VITE_CORREO_DATOS" in build_script,
-        "CI usa configuración SSM": "--from-ssm" in workflow,
+        "publicador admite configuración SSM": "--from-ssm" in build_script,
         "razon social confirmada": '"HIGH TECH SOFTWARE S.A.S"' in build_script,
         "correo de datos confirmado": '"administrativocol@blend360.com"' in build_script,
     }
