@@ -124,36 +124,50 @@ al momento de la copia.
 ## 3. Mejoras y verificaciones externas
 
 <a id="p11"></a>
-### P11 — Rol propio para GitHub Actions
+### P11 — GitHub sin acceso a AWS
 
-**Estado:** 🟡 Parcial.
+**Estado:** 🟡 Parcial (CI nuevo en la rama `ci/ci-basico-sin-aws`, 2026-11-24, sin unir a `main`).
 
-El workflow publica imágenes con un rol de OIDC, sin llaves fijas, pero ese rol es
-compartido con otros repositorios de la organización y tiene permisos de más. Además,
-desde el 18 de noviembre el CI de `main` falla en «Publish immutable SHA images» porque
-ese rol no puede leer SSM (las pruebas del backend y gitleaks sí pasan). No afecta los
-despliegues, que son manuales, pero un CI siempre en rojo esconde fallos reales.
+El CI ya no entra a AWS: solo corre pruebas ([qué revisa](despliegue/GUIA_DESPLIEGUE_LOCAL.md#ci)).
+Antes publicaba imágenes con el rol compartido `GithubActionsOIDC-DeployRole`, que acepta
+cualquier repositorio de la organización y tiene permisos de más, y fallaba desde el 18 de
+noviembre porque ese rol no lee SSM.
 
-Se resuelve con un rol dedicado ([pasos](configuracion/MIGRACION_ROL_GITHUB_ACTIONS.md))
-o apagando la publicación automática. Hay una propuesta del permiso mínimo de lectura de
-SSM en
-[`infra/sagrilaft/policies/github-build-ssm.template.json`](../../infra/sagrilaft/policies/github-build-ssm.template.json).
+Falta, después de unir la rama, que un administrador del repositorio borre en GitHub lo que
+ya nadie usa (*Settings → Secrets and variables → Actions* y *Settings → Environments*):
+
+- Variables `AWS_ROLE_TO_ASSUME`, `AWS_ACCOUNT_ID`, `HOSTED_ZONE_ID` y `CERTIFICATE_ARN`.
+- Secreto `ALERTAS_STAGING`.
+- Los ambientes `production` y `staging` que creaba el workflow anterior, si no tienen otro uso.
+
+El rol compartido no se toca en AWS: lo pueden usar otros repositorios. Si más adelante se
+quiere publicar en staging desde GitHub, hay un rol propio preparado, limitado a staging
+([pasos](../../infra/sagrilaft/policies/github-staging/README.md)).
 
 <a id="p12"></a>
 ### P12 — Proteger la rama `main`
 
 **Estado:** 🔴 Sin protección (verificado el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets).
 
-Un administrador del repositorio debe exigir PR, al menos una revisión y el check
-`Run Backend Tests` en verde ([pasos](configuracion/MIGRACION_ROL_GITHUB_ACTIONS.md)).
+Un administrador del repositorio debe exigir PR, al menos una revisión y las cuatro
+revisiones del CI en verde. Se puede hacer en *Settings → Branches* o con:
 
-<a id="p13"></a>
-### P13 — CDK Diff en CI
+```bash
+gh api -X PUT repos/ai-scm/Sagrilaft/branches/main/protection --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": ["Secretos (gitleaks)", "Backend", "Frontend", "Infraestructura"]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "restrictions": null
+}
+JSON
+```
 
-**Estado:** 🟡 Implementado, sin ejecución comprobada.
-
-El [workflow](../../.github/workflows/cdk-diff.yml) existe. Falta verlo correr con el
-rol de [P11](#p11) y revisar que su `|| true` no oculte errores.
+Los nombres deben coincidir con los de los jobs de `ci.yml`; GitHub solo los ofrece después
+de que el CI nuevo haya corrido una vez. Si cambian, hay que cambiarlos aquí también.
 
 <a id="p14"></a>
 ### P14 — Caso de uso de SES ante AWS
@@ -213,21 +227,23 @@ sensibles. No se modifican los originales.
 
 **Estado:** 🟡 Parcial.
 
-El CI solo corre `pytest`: no ejecuta pruebas de frontend, de infraestructura ni de
-PostgreSQL, y las de persistencia de listas se saltan. Los huecos están en el
+El CI corre las pruebas del backend, del formulario público y de infraestructura, y
+compila los dos frontends. Faltan: pruebas contra PostgreSQL (las de persistencia de
+listas se saltan), pruebas propias del portal interno y las de navegador (Playwright). Los huecos están en el
 [catálogo de pruebas](../../tests/README.md#cobertura) y los comandos en el
 [README del arnés](../../tests/integration/README.md).
 
 <a id="cierres"></a>
 ## 4. Cerrado
 
-<a id="p03"></a><a id="p04"></a><a id="p08"></a>
+<a id="p03"></a><a id="p04"></a><a id="p08"></a><a id="p13"></a>
 
 | Tarea o decisión | Fecha y alcance | Evidencia |
 |---|---|---|
 | P03 — Configuración de producción | 2026-10-20: secretos de SMTP y Zoho conciliados con `.env.prod`; 2026-10-27: DNS, TLS, SSM, S3 y Bedrock responden desde el contenedor del backend | [Configuración en AWS](configuracion/MATRIZ_AWS_CONFIG.md) |
 | P04 — Primer despliegue de producción | 2026-10-21, `f8d9dcf`; el lock que quedó tomado se liberó el 2026-10-24 | [Evidencia del primer corte](../evidencia/primer-corte-prod-20261021/README.md) |
 | P08 — HSTS y consola de Keycloak | 2026-10-21: HSTS en los tres dominios. 2026-10-24: regla de WAF para `/admin` y `/realms/master`, probada en staging | [Evidencia del primer corte](../evidencia/primer-corte-prod-20261021/README.md); regla en `cortafuegos-web.ts` |
+| P13 — CDK Diff en CI | 2026-11-24: retirado en la rama `ci/ci-basico-sin-aws`, porque necesitaba leer toda la cuenta de AWS. El diff se hace a mano y se pega en el PR | [Guía](despliegue/GUIA_DESPLIEGUE_LOCAL.md#infraestructura) |
 | P20 — Eliminado a pedido del usuario | 2026-11-23 | — |
 | Flujo completo en staging, con firma, auditoría y cierre | 5 y 6 de octubre | [E2E](../evidencia/e2e-staging/EVIDENCIA_E2E_STAGING_2026-10-01.md) |
 | Migraciones desde cero en PostgreSQL | 1 de octubre | [Validación local](../evidencia/e2e-staging/VALIDACION_STAGING_E2E.md) |

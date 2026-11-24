@@ -20,6 +20,29 @@ las otras tres, el despliegue falla con `CannotPullContainerError` y se revierte
 
 Todo se ejecuta desde la raíz del repositorio, con una sesión de AWS activa.
 
+<a id="ci"></a>
+## Qué hace el CI y qué no
+
+El [CI](../../../.github/workflows/ci.yml) corre en cada PR y en cada push a `main`, y
+**solo revisa**: no entra a AWS, no publica imágenes y no despliega. No usa roles, variables
+ni secretos de GitHub. Tiene cuatro revisiones:
+
+| Revisión | Qué comprueba |
+|---|---|
+| Secretos (gitleaks) | Que no se haya subido una contraseña o llave en ningún commit |
+| Backend | `pytest`, las plantillas `.env` (`validate_envs.py`) y, solo como aviso, librerías con fallas conocidas (`pip-audit`) |
+| Frontend | Pruebas del formulario (`vitest`), que el formulario y el portal compilen y, como aviso, `npm audit` |
+| Infraestructura | Tipos (`tsc`), pruebas de `infra/sagrilaft/test/` y que la plantilla de staging y la de producción se generen (`cdk synth` con valores ficticios y sin consultar AWS) |
+
+Lo que el CI no hace se hace con esta guía: publicar imágenes (paso 1), desplegar (pasos 2
+a 4) y revisar el `cdk diff` de un cambio de infraestructura contra AWS
+([abajo](#infraestructura)). Quien cambie la infraestructura pega el resumen del diff en
+el PR.
+
+Está preparado, sin activar, un rol solo para publicar en staging desde GitHub
+([`infra/sagrilaft/policies/github-staging/`](../../../infra/sagrilaft/policies/github-staging/README.md)).
+Lo que falta configurar en GitHub está en [P11 y P12](../PENDIENTES_PRODUCCION.md#p11).
+
 <a id="build"></a>
 ## Paso 1: publicar las imágenes en ECR
 
@@ -38,7 +61,7 @@ python3 scripts/despliegue/build_and_push_ecr_images.py \
 
 - Para producción: `--environment prod --env-file .env.prod`.
 - En vez de `--env-file` se puede usar `--from-ssm`, que lee la configuración de build de
-  SSM (es lo que usa el CI), o `--from-environment`, que la lee de variables del proceso.
+  SSM, o `--from-environment`, que la lee de variables del proceso.
 - `--manifest` debe ser un archivo nuevo. Guarda, por imagen, el repositorio, el digest y
   la huella de la configuración. Solo `complete: true` significa que las cuatro quedaron
   publicadas y verificadas; su campo `digests` es el que va al plan de la release.
@@ -198,6 +221,7 @@ del cliente el 2026-11-23 (registro en `tmp/despliegue-prod-20261123/`, fuera de
    un certificado).
 5. **Revisar `cdk diff SagrilaftStack-<ambiente>`.** Solo debe aparecer lo que se quiere
    cambiar. Cualquier cambio en servicios de ECS, IAM o la base exige revisarlo antes.
+   El CI no hace este diff: pegar su resumen en el PR del cambio.
 6. **En producción, tomar una copia manual de la base** ([cómo](../configuracion/ETIQUETADO_AWS.md#snapshots-de-rds)).
 7. **Desplegar** con `cdk deploy SagrilaftStack-<ambiente> --require-approval never` y
    los mismos argumentos del diff. Comparar las tareas de ECS antes y después.
