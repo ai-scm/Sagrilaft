@@ -97,3 +97,13 @@ def test_rol_futuro_de_staging_no_alcanza_produccion_ni_otros_servicios():
     for recurso in (r for r in recursos if r != "*"):
         assert "sagrilaft-staging-" in recurso or "/sagrilaft/staging/" in recurso, recurso
         assert "prod" not in recurso, recurso
+
+
+def test_ci_corre_en_los_pr_y_en_dev_y_main():
+    # Flujo de ramas: feature/* y fix/* -> PR a dev -> PR de dev a main.
+    texto = _workflows()["ci.yml"]
+    assert re.search(r"^  pull_request:\s*$", texto, re.M)
+    push = re.search(r"^  push:\n    branches:\n((?:      - .+\n)+)", texto, re.M)
+    assert push
+    ramas = [linea.split("-", 1)[1].split("#")[0].strip() for linea in push.group(1).splitlines()]
+    assert ramas == ["dev", "main"]

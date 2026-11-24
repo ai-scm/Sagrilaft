@@ -23,8 +23,8 @@ Todo se ejecuta desde la raíz del repositorio, con una sesión de AWS activa.
 <a id="ci"></a>
 ## Qué hace el CI y qué no
 
-El [CI](../../../.github/workflows/ci.yml) corre en cada PR y en cada push a `main`, y
-**solo revisa**: no entra a AWS, no publica imágenes y no despliega. No usa roles, variables
+El [CI](../../../.github/workflows/ci.yml) corre en cada PR y en cada push a `dev` o
+`main`, y **solo revisa**: no entra a AWS, no publica imágenes y no despliega. No usa roles, variables
 ni secretos de GitHub. Tiene cuatro revisiones:
 
 | Revisión | Qué comprueba |
@@ -38,6 +38,22 @@ Lo que el CI no hace se hace con esta guía: publicar imágenes (paso 1), desple
 a 4) y revisar el `cdk diff` de un cambio de infraestructura contra AWS
 ([abajo](#infraestructura)). Quien cambie la infraestructura pega el resumen del diff en
 el PR.
+
+<a id="ramas"></a>
+### Flujo de ramas
+
+| Rama | Para qué |
+|---|---|
+| `feature/*` y `fix/*` | Donde se hace cada cambio. Salen de `dev` |
+| `dev` | Integración: se juntan y se validan los cambios, en staging si hace falta |
+| `main` | Estable: lo que se despliega en producción |
+
+Todo llega por PR: de `feature/*` o `fix/*` a `dev`, y cuando está validado, un PR de
+`dev` a `main`. Nadie sube directo a `dev` ni a `main`. Una rama se borra cuando su PR
+se une.
+
+Las releases de producción salen de `main`. Las de staging pueden salir de `dev` para
+validar antes de pasar a `main`.
 
 Está preparado, sin activar, un rol solo para publicar en staging desde GitHub
 ([`infra/sagrilaft/policies/github-staging/`](../../../infra/sagrilaft/policies/github-staging/README.md)).
