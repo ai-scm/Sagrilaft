@@ -177,6 +177,18 @@ def _html_info_general(formulario: FormularioDatos) -> str:
     )
 
 
+def _justificacion_evento(metadata: Optional[Dict[str, Any]]) -> str:
+    """Comentario que el operador escribió en la acción.
+
+    Cerrar sin informe y reabrir lo guardan en `justificacion`; cerrar con informe final
+    y cargar el formulario a mano, en `upload_reason`.
+    """
+    if not metadata:
+        return ""
+    valor = metadata.get("justificacion") or metadata.get("upload_reason") or ""
+    return valor.strip() if isinstance(valor, str) else ""
+
+
 def _html_linea_de_tiempo(eventos: List[EventoAuditoria]) -> str:
     if not eventos:
         return "<h2>Línea de tiempo de eventos</h2><p class='sin-datos'>No hay eventos registrados.</p>"
@@ -191,6 +203,12 @@ def _html_linea_de_tiempo(eventos: List[EventoAuditoria]) -> str:
             causal_raw = ev.metadata["causal_cierre"]
             causal_str = _ETIQUETAS_CAUSAL_CIERRE.get(causal_raw, causal_raw)
             detalles_extra = f"<br><small style='color: #475569; font-size: 8.5pt;'><b>Causal:</b> {escape(causal_str)}</small>"
+        justificacion = _justificacion_evento(ev.metadata)
+        if justificacion:
+            detalles_extra += (
+                "<br><small style='color: #475569; font-size: 8.5pt; white-space: pre-wrap;"
+                f" word-break: break-word;'><b>Justificación:</b> {escape(justificacion)}</small>"
+            )
 
         css_clase = "alerta" if ev.tipo_evento == "CAMBIO_DIRECTO_BD" else ""
         filas += (
