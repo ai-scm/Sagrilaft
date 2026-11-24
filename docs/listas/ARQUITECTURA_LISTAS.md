@@ -1,6 +1,6 @@
 # Módulo de consultas a listas cautelares: arquitectura
 
-Estado verificado contra el código el 2026-11-13. Si este documento y el código
+Estado verificado contra el código el 2026-11-24. Si este documento y el código
 difieren, manda el código; corrige el documento en el mismo cambio.
 
 Documentos relacionados:
@@ -111,6 +111,7 @@ flowchart TB
     W --> M{Modalidad admitida}
     M --> SIM[Simulador 2.0]
     M --> ARC[Motor por archivos 2.1]
+    M --> EXT[Tusdatos 2.0]
     ARC --> G
     W --> B[Borrador → informe PDF → cierre]
     B --> H[(Historial y evidencias)]
@@ -123,7 +124,7 @@ flowchart TB
 | Dominio | `backend/domain/listas/` (`contratos.py`, `contratos_busqueda.py`, `datos_busqueda.py`, `administracion.py`, `catalogo_fuentes.py`, `catalogos_busqueda.py`, `comparacion_*.py`, `puertos*.py`, `errores.py`) | Contratos, hechos comunes, catálogos, comparadores puros y errores. Sin dependencias de FastAPI ni SQLAlchemy |
 | Servicios | `backend/services/listas/` | Política y permisos (`politica_v2.py`), servicio común de consultas (`servicio_comun.py`, `servicio_archivos_portal.py`, `admision_archivos.py`, `preparacion_criterios.py`), motor (`motor_busqueda.py`), recepción, validación, importación, comparación y administración de versiones, informes PDF y trabajadores |
 | Infraestructura | `backend/infrastructure/listas/` | Adaptadores de archivo (sintético y OFAC), lectores para búsqueda, simulador, consultor por archivos, custodia local, fábrica y trabajador local |
-| Persistencia | `backend/infrastructure/persistencia/modelos_*listas*.py` y `repositorios/{consultas,busqueda,administracion}_listas.py` | 41 tablas, restricciones e invariantes |
+| Persistencia | `backend/infrastructure/persistencia/modelos_*listas*.py` y `repositorios/{consultas,busqueda,administracion}_listas.py` | 43 tablas, restricciones e invariantes |
 | API | `backend/api/routers/{consultas_listas,recepciones_listas,administracion_versiones}.py`, `backend/api/dependencias_listas.py`, `backend/api/schemas/listas_v2.py` | Rutas autenticadas (sección 9) |
 | Portal | `frontend/apps/portal-interno/src/components/expedientes/VistaVerificarSagrilaft/` y `DetalleExpediente/{ConsultasListas,ConsultaForm,ResultadoConsultaListas,RevisionHistorial}.jsx`, `services/listas.js` | Pestaña «Verificar SAGRILAFT»: buscar expediente, consultar, seguir el progreso, ver resultados, descargar el informe y registrar la revisión |
 
@@ -209,6 +210,9 @@ Cadena de migraciones del módulo (todas aditivas, sobre `f8a9b0c1d2e3`):
 | `i09d12e345f6` | Representación de búsqueda: generación, registros y términos |
 | `j10e23f456a7` | Comprobación agrupada al cerrar una generación |
 | `k21f34a567b8` | Permite que el mismo usuario cargue y apruebe (sección 10) |
+| `l32a45b678c9` | Progreso de las consultas externas (`progreso_consulta_externa`) y ritmo de lanzamientos (`ritmo_proveedor`) |
+| `m43b56c789da` | Resultado de la verificación previa del documento en la consulta externa |
+| `n54c67d890eb` | Fuente de cada captura de pantalla del proveedor |
 
 Grupos de tablas: catálogo (`fuente_lista`, `politica_listas`, `esquema_fuente`,
 `archivo_fuente`, `comprobacion_fuente`); recepción e importación
@@ -222,7 +226,8 @@ búsqueda (`generacion_busqueda_lista`, `registro_busqueda_lista`,
 `termino_busqueda_lista`); consultas (`consulta_lista`, `consulta_fuente`,
 `coincidencia_lista`, `hallazgo_proveedor`, `evidencia_consulta`,
 `revision_cumplimiento`, `evento_consulta`, `trabajo_consulta`,
-`borrador_consulta`, `grupo_consulta_lista`).
+`borrador_consulta`, `grupo_consulta_lista`); proveedor externo (`progreso_consulta_externa`,
+`ritmo_proveedor`).
 
 Garantías que aplica la base de datos, no solo el servicio:
 
@@ -275,8 +280,9 @@ su referencia en SQL. Si SQL falla, el archivo queda huérfano y privado: el rei
 reutiliza y `/conciliacion` lo cuenta, pero nunca se publica como evidencia ni se borra
 automáticamente. Nunca se sobrescribe un archivo referenciado.
 
-Las bases desechables de pruebas usan PostgreSQL 17.9. La compatibilidad con la
-versión de PostgreSQL de cada ambiente no se ha verificado.
+Las bases desechables de las pruebas usan PostgreSQL 17.9. Las migraciones del módulo
+corrieron sin errores en staging (2026-11-17) y en producción (2026-11-18), que usan
+PostgreSQL 16.
 
 ## 6. Cómo fluye una consulta
 
@@ -360,12 +366,13 @@ Restricciones adicionales por modalidad:
 |---|---|---|
 | `simulado` | Escenario | Todos menos producción |
 | `archivos` | `LISTAS_ARCHIVOS_LOCAL_HABILITADA=true`, `LISTAS_ARCHIVOS_FUENTES` (sin duplicados), `LISTAS_ARCHIVOS_POLITICA_ID` (política con `solo_pruebas: true`), cada fuente con versión activa y generación preparada | Solo `development` y `test` |
+| `externo` | `LISTAS_TUSDATOS_URL` y `LISTAS_TUSDATOS_TOKEN` (o usuario y clave en el sandbox). Necesita salida a internet (NAT) | Todos menos producción; producción rechaza además el sandbox |
 | Administración | `LISTAS_ADMIN_HABILITADA=true`, `LISTAS_ADMIN_POLITICA_ID`, fuente habilitada (`LISTAS_ARCHIVOS_FUENTES_HABILITADAS`, o `LISTAS_OFAC_LOCAL_HABILITADA=true` para añadir `ofac_sdn` a la sintética `ofac_sdn_prueba`) | Solo `development`, `local` y `test` |
-| Custodia | `LISTAS_CUSTODIA_DIRECTORIO`; sin ella las rutas responden 503 | — |
+| Custodia | En local, `LISTAS_CUSTODIA_DIRECTORIO`; en AWS, `LISTAS_CUSTODIA_BACKEND=s3` y `LISTAS_CUSTODIA_S3_PREFIJO`. Sin custodia, las rutas responden 503 | — |
 
 `GET /api/listas/disponibilidad` informa a la sesión si puede consultar, ver el
-historial y revisar, y la modalidad activa. «Consultar» solo es verdadero en
-`simulado`, o en `archivos` con su configuración completa.
+historial y revisar, y la modalidad activa. «Consultar» es verdadero en `simulado`, y
+en `archivos` o `externo` cuando su configuración está completa.
 
 ## 8. Seguridad y permisos
 
@@ -376,8 +383,10 @@ historial y revisar, y la modalidad activa. «Consultar» solo es verdadero en
 - **Acceso a expedientes.** Además del permiso de listas, se exige `acceso_clientes`
   o `acceso_proveedores` según el tipo de contraparte, comprobado sobre el expediente
   real en cada lectura y escritura.
-- **Permisos por rol** (`services/listas/politica_v2.py`). Los roles existen en el
-  código; **no se ha verificado que estén creados en el Keycloak de ningún ambiente**.
+- **Permisos por rol** (`services/listas/politica_v2.py`). `listas_operador` y
+  `listas_revisor` vienen en `keycloak/realm-sagrilaft.json` para realms nuevos; en un
+  realm existente se crean con `scripts/listas/crear_roles_listas_keycloak.sh`. No se ha
+  verificado si están creados y asignados en el Keycloak de producción.
 
 | Rol | Permisos |
 |---|---|
@@ -704,8 +713,8 @@ libera la consulta entre pasadas (`posponer`):
   demás), omite la reutilización y envía `force: true`; queda en el manifiesto (`forzar`).
   `GET /api/listas/disponibilidad` informa `forzar` y `ver_pdf_proveedor` al portal.
 
-Despliegue en staging (custodia S3, trabajador ECS, secreto y roles): ver
-[operación, «Antes de cualquier ambiente compartido»](OPERACION_PRUEBAS_Y_PENDIENTES.md#antes-de-cualquier-ambiente-compartido-staging).
+Despliegue en AWS (custodia S3, trabajador ECS, secreto y roles): ver
+[operación, «En AWS»](OPERACION_PRUEBAS_Y_PENDIENTES.md#en-aws).
 
 Reglas que deberá respetar:
 
@@ -788,7 +797,7 @@ versionado):
 | T02 | PostgreSQL como autoridad de versiones e historial; sin motor de búsqueda externo | 2026-11-04 | Vigente |
 | T03 | Lotes con checkpoint y número de control; activación idempotente; cierre recuperable | 2026-11-04 | Vigente |
 | T06 | Tusdatos: lo incompleto se recupera después del cierre solo si es gratis (`/api/retry`, PDF, capturas); cada recarga es una consulta nueva enlazada (`consulta_previa_id`), máximo tres en 24 h | 2026-11-13 | Vigente |
-| T05 | Contrato común con dobles de prueba; sin llamadas ni credenciales externas en la primera entrega | 2026-11-04 | Vigente; el adaptador externo sigue pendiente |
+| T05 | Contrato común con dobles de prueba; sin llamadas ni credenciales externas en la primera entrega | 2026-11-04 | Cumplida; el adaptador de Tusdatos se agregó después (sección 11) |
 | — | Producción permanece deshabilitada | 2026-11-04 | Vigente; aplicada en el código |
 | — | Descarga de listas manual; nunca automática ni desde el buscador web de OFAC | 2026-11-04 | Vigente |
 | P02 | Vigencia: advertir a las 48 h y bloquear a las 96 h sin comprobación | — | **Propuesto**, no aprobado ni implementado |
