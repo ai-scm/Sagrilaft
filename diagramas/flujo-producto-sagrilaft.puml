@@ -1,5 +1,6 @@
 @startuml
-title SAGRILAFT — Flujo de negocio del producto
+' Revisado contra backend/domain/formulario/entidades.py el 2026-11-24.
+title SAGRILAFT — Flujo del expediente
 left to right direction
 skinparam componentStyle rectangle
 
@@ -11,8 +12,8 @@ rectangle "Keycloak" as keycloak
 rectangle "Backend FastAPI" as api
 database "RDS PostgreSQL" as db
 folder "S3 documentos" as s3
-rectangle "Amazon Bedrock\n extracción opcional" as bedrock
-rectangle "Zoho Sign\n sandbox" as zoho
+rectangle "Amazon Bedrock\n lectura de documentos" as bedrock
+rectangle "Zoho Sign" as zoho
 rectangle "SES / SMTP" as mail
 
 counterparty --> public_form : Enlace + código/PIN
@@ -40,12 +41,24 @@ package "Estados del expediente" {
 
 borrador --> enviado : completar y enviar
 enviado --> en_correccion : devolver
-en_correccion --> enviado : corregir y reenviar
+validado --> en_correccion : devolver
+en_correccion --> enviado : corregir y reenviar\no deshacer devolución
 enviado --> validado : aprobar
-validado --> pendiente_firma : enviar a firma
-pendiente_firma --> firmado : webhook Zoho válido
-firmado --> cerrado : cerrar expediente
+validado --> enviado : deshacer aprobación
 enviado --> rechazado : rechazar
+validado --> rechazado : rechazar
+validado --> pendiente_firma : enviar a firma
+pendiente_firma --> validado : cancelar firma\n(analista o Zoho)
+pendiente_firma --> firmado : webhook de Zoho
+firmado --> enviado : reabrir revisión
+firmado --> cerrado : cerrar expediente
+cerrado --> en_correccion : reabrir actualización
+
+note right of rechazado
+  Carga manual de un formulario en papel:
+  cualquier estado salvo CERRADO → ENVIADO.
+  Cerrar: cualquier estado salvo BORRADOR y RECHAZADO.
+end note
 
 api --> zoho : OAuth/API saliente
 zoho --> api : Webhook HMAC
@@ -53,7 +66,7 @@ api --> s3 : Guardar documento firmado
 api --> mail : Notificar cambios de estado
 
 note bottom of cerrado
-  Cada transición queda registrada en auditoría.
-  Los reintentos de operaciones y webhooks son idempotentes.
+  Cada transición queda registrada en la auditoría.
+  Un webhook de Zoho repetido no cambia nada.
 end note
 @enduml

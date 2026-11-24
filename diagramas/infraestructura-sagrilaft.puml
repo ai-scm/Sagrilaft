@@ -1,4 +1,5 @@
 @startuml
+' Infraestructura de SAGRILAFT en AWS. Revisado contra infra/sagrilaft/lib el 2026-11-24.
 !define AWSPuml https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v18.0/dist
 !include AWSPuml/AWSCommon.puml
 !include AWSPuml/AWSSimplified.puml
@@ -19,86 +20,83 @@
 
 left to right direction
 
-actor "Usuarios" as users
+actor "Contrapartes y\nequipo interno" as users
 
-package "AWS Cloud" {
+package "AWS (us-east-1), un stack por ambiente" {
 
-  package "VPC 10.0.0.0/16" {
+  WAF(waf, "AWS WAF\nreglas administradas,\nlímite por IP y regla\npara la consola de Keycloak", " ")
 
-    package "Subred Pública" #d5e8d4 {
-      WAF(waf, "AWS WAF\nEscudo Anti-Ataques", " ")
-      ElasticLoadBalancing(alb, "ALB\n:80 → redirige HTTPS\n:443 → enruta por dominio", " ")
+  package "VPC 10.0.0.0/16 (2 zonas)" {
+
+    package "Subredes públicas" #d5e8d4 {
+      ElasticLoadBalancing(alb, "ALB\n:80 redirige a HTTPS\n:443 enruta por dominio", " ")
+      component "NAT Gateway\n(salida a internet\ny a las APIs de AWS)" as nat
 
       note right of alb
-        sagrilaft.* → Formulario Público
-        portal.*    → Portal Interno
-        auth.*      → Keycloak
-        /api/*      → Backend
+        forms[-staging]-sagrilaft.* → Formulario (y /api → Backend)
+        [staging-]sagrilaft.*        → Portal interno
+        login[-staging]-sagrilaft.*  → Keycloak
       end note
     }
 
-    package "Subred Privada de Aplicación" #f8cecc {
-      Fargate(fargate, "ECS Fargate Cluster\n(capacidad por entorno: staging=1, prod=2+)", " ") {
+    package "Subredes privadas" #f8cecc {
+      Fargate(fargate, "ECS Fargate\n1 copia por servicio; backend de 1 a 2", " ") {
           ElasticContainerService(ecs_back, "Backend (FastAPI)", " ")
-          ElasticContainerService(ecs_front, "Formularios UI", " ")
-          ElasticContainerService(ecs_auth, "Keycloak SSO", " ")
+          ElasticContainerService(ecs_form, "Formulario público", " ")
+          ElasticContainerService(ecs_portal, "Portal interno", " ")
+          ElasticContainerService(ecs_auth, "Keycloak", " ")
+          ElasticContainerService(ecs_worker, "Trabajador de listas\n(0 copias si las listas\nestán deshabilitadas)", " ")
       }
-      
-      RDS(rds, "RDS PostgreSQL 16\nSubredes de datos aisladas", " ")
+
+      RDS(rds, "RDS PostgreSQL 16\nuna zona, cifrada", " ")
     }
 
-    component "VPC Endpoints\nS3 / ECR / Logs / Secrets / SSM" as endpoints
-    note right of endpoints
-      Las APIs externas (Zoho y otros proveedores)
-      requieren salida controlada (NAT o equivalente).
-      En staging se habilita solo durante pruebas
-      que necesitan comunicación externa.
-    end note
+    component "Endpoint gateway de S3\n(gratuito, no pasa por el NAT)" as s3gw
   }
 
-  CertificateManager(acm, "ACM Certificate\nSSL/TLS", " ")
-  SimpleStorageService(s3, "S3 Bucket\nUploads Privados", " ")
-  SecretsManager(sm, "Secrets Manager\nCredenciales", " ")
-  Bedrock(bedrock, "Amazon Bedrock\nModelo configurado por entorno\nExtracción IA", " ")
-  SimpleEmailService(ses, "Amazon SES / SMTP\nCorreos transaccionales y alertas", " ")
-  CloudWatch(cw, "CloudWatch\nLogs JSON y Alarmas", " ")
-  SimpleNotificationService(sns, "AWS SNS\nAlertas a Equipo TI", " ")
-  ElasticContainerRegistry(ecr, "Amazon ECR\nImágenes Docker", " ")
+  CertificateManager(acm, "Certificado ACM\n*.ia.blend360.com (compartido)", " ")
+  SimpleStorageService(s3, "S3\ndocumentos, PDF, informes de listas\ny registros del ALB", " ")
+  SecretsManager(sm, "Secrets Manager y SSM\nsecretos y configuración", " ")
+  Bedrock(bedrock, "Amazon Bedrock\nmodelo configurado por ambiente", " ")
+  SimpleEmailService(ses, "Amazon SES\ncorreos a contrapartes\ny avisos internos", " ")
+  CloudWatch(cw, "CloudWatch\nregistros, 16 alarmas\ny dos tableros", " ")
+  SimpleNotificationService(sns, "SNS\navisos de alarmas\n(solo producción)", " ")
+  ElasticContainerRegistry(ecr, "ECR\nimágenes por SHA, inmutables", " ")
 }
 
 cloud "Terceros" {
-    component "Zoho Sign\n(Contratos)" as zoho
-    component "Proveedor de listas de cautela\n(opcional; deshabilitado en staging)" as tusdatos
+    component "Zoho Sign\n(firma electrónica)" as zoho
+    component "Tusdatos\n(listas; sin credenciales,\ndeshabilitado en producción)" as tusdatos
 }
 
-' Flujo principal
 users --> waf : HTTPS
-waf --> alb : Tráfico Limpio
-acm -[#red,dashed]-> alb : SSL/TLS
+waf --> alb
+acm -[#red,dashed]-> alb : TLS
 
-alb --> ecs_front : :8080
+alb --> ecs_form : :8080
+alb --> ecs_portal : :8080
 alb --> ecs_auth : :8080
-alb --> ecs_back : :8000
+alb --> ecs_back : :8000 (/api)
 
-ecs_back -[#red]-> rds : :5432 (SELECT FOR UPDATE)
-ecs_auth -[#red]-> rds : :5432
+ecs_back -[#red]-> rds : :5432
+ecs_auth -[#red]-> rds : :5432 (misma base)
+ecs_worker -[#red]-> rds : :5432
 
-' Servicios AWS consumidos por Fargate
-ecs_back -[#teal,dashed]-> s3 : Leer/Escribir archivos
-fargate -[#teal,dashed]-> endpoints : Acceso privado a AWS
-ecs_back -[#purple,dashed]-> sm : Leer secretos
-ecs_back -[#purple,dashed]-> bedrock : Recorte a 7 pags y Extracción
-ecs_back -[#orange,dashed]-> ses : Enviar emails
-ecs_back -[#blue,dashed]-> cw : Envía logs
-ecs_front -[#blue,dashed]-> cw : Envía logs
-ecs_auth -[#blue,dashed]-> cw : Envía logs
-cw -[#pink,dashed]-> sns : Alarmas 5xx / CPU
-fargate -[#gray,dashed]-> ecr : Pull de imágenes
+ecs_back -[#teal,dashed]-> s3gw
+ecs_worker -[#teal,dashed]-> s3gw
+s3gw -[#teal,dashed]-> s3
+alb -[#teal,dashed]-> s3 : registros de acceso (90 días)
 
-' Comunicaciones Externas e Internas
-ecs_back -[#green,dashed]-> zoho : OAuth/API saliente (reintentos)
-zoho -[#green,dashed]-> alb : POST /api/webhooks/zoho-sign\nHMAC (entrante)
-ecs_back -[#gray,dashed]-> tusdatos : API opcional\n(no activo en staging)
-ecs_back -[#black,dashed]-> ecs_auth : AWS Cloud Map (Interno)
+fargate -[#gray,dashed]-> nat : salida
+nat -[#gray,dashed]-> ecr : imágenes
+nat -[#purple,dashed]-> sm
+nat -[#purple,dashed]-> bedrock : PDF recortado a 7 páginas
+nat -[#orange,dashed]-> ses : SMTP / API
+nat -[#blue,dashed]-> cw : registros
+nat -[#green,dashed]-> zoho : API saliente
+nat -[#gray,dashed]-> tusdatos : API saliente
+zoho -[#green,dashed]-> alb : POST /api/webhooks/zoho-sign\n(firma HMAC)
+cw -[#pink,dashed]-> sns : alarmas
+ecs_back -[#black,dashed]-> ecs_auth : Cloud Map\nkeycloak.sagrilaft-<ambiente>.local
 
 @enduml

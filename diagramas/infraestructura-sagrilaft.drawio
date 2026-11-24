@@ -17,7 +17,7 @@
           <mxGeometry x="310" y="75" width="160" height="70" as="geometry"/>
         </mxCell>
 
-        <mxCell id="ecs" value="ECS Fargate Cluster (capacidad por entorno: staging=1, prod=2+)&#10;Subred privada de aplicación" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+        <mxCell id="ecs" value="ECS Fargate: 1 copia por servicio, backend de 1 a 2&#10;Subredes privadas, salida por NAT" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
           <mxGeometry x="540" y="40" width="360" height="300" as="geometry"/>
         </mxCell>
         <mxCell id="form" value="formulario-publico&#10;:8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="ecs">
@@ -33,10 +33,13 @@
           <mxGeometry x="190" y="150" width="140" height="60" as="geometry"/>
         </mxCell>
 
-        <mxCell id="rds" value="RDS PostgreSQL&#10;Bloqueo Pesimista" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="worker" value="trabajador de listas&#10;(0 si están deshabilitadas)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;" vertex="1" parent="ecs">
+          <mxGeometry x="110" y="230" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="rds" value="RDS PostgreSQL 16&#10;app y Keycloak" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
           <mxGeometry x="980" y="40" width="150" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="s3" value="S3 uploads" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+        <mxCell id="s3" value="S3&#10;documentos e informes" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
           <mxGeometry x="980" y="150" width="150" height="80" as="geometry"/>
         </mxCell>
 
@@ -46,14 +49,14 @@
         <mxCell id="zoho" value="Zoho Sign&#10;(Firma Electrónica)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="980" y="340" width="150" height="60" as="geometry"/>
         </mxCell>
-        <mxCell id="tusdatos" value="Proveedor listas de cautela&#10;(opcional; deshabilitado en staging)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+        <mxCell id="tusdatos" value="Tusdatos (listas)&#10;sin credenciales; deshabilitado en producción" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
           <mxGeometry x="980" y="420" width="150" height="60" as="geometry"/>
         </mxCell>
 
         <mxCell id="ops" value="ECR / Secrets Manager&#10;SSM / CloudWatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="540" y="410" width="360" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="sns" value="AWS SNS&#10;(Alertas a Equipo TI)" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="sns" value="SNS&#10;avisos de alarmas (solo producción)" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
           <mxGeometry x="635" y="520" width="170" height="60" as="geometry"/>
         </mxCell>
 
@@ -67,7 +70,7 @@
         
         <mxCell id="e7" value="IA / Recorte" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="backend" target="bedrock"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="e8" value="API saliente + webhook entrante HMAC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="backend" target="zoho"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="e9" value="API opcional (no activo en staging)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="backend" target="tusdatos"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="API saliente (solo si se activa)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="backend" target="tusdatos"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="e10" value="Alarmas operativas / notificaciones" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="ops" target="sns"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="e11" value="POST /api/webhooks/zoho-sign (HMAC)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1" source="zoho" target="alb"><mxGeometry relative="1" as="geometry"/></mxCell>
       </root>
