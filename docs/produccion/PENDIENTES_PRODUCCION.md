@@ -150,15 +150,17 @@ quiere publicar en staging desde GitHub, hay un rol propio preparado, limitado a
 ([pasos](../../infra/sagrilaft/policies/github-staging/README.md)).
 
 <a id="p12"></a>
-### P12 — Proteger la rama `main`
+### P12 — Proteger las ramas `dev` y `main`
 
-**Estado:** 🔴 Sin protección (verificado el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets).
+**Estado:** 🔴 Sin protección (verificado el 2026-11-23: `branches/main/protection` responde 404 y no hay rulesets). `dev` existe desde el 2026-11-24.
 
-Un administrador del repositorio debe exigir PR, al menos una revisión y las cuatro
-revisiones del CI en verde. Se puede hacer en *Settings → Branches* o con:
+Un administrador del repositorio debe proteger las dos ramas del
+[flujo](despliegue/GUIA_DESPLIEGUE_LOCAL.md#ramas): exigir PR, al menos una revisión y las
+cuatro revisiones del CI en verde. Se puede hacer en *Settings → Branches* o con:
 
 ```bash
-gh api -X PUT repos/ai-scm/Sagrilaft/branches/main/protection --input - <<'JSON'
+for rama in dev main; do
+gh api -X PUT repos/ai-scm/Sagrilaft/branches/$rama/protection --input - <<'JSON'
 {
   "required_status_checks": {
     "strict": true,
@@ -169,10 +171,15 @@ gh api -X PUT repos/ai-scm/Sagrilaft/branches/main/protection --input - <<'JSON'
   "restrictions": null
 }
 JSON
+done
 ```
 
-Los nombres deben coincidir con los de los jobs de `ci.yml`; GitHub solo los ofrece después
-de que el CI nuevo haya corrido una vez. Si cambian, hay que cambiarlos aquí también.
+Los nombres deben coincidir con los de los jobs de `ci.yml`. Si cambian, hay que cambiarlos
+aquí también.
+
+También en *Settings → General*: dejar `dev` como rama por defecto, para que los PR nuevos
+apunten ahí, y activar *Automatically delete head branches*, para que GitHub borre la rama
+al unir su PR.
 
 <a id="p14"></a>
 ### P14 — Caso de uso de SES ante AWS
