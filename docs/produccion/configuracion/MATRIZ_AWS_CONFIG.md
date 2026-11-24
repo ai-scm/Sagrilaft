@@ -167,9 +167,13 @@ base. Hay que cambiar las dos en la misma ventana y comprobar la conexión. En s
 se cambió a mano el 2026-08-18 y el 2026-10-28 (por eso su secreto solo tiene dos
 campos); producción conserva la generada por CDK.
 
-**Cómo cargar un secreto externo** (Zoho o un proveedor de listas):
+**Cómo cargar un secreto externo** (Zoho o un proveedor de listas). El script no acepta
+`--profile`: definir antes `AWS_PROFILE`.
 
 1. Poner el valor en el archivo privado del ambiente (`.env.staging` o `.env.prod`).
+   Si ese archivo está desactualizado, `--apply` sobrescribe el secreto correcto de AWS
+   con el valor viejo: en octubre de 2026 `.env.prod` tenía la cuenta de Zoho anterior y
+   hubo que corregirlo antes de sincronizar.
 2. Ver qué haría, sin escribir nada:
    `python3 scripts/aws/sync_aws_runtime_assets.py --env-file .env.prod --environment prod --region us-east-1`
 3. Revisar que solo aparezca el secreto esperado y ningún `ERROR`.
@@ -177,6 +181,16 @@ campos); producción conserva la generada por CDK.
 5. Desplegar una release o reiniciar las tareas para que lo tomen.
 
 El script nunca escribe los secretos que genera CDK. SMTP se carga en la consola.
+
+Cuidados con los secretos que crea CDK:
+
+- `smtp_credentials`, `sagrilaft_listas_cautela_credentials` y `tusdatos_credentials` se
+  crean con un valor vacío fijo en el código y luego se llenan a mano. Si alguien cambia
+  ese valor fijo en el código, el siguiente despliegue borra lo cargado.
+- Ningún secreto tiene política de retención: si un recurso se elimina del stack, el
+  secreto se borra con él.
+- Si se cambia a mano en Keycloak la contraseña del administrador, hay que actualizar
+  también `keycloak_admin`: Keycloak no la vuelve a leer del secreto.
 Para comprobar si un secreto cambió, comparar la versión vigente (`AWSCURRENT`), no la
 fecha de modificación: el etiquetado del 2026-11-18 cambió esa fecha en todos sin
 tocar sus valores.

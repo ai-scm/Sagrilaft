@@ -140,12 +140,8 @@ Resumen de lo que determina el costo. La arquitectura completa está en
 
 ## Despliegue y pruebas
 
-El cambio sale de la rama `feature/listas-seleccion-unica-adaptador`. Esa rama trae,
-además de los cambios de costo, el módulo de listas: el trabajador, el secreto y los
-parámetros de Tusdatos, y permisos IAM. Los dos van juntos porque los cambios de costo
-dependen del trabajador de listas.
-
-Las imágenes del release deben estar en ECR con el SHA del commit que se despliega.
+Los cambios de costo se desplegaron junto con el módulo de listas (trabajador, secreto y
+parámetros de Tusdatos), porque dependen del trabajador.
 
 ### Staging: hecho el 17-nov-2026
 
