@@ -18,6 +18,7 @@ class ExpedienteResumen(BaseModel):
     formulario_id: str
     codigo_peticion: str
     razon_social: Optional[str] = None
+    correo_destinatario: Optional[str] = None
     numero_identificacion: Optional[str] = None
     tipo_contraparte: Optional[TipoContraparte] = None
     tipo_persona: Optional[TipoPersona] = None
@@ -63,6 +64,7 @@ class ExpedienteDetalle(BaseModel):
     formulario_id: str
     codigo_peticion: str
     razon_social: Optional[str] = None
+    correo_destinatario: Optional[str] = None
     tipo_contraparte: Optional[TipoContraparte] = None
     tipo_persona: Optional[TipoPersona] = None
     tipo_solicitud: Optional[TipoSolicitud] = None

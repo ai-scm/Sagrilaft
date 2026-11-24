@@ -41,6 +41,7 @@ def test_portal_lista_detalla_y_descarga_expediente_radicado_con_documentos(clie
     assert resumen["formulario_id"] == acceso_radicado["formulario_id"]
     assert resumen["codigo_peticion"] == acceso_radicado["codigo_peticion"]
     assert resumen["razon_social"] == "Proveedor Integracion SAS"
+    assert resumen["correo_destinatario"] == "representante@proveedor.com"
     assert resumen["numero_identificacion"] == "900123456"
     assert resumen["tipo_contraparte"] == "proveedor"
     assert resumen["tipo_persona"] == "juridica"
@@ -62,6 +63,7 @@ def test_portal_lista_detalla_y_descarga_expediente_radicado_con_documentos(clie
     assert detalle["formulario_id"] == acceso_radicado["formulario_id"]
     assert detalle["codigo_peticion"] == acceso_radicado["codigo_peticion"]
     assert detalle["razon_social"] == "Proveedor Integracion SAS"
+    assert detalle["correo_destinatario"] == "representante@proveedor.com"
     assert detalle["tipo_contraparte"] == "proveedor"
     assert detalle["tipo_persona"] == "juridica"
     assert detalle["tipo_solicitud"] == "vinculacion"

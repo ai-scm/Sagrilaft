@@ -54,6 +54,19 @@ const s = {
     padding:      '2px 9px',
     whiteSpace:   'nowrap',
   },
+  // Los correos largos se cortan con "…"; el completo queda en el title.
+  chipCorreo: {
+    fontSize:     '0.72rem',
+    color:        'var(--gray-500, #64748b)',
+    background:   'var(--gray-50, #f8fafc)',
+    border:       '1px solid var(--gray-200, #e2e8f0)',
+    borderRadius: '999px',
+    padding:      '2px 9px',
+    whiteSpace:   'nowrap',
+    maxWidth:     '240px',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+  },
   chipDocs: (cantidad) => ({
     fontSize:     '0.72rem',
     color:        cantidad > 0 ? '#15803d' : 'var(--gray-400, #94a3b8)',
@@ -97,6 +110,11 @@ export default function TarjetaExpediente({ expediente, onClick }) {
         <span style={s.chip}>{tipoLabel}</span>
         {expediente.numero_identificacion && (
           <span style={s.chip}>NIT {expediente.numero_identificacion}</span>
+        )}
+        {expediente.correo_destinatario && (
+          <span style={s.chipCorreo} title={expediente.correo_destinatario}>
+            {expediente.correo_destinatario}
+          </span>
         )}
         <span style={s.chipDocs(cantidadDocs)}>
           {cantidadDocs} doc{cantidadDocs !== 1 ? 's' : ''}
