@@ -1,4 +1,4 @@
-"""Cliente HTTP de Tusdatos: verificar documento, lanzar, estado, reporte JSON, PDF, capturas, recarga, historial y salud.
+"""Cliente HTTP de Tusdatos: lanzar, estado, reporte JSON, PDF, capturas, recarga, historial y salud.
 
 Solo conoce el protocolo. No decide qué fuentes interesan ni interpreta coincidencias:
 eso lo hace el adaptador de listas. Reglas que aplica:
@@ -101,37 +101,6 @@ class EstadoFuente:
 
 
 @dataclass(frozen=True)
-class VerificacionDocumento:
-    """Respuesta de verify/nit o verify/ce, sin nombres ni datos personales.
-
-    `estado` es el que informa la fuente oficial («ACTIVA», «VIGENTE», «CANCELADA»…);
-    `avisos` son los `findings` de Tusdatos («Nit no encontrado», «Cédula no vigente»).
-    """
-    estado: str | None
-    avisos: tuple[str, ...]
-
-    @property
-    def no_encontrado(self) -> bool:
-        return any("no encontrad" in a.casefold() or "no se encuentra" in a.casefold()
-                   or "no registrad" in a.casefold() for a in self.avisos)
-
-    @property
-    def vigente(self) -> bool | None:
-        """False si el documento existe pero no está vigente o activo; None si no se sabe."""
-        if self.no_encontrado:
-            return None
-        if any("no vigente" in a.casefold() for a in self.avisos):
-            return False
-        if not self.estado:
-            return None
-        return self.estado.strip().upper() in ESTADOS_VIGENTES
-
-
-# Estados de cámara de comercio (NIT) y Migración (CE) que cuentan como vigentes.
-ESTADOS_VIGENTES = frozenset({"ACTIVA", "ACTIVO", "VIGENTE"})
-
-
-@dataclass(frozen=True)
 class ConsultaPrevia:
     """Una consulta del historial de la cuenta (`/api/v1/checks`)."""
     reporte_id: str
@@ -226,44 +195,6 @@ class ClienteTusdatos:
         self._http.close()
 
     # ── Operaciones ───────────────────────────────────────────────────────────
-
-    def verificar_documento(self, tipo_documento: str, numero: str,
-                            fecha_expedicion: date | None = None) -> VerificacionDocumento:
-        """Valida un NIT (cámaras de comercio) o una CE (Migración Colombia) antes de consultar.
-
-        Puede gastar crédito según el plan: nunca se reintenta sola.
-        """
-        documento = limpiar_documento(numero)
-        if not documento.isdigit():
-            raise ValueError("Número de documento no válido para el tipo")
-        if tipo_documento == "NIT":
-            ruta, cuerpo = "/api/launch/verify/nit", {"nit": int(documento)}
-        elif tipo_documento == "CE":
-            if fecha_expedicion is None:
-                raise ValueError("Cédula de extranjería requiere fecha de expedición")
-            ruta, cuerpo = "/api/launch/verify/ce", {"ce": int(documento),
-                                                      "fecha_expedicion": fecha_expedicion.strftime("%d/%m/%Y")}
-        else:
-            raise ValueError("Solo se verifican NIT y cédula de extranjería")
-        respuesta = self._llamar("verificar", "POST", ruta, json=cuerpo, reintentos=0)
-        self._exigir(respuesta, "verificar", {200})
-        datos = self._json(respuesta, "verificar")
-        avisos = datos.get("findings") or []
-        if not isinstance(avisos, list):
-            raise RespuestaInesperada("verificar", 200, "Lista de avisos no válida")
-        avisos = [a.strip() for a in avisos if isinstance(a, str) and a.strip()]
-        fuente = datos.get("data") if isinstance(datos.get("data"), dict) else {}
-        estado = fuente.get("estado")
-        verificacion = VerificacionDocumento(estado=estado.strip() if isinstance(estado, str) and estado.strip() else None,
-                                             avisos=tuple(avisos))
-        error = datos.get("error")
-        if isinstance(error, str) and error.strip():
-            # El aviso puede venir en `error` en vez de `findings`; cualquier otro error no se interpreta.
-            con_error = VerificacionDocumento(estado=verificacion.estado, avisos=(*avisos, error.strip()))
-            if not (con_error.no_encontrado or con_error.vigente is False):
-                raise RespuestaInesperada("verificar", 200, "Tusdatos informó un error en la verificación")
-            return con_error
-        return verificacion
 
     def lanzar(self, tipo_documento: str, numero: str, *, nombre: str | None = None,
                fecha_expedicion: date | None = None, forzar: bool = False, referencia: str | None = None) -> Lanzamiento:

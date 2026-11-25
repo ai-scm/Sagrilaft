@@ -15,14 +15,20 @@ Tusdatos busca por **número de documento**. Se aceptan cuatro tipos:
 
 | Documento | Qué hace falta |
 |---|---|
-| Cédula de ciudadanía (CC) | Solo el número |
+| Cédula de ciudadanía (CC) | El número. La fecha de expedición es opcional: con ella Tusdatos valida que coincida y consulta fuentes adicionales |
 | Cédula de extranjería (CE) | El número y la fecha de expedición |
 | Pasaporte | El número y el nombre completo |
 | NIT | Solo el número, sin dígito de verificación (si se escribe «900.123.456-7», el sistema quita el «-7») |
 
 Si falta algo, el portal rechaza la consulta antes de enviarla y no se gasta ningún
-crédito. El nombre que se escribe en el formulario solo se envía con el pasaporte; en
-los demás casos Tusdatos resuelve el nombre por su cuenta.
+crédito. El nombre solo se pide y se envía con el pasaporte; en los demás casos Tusdatos
+resuelve el nombre por su cuenta. País del documento y fecha de nacimiento no se piden:
+Tusdatos no los usa (siguen en la búsqueda simulada).
+
+En «Consultar contraparte y representante» se usa la fecha de expedición guardada en el
+expediente, que el formulario público pide en el paso 3: es la del documento del
+representante legal o, en persona natural, de la propia persona. Por eso va con el
+representante y, en persona natural, también con la contraparte; nunca con un NIT.
 
 ## Qué fuentes se revisan
 
@@ -79,41 +85,16 @@ Casos especiales:
   portal lo muestra en rojo. Un «sin candidatos» con este aviso no es confiable:
   conviene revisar el número y el tipo de documento antes de darlo por bueno.
 
-- **Documento no encontrado:** si el NIT no está en el registro mercantil, o la cédula
-  de extranjería no está en Migración Colombia, Tusdatos lo dice de una vez. La consulta
-  se cierra con ese mensaje para que se revise el número antes de repetirla.
-- **Documento no vigente:** si la empresa no está activa en la cámara de comercio, o la
-  cédula de extranjería no está vigente, las listas se consultan igual y el resultado
-  lleva un aviso en rojo. Se consulta igual porque una empresa cancelada o una cédula
-  vencida puede seguir apareciendo en una lista.
+- **Documento no encontrado:** si Tusdatos responde a la consulta que no encontró el
+  documento (por ejemplo, un NIT fuera del registro mercantil), la consulta se cierra con
+  ese mensaje para que se revise el número antes de repetirla.
 
-## Verificación del NIT y de la cédula de extranjería
+## Sin verificación previa del documento
 
-Antes de consultar listas de un NIT o de una cédula de extranjería, el sistema le pide a
-Tusdatos que confirme que el documento existe:
-
-- **NIT:** lo busca en las cámaras de comercio (RUES) y devuelve si la empresa está activa.
-- **Cédula de extranjería:** la busca en Migración Colombia, con la fecha de expedición,
-  y devuelve si está vigente.
-
-Con eso pasa una de tres cosas:
-
-- **No existe:** la consulta se cierra sin consultar listas, con el mensaje «Tusdatos no
-  encontró el NIT…» o «…la cédula de extranjería…».
-- **Existe pero no está vigente o activa:** se consultan las listas y el resultado lleva
-  el aviso «Documento no vigente».
-- **Existe y está vigente:** se consultan las listas normalmente.
-
-Si la verificación falla (Tusdatos no responde o contesta algo que no se entiende), la
-consulta sigue sin ella. Se hace una sola vez por consulta y nunca se repite sola.
-
-Solo se guarda el resultado (por ejemplo «ACTIVA» o «Nit no encontrado»). No se guardan
-la razón social, el nombre, la nacionalidad ni las fechas que devuelve Tusdatos.
-
-**Sobre el costo:** la documentación no lo dice; Tusdatos respondió que estas
-verificaciones no cobran (falta tenerlo por escrito). Si resultara distinto, se apagan con
-`LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Las cédulas de
-ciudadanía y los pasaportes no se verifican.
+Hasta el 2026-11-25, antes de consultar un NIT o una cédula de extranjería se llamaba a
+`verify/nit` o `verify/ce`. Se retiró: no hace falta para consultar listas y no estaba
+confirmado por escrito que no cobrara. Un documento inexistente lo informa la propia
+consulta. Las consultas viejas pueden conservar el aviso «Documento no vigente».
 
 El nivel de riesgo que calcula Tusdatos (alto, medio, bajo) se muestra solo como
 referencia. Ese nivel depende de cómo esté configurada la cuenta en Tusdatos y no es
@@ -251,11 +232,10 @@ Tusdatos informó después que una cuenta demo no tiene API Token ni consultas p
 
 **Respuestas de Tusdatos pendientes de tener por escrito** (13-11-2026)
 
-- `verify/nit` y `verify/ce` no cobran crédito. Por eso la verificación previa queda
-  encendida.
+- `verify/nit` y `verify/ce` no cobran crédito (ya no se usan: se retiraron el 2026-11-25).
 - El documento inexistente (400), el titular que no autoriza (403) y la consulta con
-  todas las fuentes en error sí cobran. Es la razón de verificar el documento y revisar
-  las fuentes caídas antes de lanzar.
+  todas las fuentes en error sí cobran. Es la razón de revisar las fuentes caídas antes
+  de lanzar.
 
 Mientras no estén por escrito, se tratan como probables, no como seguras.
 
@@ -263,8 +243,8 @@ Mientras no estén por escrito, se tratan como probables, no como seguras.
 
 - Si se cobra al repetir dentro de 6 horas una cédula de extranjería, un pasaporte o un
   NIT. La regla de las 6 horas solo se menciona para la cédula de ciudadanía.
-- Si `verify/nit` y `verify/ce` vienen incluidas en el plan (la propuesta nombra
-  «Información estado documento de identidad»).
+- Qué fuentes adicionales consulta Tusdatos cuando una CC lleva fecha de expedición, y si
+  una fecha que no coincide hace fallar o cobrar la consulta (solo está documentado para PPT).
 - Si la consulta servida desde la caché de 6 horas aparece en el historial
   (`/api/v1/checks`), si `check_id` es el mismo id que recibe `report_json` y en qué formato
   viene `created_at`. El esquema solo dice que son textos, y el ejemplo de la página web

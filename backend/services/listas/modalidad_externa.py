@@ -11,9 +11,8 @@ Cada pasada del trabajador avanza una etapa y libera la consulta hasta el próxi
 
 - LANZANDO se confirma en la base ANTES de llamar a `launch`, que gasta un crédito.
 - El plazo es de 15 minutos desde la admisión; vencido, se cierra NO_CONCLUYENTE.
-- Antes de lanzar, un NIT o una cédula de extranjería se valida con `verify/nit` o
-  `verify/ce` (una sola vez por consulta). Si no existe, se cierra sin consultar listas;
-  si no está vigente, se consulta igual y el resultado lleva un aviso.
+- No se usa `verify/nit` ni `verify/ce` (retirados el 2026-11-25): un documento que no
+  existe lo informa el propio `launch` con un 400 y se cierra como DOCUMENTO_NO_ENCONTRADO.
 - Si Tusdatos responde sin jobid (CC en su caché de 6 h), el reporte se busca en el
   historial de la cuenta (`/api/v1/checks`) y se sigue desde ahí sin gastar crédito.
 - El PDF del proveedor se intenta dentro del mismo plazo; si no llega, la consulta se
@@ -50,17 +49,6 @@ def _documento(criterio) -> tuple[str, str] | None:
         if tipo:
             return tipo, limpiar_documento(identificador.get("valor", "")).upper()
     return None
-
-
-def _aviso_no_vigente(progreso) -> str | None:
-    """Texto del aviso al revisor si la verificación previa encontró el documento no vigente."""
-    verificacion = getattr(progreso, "verificacion_documento", None) or {}
-    if verificacion.get("resultado") != "NO_VIGENTE":
-        return None
-    que = "La empresa" if verificacion.get("tipo") == "NIT" else "La cédula de extranjería"
-    estado = verificacion.get("estado") or "; ".join(verificacion.get("avisos") or ()) or "no vigente"
-    return (f"{que} no figura vigente en la fuente oficial (estado informado: {estado}). "
-            "Las listas se consultaron igual; confirme el documento con la contraparte")
 
 
 def _aviso_recuperacion(consulta) -> str | None:
@@ -106,7 +94,6 @@ MARGEN_RECARGA = timedelta(minutes=3)  # Tiempo mínimo antes del plazo para esp
 VENTANA_CACHE = timedelta(hours=6)     # Tusdatos reutiliza una CC consultada en las últimas 6 h.
 VENTANA_RECUPERACION = timedelta(hours=24)  # Después no se recupera nada: el revisor ya decidió con lo que había.
 ESPERAS_RECUPERACION = (timedelta(minutes=10), timedelta(hours=1), timedelta(hours=4))
-TIPOS_VERIFICABLES = frozenset({"NIT", "CE"})  # verify/nit (cámaras de comercio) y verify/ce (Migración)
 ESTADOS_CAIDOS = frozenset({"under_maintenance", "source_down"})
 MENSAJES_NO_ENCONTRADO = {
     "NIT": "Tusdatos no encontró el NIT en el registro mercantil (RUES). Envíe el NIT sin dígito de verificación",
@@ -231,9 +218,13 @@ class ModalidadExterna:
                         "identificadores": [{"tipo": tipo, "valor": str(documento).strip()}]}
             if nombre and nombre.strip():
                 criterio["nombre"] = nombre.strip()
-            # La fecha de expedición guardada es la del documento de la contraparte.
-            if rol == "CONTRAPARTE" and TIPOS_DOCUMENTO[tipo] == "CE" and getattr(expediente, "fecha_expedicion", None):
-                criterio["fecha_expedicion"] = expediente.fecha_expedicion.isoformat()
+            # La fecha de expedición del expediente se pide en el paso 3 del formulario público:
+            # es la del documento del representante legal o, en persona natural, de la propia
+            # persona (allí contraparte y representante son la misma). Solo CC y CE la usan.
+            fecha = getattr(expediente, "fecha_expedicion", None)
+            del_mismo = rol == "REPRESENTANTE" or getattr(expediente, "tipo_persona", None) == "natural"
+            if fecha and del_mismo and TIPOS_DOCUMENTO[tipo] in ("CC", "CE"):
+                criterio["fecha_expedicion"] = fecha.isoformat()
             try:
                 traducir_criterio(Criterio.model_validate(criterio))
             except ValueError as error:
@@ -272,8 +263,7 @@ class ModalidadExterna:
             return self._cerrar(trabajador, concesion, consulta, solicitud)
         progreso = repositorio.progreso_externo(consulta.id)
         if progreso is None:
-            repositorio.guardar_progreso(concesion, etapa="POR_LANZAR", vence_en=consulta.admitida_en + PLAZO,
-                                         **self._verificacion_heredada(repositorio, consulta))
+            repositorio.guardar_progreso(concesion, etapa="POR_LANZAR", vence_en=consulta.admitida_en + PLAZO)
             progreso = repositorio.progreso_externo(consulta.id)
         if progreso.etapa == "TERMINADA":
             return repositorio.fallar(concesion, "EJECUCION_INTERRUMPIDA")
@@ -309,8 +299,6 @@ class ModalidadExterna:
                 advertencia="Intente más tarde, o use «Forzar actualización» para consultar de todos modos "
                             "(el resultado quedará parcial)", estado_cobertura="DESCONOCIDA",
                 fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
-        if self._verificar_documento(trabajador, concesion, consulta, solicitud):
-            return None  # El documento no existe: la consulta ya quedó cerrada.
         self._vigilar_creditos(trabajador.politica.entorno)
         espera = repositorio.reservar_turno(PROVEEDOR, INTERVALO_LANZAMIENTOS)
         if espera > 0:
@@ -469,16 +457,6 @@ class ModalidadExterna:
             ConsultaLista.creado_en > cerrada.creado_en, ConsultaLista.id != cerrada.id))
         return any(_documento(fila.criterio_original) == documento for fila in filas)
 
-    @staticmethod
-    def _verificacion_heredada(repositorio, consulta) -> dict:
-        """La recarga conserva la verificación previa del documento (y su aviso) de la consulta original."""
-        from uuid import UUID
-        recupera = consulta.manifiesto.get("recupera") or {}
-        if not recupera.get("consulta_id"):
-            return {}
-        previa = repositorio.progreso_externo(UUID(recupera["consulta_id"]))
-        return {"verificacion_documento": previa.verificacion_documento} if previa and previa.verificacion_documento else {}
-
     def _recargar_previa(self, trabajador, concesion, consulta, solicitud):
         """Primera etapa de una recarga automática: `/api/retry` sobre el reporte anterior, sin crédito."""
         from infrastructure.listas.tusdatos.errores import ErrorTusdatos, ProveedorNoDisponible
@@ -495,58 +473,6 @@ class ModalidadExterna:
         repositorio.guardar_progreso(concesion, etapa="ESPERANDO", jobid=nuevo, recargas=1, reporte_id=reporte_id,
                                      evento="RECARGA_FUENTES_EXTERNAS")
         return repositorio.posponer(concesion, ESPERA_TRAS_LANZAR)
-
-    # ── Verificación previa del documento (NIT y cédula de extranjería) ─────
-
-    def _verificar_documento(self, trabajador, concesion, consulta, solicitud):
-        """Valida el NIT o la CE antes de consultar listas; True si cerró la consulta (documento inexistente).
-
-        Se hace una sola vez por consulta (queda en el progreso). Si la verificación falla o
-        no se puede interpretar, la consulta sigue: nunca bloquea por un problema del servicio.
-        """
-        from infrastructure.listas.tusdatos.adaptador import resultado_sin_reporte
-        from infrastructure.listas.tusdatos.errores import ErrorTusdatos
-        if solicitud.tipo_documento not in TIPOS_VERIFICABLES:
-            return False
-        repositorio = trabajador.repositorio
-        cliente = self.cliente(trabajador.politica.entorno)
-        if not getattr(cliente.configuracion, "verificar_documento", False):
-            return False
-        progreso = repositorio.progreso_externo(consulta.id)
-        if progreso is not None and progreso.verificacion_documento is not None:
-            return False  # Ya se verificó en una pasada anterior.
-        try:
-            verificacion = cliente.verificar_documento(solicitud.tipo_documento, solicitud.numero,
-                                                       fecha_expedicion=solicitud.fecha_expedicion)
-        except (ErrorTusdatos, ValueError) as error:
-            codigo = getattr(error, "codigo", "DATOS_NO_VERIFICABLES")
-            repositorio.guardar_progreso(concesion, evento="VERIFICACION_DOCUMENTO_FALLIDA",
-                                         verificacion_documento={"tipo": solicitud.tipo_documento,
-                                                                 "resultado": "SIN_VERIFICAR", "motivo": codigo})
-            registro.info("Tusdatos: no se pudo verificar el documento (%s); la consulta sigue", codigo)
-            return False
-        if verificacion.no_encontrado:
-            resultado = "NO_ENCONTRADO"
-        elif verificacion.vigente is False:
-            resultado = "NO_VIGENTE"
-        elif verificacion.vigente:
-            resultado = "VIGENTE"
-        else:
-            resultado = "SIN_DATO"
-        guardado = {"tipo": solicitud.tipo_documento, "resultado": resultado, "estado": verificacion.estado,
-                    "avisos": list(verificacion.avisos)}
-        if resultado != "NO_ENCONTRADO":
-            repositorio.guardar_progreso(concesion, evento="DOCUMENTO_VERIFICADO", verificacion_documento=guardado)
-            return False
-        repositorio.guardar_progreso(concesion, etapa="TERMINADA", evento="DOCUMENTO_NO_ENCONTRADO",
-                                     verificacion_documento=guardado)
-        self._cerrar_con_resultado(trabajador, concesion, resultado_sin_reporte(
-            consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="DOCUMENTO_NO_ENCONTRADO",
-            mensaje=MENSAJES_NO_ENCONTRADO[solicitud.tipo_documento]
-                    + ". Se comprobó antes de consultar listas, así que no se hizo esa consulta",
-            advertencia="Revise el número y el tipo de documento antes de repetir la consulta",
-            estado_cobertura="DESCONOCIDA", fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
-        return True
 
     # ── CC en caché de Tusdatos: recuperación por el historial ──────────────
 
@@ -731,7 +657,7 @@ class ModalidadExterna:
         interpretacion = interpretar_reporte(reporte.datos, consulta_id=consulta.id, solicitud=solicitud, criterio=criterio,
             fuentes=fuentes or None, errores_estado=estado.errores, fecha_inicio=consulta.admitida_en,
             fecha_fin=repositorio.reloj(), validado=estado.validado, fuentes_caidas=frozenset(caidas),
-            documento_no_vigente=_aviso_no_vigente(progreso), recuperacion=_aviso_recuperacion(consulta))
+            recuperacion=_aviso_recuperacion(consulta))
         # Solo el subconjunto aprobado y la huella de la respuesta completa llegan a PostgreSQL.
         repositorio.guardar_progreso(concesion, etapa="DESCARGANDO_PDF", reporte_id=estado.reporte_id,
                                      huella_respuesta=reporte.sha256, respuesta_filtrada=interpretacion.respuesta_filtrada)

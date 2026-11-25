@@ -414,63 +414,6 @@ def test_historial_inexistente_o_malformado():
         c.historial("CC", "126", date(2026, 11, 13))
 
 
-# ── Verificación previa del documento (verify/nit, verify/ce) ───────────────
-
-def verificacion(estado="ACTIVA", hallazgos=(), error=""):
-    return httpx.Response(200, json={"status": "true", "data": {"estado": estado, "razon_social": "EMPRESA",
-                                                                 "nombre_completo": "NOMBRE"},
-                                     "error": error, "findings": list(hallazgos)})
-
-
-def test_verificar_nit_y_ce_con_las_respuestas_del_sandbox():
-    c, simulador = cliente()
-    nit = c.verificar_documento("NIT", "900.000.152")
-    ce = c.verificar_documento("CE", "960696", fecha_expedicion=date(2001, 11, 1))
-    assert (nit.estado, nit.vigente, nit.no_encontrado) == ("ACTIVA", True, False)
-    assert (ce.estado, ce.vigente) == ("VIGENTE", True)
-    cuerpos = simulador.cuerpos()
-    assert cuerpos == [{"nit": 900000152}, {"ce": 960696, "fecha_expedicion": "01/11/2001"}]  # números, sin nombre
-    assert [p.url.path for p in simulador.peticiones] == ["/api/launch/verify/nit", "/api/launch/verify/ce"]
-
-
-@pytest.mark.parametrize("respuesta,no_encontrado,vigente", [
-    (verificacion(hallazgos=["Nit no encontrado"]), True, None),
-    (verificacion(estado="", error="Nit no encontrado"), True, None),          # el aviso puede venir en `error`
-    (verificacion(estado="VIGENTE", hallazgos=["Cédula no vigente"]), False, False),
-    (verificacion(estado="CANCELADA"), False, False),
-    (verificacion(estado=""), False, None),
-])
-def test_avisos_de_la_verificacion(respuesta, no_encontrado, vigente):
-    c, simulador = cliente()
-    simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta
-    resultado = c.verificar_documento("NIT", "900000152")
-    assert (resultado.no_encontrado, resultado.vigente) == (no_encontrado, vigente)
-
-
-def test_verificacion_no_se_reintenta_ni_adivina():
-    c, simulador = cliente()
-    simulador.extras[("POST", "/api/launch/verify/nit")] = verificacion(error="Servicio temporalmente fuera de línea")
-    with pytest.raises(RespuestaInesperada):
-        c.verificar_documento("NIT", "900000152")
-    simulador.extras[("POST", "/api/launch/verify/nit")] = httpx.Response(503)
-    with pytest.raises(ProveedorNoDisponible):
-        c.verificar_documento("NIT", "900000152")
-    assert len([p for p in simulador.peticiones if p.url.path.endswith("/verify/nit")]) == 2  # una por llamada
-    with pytest.raises(ValueError):
-        c.verificar_documento("CE", "960696")  # sin fecha de expedición
-    with pytest.raises(ValueError):
-        c.verificar_documento("CC", "111")
-
-
-def test_verificacion_configurable(monkeypatch):
-    monkeypatch.setenv("LISTAS_TUSDATOS_URL", SANDBOX)
-    monkeypatch.setenv("LISTAS_TUSDATOS_USUARIO", "pruebas")
-    monkeypatch.setenv("LISTAS_TUSDATOS_CLAVE", "password")
-    assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is True
-    monkeypatch.setenv("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO", "false")
-    assert ConfiguracionTusdatos.desde_entorno("development").verificar_documento is False
-
-
 # ── Capturas de pantalla por fuente (static.tusdatos.co) ─────────────────────
 
 JPEG = b"\xff\xd8\xff\xe0captura-de-prueba"
