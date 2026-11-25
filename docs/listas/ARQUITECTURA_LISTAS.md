@@ -675,22 +675,11 @@ libera la consulta entre pasadas (`posponer`):
   qué fuentes aprobadas no aparecen en la respuesta y qué códigos sí trae. La
   documentación no publica esos códigos, y el sandbox solo informa cuatro; con ese
   registro se corrige `codigos_estado` si hace falta.
-- **Verificación previa del documento (NIT y CE):** después de la revisión de fuentes y
-  antes de `launch`, se llama `POST /api/launch/verify/nit` (`{"nit": <número>}`) o
-  `/api/launch/verify/ce` (`{"ce": <número>, "fecha_expedicion": "dd/mm/aaaa"}`). El
-  resultado queda en `progreso_consulta_externa.verificacion_documento` (migración
-  `m43b56c789da`) como `{tipo, resultado, estado, avisos}`, con `resultado` en
-  `VIGENTE`, `NO_VIGENTE`, `NO_ENCONTRADO`, `SIN_DATO` o `SIN_VERIFICAR`. Solo se
-  guardan el estado y los `findings`, no los datos personales. Se hace una vez por
-  consulta: si ya hay resultado guardado, no se repite (por ejemplo, tras esperar turno).
-  `NO_ENCONTRADO` («Nit no encontrado», también si llega en `error`) cierra `FALLIDA`
-  con `DOCUMENTO_NO_ENCONTRADO` sin lanzar. `NO_VIGENTE` (estado distinto de
-  ACTIVA/ACTIVO/VIGENTE, o «Cédula no vigente») lanza igual y agrega la advertencia
-  `DOCUMENTO_NO_VIGENTE`, que el portal resalta. Si la llamada falla o la respuesta no
-  se entiende, queda `SIN_VERIFICAR` (evento `VERIFICACION_DOCUMENTO_FALLIDA`) y se
-  lanza igual. No se reintenta nunca, porque puede costar crédito. Se apaga con
-  `LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO=false`. Sí corre contra el sandbox, que responde
-  siempre ACTIVA o VIGENTE.
+- **Verificación previa del documento (retirada el 2026-11-25):** ya no se llama a
+  `verify/nit` ni `verify/ce`. La columna `progreso_consulta_externa.verificacion_documento`
+  (migración `m43b56c789da`) queda sin uso, con los datos de las consultas anteriores; no se
+  borra para no perderlos. La fecha de expedición viaja en `launch` (`fechaE`) con CE
+  (obligatoria) y con CC (opcional).
 - **Documento no encontrado:** un 400 de `launch` con «no encontrado» o «no se
   encuentra» (NIT fuera de RUES, CE fuera de Migración) cierra `FALLIDA` con
   `DOCUMENTO_NO_ENCONTRADO` y un mensaje por tipo de documento. El NIT se envía sin
@@ -755,9 +744,7 @@ regrabable con `scripts/listas/grabar_sandbox_tusdatos.py`):
   ejemplo de documento no validado.
 - Los PDF del sandbox no son PDF (devuelve un texto JSON) y `/api/retry` responde 404:
   ambos solo se prueban con respuestas escritas a mano hasta tener credenciales reales.
-- `verify/nit` y `verify/ce` responden siempre ACTIVA o VIGENTE y repiten el número
-  enviado; los casos «no encontrado» y «no vigente» solo se prueban con respuestas
-  escritas a mano. `sources/status` informa solo cuatro fuentes con estado fijo.
+- `sources/status` informa solo cuatro fuentes con estado fijo.
 - `tests/contracts/test_cliente_tusdatos.py` incluye un flujo contra el sandbox real
   que se activa con `LISTAS_TUSDATOS_SANDBOX=1`.
 
