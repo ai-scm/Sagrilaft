@@ -38,11 +38,12 @@ test('staging: habilitar dummy solo cambia el parámetro del proveedor y enciend
   deepEqual(after, before);
 });
 
-test('comandos de staging usan dummy y comandos de producción mantienen deshabilitado', () => {
+test('comandos de staging usan el sandbox de Tusdatos y los de producción mantienen deshabilitado', () => {
   const { scripts } = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
   for (const action of ['synth', 'diff', 'deploy', 'deploy:staging:bootstrap']) {
     const key = action.includes(':') ? action : `${action}:staging`;
-    equal(scripts[key].includes('-c proveedorListasCautela=dummy'), true, key);
+    equal(scripts[key].includes('-c proveedorListasCautela=externo -c tusdatosUrl=http://docs.tusdatos.co'), true, key);
+    equal(scripts[key].includes('-c habilitarNatEgress=true'), true, key);
   }
   for (const key of ['synth:prod', 'diff:prod', 'deploy:prod', 'deploy:prod:bootstrap']) {
     equal(scripts[key].includes('-c proveedorListasCautela=deshabilitado'), true, key);
@@ -130,4 +131,16 @@ test('producción: deshabilitado por defecto y rechaza la modalidad externa y el
   throws(() => synthCon({ ...base, proveedorListasCautela: 'externo' }), /prod mantiene las listas deshabilitadas/);
   throws(() => synthCon({ ...base, proveedorListasCautela: 'sagrilaft' }), /prod mantiene las listas deshabilitadas/);
   throws(() => synthCon({ ...base, proveedorListasCautela: 'deshabilitado', tusdatosUrl: 'http://docs.tusdatos.co' }), /sandbox/);
+});
+
+test('staging: pasar del simulador al sandbox de Tusdatos solo cambia dos parámetros', () => {
+  const antes = synthCon({ proveedorListasCautela: 'dummy', habilitarNatEgress: 'true' });
+  const despues = synthCon({ proveedorListasCautela: 'externo', habilitarNatEgress: 'true', tusdatosUrl: 'http://docs.tusdatos.co' });
+  const cambiados = Object.keys(despues.Resources).filter(key =>
+    JSON.stringify(antes.Resources[key]) !== JSON.stringify(despues.Resources[key]));
+  deepEqual(cambiados.map(key => despues.Resources[key].Properties.Name).sort(), [
+    '/sagrilaft/staging/config/LISTAS_TUSDATOS_URL',
+    '/sagrilaft/staging/config/PROVEEDOR_LISTAS_CAUTELA',
+  ]);
+  equal(parametro(despues, '/sagrilaft/staging/config/PROVEEDOR_LISTAS_CAUTELA'), 'sagrilaft');
 });

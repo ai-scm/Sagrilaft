@@ -16,6 +16,8 @@ export interface ConfigParametersProps {
   readonly proveedorListasCautela: string;
   readonly sagrilaftApiUrl: string;
   readonly tusdatosUrl: string;
+  /** true = Zoho Sign en modo prueba (ZOHO_SIGN_TESTING): no gasta créditos ni firma con validez legal. */
+  readonly zohoSignTesting: boolean;
   /**
    * Redes desde las que el backend acepta X-Forwarded-For (TRUSTED_PROXY_IPS).
    * Es el CIDR de la VPC: el ALB vive en sus subredes públicas y es lo único
@@ -66,7 +68,7 @@ export class ConfigParameters extends Construct {
       SNS_NOTIFICACIONES_ENABLED: 'false',
       ZOHO_REDIRECT_URI: `https://${props.dominioPortal}/oauth/zoho/callback`,
       ZOHO_WEBHOOK_SIGNATURE_HEADER: 'X-ZS-WEBHOOK-SIGNATURE',
-      ZOHO_SIGN_TESTING: props.ambiente === 'prod' ? 'false' : 'true',
+      ZOHO_SIGN_TESTING: props.zohoSignTesting ? 'true' : 'false',
       ZOHO_REFRESH_MARGIN_SECONDS: '300',
       ZOHO_TOKEN_EXPIRATION_DEFAULT_SECONDS: '3600',
       ZOHO_HTTP_MAX_ATTEMPTS: '3',

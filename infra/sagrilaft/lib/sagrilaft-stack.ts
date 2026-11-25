@@ -105,6 +105,15 @@ export class SagrilaftStack extends cdk.Stack {
       throw new Error(`proveedorListasCautela desconocido: ${listasSolicitada}. Use deshabilitado, simulado (dummy) o externo (sagrilaft).`);
     }
     const sagrilaftApiUrl = String(this.node.tryGetContext('sagrilaftApiUrl') ?? '');
+    // Zoho Sign en modo prueba (testing=true): documentos con marca de agua, sin validez legal
+    // y sin gastar créditos. Por defecto, real solo en prod; -c zohoSignTesting=true lo mantiene
+    // en prueba también allí mientras se terminan las validaciones.
+    const zohoSignTestingRaw = String(
+      this.node.tryGetContext('zohoSignTesting') ?? (ambiente === 'prod' ? 'false' : 'true'),
+    ).toLowerCase();
+    if (!['true', 'false'].includes(zohoSignTestingRaw)) {
+      throw new Error(`zohoSignTesting invalido: ${zohoSignTestingRaw}. Use true o false.`);
+    }
     // Tusdatos: producción usa HTTPS; el sandbox público (HTTP, sin créditos) solo fuera de prod.
     const tusdatosUrl = String(this.node.tryGetContext('tusdatosUrl') ?? 'https://dash-board.tusdatos.co').replace(/\/+$/, '');
     // Una copia por servicio: es lo que corre hoy en staging y producción (plan de
@@ -200,6 +209,7 @@ export class SagrilaftStack extends cdk.Stack {
       proveedorListasCautela,
       sagrilaftApiUrl,
       tusdatosUrl,
+      zohoSignTesting: zohoSignTestingRaw === 'true',
       redesProxyConfiables: networking.vpc.vpcCidrBlock,
     });
 
