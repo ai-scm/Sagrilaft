@@ -36,6 +36,7 @@ import time
 from dataclasses import dataclass
 from datetime import timedelta
 
+from domain.listas.contratos_tusdatos import VERSION_CONTRATO_TUSDATOS
 from domain.listas.puertos import ListasNoDisponibles
 from services.listas.modalidad_base import Admision, crear_grupo_por_documento, datos_sujeto
 
@@ -49,6 +50,14 @@ def _documento(criterio) -> tuple[str, str] | None:
         if tipo:
             return tipo, limpiar_documento(identificador.get("valor", "")).upper()
     return None
+
+
+def _fuentes_no_consultadas(resultado: dict) -> list[str]:
+    """Fuentes que no se pudieron consultar, en el contrato propio o en el anterior (2.0)."""
+    if resultado.get("version_contrato") == VERSION_CONTRATO_TUSDATOS:
+        return [f["codigo"] for f in resultado.get("fuentes") or () if f.get("estado") == "NO_CONSULTADA" and f.get("codigo")]
+    return [c.get("fuente_codigo") for c in resultado.get("cobertura") or ()
+            if c.get("estado") == "FALLIDA" and c.get("fuente_codigo")]
 
 
 def _aviso_recuperacion(consulta) -> str | None:
@@ -202,7 +211,8 @@ class ModalidadExterna:
                 if anterior:
                     return Admision(anterior, reutilizada=True)
             identificador = servicio.repositorio.admitir(servicio.actor, peticion, PROVEEDOR,
-                self.manifiesto(servicio.entorno, traducida.sujeto, forzar=forzar), sesion_actual=sesion)
+                self.manifiesto(servicio.entorno, traducida.sujeto, forzar=forzar), sesion_actual=sesion,
+                version_resultado=VERSION_CONTRATO_TUSDATOS)
         return Admision(identificador)
 
     def crear_grupo(self, servicio, expediente_id, clave, sesion):
@@ -241,19 +251,24 @@ class ModalidadExterna:
 
         return crear_grupo_por_documento(servicio, expediente_id, clave, sesion, proveedor=PROVEEDOR,
                                          criterio_para=criterio_para, manifiesto_para=manifiesto_para,
-                                         reutilizable=reutilizable)
+                                         reutilizable=reutilizable, version_resultado=VERSION_CONTRATO_TUSDATOS)
 
     # ── Ejecución ────────────────────────────────────────────────────────────
 
     def reconoce(self, consulta):
-        from infrastructure.listas.tusdatos.adaptador import ADAPTADOR_VERSION
-        return consulta.implementacion == self.implementacion and consulta.manifiesto.get("adaptador") == ADAPTADOR_VERSION
+        from infrastructure.listas.tusdatos.adaptador import ADAPTADOR_VERSION, ADAPTADORES_ANTERIORES
+        return consulta.implementacion == self.implementacion and (
+            consulta.manifiesto.get("adaptador") in {ADAPTADOR_VERSION, *ADAPTADORES_ANTERIORES})
 
     def ejecutar(self, trabajador, concesion, consulta):
         from domain.listas.contratos import Criterio
-        from infrastructure.listas.tusdatos.adaptador import traducir_criterio
+        from infrastructure.listas.tusdatos.adaptador import ADAPTADORES_ANTERIORES, traducir_criterio
         repositorio = trabajador.repositorio
         repositorio.renovar(concesion, CONCESION_PASADA)
+        if consulta.manifiesto.get("adaptador") in ADAPTADORES_ANTERIORES:
+            # Admitida con el contrato anterior (2.0): no se puede cerrar con el resultado nuevo.
+            # No se relanza sola: se cierra para que quien consulta la repita.
+            return self._terminar_con_fallo(repositorio, concesion, "ADAPTADOR_RETIRADO")
         try:
             criterio = Criterio.model_validate(consulta.criterio)
             solicitud = traducir_criterio(criterio)
@@ -297,7 +312,7 @@ class ModalidadExterna:
                 mensaje="Tusdatos informa fuentes caídas o en mantenimiento: " + ", ".join(caidas)
                         + ". No se hizo la consulta ni se gastó crédito",
                 advertencia="Intente más tarde, o use «Forzar actualización» para consultar de todos modos "
-                            "(el resultado quedará parcial)", estado_cobertura="DESCONOCIDA",
+                            "(el resultado quedará parcial)",
                 fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
         self._vigilar_creditos(trabajador.politica.entorno)
         espera = repositorio.reservar_turno(PROVEEDOR, INTERVALO_LANZAMIENTOS)
@@ -325,7 +340,7 @@ class ModalidadExterna:
                 consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="DOCUMENTO_NO_ENCONTRADO",
                 mensaje=MENSAJES_NO_ENCONTRADO.get(solicitud.tipo_documento, MENSAJES_NO_ENCONTRADO["CC"]),
                 advertencia="Revise el número y el tipo de documento antes de repetir la consulta",
-                estado_cobertura="DESCONOCIDA", fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
+                fecha_inicio=consulta.admitida_en, fecha_fin=repositorio.reloj()))
         except (CredencialesRechazadas, AccesoDenegado, SolicitudRechazada) as error:
             return self._terminar_con_fallo(repositorio, concesion, error.codigo)
         except ValueError:
@@ -428,8 +443,7 @@ class ModalidadExterna:
         """Admite la recarga gratuita de una consulta que cerró con fuentes fallidas, si ya toca."""
         if cerrada.estado not in {"PARCIAL", "FALLIDA"} or not cerrada.resultado:
             return
-        fallidas = [c.get("fuente_codigo") for c in cerrada.resultado.get("cobertura") or ()
-                    if c.get("estado") == "FALLIDA" and c.get("fuente_codigo")]
+        fallidas = _fuentes_no_consultadas(cerrada.resultado)
         if not fallidas:
             return
         intento = int((cerrada.manifiesto.get("recupera") or {}).get("intento") or 0) + 1
@@ -445,7 +459,8 @@ class ModalidadExterna:
             bloquear_documento(sesion, cerrada.expediente_id, documento)
             if self._hay_posterior(sesion, cerrada, documento):
                 return  # Ya hay una consulta más nueva de ese documento (otra recarga o una del usuario).
-            nueva = repositorio.admitir_recuperacion(cerrada.id, manifiesto, sesion_actual=sesion)
+            nueva = repositorio.admitir_recuperacion(cerrada.id, manifiesto, sesion_actual=sesion,
+                                                     version_resultado=VERSION_CONTRATO_TUSDATOS)
         if nueva:
             registro.info("Tusdatos: recarga automática %s de la consulta %s (intento %d)", nueva, cerrada.id, intento)
 
@@ -498,7 +513,7 @@ class ModalidadExterna:
                 consulta_id=consulta.id, sujeto=solicitud.sujeto, codigo="RESULTADO_EN_CACHE_SIN_REFERENCIA",
                 mensaje="Tusdatos devolvió una consulta anterior (últimas 6 horas) sin referencia a su reporte, "
                         "y no se encontró en el historial de la cuenta",
-                advertencia="Use «Forzar actualización» para obtener un reporte nuevo", estado_cobertura="DESCONOCIDA",
+                advertencia="Use «Forzar actualización» para obtener un reporte nuevo",
                 fecha_inicio=consulta.admitida_en, fecha_fin=ahora))
         reporte_id, documento = reporte
         repositorio.guardar_progreso(concesion, reporte_id=reporte_id, evento="REPORTE_RECUPERADO_DE_HISTORIAL")
