@@ -14,6 +14,22 @@ Scripts para publicar una versión en AWS: construir y subir las imágenes Docke
 
 Son una misma cadena. `deploy_release.py` importa `run_ecs_migration.py` directamente, y el `.sh` depende de su `.py` hermano, así que deben quedarse en la misma carpeta. Además, `ORCHESTRATOR_SOURCES` en `deploy_release.py` lista estos archivos para registrar su hash en la evidencia; si se mueve alguno, hay que actualizar esa lista.
 
+## Staging con el sandbox de Tusdatos (desde 2026-11-25)
+
+Los comandos `synth:staging`, `diff:staging`, `deploy:staging:bootstrap` y
+`deploy:staging` pasan `-c proveedorListasCautela=externo -c tusdatosUrl=http://docs.tusdatos.co`:
+el adaptador real de Tusdatos contra su sandbox público, con respuestas estáticas y sin
+créditos. Frente a `dummy`, la plantilla solo cambia dos parámetros:
+`/sagrilaft/staging/config/PROVEEDOR_LISTAS_CAUTELA` (`dummy` → `sagrilaft`) y
+`/sagrilaft/staging/config/LISTAS_TUSDATOS_URL` (lo comprueba `test/listas-cautela.test.ts`).
+Antes de desplegarlo, el secreto `sagrilaft/staging/tusdatos_credentials` debe tener el
+usuario y la clave de pruebas que publica Tusdatos: con `externo` y el secreto vacío, el
+backend no arranca. Como cambia SSM, se aplica aparte de una release `compatible`; los planes
+de release posteriores deben llevar `"proveedorListasCautela": "externo"` y
+`"tusdatosUrl": "http://docs.tusdatos.co"` en `context`.
+
+La sección siguiente es el antecedente: cómo se activó `dummy` el 2026-11-17.
+
 ## Habilitación de pruebas en staging con dummy
 
 Los comandos `synth:staging`, `diff:staging`, `deploy:staging:bootstrap` y

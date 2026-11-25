@@ -247,6 +247,8 @@ Como la propuesta ya venció, el precio y las condiciones hay que pedirlos de nu
 | `/api/plans` responde una lista (una fila por compra) con `amount`, `purchase_amount` y `demo`; el sandbox, un objeto | `GET /api/plans/` |
 | Si `/api/launch` también redirige no se pudo ver sin gastar: el cliente lo cubre igual | Pendiente de la primera consulta |
 
+Tusdatos informó después que una cuenta demo no tiene API Token ni consultas por API: las 5 consultas de cortesía solo se usan en su portal web. Lo de arriba sigue sirviendo para cuando se contrate el plan.
+
 **Respuestas de Tusdatos pendientes de tener por escrito** (13-11-2026)
 
 - `verify/nit` y `verify/ce` no cobran crédito. Por eso la verificación previa queda

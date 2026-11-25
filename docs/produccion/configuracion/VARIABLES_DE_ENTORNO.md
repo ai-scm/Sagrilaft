@@ -116,7 +116,7 @@ perfil de inferencia `us.amazon.nova-pro-v1:0` sí funciona. El `BEDROCK_MODEL_I
 | `ZOHO_REDIRECT_URI` | URI enviada al renovar el token OAuth. Su registro y necesidad deben verificarse en Zoho; la ruta configurada no implica que exista un callback en la aplicación. | `ZohoSignConfig`, `zoho_sign_service.py` | Dev: `.env`. AWS: SSM | **Obl.** (falla `validar()`) | — |
 | `ZOHO_WEBHOOK_SECRET` | Secreto HMAC del webhook de Zoho. | `FirmaService` (valida firma del webhook), `routers/webhooks.py` | secreto `zoho_credentials.webhook_secret` | Opc. al arrancar; el webhook falla con `RuntimeError` si falta | 🔒 |
 | `ZOHO_WEBHOOK_SIGNATURE_HEADER` | Nombre del header con la firma. | `ZohoSignConfig` | CDK `X-ZS-WEBHOOK-SIGNATURE` | Opc. (ese valor) | — |
-| `ZOHO_SIGN_TESTING` | `true` = modo sandbox de Zoho (no consume créditos). | `ZohoSignConfig.modo_prueba` | CDK: `false` solo en `prod`; `true` en el resto. Dev: compose default `true` | Opc. (default código `false`) | — |
+| `ZOHO_SIGN_TESTING` | `true` = modo prueba de Zoho: marca de agua, sin validez legal y sin consumir créditos. | `ZohoSignConfig.modo_prueba` | CDK: contexto `-c zohoSignTesting`; sin él, `false` en `prod` y `true` en el resto. Los scripts `*:prod` de `package.json` pasan `true` desde el 2026-11-25, mientras se termina de validar. Dev: compose default `true` | Opc. (default código `false`) | — |
 | `ZOHO_REFRESH_MARGIN_SECONDS` | Margen de renovación anticipada del access token. | `ZohoSignConfig` | CDK `300` | Opc. (300) | — |
 | `ZOHO_TOKEN_EXPIRATION_DEFAULT_SECONDS` | Vigencia asumida del token si Zoho no la informa. | ídem | CDK `3600` | Opc. (3600) | — |
 | `ZOHO_HTTP_MAX_ATTEMPTS` | Reintentos HTTP. | ídem | CDK `3` | Opc. (3) | — |
@@ -196,7 +196,7 @@ prod `*sagrilaft.ia.blend360.com`.
 | `FRONTEND_URL` | `http://localhost:5173` (`.env`: `…:5173,…:5174`) | formulario (real: formulario + portal) | formulario (real: formulario + portal) |
 | `VITE_BACKEND_URL` | `http://localhost:8000` | ejemplo y real: vacío (mismo origen) | ejemplo y real: vacío (mismo origen) |
 | `KEYCLOAK_URL` | `http://localhost:8080` (`.env`: `http://keycloak:8080`) | ejemplo y real: DNS interno | ejemplo y real: DNS interno |
-| `ZOHO_SIGN_TESTING` | `true` | ejemplo `true`; **real `false`** | `false` |
+| `ZOHO_SIGN_TESTING` | `true` | ejemplo `true`; **real `false`** | `true` mientras se valida (CDK `-c zohoSignTesting=true`); `false` al salir con firmas reales |
 | `PROVEEDOR_LISTAS_CAUTELA` | ejemplo `dummy`; `docker-compose.dev.yml` la fuerza a vacía y usa `LISTAS_IMPLEMENTACION` (default `deshabilitado`) | ejemplo y archivo local: `dummy`; CDK sin contexto: `dummy` | ejemplo y archivo local: `deshabilitado`; CDK sin contexto: `deshabilitado` |
 | `SNS_NOTIFICACIONES_ENABLED` | `false` | ejemplo y real `false` | ejemplo y real `false` |
 | `SES_NOTIFICACIONES_ENABLED` | `false` | `true` | `true` |

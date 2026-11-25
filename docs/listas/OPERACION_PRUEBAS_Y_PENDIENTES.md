@@ -465,7 +465,7 @@ Sirven como aviso para quien mantenga el módulo:
 En staging, la consulta simulada con informe en S3 y revisión humana pasó el 2026-11-17
 ([pruebas de esa fecha](../produccion/ESTIMACION_COSTOS_AWS.md#staging-hecho-el-17-nov-2026)).
 
-**Activar Tusdatos en staging** (pendiente; requiere credenciales):
+**Activar Tusdatos en staging** (decidido el 2026-11-25: sandbox público, porque la cuenta demo de Tusdatos no permite consultas por API; los scripts `*:staging` ya lo pasan, ver `scripts/despliegue/README.md`):
 
 1. Rellenar `sagrilaft/staging/tusdatos_credentials`: `token` (producción de Tusdatos) o
    `usuario` y `clave` del sandbox con `-c tusdatosUrl=http://docs.tusdatos.co`. Con
