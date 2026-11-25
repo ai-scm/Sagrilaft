@@ -236,6 +236,17 @@ lo veamos con credenciales reales.
 
 Como la propuesta ya venció, el precio y las condiciones hay que pedirlos de nuevo.
 
+**Visto con credenciales reales** (25-11-2026, cuenta de cortesía con 5 consultas)
+
+| Dato | Cómo se vio |
+|---|---|
+| El usuario y la clave del portal sirven para la API (Basic Auth). El correo se escribió en minúsculas | `GET /api/plans/` respondió 200 |
+| Crear API Tokens no está habilitado para nuestro cliente: hay que pedírselo a Tusdatos antes de producción | `POST /api/v1/auth/token` respondió 403 «El acceso a API Tokens no está disponible para tu cliente» |
+| Producción exige la barra final en `/api/plans/` y `/api/v1/checks/` (sin ella responde 308). El sandbox hace lo contrario (307 hacia la ruta sin barra). El cliente sigue solo esas redirecciones, en el mismo host | Sondeo de rutas sin costo |
+| `sources/status`, `results` y `report_json` responden sin redirección. `report_pdf` y `report_nit_pdf` dan 410 con un id inexistente | Mismo sondeo, con identificadores falsos |
+| `/api/plans` responde una lista (una fila por compra) con `amount`, `purchase_amount` y `demo`; el sandbox, un objeto | `GET /api/plans/` |
+| Si `/api/launch` también redirige no se pudo ver sin gastar: el cliente lo cubre igual | Pendiente de la primera consulta |
+
 **Respuestas de Tusdatos pendientes de tener por escrito** (13-11-2026)
 
 - `verify/nit` y `verify/ce` no cobran crédito. Por eso la verificación previa queda
