@@ -5,7 +5,7 @@ y Tusdatos simulado con las respuestas grabadas del sandbox. Sin red.
 """
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -159,10 +159,10 @@ def test_cc_con_hallazgos_completa_y_solo_guarda_lo_aprobado(externo):
     assert consulta["proveedor"] == "tusdatos" and len(consulta["cobertura"]) == 12  # 12 fuentes para cédula
     assert {c["motivos"][0]["campo"] for c in consulta["candidatos"]} >= {"ofac", "peps", "procuraduria", "peps_funcion_publica"}
     assert [e["tipo"] for e in consulta["evidencias"]] == ["INFORME_INTERNO"]
-    # Un solo lanzamiento, con el documento limpio y sin fecha (solo CE la exige).
+    # Un solo lanzamiento, con el documento limpio y la fecha de expedición (opcional en CC).
     assert len(lanzamientos(externo)) == 1
     assert json.loads(lanzamientos(externo)[0].content) == {"doc": "111", "typedoc": "CC", "force": False,
-                                                            "webhook_reference": consulta_id}
+                                                            "fechaE": "01/12/2014", "webhook_reference": consulta_id}
     guardado = progreso(externo, consulta_id)
     assert guardado.etapa == "TERMINADA" and guardado.reporte_id == REPORTE_CC and len(guardado.huella_respuesta) == 64
     texto = json.dumps(guardado.respuesta_filtrada).casefold()
@@ -582,79 +582,43 @@ def test_si_el_historial_no_sirve_se_cierra_como_antes(externo, filas):
     assert not any(p.url.path.startswith("/api/report_json") for p in externo.simulador.peticiones)
 
 
-# ── Verificación previa del documento (verify/nit, verify/ce) ────────────────
+# ── Sin verificación previa (verify/nit y verify/ce retirados el 2026-11-25) ──
 
-def verificaciones(e):
-    return [p for p in e.simulador.peticiones if p.url.path.startswith("/api/launch/verify/")]
-
-
-def respuesta_verificacion(estado="ACTIVA", hallazgos=()):
-    return httpx.Response(200, json={"status": "true", "data": {"estado": estado}, "error": "", "findings": list(hallazgos)})
-
-
-def test_nit_inexistente_se_detecta_antes_de_consultar_listas(externo):
-    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta_verificacion("", ["Nit no encontrado"])
-    consulta_id = crear(externo, tipo="NIT", valor="900123456").json()["consulta_id"]
+@pytest.mark.parametrize("tipo,numero,extra", [("NIT", "900000152", {}),
+                                               ("CE", "960696", {"fecha_expedicion": "2001-11-01"})])
+def test_nit_y_ce_se_lanzan_sin_verificar_antes(externo, tipo, numero, extra):
+    respuesta = crear(externo, tipo=tipo, valor=numero, **extra)
+    assert respuesta.status_code == 202, respuesta.text
+    consulta_id = respuesta.json()["consulta_id"]
     procesar(externo)
-    consulta = detalle(externo, consulta_id)
-    assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["error"]["codigo"] == "DOCUMENTO_NO_ENCONTRADO"
-    assert "antes de consultar listas" in consulta["error"]["mensaje"]
-    assert lanzamientos(externo) == [] and "DOCUMENTO_NO_ENCONTRADO" in eventos(externo, consulta_id)
-    assert progreso(externo, consulta_id).verificacion_documento == {
-        "tipo": "NIT", "resultado": "NO_ENCONTRADO", "estado": None, "avisos": ["Nit no encontrado"]}
-
-
-def test_empresa_no_activa_se_consulta_igual_con_aviso(externo):
-    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = respuesta_verificacion("CANCELADA")
-    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
-    procesar(externo)
-    consulta = detalle(externo, consulta_id)
-    assert consulta["estado_ejecucion"] == "COMPLETADA" and len(lanzamientos(externo)) == 1
-    aviso = {a["codigo"]: a["descripcion"] for a in consulta["advertencias"]}["DOCUMENTO_NO_VIGENTE"]
-    assert "La empresa" in aviso and "CANCELADA" in aviso
-
-
-def test_cedula_de_extranjeria_no_vigente_se_consulta_igual(externo):
-    externo.simulador.extras[("POST", "/api/launch/verify/ce")] = respuesta_verificacion("VIGENTE", ["Cédula no vigente"])
-    consulta_id = crear(externo, tipo="CE", valor="960696", fecha_expedicion="2001-11-01").json()["consulta_id"]
-    procesar(externo)
-    assert json.loads(verificaciones(externo)[0].content) == {"ce": 960696, "fecha_expedicion": "01/11/2001"}
+    rutas = [p.url.path for p in externo.simulador.peticiones]
+    assert not [r for r in rutas if "/verify/" in r]
     assert len(lanzamientos(externo)) == 1
-    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "NO_VIGENTE"
+    assert progreso(externo, consulta_id).verificacion_documento is None
 
 
-def test_nit_vigente_se_verifica_una_sola_vez_aunque_espere_turno(externo):
-    from infrastructure.listas.tusdatos.adaptador import PROVEEDOR
-    externo.trabajador.repositorio.reservar_turno(PROVEEDOR, 5.0)  # otro trabajador acaba de lanzar
-    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
+def test_cc_envia_la_fecha_de_expedicion_si_se_informa(externo):
+    assert crear(externo, valor="111", fecha_expedicion="2014-12-01").status_code == 202
+    assert crear(externo, valor="112").status_code == 202
     procesar(externo)
-    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA"
-    assert len(verificaciones(externo)) == 1 and len(lanzamientos(externo)) == 1
-    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "VIGENTE"
-    assert "DOCUMENTO_VERIFICADO" in eventos(externo, consulta_id)
+    cuerpos = {c["doc"]: c for c in (json.loads(p.content) for p in lanzamientos(externo))}
+    assert cuerpos["111"]["fechaE"] == "01/12/2014" and "fechaE" not in cuerpos["112"]
 
 
-def test_si_la_verificacion_falla_la_consulta_sigue(externo):
-    externo.simulador.extras[("POST", "/api/launch/verify/nit")] = httpx.Response(503)
-    consulta_id = crear(externo, tipo="NIT", valor="900000152").json()["consulta_id"]
-    procesar(externo)
-    assert detalle(externo, consulta_id)["estado_ejecucion"] == "COMPLETADA" and len(lanzamientos(externo)) == 1
-    assert len(verificaciones(externo)) == 1  # no se repite: puede costar
-    assert progreso(externo, consulta_id).verificacion_documento["resultado"] == "SIN_VERIFICAR"
-    assert "VERIFICACION_DOCUMENTO_FALLIDA" in eventos(externo, consulta_id)
-
-
-def test_cedula_de_ciudadania_y_verificacion_apagada_no_verifican(externo, monkeypatch):
-    crear(externo, valor="112")
-    procesar(externo)
-    assert verificaciones(externo) == []
-    apagada = ConfiguracionTusdatos(url_base="http://docs.tusdatos.co", usuario="pruebas", clave="password",
-                                    verificar_documento=False)
-    monkeypatch.setitem(modalidades.MODALIDADES, "externo", ModalidadExterna(fabrica_cliente=lambda _e: ClienteTusdatos(
-        apagada, transporte=externo.simulador.transporte, dormir=lambda _s: None, metricas=lambda *_: None)))
-    crear(externo, tipo="NIT", valor="900000152")
-    procesar(externo)
-    assert verificaciones(externo) == [] and len(lanzamientos(externo)) == 2
+def test_grupo_usa_la_fecha_del_paso_3_solo_para_el_representante(externo):
+    # La fecha del expediente es la del documento del representante legal (paso 3 del formulario).
+    with externo.sesiones.begin() as sesion:
+        sesion.get(Formulario, externo.expediente).fecha_expedicion = date(2014, 12, 1)
+    respuesta = externo.cliente.post(f"/api/expedientes/{externo.expediente}/consultas-listas/grupos",
+                                     headers={"Idempotency-Key": "grupo-fecha"})
+    assert respuesta.status_code == 202, respuesta.text
+    alinear_reloj(externo)
+    for _ in range(3):
+        procesar(externo)
+        externo.reloj[0] += timedelta(seconds=6)
+    cuerpos = {c["typedoc"]: c for c in (json.loads(p.content) for p in lanzamientos(externo))}
+    assert cuerpos["CC"]["fechaE"] == "01/12/2014"   # representante
+    assert "fechaE" not in cuerpos["NIT"]              # la empresa no lleva fecha
 
 
 # ── Capturas de pantalla por fuente ──────────────────────────────────────────

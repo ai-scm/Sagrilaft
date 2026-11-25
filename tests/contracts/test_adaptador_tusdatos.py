@@ -36,6 +36,13 @@ def test_tipos_del_expediente_se_traducen(tipo, esperado, sujeto):
     assert traducida.nombre == ("JUAN PEREZ PEREZ" if esperado == "PP" else None)
 
 
+@pytest.mark.parametrize("tipo,lleva_fecha", [("CC", True), ("CE", True), ("NIT", False), ("PAS", False)])
+def test_fecha_de_expedicion_solo_viaja_con_cc_y_ce(tipo, lleva_fecha):
+    traducida = traducir_criterio(criterio(tipo, "381310014", nombre="JUAN PEREZ PEREZ", fecha_expedicion="2014-12-01"))
+    assert (traducida.fecha_expedicion is not None) is lleva_fecha
+    assert traducir_criterio(criterio("CC", "111")).fecha_expedicion is None  # en CC es opcional
+
+
 def test_ce_exige_fecha_y_pasaporte_exige_nombre():
     with pytest.raises(ValueError, match="fecha de expedición"):
         traducir_criterio(criterio("CE", "960696"))
@@ -239,13 +246,6 @@ def test_fuente_fallida_que_tusdatos_reporta_caida_lo_dice_en_el_motivo():
     assert "caída o en mantenimiento" in cobertura(resultado, "procuraduria").motivo
     assert cobertura(resultado, "policia").motivo == "Tusdatos informó error al consultar la fuente"
     assert resultado.estado_ejecucion == "PARCIAL"
-
-
-def test_documento_no_vigente_avisa_sin_cambiar_la_conclusion():
-    reporte = REPORTES["report_cc_sin_hallazgo"]
-    resultado = interpretar(reporte, "CC", "112", documento_no_vigente="La empresa no figura vigente").resultado
-    assert {a.codigo: a.descripcion for a in resultado.advertencias}["DOCUMENTO_NO_VIGENTE"] == "La empresa no figura vigente"
-    assert resultado.conclusion_busqueda == interpretar(reporte, "CC", "112").resultado.conclusion_busqueda
 
 
 def test_capturas_por_fuente_y_ruta_guardada():

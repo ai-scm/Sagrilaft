@@ -25,8 +25,6 @@ class ConfiguracionTusdatos:
     tiempo_pdf: float = 60.0
     # Con este saldo o menos se registra un aviso (y la métrica TusdatosCreditosRestantes).
     alerta_creditos: int = 100
-    # Validar NIT y cédula de extranjería (verify/nit, verify/ce) antes de consultar listas.
-    verificar_documento: bool = True
     # Guardar las capturas de pantalla por fuente que Tusdatos publica junto con el reporte.
     capturas: bool = True
     # Recuperar gratis, después del cierre, lo que quedó incompleto: recargar las fuentes que
@@ -78,7 +76,6 @@ class ConfiguracionTusdatos:
             tiempo_lectura=segundos("LISTAS_TUSDATOS_TIEMPO_LECTURA", 20.0),
             tiempo_pdf=segundos("LISTAS_TUSDATOS_TIEMPO_PDF", 60.0),
             alerta_creditos=int(segundos("LISTAS_TUSDATOS_ALERTA_CREDITOS", 100)),
-            verificar_documento=_activo("LISTAS_TUSDATOS_VERIFICAR_DOCUMENTO"),
             capturas=_activo("LISTAS_TUSDATOS_CAPTURAS"),
             recuperar=_activo("LISTAS_TUSDATOS_RECUPERAR"))
         configuracion.validar_entorno(entorno)
