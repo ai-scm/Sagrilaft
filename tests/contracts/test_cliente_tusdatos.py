@@ -249,6 +249,70 @@ def test_salud_y_creditos():
     assert c.creditos_restantes() == 0
 
 
+def test_creditos_con_la_lista_que_responde_produccion():
+    # Respuesta real de producción (2026-11-25): una fila por compra de créditos.
+    filas = [{"amount": 5, "purchase_amount": 5, "demo": True, "user": "x"}, {"amount": 2, "purchase_amount": 10}]
+    c, _ = cliente(SimuladorTusdatos({("GET", "/api/plans"): httpx.Response(200, json=filas)}))
+    assert c.creditos_restantes() == 7
+    c, _ = cliente(SimuladorTusdatos({("GET", "/api/plans"): httpx.Response(200, json=[])}))
+    assert c.creditos_restantes() is None
+
+
+# ── Redirecciones por la «/» final ───────────────────────────────────────────
+
+def _redirige(destino, codigo=308):
+    return lambda peticion: httpx.Response(codigo, headers={"location": destino})
+
+
+def test_sigue_la_redireccion_que_solo_agrega_la_barra_final():
+    # Producción redirige /api/plans → /api/plans/ (308) y conserva la consulta.
+    simulador = SimuladorTusdatos({
+        ("GET", "/api/plans"): _redirige("https://dash-board.tusdatos.co/api/plans/?exclude=checks"),
+        ("GET", "/api/plans/"): httpx.Response(200, json=[{"amount": 5}]),
+    })
+    c, _ = cliente(simulador, config=configuracion(url_base="https://dash-board.tusdatos.co"))
+    assert c.creditos_restantes() == 5
+    segunda = simulador.peticiones[-1]
+    assert segunda.url.path == "/api/plans/" and segunda.url.params["exclude"] == "checks"
+    assert segunda.headers["authorization"].startswith("Basic ")
+
+
+def test_lanzar_sigue_la_barra_final_una_sola_vez_y_conserva_el_cuerpo():
+    simulador = SimuladorTusdatos({
+        ("POST", "/api/launch"): _redirige("/api/launch/"),
+        ("POST", "/api/launch/"): httpx.Response(200, json={"jobid": JOB_CON_HALLAZGO, "validado": True}),
+    })
+    c, _ = cliente(simulador)
+    assert c.lanzar("CC", "111").jobid == JOB_CON_HALLAZGO
+    assert [p.url.path for p in simulador.peticiones] == ["/api/launch", "/api/launch/"]
+    assert simulador.cuerpos()[0] == simulador.cuerpos()[1]
+
+
+@pytest.mark.parametrize("destino", [
+    "https://otro.example.com/api/plans/",     # otro host: las credenciales no salen
+    "http://docs.tusdatos.co.evil/api/plans/",
+    "https://docs.tusdatos.co/api/plans/",     # cambia el esquema
+    "/api/otra/",                              # otra ruta
+])
+def test_no_sigue_redirecciones_que_no_son_solo_la_barra(destino):
+    simulador = SimuladorTusdatos({("GET", "/api/plans"): _redirige(destino)})
+    c, _ = cliente(simulador)
+    with pytest.raises(RespuestaInesperada):
+        c.creditos_restantes()
+    assert len(simulador.peticiones) == 1
+
+
+def test_no_encadena_redirecciones():
+    simulador = SimuladorTusdatos({
+        ("GET", "/api/plans"): _redirige("/api/plans/"),
+        ("GET", "/api/plans/"): _redirige("/api/plans"),
+    })
+    c, _ = cliente(simulador)
+    with pytest.raises(RespuestaInesperada):
+        c.creditos_restantes()
+    assert len(simulador.peticiones) == 2
+
+
 # ── Interruptor y métricas ───────────────────────────────────────────────────
 
 def test_interruptor_corta_tras_fallas_seguidas_y_se_recupera():

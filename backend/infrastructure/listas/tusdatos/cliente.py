@@ -413,8 +413,17 @@ class ClienteTusdatos:
     def creditos_restantes(self) -> int | None:
         respuesta = self._llamar("plan", "GET", "/api/plans", params={"exclude": "checks"})
         self._exigir(respuesta, "plan", {200})
-        cantidad = self._json(respuesta, "plan").get("amount")
-        return cantidad if isinstance(cantidad, int) else None
+        try:
+            datos = respuesta.json()
+        except ValueError:
+            raise RespuestaInesperada("plan", 200, "La respuesta no es JSON") from None
+        # Producción responde una lista (una fila por compra de créditos); el sandbox, un objeto.
+        # Con varias compras se suman los saldos de cada una.
+        planes = datos if isinstance(datos, list) else [datos]
+        cantidades = [p.get("amount") for p in planes if isinstance(p, dict)]
+        if not cantidades or not all(isinstance(c, int) and not isinstance(c, bool) for c in cantidades):
+            return None
+        return sum(cantidades)
 
     # ── Transporte ────────────────────────────────────────────────────────────
 
@@ -433,7 +442,7 @@ class ClienteTusdatos:
                     peticion.headers.pop("Authorization", None)
                     respuesta = self._http.send(peticion, auth=None)
                 else:
-                    respuesta = self._http.request(metodo, ruta, **opciones)
+                    respuesta = self._pedir_ajustando_barra(metodo, ruta, opciones)
             except _SIN_EFECTO:
                 error = ProveedorNoDisponible(operacion, detalle="No se pudo conectar")
             except httpx.HTTPError:
@@ -459,6 +468,24 @@ class ClienteTusdatos:
                 raise error
             self.dormir(0.5 * (2 ** intento))
         raise AssertionError("inalcanzable")  # pragma: no cover
+
+    def _pedir_ajustando_barra(self, metodo, ruta, opciones):
+        """Sigue una sola redirección 307/308 cuando solo agrega o quita la «/» final de la ruta.
+
+        Producción exige «/api/plans/» y «/api/v1/checks/»; el sandbox, sin barra. El servidor
+        redirige antes de atender la petición, así que repetirla no gasta crédito. Cualquier otra
+        redirección (otro host, otro esquema, otra ruta) se devuelve tal cual y falla en `_exigir`:
+        ni las credenciales ni el documento salen hacia otro destino.
+        """
+        respuesta = self._http.request(metodo, ruta, **opciones)
+        if respuesta.status_code not in (307, 308) or "location" not in respuesta.headers:
+            return respuesta
+        origen = respuesta.request.url
+        destino = origen.join(respuesta.headers["location"])
+        if ((destino.scheme, destino.host, destino.port) != (origen.scheme, origen.host, origen.port)
+                or destino.path == origen.path or destino.path.rstrip("/") != origen.path.rstrip("/")):
+            return respuesta
+        return self._http.request(metodo, destino.path, **opciones)
 
     def _medir(self, operacion, inicio, estado_http):
         exito = estado_http is not None and estado_http < 500
