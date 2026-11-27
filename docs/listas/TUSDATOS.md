@@ -25,10 +25,12 @@ crédito. El nombre solo se pide y se envía con el pasaporte; en los demás cas
 resuelve el nombre por su cuenta. País del documento y fecha de nacimiento no se piden:
 Tusdatos no los usa (siguen en la búsqueda simulada).
 
-En «Consultar contraparte y representante» se usa la fecha de expedición guardada en el
-expediente, que el formulario público pide en el paso 3: es la del documento del
-representante legal o, en persona natural, de la propia persona. Por eso va con el
-representante y, en persona natural, también con la contraparte; nunca con un NIT.
+Desde el 2026-11-27, en modo Tusdatos el portal tiene un solo botón, «Generar reporte»: el
+equipo escribe a mano el tipo y el número de documento (y la fecha de expedición o el nombre
+cuando aplican); no se precarga nada del expediente. Antes de consultar se muestra un resumen
+de los datos para verificarlos y confirmar. Cada reporte consulta un solo documento; para la
+contraparte y el representante legal se generan dos reportes. El historial muestra el
+documento consultado. La búsqueda por archivos y la simulada conservan sus dos botones.
 
 ## Qué fuentes se revisan
 

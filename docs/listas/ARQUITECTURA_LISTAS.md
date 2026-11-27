@@ -323,6 +323,9 @@ Otras reglas:
   independientes en una sola admisión. Un sujeto sin datos utilizables aparece como
   «no consultado» con su motivo. En modo archivos los datos salen del expediente
   guardado (sección 2 de [reglas](BUSCADOR_REGLAS_Y_CASOS.md#2-de-dónde-salen-los-datos-consultados)).
+- En modo Tusdatos el portal no usa la consulta de contraparte y representante (desde el
+  2026-11-27): cada «Generar reporte» es una consulta individual con los datos escritos a
+  mano, confirmados en un resumen. El endpoint de grupos se conserva para las otras modalidades.
 - La consulta **individual** usa el nombre y el documento editados en pantalla y no
   les añade datos personales guardados, porque podrían ser de otra persona.
 
