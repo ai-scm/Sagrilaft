@@ -8,7 +8,7 @@ import { memo, useState } from 'react';
  * el resultado de la consulta (candidatos, motivos, evidencias), que es la
  * parte más pesada del árbol.
  */
-function RevisionHistorial({ consulta, revisiones, ocupado, onRevisar }) {
+function RevisionHistorial({ opciones, revisiones, ocupado, onRevisar }) {
   const [decision, setDecision] = useState('REQUIERE_INFORMACION');
   const [justificacion, setJustificacion] = useState('');
   const [candidato, setCandidato] = useState('');
@@ -28,7 +28,7 @@ function RevisionHistorial({ consulta, revisiones, ocupado, onRevisar }) {
     <form className="listas-revision-form" onSubmit={manejarEnvio}>
       <label className="listas-campo">Alcance <select className="form-input" value={candidato} onChange={e => setCandidato(e.target.value)}>
         <option value="">Consulta completa</option>
-        {consulta.candidatos.map(c => <option key={c.id} value={c.id}>{c.nombre_principal}</option>)}
+        {opciones.map(o => <option key={o.id} value={o.id}>{o.etiqueta}</option>)}
       </select></label>
       <label className="listas-campo">Corrige una revisión <select className="form-input" value={revisionPrevia} onChange={e => setRevisionPrevia(e.target.value)}>
         <option value="">Nueva revisión</option>

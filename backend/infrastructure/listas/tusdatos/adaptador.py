@@ -1,13 +1,13 @@
-"""Traduce el reporte de Tusdatos al contrato 2.0, solo con las fuentes SAGRILAFT aprobadas.
+"""Traduce el reporte de Tusdatos a su contrato propio (`tusdatos-1`), solo con las fuentes SAGRILAFT aprobadas.
 
 Reglas (decisiones del 2026-11-12 y comportamiento observado en el sandbox):
 
 - Se lee el campo propio de cada fuente (`ofac`, `lista_onu`, `peps`…), no
   `dict_hallazgos`: allí no aparecen los aciertos de OFAC/ONU y en NIT viene nulo.
 - Cada campo puede ser booleano, objeto, lista, texto o `"Error"`:
-  objeto/lista con datos → candidato; `true` sin detalle → hallazgo sin estructura;
-  `false`, vacío o nulo → sin registro; `"Error"` o código en `errores` → fuente fallida;
-  campo ausente → fuente no disponible en el plan.
+  objeto/lista con datos → registro con su detalle completo; texto → registro con ese texto;
+  `true` → registro sin detalle; `false`, vacío o nulo → sin registro;
+  `"Error"` o código en `errores` → fuente no consultada; campo ausente → fuente no incluida.
 - `peps_internacionales`, `listas_restrictivas` y `listas_vinculantes` son categorías de
   los registros de `peps`/`peps_denom` (campo CATEGORIA), no campos propios.
 - Todo lo demás del reporte (Sisben, RUAF, FOSYGA, etc.) se descarta antes de guardar.
@@ -19,14 +19,16 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from domain.listas.contratos import (
-    Advertencia, Candidato, Cobertura, Conclusion, Criterio, ErrorConsulta, Estado, Hallazgo,
-    Implementacion, Motivo, ResultadoProveedorV2,
+from domain.listas.contratos import Conclusion, Criterio, ErrorConsulta, Estado
+from domain.listas.contratos_tusdatos import (
+    AvisoTusdatos, FuenteTusdatos, HallazgoInformado, RegistroTusdatos, ResultadoTusdatos,
 )
+from infrastructure.listas.tusdatos.catalogos import descripcion_hallazgo, nombre_fuente
 
 PROVEEDOR = "tusdatos"
-ADAPTADOR_VERSION = "tusdatos-v1"
-ALGORITMO_VERSION = "tusdatos-fuentes-v1"
+ADAPTADOR_VERSION = "tusdatos-v2"
+ADAPTADORES_ANTERIORES = frozenset({"tusdatos-v1"})  # resultado en contrato 2.0
+ALGORITMO_VERSION = "tusdatos-fuentes-v2"
 PERSONA, EMPRESA = "PERSONA", "EMPRESA"
 AMBOS = frozenset({PERSONA, EMPRESA})
 
@@ -48,6 +50,8 @@ class FuenteSagrilaft:
     # Nombre del archivo de la captura de pantalla que Tusdatos publica para la fuente
     # (static.tusdatos.co/static/img/<dest>/<captura>.jpg). None: la fuente no genera captura.
     captura: str | None = None
+    # False: Tusdatos no publica el modelo de la fuente; el detalle se guarda tal como llega.
+    documentada: bool = True
 
     @property
     def codigos_estado(self) -> frozenset:
@@ -57,20 +61,20 @@ class FuenteSagrilaft:
 
 FUENTES = (
     FuenteSagrilaft("ofac", "OFAC (Lista Clinton), por documento", ("ofac",), ("ofac", "ofac_offline", "ofac_database_id"),
-                    captura="ofac"),
+                    captura="ofac", documentada=False),
     FuenteSagrilaft("ofac_nombre", "OFAC (Lista Clinton), por nombre", ("ofac_nombre",),
-                    ("ofac_nombre", "ofac_offline_name", "ofac_database_nombre"), frozenset({PERSONA}), True, captura="ofac_nombre"),
+                    ("ofac_nombre", "ofac_offline_name", "ofac_database_nombre"), frozenset({PERSONA}), True, captura="ofac_nombre", documentada=False),
     # El catálogo de errores de Tusdatos usa dos códigos para ONU: lista_onu y onu. La captura se llama onu.jpg.
-    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu", "onu"), captura="onu"),
-    FuenteSagrilaft("interpol", "INTERPOL", ("interpol",), ("interpol",), frozenset({PERSONA}), captura="interpol"),
-    FuenteSagrilaft("europol", "EUROPOL", ("europol",), ("europol",), frozenset({PERSONA}), captura="europol"),
+    FuenteSagrilaft("lista_onu", "Consejo de Seguridad de la ONU", ("lista_onu",), ("lista_onu", "onu"), captura="onu", documentada=False),
+    FuenteSagrilaft("interpol", "INTERPOL", ("interpol",), ("interpol",), frozenset({PERSONA}), captura="interpol", documentada=False),
+    FuenteSagrilaft("europol", "EUROPOL", ("europol",), ("europol",), frozenset({PERSONA}), captura="europol", documentada=False),
     FuenteSagrilaft("peps", "Listas y PEP, por documento", ("peps",), ("peps",)),
     FuenteSagrilaft("peps_denom", "Listas y PEP, por nombre", ("peps_denom",), ("peps_denom",), AMBOS, True),
     FuenteSagrilaft("cidob", "CIDOB, PEP a nivel mundial", ("cidob",), ("cidob",), frozenset({PERSONA}), True, captura="cidob"),
     # PEP por cargo en la función pública colombiana. En el sandbox solo aparece cuando hay
     # registro, así que su ausencia no impide concluir (por confirmar con datos reales).
     FuenteSagrilaft("peps_funcion_publica", "Listas y PEP, función pública (Colombia)", ("peps_funcion_publica",),
-                    ("peps_funcion_publica",), frozenset({PERSONA}), ausencia_bloquea=False),
+                    ("peps_funcion_publica",), frozenset({PERSONA}), ausencia_bloquea=False, documentada=False),
     FuenteSagrilaft("procuraduria", "Procuraduría General de la Nación", ("procuraduria",), ("procuraduria", "procuraduria_db"),
                     captura="procuraduria"),
     FuenteSagrilaft("contraloria", "Contraloría General de la República", ("contraloria", "contraloria2"),
@@ -86,7 +90,7 @@ CODIGOS_HALLAZGO_APROBADOS = CAMPOS_APROBADOS | {c for _, c in CATEGORIAS_PEP} |
 _POLICIA_SIN_ANTECEDENTES = re.compile(r"no\s+tiene\s+asuntos\s+pendientes", re.IGNORECASE)
 _NOMBRE = ("NOMBRECOMPLETO", "NOMBRE_PEP", "name", "nombre", "Nombre", "nombres", "nombre_completo", "title", "contador")
 _UID = ("ID", "CODIGO", "id", "codigo")
-_MAX_ATRIBUTOS, _MAX_TEXTO = 40, 500
+_MAX_TEXTO = 500
 
 
 @dataclass(frozen=True)
@@ -104,7 +108,7 @@ class SolicitudTusdatos:
 
 @dataclass(frozen=True)
 class Interpretacion:
-    resultado: ResultadoProveedorV2
+    resultado: ResultadoTusdatos
     respuesta_filtrada: dict = field(default_factory=dict)
 
 
@@ -154,17 +158,6 @@ def _vacio(valor) -> bool:
     return isinstance(valor, str) and not valor.strip()
 
 
-def _atributos(registro: dict) -> dict:
-    atributos = {}
-    for clave, valor in registro.items():
-        if len(atributos) >= _MAX_ATRIBUTOS:
-            break
-        clave = _texto(clave, 64).rstrip(":").strip()
-        if clave and not _vacio(valor):
-            atributos[clave] = _texto(valor)
-    return atributos
-
-
 def _nombre_registro(registro: dict, respaldo: str) -> str:
     for clave in _NOMBRE:
         if isinstance(registro.get(clave), str) and registro[clave].strip():
@@ -204,6 +197,72 @@ def _registros(valor):
     return [], [], False
 
 
+# Tamaño máximo del detalle de un registro (JSON). Un registro mayor se guarda parcial y se avisa.
+_MAX_DETALLE = 32_000
+_NIVELES = {"altos": "alto", "medios": "medio", "bajos": "bajo", "infos": "informativo"}
+
+
+def _detalle(registro: dict) -> tuple[dict, bool]:
+    """El registro tal como llega (sin aplanar ni recortar textos); parcial solo si es desmedido."""
+    if len(json.dumps(registro, ensure_ascii=False, default=str)) <= _MAX_DETALLE:
+        return registro, False
+    parcial, tamano = {}, 2
+    for clave, valor in registro.items():
+        tamano += len(json.dumps({clave: valor}, ensure_ascii=False, default=str))
+        if tamano > _MAX_DETALLE:
+            break
+        parcial[clave] = valor
+    return parcial, True
+
+
+def _fuente_de_hallazgo(codigo: str, codigos: tuple[str, ...]) -> str | None:
+    """Fuente aprobada a la que pertenece un código de hallazgo (prefijo más largo; categorías de PEP)."""
+    for patron, categoria in CATEGORIAS_PEP:
+        if codigo == f"{categoria}_denom":
+            return "peps_denom" if "peps_denom" in codigos else None
+        if codigo == categoria:
+            return "peps" if "peps" in codigos else None
+    alias = {"ofac_offline": "ofac", "ofac_offline_name": "ofac_nombre", "onu": "lista_onu"}
+    if codigo in alias:
+        return alias[codigo] if alias[codigo] in codigos else None
+    candidatas = [c for c in codigos if codigo == c or codigo.startswith(f"{c}_")]
+    return max(candidatas, key=len) if candidatas else None
+
+
+def _hallazgos_por_fuente(reporte: dict, codigos: tuple[str, ...]) -> dict[str, list[HallazgoInformado]]:
+    por_fuente: dict[str, list[HallazgoInformado]] = {}
+    for nivel, lista in (reporte.get("dict_hallazgos") or {}).items():
+        for entrada in lista if isinstance(lista, list) else ():
+            codigo = entrada.get("codigo") if isinstance(entrada, dict) else None
+            fuente = _fuente_de_hallazgo(codigo, codigos) if isinstance(codigo, str) and codigo.strip() else None
+            if fuente is None:
+                continue
+            texto = descripcion_hallazgo(codigo) or entrada.get("hallazgo") or codigo
+            por_fuente.setdefault(fuente, []).append(HallazgoInformado(codigo=_texto(codigo, 64),
+                descripcion=_texto(texto, 2000), nivel=_NIVELES.get(nivel, _texto(nivel, 64))))
+    return por_fuente
+
+
+def _registros_de_campo(consulta_id, campo: str, valor, fuente: FuenteSagrilaft, titular: str | None) -> list[RegistroTusdatos]:
+    estructurados, textos, marca = _registros(valor)
+    registros = []
+    for indice, registro in enumerate(estructurados):
+        detalle, recortado = _detalle(registro)
+        categoria = _categoria_pep(registro) if fuente.codigo in {"peps", "peps_denom"} else None
+        registros.append(RegistroTusdatos(id=_id(consulta_id, "registro", campo, indice), campo=campo,
+            titulo=_nombre_registro(registro, _texto(titular) if titular else f"Registro reportado en {fuente.nombre}"),
+            identificador_origen=_uid(registro), categoria=categoria, detalle=detalle, detalle_recortado=recortado))
+    for indice, texto in enumerate(textos):
+        if fuente.codigo == "policia" and _POLICIA_SIN_ANTECEDENTES.search(texto):
+            continue
+        registros.append(RegistroTusdatos(id=_id(consulta_id, "texto", campo, indice), campo=campo,
+            titulo=_texto(texto), detalle={"texto": texto[:_MAX_DETALLE]}, detalle_recortado=len(texto) > _MAX_DETALLE))
+    if marca:
+        registros.append(RegistroTusdatos(id=_id(consulta_id, "marca", campo), campo=campo, sin_detalle=True,
+            titulo=f"{fuente.nombre}: registro informado sin detalle"))
+    return registros
+
+
 def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: SolicitudTusdatos, criterio: Criterio,
                         errores_estado=(), fecha_inicio: datetime, fecha_fin: datetime,
                         fuentes: tuple[str, ...] | None = None, validado: bool | None = None,
@@ -214,81 +273,61 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
     `fuentes_caidas`: códigos que Tusdatos reportaba caídos o en mantenimiento al cerrar.
     `recuperacion`: texto que explica que es la recarga automática de una consulta anterior."""
     errores = set(errores_estado) | {e for e in (reporte.get("errores") or []) if isinstance(e, str)}
-    tipo_sujeto = "ENTIDAD" if solicitud.sujeto == EMPRESA else "PERSONA"
     titular = reporte.get("nombre") if isinstance(reporte.get("nombre"), str) and reporte["nombre"].strip() else None
-    cobertura, candidatos, hallazgos, advertencias = [], [], [], []
-    codigos = fuentes or fuentes_para(solicitud.sujeto)
+    codigos = tuple(fuentes or fuentes_para(solicitud.sujeto))
     if any(codigo not in FUENTES_POR_CODIGO for codigo in codigos):
         raise ValueError("Fuente fijada desconocida por este adaptador")
+    hallazgos = _hallazgos_por_fuente(reporte, codigos)
+    version_peps = reporte.get("peps_version") if isinstance(reporte.get("peps_version"), str) else None
+    consolidado = tuple(r for r in reporte.get("peps_consolidado") or () if isinstance(r, dict)) \
+        if isinstance(reporte.get("peps_consolidado"), list) else ()
+    resultado_fuentes = []
     for codigo in codigos:
         fuente = FUENTES_POR_CODIGO[codigo]
-        cobertura_id = _id(consulta_id, "cobertura", codigo)
         valores = [(campo, reporte[campo]) for campo in fuente.campos if campo in reporte]
-        base = dict(id=cobertura_id, fuente_codigo=codigo, nombre_origen=fuente.nombre, requerida=True)
-        if not valores and not errores & set(fuente.errores):
-            cobertura.append(Cobertura(**{**base, "requerida": fuente.ausencia_bloquea}, estado="NO_DISPONIBLE",
-                                       motivo="La fuente no vino en el reporte" + ("" if fuente.ausencia_bloquea
-                                              else "; Tusdatos solo la incluye cuando hay registro")))
-            advertencias.append(Advertencia(codigo="FUENTE_NO_DISPONIBLE", descripcion=fuente.nombre, cobertura_id=cobertura_id))
-            continue
+        base = dict(id=_id(consulta_id, "cobertura", codigo), codigo=codigo,
+                    nombre=_texto(nombre_fuente(codigo) or fuente.nombre), estructura_documentada=fuente.documentada,
+                    hallazgos=tuple(hallazgos.get(codigo, ())))
+        if codigo in {"peps", "peps_denom"}:
+            base.update(version_base=_texto(version_peps, 64) if version_peps and version_peps.strip() else None,
+                        resumen=consolidado if codigo == "peps" else ())
         if errores & set(fuente.errores) or any(isinstance(v, str) and v.strip().casefold() == "error" for _, v in valores):
             motivo = ("Tusdatos informa la fuente caída o en mantenimiento; no se pudo consultar" if codigo in fuentes_caidas
                       else "Tusdatos informó error al consultar la fuente")
-            cobertura.append(Cobertura(**base, estado="FALLIDA", motivo=motivo))
-            advertencias.append(Advertencia(codigo="FUENTE_FALLIDA", descripcion=fuente.nombre, cobertura_id=cobertura_id))
+            resultado_fuentes.append(FuenteTusdatos(**base, estado="NO_CONSULTADA", motivo=motivo))
             continue
-        cobertura.append(Cobertura(**base, estado="CONSULTADA"))
-        consultado = (solicitud.nombre or criterio.nombre or "Nombre resuelto por el proveedor") if fuente.por_nombre \
-            else f"{solicitud.tipo_documento} {solicitud.numero}"
-        for campo, valor in valores:
-            registros, textos, marca = _registros(valor)
-            for indice, registro in enumerate(registros):
-                nombre = _nombre_registro(registro, _texto(titular) if titular else f"Registro reportado en {fuente.nombre}")
-                atributos = _atributos(registro)
-                if codigo in {"peps", "peps_denom"} and (categoria := _categoria_pep(registro)):
-                    atributos["categoria_sagrilaft"] = categoria
-                candidatos.append(Candidato(id=_id(consulta_id, "candidato", campo, indice), cobertura_id=cobertura_id,
-                    uid_origen=_uid(registro), tipo_sujeto=tipo_sujeto, nombre_principal=nombre, atributos=atributos,
-                    motivos=(Motivo(campo=codigo, valor_consultado=_texto(consultado), valor_registro=nombre, metodo="PROVEEDOR"),),
-                    algoritmo_version=ALGORITMO_VERSION))
-            for indice, texto in enumerate(textos):
-                if codigo == "policia" and _POLICIA_SIN_ANTECEDENTES.search(texto):
-                    continue
-                hallazgos.append(Hallazgo(id=_id(consulta_id, "texto", campo, indice), cobertura_id=cobertura_id,
-                    codigo=codigo, descripcion=_texto(texto), referencia_raw=campo))
-            if marca:
-                hallazgos.append(Hallazgo(id=_id(consulta_id, "marca", campo), cobertura_id=cobertura_id, codigo=codigo,
-                    descripcion=f"{fuente.nombre}: Tusdatos reporta un registro sin detalle; revisar el PDF del proveedor",
-                    referencia_raw=campo))
+        if not valores:
+            resultado_fuentes.append(FuenteTusdatos(**base, estado="NO_INCLUIDA", requerida=fuente.ausencia_bloquea,
+                motivo="La fuente no vino en el reporte" + ("" if fuente.ausencia_bloquea
+                       else "; Tusdatos solo la incluye cuando hay registro")))
+            continue
+        registros = [r for campo, valor in valores for r in _registros_de_campo(consulta_id, campo, valor, fuente, titular)]
+        resultado_fuentes.append(FuenteTusdatos(**base, estado="CON_REGISTRO" if registros else "SIN_REGISTRO",
+                                                registros=tuple(registros)))
+    avisos = []
     if validado is False:
-        advertencias.append(Advertencia(codigo="DOCUMENTO_NO_VALIDADO", descripcion=(
+        avisos.append(AvisoTusdatos(codigo="DOCUMENTO_NO_VALIDADO", descripcion=(
             "Tusdatos no pudo validar el documento contra la fuente oficial. Las búsquedas por documento "
             "pueden no corresponder al titular: confirme el número y el tipo antes de dar por buena la ausencia de registros")))
     if recuperacion:
-        advertencias.append(Advertencia(codigo="RECUPERACION_AUTOMATICA", descripcion=_texto(recuperacion)))
-    nivel = reporte.get("hallazgos")
-    if isinstance(nivel, str) and nivel.strip():
-        advertencias.append(Advertencia(codigo="NIVEL_INFORMADO_PROVEEDOR", descripcion=_texto(
-            f"Nivel general informado por Tusdatos: {nivel.strip()}. Lo configura su cuenta; no es una decisión de cumplimiento")))
-    no_aplicados = [Advertencia(codigo="CRITERIO_NO_APLICADO", descripcion=campo) for campo in
-                    ("nombres_adicionales", "fecha_nacimiento", "nacionalidades", "ubicacion") if getattr(criterio, campo)]
-    if criterio.nombre and solicitud.tipo_documento != "PP":
-        no_aplicados.append(Advertencia(codigo="CRITERIO_NO_APLICADO",
-            descripcion="nombre: Tusdatos consulta por documento y resuelve el nombre por su cuenta"))
-    requeridas = [c for c in cobertura if c.requerida]
-    if all(c.estado == "CONSULTADA" for c in requeridas):
+        avisos.append(AvisoTusdatos(codigo="RECUPERACION_AUTOMATICA", descripcion=_texto(recuperacion, 2000)))
+    requeridas = [f for f in resultado_fuentes if f.requerida]
+    con_registro = any(f.registros for f in resultado_fuentes)
+    if all(f.estado in {"CON_REGISTRO", "SIN_REGISTRO"} for f in requeridas):
         estado = Estado.COMPLETADA
-        conclusion = Conclusion.CON_CANDIDATOS if candidatos or hallazgos else Conclusion.SIN_CANDIDATOS
+        conclusion = Conclusion.CON_CANDIDATOS if con_registro else Conclusion.SIN_CANDIDATOS
     else:
-        estado = Estado.PARCIAL if any(c.estado == "CONSULTADA" for c in requeridas) else Estado.FALLIDA
+        estado = Estado.PARCIAL if any(f.estado in {"CON_REGISTRO", "SIN_REGISTRO"} for f in requeridas) else Estado.FALLIDA
         conclusion = Conclusion.NO_CONCLUYENTE
     error = None
     if estado == Estado.FALLIDA:
         error = ErrorConsulta(codigo="FUENTES_NO_CONSULTADAS", mensaje="Tusdatos no pudo consultar las fuentes requeridas",
                               correlacion_id=consulta_id, reintentable=True)
-    resultado = ResultadoProveedorV2(consulta_id=consulta_id, implementacion=Implementacion.EXTERNO, proveedor=PROVEEDOR,
-        estado_ejecucion=estado, conclusion_busqueda=conclusion, cobertura=tuple(cobertura), candidatos=tuple(candidatos),
-        hallazgos_no_estructurados=tuple(hallazgos), advertencias=tuple(advertencias), criterios_no_aplicados=tuple(no_aplicados),
+    nivel = reporte.get("hallazgos")
+    resultado = ResultadoTusdatos(consulta_id=consulta_id, proveedor=PROVEEDOR, estado_ejecucion=estado,
+        conclusion_busqueda=conclusion, titular_nombre=_texto(titular) if titular else None, documento_validado=validado,
+        nivel_informado_proveedor=_texto(nivel, 64) if isinstance(nivel, str) and nivel.strip() else None,
+        fuentes=tuple(resultado_fuentes), avisos=tuple(avisos),
         fecha_inicio=fecha_inicio, fecha_fin=max(fecha_fin, fecha_inicio), error=error)
     return Interpretacion(resultado=resultado, respuesta_filtrada=filtrar_reporte(reporte))
 
@@ -309,12 +348,14 @@ def filtrar_reporte(reporte: dict) -> dict:
 
 
 def resultado_sin_reporte(*, consulta_id: uuid.UUID, sujeto: str, codigo: str, mensaje: str, fecha_inicio: datetime,
-                          fecha_fin: datetime, estado_cobertura="FALLIDA", advertencia: str | None = None) -> ResultadoProveedorV2:
-    """Cierre con constancia cuando Tusdatos respondió pero no hay reporte (titular no autoriza, caché sin referencia)."""
-    cobertura = tuple(Cobertura(id=_id(consulta_id, "cobertura", c), fuente_codigo=c, nombre_origen=FUENTES_POR_CODIGO[c].nombre,
-                                estado=estado_cobertura, requerida=True, motivo=_texto(mensaje)) for c in fuentes_para(sujeto))
-    return ResultadoProveedorV2(consulta_id=consulta_id, implementacion=Implementacion.EXTERNO, proveedor=PROVEEDOR,
-        estado_ejecucion=Estado.FALLIDA, conclusion_busqueda=Conclusion.NO_CONCLUYENTE, cobertura=cobertura,
-        advertencias=(Advertencia(codigo=codigo, descripcion=_texto(advertencia or mensaje)),),
+                          fecha_fin: datetime, advertencia: str | None = None) -> ResultadoTusdatos:
+    """Cierre con constancia cuando no hay reporte (titular no autoriza, documento no encontrado, fuentes caídas…)."""
+    fuentes = tuple(FuenteTusdatos(id=_id(consulta_id, "cobertura", c), codigo=c,
+                                   nombre=_texto(nombre_fuente(c) or FUENTES_POR_CODIGO[c].nombre),
+                                   estado="NO_CONSULTADA", motivo=_texto(mensaje, 2000),
+                                   estructura_documentada=FUENTES_POR_CODIGO[c].documentada) for c in fuentes_para(sujeto))
+    return ResultadoTusdatos(consulta_id=consulta_id, proveedor=PROVEEDOR, estado_ejecucion=Estado.FALLIDA,
+        conclusion_busqueda=Conclusion.NO_CONCLUYENTE, fuentes=fuentes,
+        avisos=(AvisoTusdatos(codigo=codigo, descripcion=_texto(advertencia, 2000)),) if advertencia else (),
         fecha_inicio=fecha_inicio, fecha_fin=max(fecha_fin, fecha_inicio),
         error=ErrorConsulta(codigo=codigo, mensaje=_texto(mensaje), correlacion_id=consulta_id, reintentable=False))

@@ -3,6 +3,7 @@ from sqlalchemy import select, text, or_, and_
 
 from domain.listas.contratos import CrearConsultaV2, ConsultaV2
 from domain.listas.contratos_busqueda import ConsultaBusquedaF6
+from domain.listas.contratos_tusdatos import VERSION_CONTRATO_TUSDATOS, ConsultaTusdatos
 from domain.listas.puertos import ListasNoDisponibles
 from infrastructure.persistencia.models import Formulario, ResultadoValidacion
 from infrastructure.persistencia.modelos_listas import ConsultaLista, CoincidenciaLista, EvidenciaConsulta, TrabajoConsulta, RevisionCumplimiento
@@ -88,15 +89,18 @@ class ServicioComunListas:
             consulta = sesion.get(ConsultaLista, consulta_id)
             trabajo = sesion.scalar(select(TrabajoConsulta).where(TrabajoConsulta.consulta_id == consulta_id))
             evidencias = list(sesion.scalars(select(EvidenciaConsulta).where(EvidenciaConsulta.consulta_id == consulta_id)))
+            tusdatos = consulta.version_contrato == VERSION_CONTRATO_TUSDATOS
             resultado = consulta.resultado or {"consulta_id": consulta.id, "implementacion": consulta.implementacion,
                 "version_contrato": consulta.version_contrato,
                 "proveedor": consulta.proveedor, "estado_ejecucion": consulta.estado, "conclusion_busqueda": consulta.conclusion,
-                "cobertura": [], "fecha_inicio": consulta.creado_en, "fecha_fin": consulta.finalizada_en,
-                "advertencias": [{"codigo": "SIMULADO", "descripcion": "Datos ficticios"}] if consulta.implementacion == "simulado" else []}
+                "fecha_inicio": consulta.creado_en, "fecha_fin": consulta.finalizada_en,
+                **({"fuentes": []} if tusdatos else {"cobertura": [], "advertencias": [
+                    {"codigo": "SIMULADO", "descripcion": "Datos ficticios"}] if consulta.implementacion == "simulado" else []})}
             if not consulta.resultado and trabajo.error:
                 resultado["error"] = {"codigo": trabajo.error, "mensaje": "La consulta no pudo completarse",
                                       "correlacion_id": consulta.id, "reintentable": False}
-            modelo = ConsultaBusquedaF6 if consulta.version_contrato == "2.1" else ConsultaV2
+            modelo = {"2.1": ConsultaBusquedaF6, VERSION_CONTRATO_TUSDATOS: ConsultaTusdatos}.get(
+                consulta.version_contrato, ConsultaV2)
             datos = modelo(**resultado, contexto={"tipo": "EXPEDIENTE", "expediente_id": consulta.expediente_id,
                 "sujeto_rol": consulta.sujeto_rol, "motivo": consulta.motivo}, criterio=consulta.criterio_original,
                 grupo_id=consulta.grupo_id, fase=trabajo.fase,

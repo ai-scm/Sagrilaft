@@ -1,4 +1,4 @@
-"""Intérprete del reporte de Tusdatos: alcance SAGRILAFT, minimización de datos y contrato 2.0. Sin red ni base."""
+"""Intérprete del reporte de Tusdatos: alcance SAGRILAFT, minimización de datos y contrato propio `tusdatos-1`."""
 import copy
 import json
 import uuid
@@ -65,16 +65,50 @@ def test_empresa_no_incluye_fuentes_solo_de_personas():
 
 # ── Interpretación de los reportes grabados ──────────────────────────────────
 
-def test_cc_con_hallazgos_produce_candidatos_por_fuente():
+def fuente(resultado, codigo):
+    return next(f for f in resultado.fuentes if f.codigo == codigo)
+
+
+def test_cc_con_hallazgos_da_registros_por_fuente_en_un_solo_lugar():
     resultado = interpretar(REPORTES["report_cc_con_hallazgo"]).resultado
+    assert resultado.version_contrato == "tusdatos-1"
     assert resultado.estado_ejecucion == "COMPLETADA" and resultado.conclusion_busqueda == "CON_CANDIDATOS"
-    por_fuente = {c.motivos[0].campo for c in resultado.candidatos}
-    assert {"ofac", "ofac_nombre", "europol", "peps", "peps_denom", "cidob", "procuraduria"} <= por_fuente
-    # ONU, INTERPOL y Contraloría solo dicen «true»; Policía devuelve una frase: quedan para revisión.
-    assert {h.codigo for h in resultado.hallazgos_no_estructurados} == {"lista_onu", "interpol", "contraloria", "policia"}
-    pep = next(c for c in resultado.candidatos if c.motivos[0].campo == "peps")
-    assert pep.atributos["categoria_sagrilaft"] == "listas_restrictivas" and pep.uid_origen
-    assert all(m.metodo == "PROVEEDOR" for c in resultado.candidatos for m in c.motivos)
+    con_registro = {f.codigo for f in resultado.fuentes if f.estado == "CON_REGISTRO"}
+    # Todas las coincidencias quedan en su fuente: también ONU, INTERPOL, Contraloría (true) y Policía (texto).
+    assert con_registro == {"ofac", "ofac_nombre", "lista_onu", "interpol", "europol", "peps", "peps_denom", "cidob",
+                            "peps_funcion_publica", "procuraduria", "contraloria", "policia"}
+    assert fuente(resultado, "lista_onu").registros[0].sin_detalle
+    assert {r.campo for r in fuente(resultado, "contraloria").registros} == {"contraloria", "contraloria2"}
+    assert "asuntos pendientes" in fuente(resultado, "policia").registros[0].detalle["texto"]
+    pep = fuente(resultado, "peps").registros[0]
+    assert pep.categoria == "listas_restrictivas" and pep.identificador_origen
+    assert resultado.titular_nombre == "MIGUEL FERNANDO PEREZ GOMEZ"
+
+
+def test_el_detalle_se_conserva_completo_y_estructurado():
+    """Antes se aplanaba a texto y se cortaba en 500 caracteres (Procuraduría quedaba en «\\"Fech»)."""
+    reporte = REPORTES["report_cc_con_hallazgo"]
+    procuraduria = fuente(interpretar(reporte).resultado, "procuraduria").registros[0]
+    assert procuraduria.detalle == reporte["procuraduria"][0] and not procuraduria.detalle_recortado
+    assert isinstance(procuraduria.detalle["datos"], list)
+    europol = fuente(interpretar(reporte).resultado, "europol").registros[0]
+    assert europol.detalle["crimes"] == ["crimen1", "crimen2"]
+
+
+def test_detalle_desmedido_se_guarda_parcial_y_avisado():
+    reporte = copy.deepcopy(REPORTES["report_cc_con_hallazgo"])
+    reporte["europol"] = {"name": "X", **{f"campo_{i}": "y" * 1000 for i in range(60)}}
+    registro = fuente(interpretar(reporte).resultado, "europol").registros[0]
+    assert registro.detalle_recortado and registro.detalle["name"] == "X"
+    assert len(json.dumps(registro.detalle)) <= 32_000
+
+
+def test_sin_campos_heredados_de_la_busqueda_por_archivos():
+    texto = json.dumps(interpretar(REPORTES["report_cc_con_hallazgo"]).resultado.model_dump(mode="json"))
+    for heredado in ("hash_contenido", "revision_activa", "version_declarada", "puntaje", "escala_puntaje",
+                     "motivos", "valor_consultado", "Nombre resuelto por el proveedor", "hallazgos_no_estructurados",
+                     "criterios_no_aplicados", "cobertura"):
+        assert f'"{heredado}"' not in texto and heredado not in texto
 
 
 def test_cc_sin_hallazgos_y_nit_concluyen_sin_candidatos():
@@ -82,8 +116,8 @@ def test_cc_sin_hallazgos_y_nit_concluyen_sin_candidatos():
     for nombre, tipo, valor, cantidad in (("report_cc_sin_hallazgo", "CC", "112", 12), ("report_nit", "NIT", "900000152", 6)):
         resultado = interpretar(REPORTES[nombre], tipo, valor).resultado
         assert resultado.estado_ejecucion == "COMPLETADA" and resultado.conclusion_busqueda == "SIN_CANDIDATOS"
-        assert len(resultado.cobertura) == cantidad
-        assert all(c.estado == "CONSULTADA" for c in resultado.cobertura if c.requerida)
+        assert len(resultado.fuentes) == cantidad
+        assert all(f.estado == "SIN_REGISTRO" for f in resultado.fuentes if f.requerida)
 
 
 def test_fuentes_con_error_no_permiten_concluir():
@@ -92,15 +126,14 @@ def test_fuentes_con_error_no_permiten_concluir():
     assert resultado.error.codigo == "FUENTES_NO_CONSULTADAS"
 
 
-def test_una_fuente_fallida_o_ausente_deja_resultado_parcial():
+def test_una_fuente_fallida_o_ausente_deja_resultado_parcial_sin_avisos_repetidos():
     reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
     reporte["errores"] = ["ofac_offline"]           # variante del código de OFAC
     del reporte["europol"]                           # no vino en el plan
     resultado = interpretar(reporte, "CC", "112").resultado
-    estados = {c.fuente_codigo: c.estado for c in resultado.cobertura}
-    assert estados["ofac"] == "FALLIDA" and estados["europol"] == "NO_DISPONIBLE"
+    assert fuente(resultado, "ofac").estado == "NO_CONSULTADA" and fuente(resultado, "europol").estado == "NO_INCLUIDA"
     assert resultado.estado_ejecucion == "PARCIAL" and resultado.conclusion_busqueda == "NO_CONCLUYENTE"
-    assert {"FUENTE_FALLIDA", "FUENTE_NO_DISPONIBLE"} <= {a.codigo for a in resultado.advertencias}
+    assert resultado.avisos == ()  # el estado de cada fuente no se repite como aviso
 
 
 def test_texto_de_policia_sin_antecedentes_no_es_hallazgo():
@@ -111,20 +144,46 @@ def test_texto_de_policia_sin_antecedentes_no_es_hallazgo():
 
 def test_nivel_del_proveedor_se_informa_pero_no_decide():
     resultado = interpretar(REPORTES["report_cc_con_hallazgo"]).resultado
-    nivel = next(a for a in resultado.advertencias if a.codigo == "NIVEL_INFORMADO_PROVEEDOR")
-    assert "no es una decisión" in nivel.descripcion
+    assert resultado.nivel_informado_proveedor == "alto"
+    sin = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado
+    assert sin.conclusion_busqueda == "SIN_CANDIDATOS"
 
 
-def test_nombre_no_se_envia_y_queda_como_criterio_no_aplicado():
-    resultado = interpretar(REPORTES["report_cc_sin_hallazgo"], criterio=criterio("CC", "112", nombre="Persona ficticia",
-                                                                                  fecha_nacimiento="1980-01-01")).resultado
-    descripciones = " ".join(a.descripcion for a in resultado.criterios_no_aplicados)
-    assert "nombre" in descripciones and "fecha_nacimiento" in descripciones
+def test_hallazgos_informados_usan_el_codigo_y_el_catalogo_oficial():
+    reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
+    reporte["dict_hallazgos"] = {"infos": [{"codigo": "ofac_nombre_info", "hallazgo": "texto que puede cambiar"}],
+                                 "altos": [{"codigo": "listas_restrictivas_denom", "hallazgo": "x"},
+                                           {"codigo": "policia_novedad_administrativa", "hallazgo": "x"},
+                                           {"codigo": "sisben", "hallazgo": "fuera de alcance"}]}
+    resultado = interpretar(reporte, "CC", "112").resultado
+    info = fuente(resultado, "ofac_nombre").hallazgos[0]
+    assert info.codigo == "ofac_nombre_info" and info.nivel == "informativo" and "coincidencias parciales" in info.descripcion
+    assert fuente(resultado, "peps_denom").hallazgos[0].codigo == "listas_restrictivas_denom"
+    assert fuente(resultado, "policia").hallazgos[0].codigo == "policia_novedad_administrativa"
+    assert not fuente(resultado, "ofac").hallazgos  # ofac_nombre_info no es de OFAC por documento
+    assert "sisben" not in json.dumps(resultado.model_dump(mode="json"))
+
+
+def test_version_y_resumen_de_pep_se_conservan_si_vienen():
+    reporte = copy.deepcopy(REPORTES["report_cc_con_hallazgo"])
+    reporte["peps_version"] = "2026.11.20"
+    reporte["peps_consolidado"] = [{"categoria": "Listas restrictivas", "nombre_lista": "OFAC", "origen": "INTERNACIONAL",
+                                    "tipo_lista": "OFAC"}]
+    peps = fuente(interpretar(reporte).resultado, "peps")
+    assert peps.version_base == "2026.11.20" and peps.resumen[0]["nombre_lista"] == "OFAC"
+    assert fuente(interpretar(reporte).resultado, "peps_denom").resumen == ()
+
+
+def test_nombre_oficial_de_la_fuente_sale_del_catalogo():
+    resultado = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado
+    assert fuente(resultado, "ofac").nombre.startswith("Lista Clinton (OFAC)")
+    assert fuente(resultado, "ofac").estructura_documentada is False
+    assert fuente(resultado, "procuraduria").estructura_documentada is True
 
 
 def test_respeta_las_fuentes_fijadas_al_admitir():
     resultado = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112", fuentes=("ofac", "lista_onu")).resultado
-    assert [c.fuente_codigo for c in resultado.cobertura] == ["ofac", "lista_onu"]
+    assert [f.codigo for f in resultado.fuentes] == ["ofac", "lista_onu"]
     with pytest.raises(ValueError):
         interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112", fuentes=("sisben",))
 
@@ -150,7 +209,8 @@ def test_ids_son_estables_para_la_misma_consulta():
     consulta_id, c = uuid.uuid4(), criterio()
     uno, dos = (interpretar_reporte(REPORTES["report_cc_con_hallazgo"], consulta_id=consulta_id, solicitud=traducir_criterio(c),
                                     criterio=c, fecha_inicio=AHORA, fecha_fin=AHORA).resultado for _ in range(2))
-    assert [x.id for x in uno.candidatos] == [x.id for x in dos.candidatos]
+    assert [r.id for f in uno.fuentes for r in f.registros] == [r.id for f in dos.fuentes for r in f.registros]
+    assert [f.id for f in uno.fuentes] == [f.id for f in dos.fuentes]
 
 
 def test_cierre_sin_reporte_cumple_el_contrato():
@@ -158,58 +218,55 @@ def test_cierre_sin_reporte_cumple_el_contrato():
                                       mensaje="El titular no autoriza", fecha_inicio=AHORA, fecha_fin=AHORA)
     assert resultado.estado_ejecucion == "FALLIDA" and resultado.conclusion_busqueda == "NO_CONCLUYENTE"
     assert resultado.error.codigo == "TITULAR_NO_AUTORIZA" and not resultado.error.reintentable
+    assert {f.estado for f in resultado.fuentes} == {"NO_CONSULTADA"} and resultado.avisos == ()
 
 
 # ── Correcciones frente al catálogo de Tusdatos ──────────────────────────────
-
-def cobertura(resultado, codigo):
-    return next(c for c in resultado.cobertura if c.fuente_codigo == codigo)
-
 
 def test_error_de_onu_con_el_codigo_corto_no_pasa_como_consultada():
     """El catálogo de errores usa `onu` además de `lista_onu`; antes la falla se perdía."""
     reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
     reporte["errores"] = ["onu"]
     resultado = interpretar(reporte, "CC", "112").resultado
-    assert cobertura(resultado, "lista_onu").estado == "FALLIDA"
+    assert fuente(resultado, "lista_onu").estado == "NO_CONSULTADA"
     assert resultado.estado_ejecucion == "PARCIAL" and resultado.conclusion_busqueda == "NO_CONCLUYENTE"
 
 
 def test_documento_no_validado_queda_advertido():
     reporte = REPORTES["report_cc_sin_hallazgo"]
     advertido = interpretar(reporte, "CC", "112", validado=False).resultado
-    assert "DOCUMENTO_NO_VALIDADO" in {a.codigo for a in advertido.advertencias}
+    assert "DOCUMENTO_NO_VALIDADO" in {a.codigo for a in advertido.avisos} and advertido.documento_validado is False
     for validado in (True, None):  # None: el proveedor no valida pasaportes ni NIT
         resultado = interpretar(reporte, "CC", "112", validado=validado).resultado
-        assert "DOCUMENTO_NO_VALIDADO" not in {a.codigo for a in resultado.advertencias}
+        assert "DOCUMENTO_NO_VALIDADO" not in {a.codigo for a in resultado.avisos}
 
 
-def test_pep_por_funcion_publica_produce_candidato():
+def test_pep_por_funcion_publica_da_registro_con_su_detalle():
     resultado = interpretar(REPORTES["report_cc_con_hallazgo"]).resultado
-    candidato = next(c for c in resultado.candidatos if c.motivos[0].campo == "peps_funcion_publica")
-    assert candidato.nombre_principal == "MIGUEL FERNANDO PEREZ GOMEZ"
-    assert candidato.atributos["DENOMINACION_CARGO"] == "Secretario de Planeación"
+    registro = fuente(resultado, "peps_funcion_publica").registros[0]
+    assert registro.titulo == "MIGUEL FERNANDO PEREZ GOMEZ"
+    assert registro.detalle["DENOMINACION_CARGO"] == "Secretario de Planeación"
     assert "peps_funcion_publica" in interpretar(REPORTES["report_cc_con_hallazgo"]).respuesta_filtrada["fuentes"]
 
 
 def test_pep_por_funcion_publica_ausente_no_impide_concluir_pero_con_error_si():
     sin = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado
-    fuente = cobertura(sin, "peps_funcion_publica")
-    assert fuente.estado == "NO_DISPONIBLE" and fuente.requerida is False
-    assert sin.estado_ejecucion == "COMPLETADA"
+    funcion = fuente(sin, "peps_funcion_publica")
+    assert funcion.estado == "NO_INCLUIDA" and funcion.requerida is False
+    assert sin.estado_ejecucion == "COMPLETADA" and sin.avisos == ()
     reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
     reporte["errores"] = ["peps_funcion_publica"]
     fallida = interpretar(reporte, "CC", "112").resultado
-    assert cobertura(fallida, "peps_funcion_publica").estado == "FALLIDA"
-    assert cobertura(fallida, "peps_funcion_publica").requerida is True
+    assert fuente(fallida, "peps_funcion_publica").estado == "NO_CONSULTADA"
+    assert fuente(fallida, "peps_funcion_publica").requerida is True
     assert fallida.estado_ejecucion == "PARCIAL"
 
 
-def test_fuente_ausente_pero_con_error_cuenta_como_fallida():
+def test_fuente_ausente_pero_con_error_cuenta_como_no_consultada():
     reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
     del reporte["interpol"]
     reporte["errores"] = ["interpol"]
-    assert cobertura(interpretar(reporte, "CC", "112").resultado, "interpol").estado == "FALLIDA"
+    assert fuente(interpretar(reporte, "CC", "112").resultado, "interpol").estado == "NO_CONSULTADA"
 
 
 def test_codigos_de_las_fuentes_coinciden_con_el_catalogo_de_errores():
@@ -243,8 +300,8 @@ def test_fuente_fallida_que_tusdatos_reporta_caida_lo_dice_en_el_motivo():
     reporte = copy.deepcopy(REPORTES["report_cc_sin_hallazgo"])
     reporte["errores"] = ["procuraduria", "policia"]
     resultado = interpretar(reporte, "CC", "112", fuentes_caidas=frozenset({"procuraduria"})).resultado
-    assert "caída o en mantenimiento" in cobertura(resultado, "procuraduria").motivo
-    assert cobertura(resultado, "policia").motivo == "Tusdatos informó error al consultar la fuente"
+    assert "caída o en mantenimiento" in fuente(resultado, "procuraduria").motivo
+    assert fuente(resultado, "policia").motivo == "Tusdatos informó error al consultar la fuente"
     assert resultado.estado_ejecucion == "PARCIAL"
 
 

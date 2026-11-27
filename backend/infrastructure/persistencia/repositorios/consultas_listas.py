@@ -8,6 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from domain.listas.contratos import ContextoExpediente, ResultadoProveedorV2, SolicitudIdempotente
+from domain.listas.contratos_tusdatos import VERSION_CONTRATO_TUSDATOS, ResultadoTusdatos
+
+# Estado de la fuente en Tusdatos → estado de cobertura común (consulta_fuente).
+COBERTURA_DE_ESTADO_TUSDATOS = {"CON_REGISTRO": "CONSULTADA", "SIN_REGISTRO": "CONSULTADA",
+                                "NO_CONSULTADA": "FALLIDA", "NO_INCLUIDA": "NO_DISPONIBLE"}
 from domain.listas.contratos_busqueda import ResultadoBusquedaF6
 from domain.listas.errores import ConflictoListas, ErrorIntegridadEvidencia, TrabajoNoVigente, VersionNoDisponible
 from infrastructure.persistencia.modelos_listas import (
@@ -53,7 +58,9 @@ class RepositorioConsultasListas:
 
     def admitir(self, actor: ActorListas, peticion: SolicitudIdempotente, proveedor: str,
                 manifiesto: dict, fuentes_requeridas: tuple[UUID, ...] = (), politica_id: UUID | None = None, grupo_id: UUID | None = None, sesion_actual=None,
-                preparar_admision=None, criterio_efectivo=None) -> UUID:
+                preparar_admision=None, criterio_efectivo=None, version_resultado: str | None = None) -> UUID:
+        """`version_resultado`: contrato del resultado que se guardará, si no es el de la petición
+        (Tusdatos admite con la petición 2.0 y guarda su propio resultado `tusdatos-1`)."""
         solicitud = peticion.solicitud
         self.politica.consulta(actor, solicitud, self.puede_acceder_expediente)
         modo = self.politica.config.implementacion
@@ -90,7 +97,7 @@ class RepositorioConsultasListas:
                 expediente_id=expediente.expediente_id if expediente else None,
                 sujeto_rol=expediente.sujeto_rol if expediente else None, motivo=solicitud.contexto.motivo,
                 ambito_idempotencia=ambito, clave_idempotencia=peticion.clave, huella_peticion=peticion.hash_cuerpo,
-                implementacion=modo, proveedor=proveedor, version_contrato=solicitud.version_contrato,
+                implementacion=modo, proveedor=proveedor, version_contrato=version_resultado or solicitud.version_contrato,
                 criterio_original=(criterio_efectivo or solicitud.criterio).model_dump(mode="json"), manifiesto=manifiesto,
                 politica_id=politica_id, estado="PENDIENTE",
             ).on_conflict_do_nothing(constraint="uq_consulta_peticion").returning(ConsultaLista.id)
@@ -323,7 +330,8 @@ class RepositorioConsultasListas:
                          {"intento": len(previos) + 1, "en": ahora.isoformat()})
             return len(previos) + 1
 
-    def admitir_recuperacion(self, previa_id: UUID, manifiesto: dict, sesion_actual=None) -> UUID | None:
+    def admitir_recuperacion(self, previa_id: UUID, manifiesto: dict, sesion_actual=None,
+                             version_resultado: str | None = None) -> UUID | None:
         """Admite la recarga automática de una consulta cerrada como consulta nueva enlazada.
 
         Conserva el expediente, el rol, el criterio y la identidad de quien pidió la original
@@ -341,7 +349,8 @@ class RepositorioConsultasListas:
                 actor_emisor=previa.actor_emisor, actor_sujeto=previa.actor_sujeto, expediente_id=previa.expediente_id,
                 sujeto_rol=previa.sujeto_rol, motivo=previa.motivo, ambito_idempotencia=previa.ambito_idempotencia,
                 clave_idempotencia=f"recuperacion:{previa.id}", huella_peticion=previa.huella_peticion,
-                implementacion=previa.implementacion, proveedor=previa.proveedor, version_contrato=previa.version_contrato,
+                implementacion=previa.implementacion, proveedor=previa.proveedor,
+                version_contrato=version_resultado or previa.version_contrato,
                 criterio_original=previa.criterio_original, manifiesto=manifiesto, politica_id=previa.politica_id,
                 estado="PENDIENTE",
             ).on_conflict_do_nothing(constraint="uq_consulta_peticion").returning(ConsultaLista.id)).scalar_one_or_none()
@@ -357,7 +366,7 @@ class RepositorioConsultasListas:
     def _actor_de(consulta):
         return ActorListas(consulta.actor_emisor, consulta.actor_sujeto, frozenset())
 
-    def guardar_borrador(self, concesion: ConcesionConsulta, resultado: ResultadoProveedorV2):
+    def guardar_borrador(self, concesion: ConcesionConsulta, resultado: ResultadoProveedorV2 | ResultadoTusdatos):
         resultado = self._validar_resultado(resultado.model_dump())
         if resultado.consulta_id != concesion.consulta_id or resultado.fecha_fin is None:
             raise ConflictoListas("Resultado no corresponde al trabajo o no es terminal")
@@ -466,6 +475,22 @@ class RepositorioConsultasListas:
                 if cobertura.estado == "CONSULTADA" and versiones[fijada.version_id].estado != "VALIDA":
                     raise VersionNoDisponible("Versión bloqueada durante la consulta; cierre concluyente rechazado")
                 fijada.estado = cobertura.estado
+        elif isinstance(resultado, ResultadoTusdatos):
+            # Tusdatos: una fila por fuente (sin versión fijada) y una coincidencia por registro, para
+            # que cada registro se pueda revisar por separado. El detalle va tal como lo publica la fuente.
+            # `consulta_fuente` es la cobertura común (la validan los triggers de cierre): guarda el estado en
+            # su vocabulario; el estado propio de Tusdatos queda en el resultado y en `detalle`.
+            for fuente in resultado.fuentes:
+                sesion.add(ConsultaFuente(id=fuente.id, consulta_id=consulta.id, nombre_origen=fuente.nombre,
+                    estado=COBERTURA_DE_ESTADO_TUSDATOS[fuente.estado], requerida=fuente.requerida,
+                    version_externa=fuente.version_base,
+                    detalle=fuente.model_dump(mode="json", exclude={"registros"})))
+            sesion.flush()
+            for fuente in resultado.fuentes:
+                for registro in fuente.registros:
+                    sesion.add(CoincidenciaLista(id=registro.id, consulta_id=consulta.id, consulta_fuente_id=fuente.id,
+                        identificador_externo=registro.identificador_origen, datos_candidato=registro.model_dump(mode="json")))
+            return
         else:
             for cobertura in resultado.cobertura:
                 sesion.add(ConsultaFuente(id=cobertura.id, consulta_id=consulta.id, nombre_origen=cobertura.nombre_origen,
@@ -582,7 +607,8 @@ class RepositorioConsultasListas:
 
     @staticmethod
     def _validar_resultado(datos):
-        modelo = ResultadoBusquedaF6 if datos.get("version_contrato") == "2.1" else ResultadoProveedorV2
+        modelo = {"2.1": ResultadoBusquedaF6, VERSION_CONTRATO_TUSDATOS: ResultadoTusdatos}.get(
+            datos.get("version_contrato"), ResultadoProveedorV2)
         return modelo.model_validate(datos)
 
     @staticmethod

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listas } from '../../../services/listas';
 import ResultadoConsultaListas from './ResultadoConsultaListas';
+import ResultadoTusdatos, { opcionesRevisionTusdatos } from './ResultadoTusdatos';
 import ConsultaForm from './ConsultaForm';
 import RevisionHistorial from './RevisionHistorial';
 import { etiquetasListas as etiquetas } from './presentacionListas';
@@ -11,6 +12,13 @@ import '../../modals/Modals.css';
 import './ConsultasListas.css';
 
 const pendientes = new Set(['PENDIENTE', 'EN_CURSO']);
+const CONTRATO_TUSDATOS = 'tusdatos-1';
+
+// Coincidencias que se pueden revisar una por una, según el formato del resultado.
+function opcionesRevision(consulta) {
+  if (consulta.version_contrato === CONTRATO_TUSDATOS) return opcionesRevisionTusdatos(consulta);
+  return (consulta.candidatos ?? []).map(c => ({ id: c.id, etiqueta: c.nombre_principal }));
+}
 const AVISO_REUTILIZADA = 'Ya había una consulta de este documento en las últimas 6 horas en este expediente; se muestra esa y no se consumió otro crédito.';
 
 function avisoAdmision(respuesta, ambos) {
@@ -165,6 +173,8 @@ export default function ConsultasListas({ expediente, enModal = false }) {
   }, []);
 
   const consulta = detalle?.consulta;
+  const opciones = useMemo(() => (consulta ? opcionesRevision(consulta) : []), [consulta]);
+  const etiquetaAlcance = useMemo(() => new Map(opciones.map(o => [o.id, o.etiqueta])), [opciones]);
   return <section id="consultas-listas" aria-label="Consultas de listas" className={`listas-panel${enModal ? ' listas-en-modal' : ''}`}>
     <h3 className="listas-panel__titulo">Consultas de listas cautelares</h3>
     <p className="listas-aviso">Las coincidencias requieren revisión humana. No determinan aprobación, rechazo ni nivel de riesgo.</p>
@@ -201,17 +211,22 @@ export default function ConsultasListas({ expediente, enModal = false }) {
         <button type="button" className="btn-modal btn-modal-secondary" onClick={cerrarDetalle}>✕ Cerrar</button>
       </div>
       {pendientes.has(consulta.estado_ejecucion) && <p role="status" className="listas-progreso">La consulta se está procesando. Esta pantalla se actualiza sola.</p>}
-      <ResultadoConsultaListas consulta={consulta} descargar={descargar} puedeVerPdfProveedor={!!capacidades.ver_pdf_proveedor} />
+      {consulta.version_contrato === CONTRATO_TUSDATOS
+        ? <ResultadoTusdatos consulta={consulta} descargar={descargar} puedeVerPdfProveedor={!!capacidades.ver_pdf_proveedor} />
+        : <ResultadoConsultaListas consulta={consulta} descargar={descargar} puedeVerPdfProveedor={!!capacidades.ver_pdf_proveedor} />}
       {capacidades.forzar && consulta.implementacion === 'externo' && !pendientes.has(consulta.estado_ejecucion) && (
         <button type="button" className="btn-modal btn-modal-secondary" disabled={ocupado} onClick={() => forzarActualizacion(consulta)}>Forzar actualización</button>
       )}
       <h4>Revisiones humanas</h4>
       {!detalle.revisiones.length && <p className="listas-vacio">Aún no hay revisiones humanas registradas.</p>}
-      <ul className="listas-revisiones">{detalle.revisiones.map(r => <li key={r.id}>{r.resultado}: {r.justificacion}{r.revision_previa_id && ' (corrección de revisión anterior)'}</li>)}</ul>
+      <ul className="listas-revisiones">{detalle.revisiones.map(r => <li key={r.id}>
+        {r.coincidencia_id && <strong>{etiquetaAlcance.get(r.coincidencia_id) ?? 'Registro'} — </strong>}
+        {r.resultado}: {r.justificacion}{r.revision_previa_id && ' (corrección de revisión anterior)'}
+      </li>)}</ul>
       {capacidades.revisar && !pendientes.has(consulta.estado_ejecucion) && (
         <RevisionHistorial
           key={consulta.consulta_id}
-          consulta={consulta}
+          opciones={opciones}
           revisiones={detalle.revisiones}
           ocupado={ocupado}
           onRevisar={revisar}

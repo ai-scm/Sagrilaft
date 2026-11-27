@@ -40,7 +40,8 @@ class ModalidadListas(Protocol):
 def crear_grupo_por_documento(servicio, expediente_id, clave, sesion, *, proveedor: str,
                               criterio_para: Callable[[str, object], tuple[dict | None, str]],
                               manifiesto_para: Callable[[dict], dict],
-                              reutilizable: Callable[[dict, object], UUID | None] | None = None) -> dict:
+                              reutilizable: Callable[[dict, object], UUID | None] | None = None,
+                              version_resultado: str | None = None) -> dict:
     """Admite en una transacción la consulta de la contraparte y la de su representante.
 
     `criterio_para(rol, expediente)` devuelve (criterio, motivo): criterio None omite al
@@ -76,7 +77,8 @@ def crear_grupo_por_documento(servicio, expediente_id, clave, sesion, *, proveed
             continue
         identificador = servicio.repositorio.admitir(servicio.actor,
             SolicitudIdempotente(clave=f"grupo:{grupo_id}:{solicitud.contexto.sujeto_rol}", solicitud=solicitud),
-            proveedor, manifiesto_para(criterio), grupo_id=grupo_id, sesion_actual=sesion)
+            proveedor, manifiesto_para(criterio), grupo_id=grupo_id, sesion_actual=sesion,
+            version_resultado=version_resultado)
         respuesta["consultas"].append({"consulta_id": str(identificador), "sujeto_rol": solicitud.contexto.sujeto_rol})
     grupo.respuesta = respuesta
     sesion.add(grupo)

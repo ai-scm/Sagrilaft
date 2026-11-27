@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from domain.listas.contratos import Criterio, ConsultaV2
 from domain.listas.contratos_busqueda import CriterioBusqueda, ConsultaBusquedaF6
+from domain.listas.contratos_tusdatos import ConsultaTusdatos
 
 
 class SolicitudConsultaLista(BaseModel):
@@ -39,7 +40,7 @@ class AdmisionLista(BaseModel):
 
 
 class DetalleConsultaLista(BaseModel):
-    consulta: ConsultaV2 | ConsultaBusquedaF6 = Field(discriminator="version_contrato")
+    consulta: ConsultaV2 | ConsultaBusquedaF6 | ConsultaTusdatos = Field(discriminator="version_contrato")
     revisiones: list[dict]
 
 

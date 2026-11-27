@@ -16,7 +16,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from api import dependencias_listas
 from api.middleware import autenticacion
@@ -27,7 +27,7 @@ from infrastructure.listas.tusdatos.cliente import ClienteTusdatos
 from infrastructure.listas.tusdatos.configuracion import ConfiguracionTusdatos
 from infrastructure.persistencia.models import Formulario
 from infrastructure.persistencia.modelos_listas import (
-    ConsultaLista, EventoConsulta, EvidenciaConsulta, ProgresoConsultaExterna, TrabajoConsulta,
+    CoincidenciaLista, ConsultaLista, EventoConsulta, EvidenciaConsulta, ProgresoConsultaExterna, TrabajoConsulta,
 )
 from services.listas import modalidades
 from services.listas.modalidad_externa import ModalidadExterna
@@ -156,8 +156,14 @@ def test_cc_con_hallazgos_completa_y_solo_guarda_lo_aprobado(externo):
     procesar(externo)
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "COMPLETADA" and consulta["conclusion_busqueda"] == "CON_CANDIDATOS"
-    assert consulta["proveedor"] == "tusdatos" and len(consulta["cobertura"]) == 12  # 12 fuentes para cédula
-    assert {c["motivos"][0]["campo"] for c in consulta["candidatos"]} >= {"ofac", "peps", "procuraduria", "peps_funcion_publica"}
+    assert consulta["proveedor"] == "tusdatos" and consulta["version_contrato"] == "tusdatos-1"
+    assert len(consulta["fuentes"]) == 12  # 12 fuentes para cédula
+    assert {f["codigo"] for f in consulta["fuentes"] if f["estado"] == "CON_REGISTRO"} >= {
+        "ofac", "peps", "procuraduria", "peps_funcion_publica", "lista_onu", "policia"}
+    with externo.sesiones() as sesion:  # cada registro es una coincidencia revisable, también ONU y Policía
+        registros = sum(len(f["registros"]) for f in consulta["fuentes"])
+        assert sesion.scalar(select(func.count()).select_from(CoincidenciaLista)
+                             .where(CoincidenciaLista.consulta_id == UUID(consulta_id))) == registros
     assert [e["tipo"] for e in consulta["evidencias"]] == ["INFORME_INTERNO"]
     # Un solo lanzamiento, con el documento limpio y la fecha de expedición (opcional en CC).
     assert len(lanzamientos(externo)) == 1
@@ -205,7 +211,7 @@ def test_grupo_empresa_y_representante_respeta_turno_de_5_segundos(externo):
     procesar(externo)
     assert len(lanzamientos(externo)) == 2
     empresa, persona = detalle(externo, consultas["CONTRAPARTE"]), detalle(externo, consultas["REPRESENTANTE"])
-    assert empresa["estado_ejecucion"] == "COMPLETADA" and len(empresa["cobertura"]) == 6
+    assert empresa["estado_ejecucion"] == "COMPLETADA" and len(empresa["fuentes"]) == 6
     assert persona["conclusion_busqueda"] == "CON_CANDIDATOS"
 
 
@@ -219,6 +225,35 @@ def test_recarga_gratuita_de_fuentes_con_error(externo):
     assert "RECARGA_FUENTES_EXTERNAS" in eventos(externo, consulta_id) and len(lanzamientos(externo)) == 1
 
 
+def test_cada_registro_de_tusdatos_se_revisa_por_separado(externo):
+    """ONU y Policía antes quedaban como «hallazgo sin estructura» y no admitían revisión individual."""
+    consulta_id = crear(externo, valor="111", fecha_expedicion="2014-12-01").json()["consulta_id"]
+    procesar(externo)
+    consulta = detalle(externo, consulta_id)
+    onu = next(f for f in consulta["fuentes"] if f["codigo"] == "lista_onu")["registros"][0]
+    assert onu["sin_detalle"] is True
+    respuesta = externo.cliente.post(f"/api/consultas-listas/{consulta_id}/revisiones", json={
+        "resultado": "DESCARTADA", "justificacion": "Homónimo: otra fecha de nacimiento", "coincidencia_id": onu["id"]},
+        headers={"Authorization": f"Bearer {externo.token('listas_revisor')}"})
+    assert respuesta.status_code == 201, respuesta.text
+    revisiones = externo.cliente.get(f"/api/consultas-listas/{consulta_id}").json()["revisiones"]
+    assert [r["coincidencia_id"] for r in revisiones] == [onu["id"]]
+
+
+def test_consulta_pendiente_del_adaptador_anterior_se_cierra_sin_lanzar(externo, monkeypatch):
+    from infrastructure.listas.tusdatos import adaptador
+    from services.listas import modalidad_externa
+    with monkeypatch.context() as cambio:  # admitida antes del cambio de contrato (la base no deja alterarla después)
+        cambio.setattr(adaptador, "ADAPTADOR_VERSION", "tusdatos-v1")
+        cambio.setattr(modalidad_externa, "VERSION_CONTRATO_TUSDATOS", "2.0")
+        consulta_id = crear(externo, valor="112").json()["consulta_id"]
+    procesar(externo)
+    assert lanzamientos(externo) == []
+    with externo.sesiones() as sesion:
+        trabajo = sesion.scalar(select(TrabajoConsulta).where(TrabajoConsulta.consulta_id == UUID(consulta_id)))
+        assert trabajo.error == "ADAPTADOR_RETIRADO"
+
+
 # ── Respuestas sin reporte ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("valor,codigo", [("128", "TITULAR_NO_AUTORIZA"), ("126", "RESULTADO_EN_CACHE_SIN_REFERENCIA")])
@@ -227,7 +262,8 @@ def test_respuestas_sin_reporte_cierran_con_constancia(externo, valor, codigo):
     procesar(externo)
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["conclusion_busqueda"] == "NO_CONCLUYENTE"
-    assert codigo in {a["codigo"] for a in consulta["advertencias"]}
+    assert consulta["error"]["codigo"] == codigo
+    assert {f["estado"] for f in consulta["fuentes"]} == {"NO_CONSULTADA"}
     assert [e["tipo"] for e in consulta["evidencias"]] == ["INFORME_INTERNO"]
 
 
@@ -381,7 +417,7 @@ def test_documento_que_tusdatos_no_valida_queda_advertido(externo):
     procesar(externo)
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "COMPLETADA"
-    assert "DOCUMENTO_NO_VALIDADO" in {a["codigo"] for a in consulta["advertencias"]}
+    assert "DOCUMENTO_NO_VALIDADO" in {a["codigo"] for a in consulta["avisos"]}
 
 
 # ── Documento inexistente y revisión previa de fuentes y créditos ────────────
@@ -508,7 +544,7 @@ def test_si_la_fuente_no_vuelve_a_tiempo_no_gasta_la_recarga_y_dice_por_que(prod
     consulta = detalle(produccion, consulta_id)
     # El sandbox con error falla en todas las fuentes: sin ninguna consultada, la consulta queda FALLIDA.
     assert consulta["estado_ejecucion"] == "FALLIDA" and consulta["conclusion_busqueda"] == "NO_CONCLUYENTE"
-    procuraduria = next(c for c in consulta["cobertura"] if c["fuente_codigo"] == "procuraduria")
+    procuraduria = next(f for f in consulta["fuentes"] if f["codigo"] == "procuraduria")
     assert "caída o en mantenimiento" in procuraduria["motivo"]
     assert recargas_pedidas(produccion) == [] and "RECARGA_OMITIDA_FUENTES_CAIDAS" in eventos(produccion, consulta_id)
 
@@ -578,7 +614,7 @@ def test_si_el_historial_no_sirve_se_cierra_como_antes(externo, filas):
     procesar(externo)
     consulta = detalle(externo, consulta_id)
     assert consulta["estado_ejecucion"] == "FALLIDA"
-    assert "RESULTADO_EN_CACHE_SIN_REFERENCIA" in {a["codigo"] for a in consulta["advertencias"]}
+    assert consulta["error"]["codigo"] == "RESULTADO_EN_CACHE_SIN_REFERENCIA"
     assert not any(p.url.path.startswith("/api/report_json") for p in externo.simulador.peticiones)
 
 
@@ -710,7 +746,7 @@ def test_fuentes_fallidas_se_recargan_solas_despues_del_cierre_sin_gastar_credit
     procesar(externo)
     consulta = detalle(externo, recarga)
     assert consulta["estado_ejecucion"] == "COMPLETADA" and consulta["contexto"]["sujeto_rol"] == "CONTRAPARTE"
-    aviso = next(a for a in consulta["advertencias"] if a["codigo"] == "RECUPERACION_AUTOMATICA")
+    aviso = next(a for a in consulta["avisos"] if a["codigo"] == "RECUPERACION_AUTOMATICA")
     assert original in aviso["descripcion"] and "intento 1 de 3" in aviso["descripcion"]
     assert len(lanzamientos(externo)) == 1 and len(recargas_pedidas(externo)) == 2
     assert "RECUPERACION_PROGRAMADA" in eventos(externo, original)
@@ -730,7 +766,7 @@ def test_la_recarga_automatica_se_detiene_a_las_tres(externo):
         cadena += recargas_de(externo, cadena[-1])
         procesar(externo)
     assert len(cadena) == 4 and len(recargas_pedidas(externo)) == 4 and len(lanzamientos(externo)) == 1
-    assert "intento 3 de 3" in next(a["descripcion"] for a in detalle(externo, cadena[-1])["advertencias"]
+    assert "intento 3 de 3" in next(a["descripcion"] for a in detalle(externo, cadena[-1])["avisos"]
                                      if a["codigo"] == "RECUPERACION_AUTOMATICA")
 
 

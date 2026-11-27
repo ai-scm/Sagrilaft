@@ -56,15 +56,32 @@ categoría para que el revisor la vea.
 
 ## Cómo leer el resultado
 
+Desde el 2026-11-25 Tusdatos tiene su propio formato de resultado (`tusdatos-1`, en
+`backend/domain/listas/contratos_tusdatos.py`), separado del de la búsqueda propia sobre
+archivos de listas: una entrada por fuente con su estado, sus registros con el detalle tal
+como lo publica la fuente (sin aplanar ni recortar), los códigos de hallazgo que Tusdatos
+asoció y, en PEP, la versión de la base y el resumen de listas si vienen. No lleva versiones
+fijadas, hashes, puntajes ni motivos de comparación, que son de la búsqueda por archivos.
+Cada registro se guarda como una coincidencia revisable. Las consultas anteriores conservan
+el formato 2.0.
+
 Cada fuente queda en uno de estos estados:
 
-- **Consultada:** Tusdatos la revisó. Si encontró algo, aparece como candidato.
-- **Fallida:** Tusdatos no pudo consultarla. Se intenta una vez más, sin costo; si
+- **Con registro:** Tusdatos la revisó y encontró al menos un registro. Todos quedan en
+  la fuente, también los que solo vienen marcados (ONU, INTERPOL, Contraloría) o como
+  frase (Policía).
+- **Sin registro:** Tusdatos la revisó y no encontró nada.
+- **No consultada:** Tusdatos no pudo consultarla. Se intenta una vez más, sin costo; si
   sigue fallando, la consulta no puede concluir. Si Tusdatos dice que la fuente está
   caída, el sistema espera a que vuelva antes de intentarlo. Si no vuelve a tiempo, la
-  fuente queda fallida con el motivo «caída o en mantenimiento».
-- **No disponible:** la fuente no vino en el reporte, por ejemplo porque no está en el
+  fuente queda con el motivo «caída o en mantenimiento».
+- **No incluida:** la fuente no vino en el reporte, por ejemplo porque no está en el
   plan contratado.
+
+Los nombres de las fuentes y las descripciones de los hallazgos salen de los catálogos
+oficiales de Tusdatos, guardados en `backend/infrastructure/listas/tusdatos/catalogos/`.
+OFAC, ONU, INTERPOL, EUROPOL y PEP por función pública no tienen modelo publicado: su
+detalle se muestra tal como llega y queda marcado como estructura no documentada.
 
 Con eso, la consulta termina así:
 
@@ -72,6 +89,7 @@ Con eso, la consulta termina así:
   registros.
 - **Completada, con candidatos:** hay registros para revisar. Un candidato es una
   alerta, no una decisión: alguien tiene que confirmar si se trata de la misma persona.
+  Cada registro se revisa por separado.
 - **Parcial o no concluyente:** faltó alguna fuente obligatoria o pasó algo que impide
   afirmar que no hay registros. Hay que repetir la consulta o revisarla a mano.
 
