@@ -79,6 +79,8 @@ class ResultadoTusdatos(DTO):
     titular_nombre: Texto | None = None          # nombre que Tusdatos resolvió para el documento
     documento_validado: bool | None = None
     nivel_informado_proveedor: Codigo | None = None
+    reporte_proveedor_id: Codigo | None = None   # id del reporte en Tusdatos (report_json / report_pdf)
+    huella_respuesta: Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{64}$")] | None = None  # SHA-256 del JSON completo recibido
     fuentes: tuple[FuenteTusdatos, ...] = ()
     avisos: tuple[AvisoTusdatos, ...] = ()
     fecha_inicio: AwareDatetime

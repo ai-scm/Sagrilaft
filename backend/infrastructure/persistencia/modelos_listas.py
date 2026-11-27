@@ -381,7 +381,7 @@ class EvidenciaConsulta(IdentidadRegistro, Base):
     )
     consulta_id: Mapped[UUID] = mapped_column(ForeignKey("consulta_lista.id", ondelete="RESTRICT"))
     tipo: Mapped[str] = mapped_column(String(30))
-    clave: Mapped[str] = mapped_column(String(500), unique=True)
+    clave: Mapped[str] = mapped_column(String(500))  # puede repetirse entre consultas (migración o65e78f901ab)
     huella: Mapped[str] = mapped_column(String(64))
     tamano_bytes: Mapped[int] = mapped_column(BigInteger)
     tipo_contenido: Mapped[str] = mapped_column(String(100))

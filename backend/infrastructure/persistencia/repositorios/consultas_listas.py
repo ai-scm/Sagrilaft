@@ -253,8 +253,8 @@ class RepositorioConsultasListas:
                                     version_generador: str, fuente_codigo: str | None = None) -> UUID | None:
         """Evidencia entregada por el proveedor (su PDF o una captura por fuente), ya custodiada.
 
-        Devuelve None si ese mismo objeto ya es evidencia de otra consulta: la clave de
-        custodia es única en toda la tabla, y no se puede registrar dos veces.
+        El mismo objeto custodiado (misma huella) puede ser evidencia de varias consultas: por
+        ejemplo, dos consultas que reciben la misma captura. Devuelve el id de la evidencia.
         """
         self._validar_tipo_proveedor(tipo, fuente_codigo)
         with self.sesiones.begin() as sesion:
@@ -276,9 +276,6 @@ class RepositorioConsultasListas:
                                                                      EvidenciaConsulta.fuente_codigo == fuente_codigo))
         if existente:
             return existente
-        ajena = sesion.scalar(select(EvidenciaConsulta.consulta_id).where(EvidenciaConsulta.clave == objeto.clave))
-        if ajena is not None and ajena != consulta_id:
-            return None
         identificador = uuid4()
         sesion.add(EvidenciaConsulta(id=identificador, consulta_id=consulta_id, tipo=tipo, clave=objeto.clave,
             huella=objeto.huella, tamano_bytes=objeto.tamano_bytes, tipo_contenido=tipo_contenido,

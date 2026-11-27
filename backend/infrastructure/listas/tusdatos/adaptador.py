@@ -267,11 +267,13 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
                         errores_estado=(), fecha_inicio: datetime, fecha_fin: datetime,
                         fuentes: tuple[str, ...] | None = None, validado: bool | None = None,
                         fuentes_caidas: frozenset[str] = frozenset(),
-                        recuperacion: str | None = None) -> Interpretacion:
+                        recuperacion: str | None = None, reporte_id: str | None = None,
+                        huella_respuesta: str | None = None) -> Interpretacion:
     """`fuentes`: las fijadas al admitir (manifiesto); por defecto, las aprobadas para el sujeto.
     `validado`: lo que Tusdatos informa al terminar (False = no pudo validar el documento).
     `fuentes_caidas`: códigos que Tusdatos reportaba caídos o en mantenimiento al cerrar.
-    `recuperacion`: texto que explica que es la recarga automática de una consulta anterior."""
+    `recuperacion`: texto que explica que es la recarga automática de una consulta anterior.
+    `reporte_id` y `huella_respuesta`: id del reporte en Tusdatos y SHA-256 del JSON completo recibido."""
     errores = set(errores_estado) | {e for e in (reporte.get("errores") or []) if isinstance(e, str)}
     titular = reporte.get("nombre") if isinstance(reporte.get("nombre"), str) and reporte["nombre"].strip() else None
     codigos = tuple(fuentes or fuentes_para(solicitud.sujeto))
@@ -327,8 +329,8 @@ def interpretar_reporte(reporte: dict, *, consulta_id: uuid.UUID, solicitud: Sol
     resultado = ResultadoTusdatos(consulta_id=consulta_id, proveedor=PROVEEDOR, estado_ejecucion=estado,
         conclusion_busqueda=conclusion, titular_nombre=_texto(titular) if titular else None, documento_validado=validado,
         nivel_informado_proveedor=_texto(nivel, 64) if isinstance(nivel, str) and nivel.strip() else None,
-        fuentes=tuple(resultado_fuentes), avisos=tuple(avisos),
-        fecha_inicio=fecha_inicio, fecha_fin=max(fecha_fin, fecha_inicio), error=error)
+        fuentes=tuple(resultado_fuentes), avisos=tuple(avisos), reporte_proveedor_id=reporte_id,
+        huella_respuesta=huella_respuesta, fecha_inicio=fecha_inicio, fecha_fin=max(fecha_fin, fecha_inicio), error=error)
     return Interpretacion(resultado=resultado, respuesta_filtrada=filtrar_reporte(reporte))
 
 
