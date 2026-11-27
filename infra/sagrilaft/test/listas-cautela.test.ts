@@ -125,12 +125,24 @@ test('URL de Tusdatos inválida o modalidad desconocida no sintetizan', () => {
   throws(() => synthCon({ proveedorListasCautela: 'tusdatos' }), /desconocido/);
 });
 
-test('producción: deshabilitado por defecto y rechaza la modalidad externa y el sandbox', () => {
+test('producción: deshabilitado por defecto; admite Tusdatos real pero nunca el sandbox ni sin salida a Internet', () => {
   const base = { environment: 'prod', habilitarNatEgress: 'true' };
   equal(parametro(synthCon(base), '/sagrilaft/prod/config/PROVEEDOR_LISTAS_CAUTELA'), 'deshabilitado');
-  throws(() => synthCon({ ...base, proveedorListasCautela: 'externo' }), /prod mantiene las listas deshabilitadas/);
-  throws(() => synthCon({ ...base, proveedorListasCautela: 'sagrilaft' }), /prod mantiene las listas deshabilitadas/);
+  const encendida = synthCon({ ...base, proveedorListasCautela: 'externo' });
+  equal(parametro(encendida, '/sagrilaft/prod/config/PROVEEDOR_LISTAS_CAUTELA'), 'sagrilaft');
+  equal(parametro(encendida, '/sagrilaft/prod/config/LISTAS_TUSDATOS_URL'), 'https://dash-board.tusdatos.co');
+  throws(() => synthCon({ ...base, proveedorListasCautela: 'externo', tusdatosUrl: 'http://docs.tusdatos.co' }), /sandbox/);
+  throws(() => synthCon({ environment: 'prod', proveedorListasCautela: 'externo' }), /habilitarNatEgress/);
   throws(() => synthCon({ ...base, proveedorListasCautela: 'deshabilitado', tusdatosUrl: 'http://docs.tusdatos.co' }), /sandbox/);
+});
+
+test('producción: encender Tusdatos solo cambia el parámetro del proveedor y enciende el trabajador', () => {
+  const base = { environment: 'prod', habilitarNatEgress: 'true' };
+  const antes = synthCon({ ...base, proveedorListasCautela: 'deshabilitado' });
+  const despues = synthCon({ ...base, proveedorListasCautela: 'externo' });
+  const cambiados = Object.keys(despues.Resources).filter(key =>
+    JSON.stringify(antes.Resources[key]) !== JSON.stringify(despues.Resources[key]));
+  deepEqual(cambiados.map(key => despues.Resources[key].Type).sort(), ['AWS::ECS::Service', 'AWS::SSM::Parameter']);
 });
 
 test('staging: pasar del simulador al sandbox de Tusdatos solo cambia dos parámetros', () => {

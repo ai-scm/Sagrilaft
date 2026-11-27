@@ -318,8 +318,12 @@ class SagrilaftListasConfig:
         object.__setattr__(self, "proveedor", legado[modo])
 
     def validar_entorno(self, entorno: str) -> None:
-        if entorno == "production" and (self.implementacion != "deshabilitado" or self.admin_habilitada):
-            raise RuntimeError("PROVEEDOR_LISTAS_CAUTELA / LISTAS_IMPLEMENTACION: producción debe permanecer deshabilitada")
+        # Producción admite solo Tusdatos (externo) o listas apagadas: nunca el simulador ni la
+        # búsqueda por archivos, ni la administración de archivos. Se enciende al desplegar con
+        # -c proveedorListasCautela=externo (decisión del 2026-11-27: código listo antes de comprar el plan).
+        if entorno == "production" and (self.implementacion not in {"deshabilitado", "externo"} or self.admin_habilitada):
+            raise RuntimeError("PROVEEDOR_LISTAS_CAUTELA / LISTAS_IMPLEMENTACION: producción solo admite "
+                               "Tusdatos (externo) o listas deshabilitadas")
 
     @property
     def configurado(self) -> bool:

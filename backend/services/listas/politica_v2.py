@@ -7,13 +7,23 @@ from domain.listas.puertos import ListasNoDisponibles
 from infrastructure.config.configuracion import SagrilaftListasConfig
 
 
-# Roles propuestos: solo se interpretan tras validar la identidad. No se crean en Keycloak.
+# Listas sobre expedientes: consultar, ver resultados y evidencias (también el PDF y las capturas
+# del proveedor), registrar revisiones y forzar una consulta nueva. Desde el 2026-11-27 los dan los
+# mismos roles del portal interno (`acceso_clientes`, `acceso_proveedores`): no hacen falta roles
+# aparte. Qué expedientes alcanza cada persona lo sigue decidiendo su tipo de acceso
+# (`api.rbac.contrapartes_permitidas`), así que nadie consulta expedientes del otro tipo.
+PERMISOS_LISTAS_EXPEDIENTE = frozenset({"listas.consultar", "listas.ver_evidencias", "listas.revisar",
+                                        "listas.ver_pdf_proveedor", "listas.forzar_actualizacion"})
+
+# Solo se interpretan tras validar la identidad.
 PERMISOS_POR_ROL = {
+    "acceso_clientes": PERMISOS_LISTAS_EXPEDIENTE,
+    "acceso_proveedores": PERMISOS_LISTAS_EXPEDIENTE,
+    # Heredados (2026-11-12): ya no hacen falta para listas sobre expedientes; se conservan para
+    # no quitar acceso a quien los tenga asignados.
     "listas_operador": frozenset({"listas.consultar", "listas.ver_evidencias"}),
-    # El equipo revisor también abre el PDF del proveedor (trae datos sensibles) y fuerza
-    # consultas nuevas (gastan créditos): decisión del 2026-11-12, sin rol exclusivo.
-    "listas_revisor": frozenset({"listas.consultar", "listas.ver_evidencias", "listas.revisar",
-                                 "listas.ver_pdf_proveedor", "listas.forzar_actualizacion"}),
+    "listas_revisor": PERMISOS_LISTAS_EXPEDIENTE,
+    # Administración de archivos de listas y búsqueda independiente: siguen con roles propios.
     "listas_cargador": frozenset({"listas.importar", "listas.comparar", "listas.ver_administracion"}),
     "listas_aprobador": frozenset({"listas.comparar", "listas.ver_administracion", "listas.aprobar_version", "listas.activar_version"}),
     "listas_incidentes": frozenset({"listas.ver_administracion", "listas.bloquear_version", "listas.reconstruir_version"}),

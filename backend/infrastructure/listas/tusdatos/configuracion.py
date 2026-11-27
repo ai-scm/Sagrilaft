@@ -52,10 +52,10 @@ class ConfiguracionTusdatos:
         return urlsplit(self.url_base).hostname == HOST_SANDBOX
 
     def validar_entorno(self, entorno: str) -> None:
+        # Producción acepta API Token (preferido) o usuario y clave (Basic Auth): la cuenta demo no
+        # pudo crear tokens (403), así que no se depende de que Tusdatos los habilite en el plan.
         if entorno == "production" and self.es_sandbox:
             raise ListasNoDisponibles("Producción no puede usar el sandbox de Tusdatos")
-        if entorno == "production" and not self.token:
-            raise ListasNoDisponibles("Producción usa API Token de Tusdatos, no usuario y clave")
 
     @classmethod
     def desde_entorno(cls, entorno: str) -> "ConfiguracionTusdatos":

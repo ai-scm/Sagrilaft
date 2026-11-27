@@ -156,10 +156,9 @@ export class SagrilaftStack extends cdk.Stack {
     if (ambiente === 'prod' && tusdatosUrl === 'http://docs.tusdatos.co') {
       throw new Error('El ambiente prod no permite el sandbox de Tusdatos.');
     }
-    if (proveedorListasCautela === 'sagrilaft' && ambiente === 'prod') {
-      // El backend (validar_entorno) también lo rechaza: habilitarlo es la decisión de la Fase 8.
-      throw new Error('El ambiente prod mantiene las listas deshabilitadas hasta aprobar su salida a producción.');
-    }
+    // Producción admite Tusdatos (externo) desde el 2026-11-27, pero sus scripts siguen con
+    // `deshabilitado`: se enciende pasando -c proveedorListasCautela=externo al desplegar, con el
+    // secreto sagrilaft/prod/tusdatos_credentials ya relleno. El simulador y el sandbox siguen prohibidos.
     if (proveedorListasCautela === 'sagrilaft' && ['staging', 'prod'].includes(ambiente) && !habilitarNatEgress) {
       throw new Error(
         'La modalidad externa necesita salida a Internet para llegar a Tusdatos: use -c habilitarNatEgress=true.',

@@ -205,11 +205,16 @@ def test_fabrica_no_sustituye_por_simulador(modo):
         assert c.proveedor == "deshabilitado"
 
 
-@pytest.mark.parametrize("modo", ["simulado", "archivos", "externo"])
-def test_produccion_bloquea_todos_los_modos_activos(modo):
+@pytest.mark.parametrize("modo", ["simulado", "archivos"])
+def test_produccion_bloquea_simulador_y_archivos(modo):
     c = SagrilaftListasConfig(implementacion=modo, escenario="sin_coincidencias_v1")
     with pytest.raises(RuntimeError, match="producción"):
         crear_consultor_v2(c, "production")
+
+
+def test_produccion_admite_tusdatos():
+    SagrilaftListasConfig(implementacion="externo").validar_entorno("production")
+    SagrilaftListasConfig(implementacion="deshabilitado").validar_entorno("production")
 
 
 def test_produccion_no_admite_administracion():
@@ -295,9 +300,14 @@ def test_mismo_usuario_aprueba_sin_omitir_flag():
         PoliticaListasV2(config(), "staging").aprobar(actor("listas.aprobar_version", sub="persona-2"), a)
 
 
-def test_roles_de_carpeta_no_otorgan_permisos_de_listas():
-    a = ActorListas.desde_identidad_validada("issuer", "sub", ("acceso_clientes", "acceso_proveedores", "administrador"))
-    assert a.permisos == frozenset()
+def test_roles_del_portal_dan_listas_de_expediente_pero_no_administracion():
+    """Desde el 2026-11-27 acceso_clientes / acceso_proveedores bastan para listas sobre expedientes."""
+    for rol in ("acceso_clientes", "acceso_proveedores"):
+        a = ActorListas.desde_identidad_validada("issuer", "sub", (rol,))
+        assert a.permisos == frozenset({"listas.consultar", "listas.ver_evidencias", "listas.revisar",
+                                        "listas.ver_pdf_proveedor", "listas.forzar_actualizacion"})
+        assert not {"listas.importar", "listas.activar_version", "listas.consultar_independiente"} & a.permisos
+    assert ActorListas.desde_identidad_validada("issuer", "sub", ("administrador",)).permisos == frozenset()
     cargador = ActorListas.desde_identidad_validada("issuer", "sub", ("listas_cargador",))
     assert "listas.importar" in cargador.permisos
     assert "listas.activar_version" not in cargador.permisos

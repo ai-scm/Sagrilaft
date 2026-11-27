@@ -148,7 +148,7 @@ def test_f64_natural_un_sujeto_y_no_se_agrega_nacimiento_a_nombre_editado(archiv
     assert consulta["candidatos"][0]["nivel"] == "BAJA"
 
 
-@pytest.mark.parametrize("roles,estado", [([],403),(["acceso_proveedores","listas_revisor"],404),(["acceso_clientes"],403)])
+@pytest.mark.parametrize("roles,estado", [([],403),(["acceso_proveedores","listas_revisor"],404),(["acceso_proveedores"],404)])
 def test_f64_permisos_reales_en_ambos_circuitos(archivos,roles,estado):
     a = archivos
     a.cliente.headers["Authorization"] = "Bearer " + a.token(roles)

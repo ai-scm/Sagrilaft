@@ -121,8 +121,12 @@ def test_firma_y_ausencia_token(portal):
 
 def test_roles_y_acceso_cruzado(portal):
     assert crear(portal, expediente=portal.ajeno).status_code == 404
-    portal.cliente.headers["Authorization"] = f"Bearer {portal.token(['acceso_clientes'])}"
+    portal.cliente.headers["Authorization"] = f"Bearer {portal.token(['acceso_proveedores'])}"
+    assert crear(portal).status_code in (403, 404)  # expediente de cliente: el acceso a proveedores no lo alcanza
+    portal.cliente.headers["Authorization"] = f"Bearer {portal.token([])}"
     assert crear(portal).status_code == 403
+    portal.cliente.headers["Authorization"] = f"Bearer {portal.token(['acceso_clientes'])}"
+    assert crear(portal).status_code == 202  # el acceso del portal basta para consultar
 
 
 def test_grupo_atomico_y_reintento_preserva_datos_originales(portal):
@@ -163,11 +167,11 @@ def test_historial_reconsulta_pdf_y_revision_aditiva(portal):
     assert portal.cliente.get(pdf_ruta).status_code == 404
 
 
-def test_consultor_no_revisa_y_referencias_ajenas_no_valen(portal):
+def test_sin_acceso_al_expediente_no_revisa_y_referencias_ajenas_no_valen(portal):
     detalle = finalizar(portal)["consulta"]
     ruta = f"/api/consultas-listas/{detalle['consulta_id']}/revisiones"
-    portal.cliente.headers["Authorization"] = f"Bearer {portal.token(['acceso_clientes','listas_operador'])}"
-    assert portal.cliente.post(ruta, json={"resultado": "DESCARTADA", "justificacion": "Prueba"}).status_code == 403
+    portal.cliente.headers["Authorization"] = f"Bearer {portal.token(['acceso_proveedores'])}"
+    assert portal.cliente.post(ruta, json={"resultado": "DESCARTADA", "justificacion": "Prueba"}).status_code in (403, 404)
     portal.cliente.headers["Authorization"] = f"Bearer {portal.token()}"
     assert portal.cliente.post(ruta, json={"resultado": "DESCARTADA", "justificacion": "Prueba", "coincidencia_id": str(uuid4())}).status_code == 404
 

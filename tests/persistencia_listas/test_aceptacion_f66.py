@@ -115,7 +115,7 @@ def test_f66_O11_permisos_consulta_historial_y_pdf(archivos):
     identificador = crear(a).json()["consulta_id"]
     assert a.trabajador.ejecutar_uno()
     evidencia = detalle(a,identificador)["evidencias"][0]["id"]
-    for roles,estado in (([],403),(["acceso_clientes"],403),(["acceso_proveedores","listas_revisor"],404)):
+    for roles,estado in (([],403),(["acceso_proveedores"],404),(["acceso_proveedores","listas_revisor"],404)):
         a.cliente.headers["Authorization"] = "Bearer "+a.token(roles)
         assert crear(a,clave="sin-acceso").status_code == estado
         assert a.cliente.post(f"/api/expedientes/{a.expediente}/consultas-listas/grupos",headers={"Idempotency-Key":"sin-acceso"}).status_code == estado
