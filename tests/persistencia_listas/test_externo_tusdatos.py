@@ -73,10 +73,10 @@ def externo(sesiones, tmp_path, monkeypatch):
                 razon_social="EMPRESA DE PRUEBAS S A S", numero_identificacion="900000152", tipo_identificacion="NIT",
                 nombre_representante="MIGUEL FERNANDO PEREZ GOMEZ", numero_doc_representante="111", tipo_doc_representante="CC"))
 
-    def token(*roles):
+    def token(*roles, acceso=("acceso_clientes",)):
         return jwt.encode({"sub": "persona-local", "iss": keycloak.issuer, "aud": "portal", "azp": "portal",
                            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
-                           "realm_access": {"roles": ["acceso_clientes", *(roles or ("listas_revisor",))]}},
+                           "realm_access": {"roles": [*acceso, *(roles or ("listas_revisor",))]}},
                           clave, algorithm="RS256", headers={"kid": "clave-local"})
     cliente = TestClient(aplicacion)
     cliente.headers["Authorization"] = f"Bearer {token()}"
@@ -391,15 +391,29 @@ def test_forzar_actualizacion_lanza_con_force_y_queda_en_el_manifiesto(externo):
         assert sesion.get(ConsultaLista, UUID(forzada["consulta_id"])).manifiesto["forzar"] is True
 
 
-def test_forzar_exige_el_permiso_del_equipo_revisor(externo):
-    assert crear(externo, forzar=True, roles=("listas_operador",)).status_code == 403
-    assert externo.cliente.get("/api/listas/disponibilidad").json()["forzar"] is True
-    operador = externo.cliente.get("/api/listas/disponibilidad",
-                                   headers={"Authorization": f"Bearer {externo.token('listas_operador')}"}).json()
-    assert operador["forzar"] is False and operador["ver_pdf_proveedor"] is False
+def test_el_acceso_del_portal_basta_para_todas_las_funciones_de_listas(externo):
+    """Desde el 2026-11-27 no hacen falta roles de listas: acceso_clientes / acceso_proveedores bastan."""
+    sin_acceso = {"Authorization": f"Bearer {externo.token(acceso=())}"}  # sin acceso al portal: nada
+    assert externo.cliente.get("/api/listas/disponibilidad", headers=sin_acceso).status_code == 403
+    clientes = {"Authorization": f"Bearer {externo.token(acceso=('acceso_clientes',))}"}
+    capacidades = externo.cliente.get("/api/listas/disponibilidad", headers=clientes).json()
+    assert all(capacidades[c] for c in ("consultar", "historial", "revisar", "forzar", "ver_pdf_proveedor"))
 
 
-def test_pdf_del_proveedor_solo_para_el_equipo_revisor_y_queda_auditado(externo):
+def test_cada_acceso_solo_alcanza_los_expedientes_de_su_tipo(externo):
+    """El expediente de prueba es de un cliente: quien solo tiene acceso a proveedores no lo alcanza."""
+    proveedores = {"Authorization": f"Bearer {externo.token(acceso=('acceso_proveedores',))}"}
+    respuesta = externo.cliente.post(f"/api/expedientes/{externo.expediente}/consultas-listas", headers={
+        **proveedores, "Idempotency-Key": "cruzado"}, json={"criterio": {"tipo_sujeto": "PERSONA",
+        "identificadores": [{"tipo": "CC", "valor": "112"}]}})
+    assert respuesta.status_code in (403, 404)
+    assert lanzamientos(externo) == []
+    consulta_id = crear(externo, valor="112").json()["consulta_id"]
+    procesar(externo)
+    assert externo.cliente.get(f"/api/consultas-listas/{consulta_id}", headers=proveedores).status_code in (403, 404)
+
+
+def test_pdf_del_proveedor_para_el_acceso_del_expediente_y_queda_auditado(externo):
     externo.simulador.extras[("GET", f"/api/v2/report_pdf/{REPORTE_CC}")] = httpx.Response(
         200, content=PDF_MINIMO, headers={"content-type": "application/pdf"})
     consulta_id = crear(externo, valor="111").json()["consulta_id"]
@@ -409,12 +423,15 @@ def test_pdf_del_proveedor_solo_para_el_equipo_revisor_y_queda_auditado(externo)
     respuesta = externo.cliente.get(ruta)
     assert respuesta.status_code == 200 and respuesta.content == PDF_MINIMO
     assert f'filename="proveedor_{consulta_id}.pdf"' in respuesta.headers["content-disposition"]
-    operador = {"Authorization": f"Bearer {externo.token('listas_operador')}"}
-    assert externo.cliente.get(ruta, headers=operador).status_code == 403
+    # Cualquier persona con acceso a clientes lo descarga; quien solo ve proveedores, no.
+    clientes = {"Authorization": f"Bearer {externo.token(acceso=('acceso_clientes',))}"}
+    assert externo.cliente.get(ruta, headers=clientes).status_code == 200
+    proveedores = {"Authorization": f"Bearer {externo.token(acceso=('acceso_proveedores',))}"}
+    assert externo.cliente.get(ruta, headers=proveedores).status_code in (403, 404)
     with externo.sesiones() as sesion:
         lecturas = [ev.detalle for ev in sesion.scalars(select(EventoConsulta).where(
             EventoConsulta.consulta_id == UUID(consulta_id), EventoConsulta.tipo == "EVIDENCIA_LEIDA"))]
-    assert lecturas == [{"tipo": "PDF_PROVEEDOR", "evidencia_id": pdf["id"]}]
+    assert lecturas == [{"tipo": "PDF_PROVEEDOR", "evidencia_id": pdf["id"]}] * 2  # cada descarga queda auditada
 
 
 def test_documento_que_tusdatos_no_valida_queda_advertido(externo):
@@ -693,7 +710,8 @@ def test_capturas_de_las_fuentes_quedan_como_evidencia_restringida(externo):
     assert respuesta.status_code == 200 and respuesta.content == JPEG + b"ofac"
     assert respuesta.headers["content-type"] == "image/jpeg"
     assert f'filename="captura_ofac_{consulta_id}.jpg"' in respuesta.headers["content-disposition"]
-    assert externo.cliente.get(ruta, headers={"Authorization": f"Bearer {externo.token('listas_operador')}"}).status_code == 403
+    proveedores = {"Authorization": f"Bearer {externo.token(acceso=('acceso_proveedores',))}"}
+    assert externo.cliente.get(ruta, headers=proveedores).status_code in (403, 404)
 
 
 def test_la_misma_imagen_en_dos_consultas_no_rompe_el_cierre(externo):

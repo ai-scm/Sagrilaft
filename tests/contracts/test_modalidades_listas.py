@@ -149,11 +149,12 @@ def test_disponibilidad_sin_modalidad_no_ofrece_consultar(monkeypatch):
 
 # ── Forzar actualización y permisos del equipo revisor ───────────────────────
 
-def test_revisor_abre_pdf_del_proveedor_y_fuerza_consultas():
-    revisor = ActorListas.desde_identidad_validada("e", "s", ("listas_revisor",))
-    operador = ActorListas.desde_identidad_validada("e", "s", ("listas_operador",))
-    assert {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion"} <= revisor.permisos
-    assert not {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion"} & operador.permisos
+def test_roles_del_portal_abren_pdf_del_proveedor_y_fuerzan_consultas():
+    for roles in (("acceso_clientes",), ("acceso_proveedores",), ("listas_revisor",)):
+        actor = ActorListas.desde_identidad_validada("e", "s", roles)
+        assert {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion", "listas.revisar"} <= actor.permisos
+    heredado = ActorListas.desde_identidad_validada("e", "s", ("listas_operador",))
+    assert not {"listas.ver_pdf_proveedor", "listas.forzar_actualizacion"} & heredado.permisos
 
 
 def test_forzar_exige_permiso_antes_de_tocar_la_modalidad():
