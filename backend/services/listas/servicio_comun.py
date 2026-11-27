@@ -15,6 +15,15 @@ from services.listas.modalidades import modalidad_vigente, reintento_admitido
 from services.listas.politica_v2 import PoliticaListasV2
 
 
+
+def _documento_consultado(criterio: dict | None) -> str | None:
+    """«TIPO número» del primer documento del criterio admitido, para el historial."""
+    for identificador in (criterio or {}).get("identificadores") or ():
+        tipo, valor = identificador.get("tipo"), identificador.get("valor")
+        if tipo and valor:
+            return f"{tipo} {valor}"[:140]
+    return None
+
 class ServicioComunListas:
     def __init__(self, sesiones, politica: PoliticaListasV2, custodia, actor, contrapartes, entorno="development"):
         self.sesiones, self.politica, self.actor = sesiones, politica, actor
@@ -131,7 +140,8 @@ class ServicioComunListas:
             return {"consultas": [{"consulta_id": str(c.id), "estado": c.estado, "conclusion": c.conclusion,
                     "sujeto_rol": c.sujeto_rol, "creado_en": c.creado_en.isoformat(),
                     # Recarga automática: la consulta anterior que completa.
-                    "recupera": str(c.consulta_previa_id) if c.consulta_previa_id else None} for c in filas[:limite]],
+                    "recupera": str(c.consulta_previa_id) if c.consulta_previa_id else None,
+                    "documento": _documento_consultado(c.criterio_original)} for c in filas[:limite]],
                 "siguiente": str(filas[limite-1].id) if len(filas) > limite else None,
                 "legado": {"validaciones": [{"campo": r.campo, "resultado_original": r.resultado, "detalle": r.detalle}
                     for r in sesion.scalars(select(ResultadoValidacion).where(ResultadoValidacion.formulario_id == expediente_id,
