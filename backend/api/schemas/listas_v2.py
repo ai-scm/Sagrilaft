@@ -83,6 +83,7 @@ class ResumenConsultaLista(BaseModel):
     sujeto_rol: Literal["CONTRAPARTE", "REPRESENTANTE"]
     creado_en: str
     recupera: UUID | None = None  # recarga automática de esa consulta anterior
+    documento: str | None = None  # tipo y número consultados (p. ej. «CC 111»), para distinguir las consultas
 
 
 class AntecedenteLista(BaseModel):

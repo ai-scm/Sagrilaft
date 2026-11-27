@@ -254,6 +254,13 @@ def test_consulta_pendiente_del_adaptador_anterior_se_cierra_sin_lanzar(externo,
         assert trabajo.error == "ADAPTADOR_RETIRADO"
 
 
+def test_historial_muestra_el_documento_consultado(externo):
+    crear(externo, valor="111", fecha_expedicion="2014-12-01")
+    crear(externo, tipo="NIT", valor="900000152")
+    historial = externo.cliente.get(f"/api/expedientes/{externo.expediente}/consultas-listas").json()["consultas"]
+    assert {c["documento"] for c in historial} == {"CC 111", "NIT 900000152"}
+
+
 # ── Respuestas sin reporte ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("valor,codigo", [("128", "TITULAR_NO_AUTORIZA"), ("126", "RESULTADO_EN_CACHE_SIN_REFERENCIA")])
