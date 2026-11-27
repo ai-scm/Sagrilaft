@@ -261,6 +261,20 @@ def test_historial_muestra_el_documento_consultado(externo):
     assert {c["documento"] for c in historial} == {"CC 111", "NIT 900000152"}
 
 
+def test_constancia_de_tusdatos_es_auditoria_interna_y_no_el_informe_oficial(externo):
+    import io
+    from pypdf import PdfReader
+    consulta_id = crear(externo, valor="112").json()["consulta_id"]
+    procesar(externo)
+    constancia = next(e for e in detalle(externo, consulta_id)["evidencias"] if e["tipo"] == "INFORME_INTERNO")
+    assert constancia["generador_version"] == "constancia-tusdatos-v1"
+    respuesta = externo.cliente.get(f"/api/consultas-listas/{consulta_id}/evidencias/{constancia['id']}")
+    assert respuesta.status_code == 200 and respuesta.content.startswith(b"%PDF-")
+    texto = " ".join(" ".join(p.extract_text().split()) for p in PdfReader(io.BytesIO(respuesta.content)).pages)
+    assert "Constancia técnica del sistema" in texto and "Informe de consulta de listas" not in texto
+    assert "No es el informe oficial" in texto and "PDF que entrega Tusdatos" in texto
+
+
 # ── Respuestas sin reporte ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("valor,codigo", [("128", "TITULAR_NO_AUTORIZA"), ("126", "RESULTADO_EN_CACHE_SIN_REFERENCIA")])

@@ -159,20 +159,28 @@ gastado el crédito. Hay que revisarla y, si hace falta, forzar una nueva.
 
 ## Evidencias
 
-- **Informe interno:** lo genera el sistema con lo encontrado. Lo descarga cualquiera
-  que vea el historial.
-- **PDF de Tusdatos:** es el reporte oficial del proveedor. Trae datos de todas sus
-  fuentes, no solo de las de SAGRILAFT, así que solo lo descarga el equipo revisor y cada
-  descarga queda registrada.
+- **PDF oficial de Tusdatos:** es el reporte oficial del proveedor y la descarga principal
+  («Descargar PDF oficial», en «Reporte oficial de Tusdatos»). Trae datos de todas las
+  fuentes del plan, no solo de las de SAGRILAFT. El sistema lo pide al cerrar la consulta
+  (`/api/v2/report_pdf` o `report_nit_pdf`) y, si no llega, lo vuelve a pedir solo durante
+  24 horas. Mientras no exista, la pantalla lo dice. El ambiente de pruebas de Tusdatos no
+  entrega PDF, así que en staging nunca aparece.
 - **Capturas de pantalla:** para OFAC (por documento y por nombre), ONU, INTERPOL,
   EUROPOL, CIDOB, Procuraduría y Policía, Tusdatos publica una foto de la página de la
-  fuente tal como la vio al consultar. El sistema guarda una por fuente de la consulta,
-  con su huella, junto al PDF. Sirven de prueba si alguien pregunta qué mostraba la
-  fuente ese día. Las ve el mismo equipo que ve el PDF y cada descarga queda registrada.
-  No cuestan crédito. Si alguna no está, la consulta se cierra igual. Para apagarlas,
-  `LISTAS_TUSDATOS_CAPTURAS=false`. Listas y PEP no tiene captura: su evidencia es el
-  registro que trae el reporte.
+  fuente tal como la vio al consultar. El sistema guarda una por fuente, con su huella, y
+  se abre con «Ver captura de la fuente». No cuestan crédito. Si alguna no está, la
+  consulta se cierra igual. Para apagarlas, `LISTAS_TUSDATOS_CAPTURAS=false`. Listas y PEP
+  no tiene captura: su evidencia es el registro que trae el reporte.
+- **Constancia técnica del sistema** (sección «Auditoría», generador
+  `constancia-tusdatos-v1`): documento de auditoría interna de SAGRILAFT, **no el informe
+  oficial**. La genera el sistema al cerrar cada consulta (la base de datos la exige para
+  cerrar) y registra, sin posibilidad de cambios, qué se consultó, qué respondió Tusdatos en
+  las fuentes SAGRILAFT y qué concluyó el sistema. Su contenido es técnico (incluye el
+  registro en JSON). Las consultas cerradas antes del 2026-11-27 conservan la versión
+  anterior, titulada «Informe de consulta de listas».
 
+Pueden abrir y descargar todo quienes tengan acceso al expediente (`acceso_clientes` o
+`acceso_proveedores`, según su tipo). Cada descarga del PDF o de una captura queda registrada.
 ## Tiempos
 
 Una consulta tarda en promedio un minuto. Si en 15 minutos Tusdatos no responde, la

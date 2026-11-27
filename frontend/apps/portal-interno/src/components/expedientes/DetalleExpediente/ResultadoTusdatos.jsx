@@ -26,9 +26,6 @@ const CATEGORIAS = {
   listas_restrictivas: 'Lista restrictiva', listas_vinculantes: 'Lista vinculante', peps_internacionales: 'PEP internacional',
 };
 const AVISOS_DESTACADOS = new Set(['DOCUMENTO_NO_VALIDADO']);
-const NOMBRES_EVIDENCIA = { PDF_PROVEEDOR: 'PDF del proveedor (reporte oficial de Tusdatos)', INFORME_INTERNO: 'Constancia técnica del sistema' };
-// El PDF de Tusdatos es el documento principal; la constancia del sistema va después.
-const ORDEN_EVIDENCIA = { PDF_PROVEEDOR: 0, INFORME_INTERNO: 1 };
 
 // Nombres legibles de campos documentados por Tusdatos («Listas y PEPS»); el resto se muestra limpio.
 const CAMPOS = {
@@ -148,6 +145,10 @@ function ResultadoTusdatos({ consulta, descargar, puedeVerPdfProveedor = false }
   const capturas = useMemo(() => new Map(consulta.evidencias.filter(e => e.tipo === 'CAPTURA_PROVEEDOR')
     .map(e => [e.fuente_codigo, e])), [consulta.evidencias]);
   const conRegistro = consulta.fuentes.filter(f => f.estado === 'CON_REGISTRO').length;
+  // Evidencias: el PDF oficial de Tusdatos es la descarga principal; la constancia del sistema va en «Auditoría».
+  const pdfOficial = consulta.evidencias.find(e => e.tipo === 'PDF_PROVEEDOR');
+  const constancias = consulta.evidencias.filter(e => e.tipo === 'INFORME_INTERNO');
+  const pendiente = ['PENDIENTE', 'EN_CURSO'].includes(consulta.estado_ejecucion);
   const validado = consulta.documento_validado;
   return <div className="listas-resultado tusdatos-resultado">
     <h4>{etiquetaLista(consulta.estado_ejecucion)}</h4>
@@ -180,18 +181,30 @@ function ResultadoTusdatos({ consulta, descargar, puedeVerPdfProveedor = false }
         : <Fuente key={g.fuentes[0].id} fuente={g.fuentes[0]} captura={capturas.get(g.fuentes[0].codigo)}
             descargar={descargar} puedeVerEvidencias={puedeVerPdfProveedor} />)}
     </>}
-    <h5>Evidencias conservadas</h5>
-    {!consulta.evidencias.some(e => e.tipo !== 'CAPTURA_PROVEEDOR') && <p>No hay un informe disponible para esta consulta.</p>}
-    {consulta.evidencias.filter(e => e.tipo !== 'CAPTURA_PROVEEDOR')
-      .sort((x, y) => (ORDEN_EVIDENCIA[x.tipo] ?? 9) - (ORDEN_EVIDENCIA[y.tipo] ?? 9))
-      .map(e => <div key={e.id} className="tusdatos-evidencia">
-      <span>{NOMBRES_EVIDENCIA[e.tipo] ?? e.tipo} · {e.creada_en && new Date(e.creada_en).toLocaleString()}</span>
-      {e.estado === 'DISPONIBLE' && (e.tipo !== 'PDF_PROVEEDOR' || puedeVerPdfProveedor) && <button type="button"
-        className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar</button>}
-    </div>)}
-    {consulta.evidencias.some(e => e.tipo === 'PDF_PROVEEDOR' || e.tipo === 'CAPTURA_PROVEEDOR') && <p className="listas-nota">
+    <h5>Reporte oficial de Tusdatos</h5>
+    {pdfOficial
+      ? <div className="tusdatos-evidencia tusdatos-evidencia--principal">
+          <span><strong>PDF oficial de Tusdatos</strong> · {pdfOficial.creada_en && new Date(pdfOficial.creada_en).toLocaleString()}</span>
+          {pdfOficial.estado === 'DISPONIBLE' && puedeVerPdfProveedor && <button type="button" className="btn-modal btn-modal-primary"
+            onClick={() => descargar(pdfOficial.id, pdfOficial.tipo)}>Descargar PDF oficial</button>}
+        </div>
+      : <p className="listas-nota">{pendiente
+          ? 'El PDF oficial estará disponible cuando termine la consulta.'
+          : 'Tusdatos todavía no ha entregado el PDF oficial de esta consulta. El sistema lo vuelve a pedir solo durante 24 horas y, si llega, aparece aquí. (El ambiente de pruebas de Tusdatos no entrega PDF.)'}</p>}
+    {(pdfOficial || capturas.size > 0) && <p className="listas-nota">
       El PDF y las capturas del proveedor contienen datos de la fuente; su acceso queda registrado.
     </p>}
+    {!!constancias.length && <details className="tusdatos-auditoria">
+      <summary>Auditoría</summary>
+      <p className="listas-nota">La constancia técnica es un documento de auditoría interna de SAGRILAFT, no el informe oficial:
+        registra qué se consultó, qué respondió Tusdatos en las fuentes SAGRILAFT y qué concluyó el sistema, sin posibilidad de cambios.
+        Su contenido es técnico (incluye el registro en formato JSON).</p>
+      {constancias.map(e => <div key={e.id} className="tusdatos-evidencia">
+        <span>Constancia técnica del sistema · {e.creada_en && new Date(e.creada_en).toLocaleString()}</span>
+        {e.estado === 'DISPONIBLE' && <button type="button" className="btn-modal btn-modal-secondary"
+          onClick={() => descargar(e.id, e.tipo)}>Descargar constancia</button>}
+      </div>)}
+    </details>}
   </div>;
 }
 
