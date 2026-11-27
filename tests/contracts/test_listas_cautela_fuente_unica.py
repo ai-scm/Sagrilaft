@@ -106,12 +106,15 @@ def test_load_config_admite_externo_con_tusdatos_en_staging(monkeypatch):
     assert load_config().listas_cautela.implementacion == "externo"
 
 
-def test_load_config_rechaza_sagrilaft_incluso_configurado_en_produccion(monkeypatch):
+def test_produccion_admite_tusdatos_pero_no_simulador_ni_archivos(monkeypatch):
+    """Desde el 2026-11-27 producción puede encender Tusdatos; nunca el simulador ni los archivos."""
     _preparar_env_base(monkeypatch, "production")
     monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "sagrilaft")
-    monkeypatch.setenv("SAGRILAFT_API_URL", "https://api.tusdatos.co")
-    monkeypatch.setenv("SAGRILAFT_API_KEY", "usuario:clave")
-    with pytest.raises(RuntimeError, match="producción debe permanecer deshabilitada"):
+    monkeypatch.setenv("LISTAS_TUSDATOS_URL", "https://dash-board.tusdatos.co")
+    monkeypatch.setenv("LISTAS_TUSDATOS_TOKEN", "api_td_prueba")
+    assert load_config().listas_cautela.implementacion == "externo"
+    monkeypatch.setenv("PROVEEDOR_LISTAS_CAUTELA", "dummy")
+    with pytest.raises(RuntimeError, match="producción solo admite"):
         load_config()
 
 

@@ -51,11 +51,11 @@ def test_configuracion_invalida_no_arranca(cambios):
         configuracion(**cambios)
 
 
-def test_produccion_exige_https_real_y_token():
+def test_produccion_rechaza_el_sandbox_y_acepta_token_o_usuario_y_clave():
     with pytest.raises(ListasNoDisponibles, match="sandbox"):
         configuracion().validar_entorno("production")
-    with pytest.raises(ListasNoDisponibles, match="Token"):
-        configuracion(url_base="https://dash-board.tusdatos.co").validar_entorno("production")
+    # Usuario y clave (Basic Auth): la cuenta demo no pudo crear API Tokens.
+    configuracion(url_base="https://dash-board.tusdatos.co").validar_entorno("production")
     ConfiguracionTusdatos(url_base="https://dash-board.tusdatos.co", token="api_td_x").validar_entorno("production")
 
 
