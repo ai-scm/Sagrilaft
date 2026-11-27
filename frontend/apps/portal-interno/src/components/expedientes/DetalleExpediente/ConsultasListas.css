@@ -56,3 +56,6 @@
 .listas-panel details > summary { cursor: pointer; font-weight: 600; color: #334155; }
 
 @media (max-width: 720px) { .listas-campos { grid-template-columns: 1fr; } }
+
+.listas-confirmacion { border: 1px solid #93C5FD; background: #EFF6FF; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.listas-confirmacion p { margin: 0; }

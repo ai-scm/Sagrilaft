@@ -21,7 +21,8 @@ function opcionesRevision(consulta) {
 }
 const AVISO_REUTILIZADA = 'Ya había una consulta de este documento en las últimas 6 horas en este expediente; se muestra esa y no se consumió otro crédito.';
 
-function avisoAdmision(respuesta, ambos) {
+function avisoAdmision(respuesta, ambos, externo) {
+  if (!ambos && externo && !respuesta.reutilizada) return 'Reporte solicitado. El resultado aparece en el historial en unos minutos.';
   if (!ambos) return respuesta.reutilizada ? AVISO_REUTILIZADA : 'Consulta registrada.';
   const partes = respuesta.no_consultados.map(s => `${s.sujeto_rol}: ${s.motivo}`);
   const reutilizadas = respuesta.consultas.filter(c => c.reutilizada).map(c => c.sujeto_rol);
@@ -128,7 +129,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       sessionStorage.setItem(almacenamiento, JSON.stringify({ operacion, clave }));
       const respuesta = ambos ? await listas.grupo(expediente.id, clave) : await listas.crear(expediente.id, datos, clave);
       sessionStorage.removeItem(almacenamiento);
-      setAviso(avisoAdmision(respuesta, ambos));
+      setAviso(avisoAdmision(respuesta, ambos, capacidades.implementacion === 'externo'));
       if (capacidades.historial) {
         await cargar();
         const id = ambos ? respuesta.consultas[0]?.consulta_id : respuesta.consulta_id;
@@ -136,7 +137,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       }
     } catch (e) { setError(e.message); }
     finally { setOcupado(false); }
-  }, [capacidades.version_contrato, capacidades.historial, expediente.id, cargar, ver]);
+  }, [capacidades.version_contrato, capacidades.historial, capacidades.implementacion, expediente.id, cargar, ver]);
 
   // Consulta nueva del mismo sujeto aunque haya una reciente: gasta un crédito del proveedor.
   const forzarActualizacion = useCallback(async function forzarActualizacion(actual) {
@@ -195,7 +196,7 @@ export default function ConsultasListas({ expediente, enModal = false }) {
       {!!legado?.validaciones?.length && <details><summary>Antecedentes de listas del circuito anterior</summary><p>Información heredada sin versiones verificables; no constituye una nueva decisión.</p><ul>{legado.validaciones.map((v, i) => <li key={i}>{v.campo}: {v.resultado_original}. {v.detalle}</li>)}</ul></details>}
       {!historial.length && <p className="listas-vacio">No hay consultas registradas en el módulo nuevo.</p>}
       <ul className="listas-historial">{paginacionHistorial.elementosPagina.map(c => <li key={c.consulta_id}><button type="button" className="listas-item" aria-current={consulta?.consulta_id === c.consulta_id} onClick={() => ver(c.consulta_id)}>
-        {c.sujeto_rol} · <span className="listas-estado" data-estado={c.estado}>{etiquetas[c.estado]}</span> · {new Date(c.creado_en).toLocaleString()}
+        {(capacidades.implementacion === 'externo' && c.documento) || c.sujeto_rol} · <span className="listas-estado" data-estado={c.estado}>{etiquetas[c.estado]}</span> · {new Date(c.creado_en).toLocaleString()}
         {c.recupera && <> · <span title="Tusdatos volvió a consultar, sin gastar crédito, las fuentes que fallaron en la consulta anterior">recarga automática</span></>}
       </button></li>)}</ul>
       <ControlsPaginacion
