@@ -178,8 +178,8 @@ Si hubiera que repetirlo (por ejemplo, para recrear staging desde cero):
      defenses → Brute force detection): bloqueo temporal, 5 fallos, espera de 1
      minuto con tope de 15 y reinicio a las 12 horas.
    - **Usuarios**, en el realm `sagrilaft`, con roles del realm asignados directo al
-     usuario: `acceso_clientes`, `acceso_proveedores` y, para listas, `listas_revisor`
-     o `listas_operador`. El backend lee los roles del token; un grupo sin roles
+     usuario: `acceso_clientes` y/o `acceso_proveedores`, que desde el 2026-11-27 también
+     dan las funciones de listas. El backend lee los roles del token; un grupo sin roles
      asignados no da ningún permiso.
    - La consola de Keycloak avisa que el administrador es "temporal". Es el
      administrador de arranque que crea Keycloak 26. Se deja como está: es el usuario

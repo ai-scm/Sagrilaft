@@ -343,9 +343,9 @@ modalidad al arrancar:
 - `simulado` exige `LISTAS_SIMULACION_ESCENARIO` (`sin_coincidencias_v1`,
   `coincidencia_v1`, `parcial_v1`, `error_v1`). Si la modalidad viene solo de la
   variable heredada `dummy`, se usa `sin_coincidencias_v1`.
-- **Producción:** `validar_entorno` rechaza cualquier modalidad distinta de
-  `deshabilitado` y la administración habilitada. Habilitar producción exige cambiar
-  esa regla, por decisión expresa.
+- **Producción:** `validar_entorno` admite solo `deshabilitado` (valor por defecto) o
+  `externo` (Tusdatos, desde el 2026-11-27), y rechaza el simulador, los archivos y la
+  administración habilitada. El CDK aplica la misma regla y prohíbe el sandbox.
 
 **Registro único de modalidades** (`backend/services/listas/modalidades.py`). La
 configuración solo elige el nombre; lo que significa cada modalidad lo declara su
@@ -383,18 +383,20 @@ en `archivos` o `externo` cuando su configuración está completa.
   cliente, sujeto y `exp` obligatorio; un JWT sin `exp` o con `exp=null` recibe 401).
   El actor se identifica por `issuer` y `sub`, nunca por datos del cuerpo. Las
   operaciones administrativas vuelven a validar el JWT antes de confirmar una mutación.
-- **Acceso a expedientes.** Además del permiso de listas, se exige `acceso_clientes`
-  o `acceso_proveedores` según el tipo de contraparte, comprobado sobre el expediente
-  real en cada lectura y escritura.
-- **Permisos por rol** (`services/listas/politica_v2.py`). `listas_operador` y
-  `listas_revisor` vienen en `keycloak/realm-sagrilaft.json` para realms nuevos; en un
-  realm existente se crean con `scripts/listas/crear_roles_listas_keycloak.sh`. No se ha
-  verificado si están creados y asignados en el Keycloak de producción.
+- **Acceso a expedientes.** Se exige `acceso_clientes` o `acceso_proveedores` según el
+  tipo de contraparte, comprobado sobre el expediente real en cada lectura y escritura.
+- **Permisos por rol** (`services/listas/politica_v2.py`). Desde el 2026-11-27 los mismos
+  roles del portal (`acceso_clientes`, `acceso_proveedores`) dan todas las funciones de
+  listas sobre expedientes: consultar, ver resultados y evidencias (también el PDF y las
+  capturas del proveedor), revisar y forzar. Cada uno solo sobre los expedientes de su tipo.
+  `listas_operador` y `listas_revisor` ya no hacen falta; se conservan para no quitar
+  acceso a quien los tenga.
 
 | Rol | Permisos |
 |---|---|
-| `listas_operador` | `listas.consultar`, `listas.ver_evidencias` |
-| `listas_revisor` | los anteriores + `listas.revisar`, `listas.ver_pdf_proveedor` (PDF del proveedor) y `listas.forzar_actualizacion` (consulta externa nueva) |
+| `acceso_clientes`, `acceso_proveedores` | `listas.consultar`, `listas.ver_evidencias`, `listas.revisar`, `listas.ver_pdf_proveedor` (PDF y capturas del proveedor), `listas.forzar_actualizacion` (consulta externa nueva) |
+| `listas_operador` (heredado) | `listas.consultar`, `listas.ver_evidencias` |
+| `listas_revisor` (heredado) | igual que `acceso_clientes` |
 | `listas_cargador` | `listas.importar`, `listas.comparar`, `listas.ver_administracion` |
 | `listas_aprobador` | `listas.comparar`, `listas.ver_administracion`, `listas.aprobar_version`, `listas.activar_version` |
 | `listas_incidentes` | `listas.ver_administracion`, `listas.bloquear_version`, `listas.reconstruir_version` |

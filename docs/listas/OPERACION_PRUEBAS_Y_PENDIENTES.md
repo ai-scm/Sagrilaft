@@ -43,9 +43,8 @@ Variables del Compose (todas con valor seguro por defecto):
 
 Roles necesarios en el Keycloak local (ver
 [permisos](ARQUITECTURA_LISTAS.md#8-seguridad-y-permisos)): `listas_cargador` y
-`listas_aprobador` para administrar (pueden estar en la misma cuenta), y
-`listas_operador` o `listas_revisor` más `acceso_clientes`/`acceso_proveedores`
-para consultar. Su existencia en Keycloak no se ha verificado: hay que crearlos y
+`listas_aprobador` para administrar (pueden estar en la misma cuenta). Para consultar
+basta `acceso_clientes`/`acceso_proveedores` (desde el 2026-11-27). Su existencia en Keycloak no se ha verificado: hay que crearlos y
 asignarlos desde la consola.
 
 ## 2. Perfiles y límites
@@ -457,10 +456,11 @@ Sirven como aviso para quien mantenga el módulo:
   y el secreto `sagrilaft/<ambiente>/tusdatos_credentials` (vacío en los dos ambientes).
 - CDK: `-c proveedorListasCautela` acepta `simulado`/`dummy`, `externo`/`sagrilaft` y
   `deshabilitado` (sin contexto: `dummy` en staging y `deshabilitado` en producción).
-  Externo exige `-c habilitarNatEgress=true`; producción rechaza externo y el sandbox.
+  Externo exige `-c habilitarNatEgress=true`; producción admite externo (desde el
+  2026-11-27, apagado por defecto) y rechaza el simulador y el sandbox.
   `-c tusdatosUrl` permite el sandbox fuera de producción.
-- Roles `listas_operador` y `listas_revisor`: vienen en `keycloak/realm-sagrilaft.json`
-  para realms nuevos; para uno existente, `scripts/listas/crear_roles_listas_keycloak.sh`.
+- Roles `listas_operador` y `listas_revisor`: heredados; desde el 2026-11-27 no hacen
+  falta, porque `acceso_clientes`/`acceso_proveedores` dan las funciones de listas.
 
 En staging, la consulta simulada con informe en S3 y revisión humana pasó el 2026-11-17
 ([pruebas de esa fecha](../produccion/ESTIMACION_COSTOS_AWS.md#staging-hecho-el-17-nov-2026)).
@@ -496,7 +496,8 @@ En staging, la consulta simulada con informe en S3 y revisión humana pasó el 2
 
 ### Antes de producción
 
-- Decidir y cambiar `validar_entorno`, que hoy obliga a `deshabilitado` en producción.
+- ~~Decidir y cambiar `validar_entorno`~~: hecho el 2026-11-27, producción admite Tusdatos
+  (apagado por defecto). Pasos para encenderlo en [TUSDATOS.md](TUSDATOS.md#activar-en-producción).
 - Políticas operativas aprobadas: frecuencia de comprobación y vigencia (P02,
   **propuesto**), umbrales de anomalías (P04, **propuesto**), retención y purga,
   enmascaramiento de datos por rol, responsables (titular y suplente) y auditoría

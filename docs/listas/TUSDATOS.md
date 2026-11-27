@@ -297,6 +297,37 @@ Mientras no estén por escrito, se tratan como probables, no como seguras.
 - Si firman un contrato de transmisión de datos personales. La propuesta solo pide nuestra
   política de tratamiento.
 
+## Quién puede usar las consultas
+
+Desde el 2026-11-27, los mismos roles del portal interno (`acceso_clientes` y
+`acceso_proveedores`) dan todas las funciones de listas: consultar («Generar reporte»), ver
+resultados, descargar el PDF oficial de Tusdatos, las capturas y la constancia técnica,
+registrar revisiones y forzar una consulta nueva. Cada persona solo alcanza los expedientes de
+su tipo de acceso: quien tiene solo `acceso_clientes` no ve ni consulta expedientes de
+proveedores, y al revés. No hacen falta los roles `listas_operador` ni `listas_revisor`.
+
+## Activar en producción
+
+El código queda listo: producción admite Tusdatos, pero sigue apagado (`deshabilitado`)
+hasta comprar el plan. Producción acepta API Token (preferido) o usuario y clave del portal
+de Tusdatos (Basic Auth). Pasos el día de la compra, sin desarrollo:
+
+1. **Credenciales.** Rellenar el secreto `sagrilaft/prod/tusdatos_credentials` con
+   `{"token":"api_td_…","usuario":"","clave":""}` o, si Tusdatos no habilita tokens,
+   `{"token":"","usuario":"<correo>","clave":"<clave>"}`. Nunca los dos a la vez.
+2. **Cuenta de Tusdatos.** En su panel, categorizar como «alto» las fuentes SAGRILAFT
+   (OFAC, ONU, PEP, Procuraduría, Contraloría, Policía…): no decide nada aquí, pero así el
+   PDF oficial y su panel coinciden con el portal.
+3. **Despliegue.** `cdk diff` de producción con `-c proveedorListasCautela=externo`: debe
+   cambiar solo el parámetro `PROVEEDOR_LISTAS_CAUTELA` y el número de tareas del trabajador
+   de listas (0 → 1). La NAT ya está encendida en producción. Como cambia SSM, se aplica
+   aparte de una release `compatible`; los planes de release siguientes deben llevar
+   `"proveedorListasCautela": "externo"` en `context`.
+4. **Primera consulta real** (gasta un crédito), con un documento autorizado. Comprobar:
+   que llega el «PDF del proveedor» (`report_pdf`), el saldo (`plans`, métrica
+   `TusdatosCreditosRestantes`), y si alguna fuente falla, la recarga (`retry`).
+5. **Alarma de créditos** sobre `TusdatosCreditosRestantes` (pendiente, ver abajo).
+
 ## Pendiente
 
 - La búsqueda en el historial no se puede probar en el sandbox, porque allí no existe.
