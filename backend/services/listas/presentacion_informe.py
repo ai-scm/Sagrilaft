@@ -15,6 +15,9 @@ ETIQUETAS = {
     "fecha_nacimiento": "Fecha de nacimiento", "fecha_expedicion": "Fecha de expedición",
     "nacionalidades": "Nacionalidades", "ciudadanias": "Ciudadanías", "ubicacion": "Ubicación",
     "ubicaciones": "Ubicaciones", "tipo_sujeto": "Tipo de sujeto", "observacion": "Observación",
+    # Estado de cada fuente en Tusdatos (contrato tusdatos-1).
+    "CON_REGISTRO": "Con registro", "SIN_REGISTRO": "Sin registro",
+    "NO_CONSULTADA": "No se pudo consultar", "NO_INCLUIDA": "No incluida en el reporte",
 }
 
 
@@ -160,4 +163,66 @@ def presentar_informe(datos):
         contenido += filas([("Fuente", fuente["fuente_codigo"]), ("Generación de búsqueda", fuente["generacion_id"]),
             ("Hash de generación", fuente["generacion_hash"]), ("Adaptador", fuente["version_adaptador"]),
             ("Normalización", fuente["version_normalizacion"])])
-    return '<html lang="es"><meta charset="utf-8"><style>@page {size:A4; margin:18mm} body {font-family:sans-serif; font-size:10pt; color:#17212b} h1 {font-size:18pt} h2 {font-size:13pt; margin-top:20pt} dt {font-weight:bold; margin-top:5pt} dd {margin-left:0; overflow-wrap:anywhere; white-space:pre-wrap} h2,h3,dt {break-after:avoid} dl {margin:8pt 0} </style><body>' + contenido + '</body></html>'
+    return documento_html(contenido)
+
+
+_ESTILO = ('@page {size:A4; margin:18mm} body {font-family:sans-serif; font-size:10pt; color:#17212b} h1 {font-size:18pt} '
+           'h2 {font-size:13pt; margin-top:20pt} dt {font-weight:bold; margin-top:5pt} '
+           'dd {margin-left:0; overflow-wrap:anywhere; white-space:pre-wrap} h2,h3,dt {break-after:avoid} dl {margin:8pt 0} ')
+
+
+def documento_html(contenido, estilo_extra=""):
+    """Documento A4 común a los informes y constancias del módulo."""
+    return f'<html lang="es"><meta charset="utf-8"><style>{_ESTILO}{estilo_extra}</style><body>{contenido}</body></html>'
+
+
+def _documento_consultado(criterio):
+    documento = next(iter(criterio.get("identificadores") or ()), None)
+    partes = [f"{documento['tipo']} {documento['valor']}" if documento else None,
+              f"expedición {criterio['fecha_expedicion']}" if criterio.get("fecha_expedicion") else None,
+              criterio.get("nombre")]
+    return " · ".join(p for p in partes if p) or None
+
+
+def presentar_constancia_tusdatos(datos):
+    """Constancia técnica de una consulta a Tusdatos: documento de auditoría interna, no el informe oficial.
+
+    Solo dos tablas: los datos de la consulta y el estado de cada fuente. El detalle de cada registro
+    está en la pantalla y en el PDF oficial de Tusdatos; el resultado completo queda en la base de
+    datos, y su huella (aquí) permite comprobar que esta constancia le corresponde.
+    """
+    from services.listas.informes import calcular_huella
+    resultado, contexto = datos["resultado"], datos.get("contexto", {})
+    validado = resultado.get("documento_validado")
+    avisos = "; ".join(a["descripcion"] for a in resultado.get("avisos", [])) or "Ninguno"
+    contenido = "<h1>Constancia técnica del sistema</h1>"
+    contenido += ('<p class="aviso"><strong>Documento de auditoría interna de SAGRILAFT. No es el informe oficial.</strong> '
+                  "El reporte oficial de la consulta es el PDF que entrega Tusdatos. Esta constancia la genera el sistema "
+                  "al cerrar la consulta y deja registro, sin posibilidad de cambios, de qué se consultó y qué concluyó el "
+                  "sistema con las fuentes SAGRILAFT. Los registros requieren revisión humana; este documento no decide "
+                  "sanciones ni riesgo.</p>")
+    contenido += "<h2>Datos de la consulta</h2>" + filas([
+        ("Documento consultado", _documento_consultado(datos.get("criterio", {}))),
+        ("Nombre según Tusdatos", resultado.get("titular_nombre")),
+        ("Documento validado", {True: "Sí", False: "No"}.get(validado, "No aplica")),
+        ("Expediente", contexto.get("expediente_id")), ("Sujeto consultado", etiqueta(contexto.get("sujeto_rol", "No informado"))),
+        ("Consulta", resultado["consulta_id"]), ("Fecha de consulta", resultado["fecha_inicio"]),
+        ("Fecha de cierre", resultado.get("fecha_fin")), ("Estado", etiqueta(resultado["estado_ejecucion"])),
+        ("Conclusión del sistema", etiqueta(resultado["conclusion_busqueda"])),
+        ("Nivel informado por Tusdatos (solo referencia)", resultado.get("nivel_informado_proveedor")),
+        ("Avisos", avisos), *((("Error", f"{resultado['error']['mensaje']} ({resultado['error']['codigo']})"),)
+                              if resultado.get("error") else ()),
+        ("Reporte en Tusdatos", resultado.get("reporte_proveedor_id")),
+        ("Huella SHA-256 de la respuesta de Tusdatos", resultado.get("huella_respuesta")),
+        ("Huella SHA-256 del resultado conservado", calcular_huella(resultado)),
+        ("Generador", datos["version_generador"]),
+    ])
+    contenido += ("<h2>Fuentes</h2><table><thead><tr><th>Fuente</th><th>Estado</th><th>Registros</th><th>Motivo</th>"
+                  "</tr></thead><tbody>")
+    contenido += "".join(f"<tr><td>{texto(f['nombre'])}</td><td>{texto(etiqueta(f['estado']))}</td>"
+                         f"<td>{len(f.get('registros') or ())}</td><td>{texto(f.get('motivo') or '')}</td></tr>"
+                         for f in resultado.get("fuentes", []))
+    contenido += "</tbody></table>"
+    return documento_html(contenido, ".aviso {border:1px solid #999; padding:8px 10px; background:#f3f3f3} "
+                          "table {border-collapse:collapse; width:100%} th,td {border:1px solid #ccc; padding:4px 6px; "
+                          "text-align:left; vertical-align:top} th {background:#f3f3f3} tr {break-inside:avoid}")
