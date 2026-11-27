@@ -174,6 +174,13 @@ def test_version_y_resumen_de_pep_se_conservan_si_vienen():
     assert fuente(interpretar(reporte).resultado, "peps_denom").resumen == ()
 
 
+def test_id_y_huella_del_reporte_del_proveedor_quedan_en_el_resultado():
+    resultado = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112", reporte_id="8188f7e8aa70102bf2053f32",
+                            huella_respuesta="b" * 64).resultado
+    assert resultado.reporte_proveedor_id == "8188f7e8aa70102bf2053f32" and resultado.huella_respuesta == "b" * 64
+    assert interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado.huella_respuesta is None
+
+
 def test_nombre_oficial_de_la_fuente_sale_del_catalogo():
     resultado = interpretar(REPORTES["report_cc_sin_hallazgo"], "CC", "112").resultado
     assert fuente(resultado, "ofac").nombre.startswith("Lista Clinton (OFAC)")
