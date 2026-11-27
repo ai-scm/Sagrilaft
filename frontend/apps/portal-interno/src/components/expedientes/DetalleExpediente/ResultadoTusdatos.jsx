@@ -26,7 +26,9 @@ const CATEGORIAS = {
   listas_restrictivas: 'Lista restrictiva', listas_vinculantes: 'Lista vinculante', peps_internacionales: 'PEP internacional',
 };
 const AVISOS_DESTACADOS = new Set(['DOCUMENTO_NO_VALIDADO']);
-const NOMBRES_EVIDENCIA = { PDF_PROVEEDOR: 'PDF del proveedor', INFORME_INTERNO: 'Informe de la consulta' };
+const NOMBRES_EVIDENCIA = { PDF_PROVEEDOR: 'PDF del proveedor (reporte oficial de Tusdatos)', INFORME_INTERNO: 'Constancia técnica del sistema' };
+// El PDF de Tusdatos es el documento principal; la constancia del sistema va después.
+const ORDEN_EVIDENCIA = { PDF_PROVEEDOR: 0, INFORME_INTERNO: 1 };
 
 // Nombres legibles de campos documentados por Tusdatos («Listas y PEPS»); el resto se muestra limpio.
 const CAMPOS = {
@@ -180,7 +182,9 @@ function ResultadoTusdatos({ consulta, descargar, puedeVerPdfProveedor = false }
     </>}
     <h5>Evidencias conservadas</h5>
     {!consulta.evidencias.some(e => e.tipo !== 'CAPTURA_PROVEEDOR') && <p>No hay un informe disponible para esta consulta.</p>}
-    {consulta.evidencias.filter(e => e.tipo !== 'CAPTURA_PROVEEDOR').map(e => <div key={e.id} className="tusdatos-evidencia">
+    {consulta.evidencias.filter(e => e.tipo !== 'CAPTURA_PROVEEDOR')
+      .sort((x, y) => (ORDEN_EVIDENCIA[x.tipo] ?? 9) - (ORDEN_EVIDENCIA[y.tipo] ?? 9))
+      .map(e => <div key={e.id} className="tusdatos-evidencia">
       <span>{NOMBRES_EVIDENCIA[e.tipo] ?? e.tipo} · {e.creada_en && new Date(e.creada_en).toLocaleString()}</span>
       {e.estado === 'DISPONIBLE' && (e.tipo !== 'PDF_PROVEEDOR' || puedeVerPdfProveedor) && <button type="button"
         className="btn-modal btn-modal-secondary" onClick={() => descargar(e.id, e.tipo)}>Descargar</button>}
