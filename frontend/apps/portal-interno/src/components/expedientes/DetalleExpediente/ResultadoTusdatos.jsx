@@ -198,7 +198,7 @@ function ResultadoTusdatos({ consulta, descargar, puedeVerPdfProveedor = false }
       <summary>Auditoría</summary>
       <p className="listas-nota">La constancia técnica es un documento de auditoría interna de SAGRILAFT, no el informe oficial:
         registra qué se consultó, qué respondió Tusdatos en las fuentes SAGRILAFT y qué concluyó el sistema, sin posibilidad de cambios.
-        Su contenido es técnico (incluye el registro en formato JSON).</p>
+        Resume la consulta y el estado de cada fuente, con huellas para cotejarla con lo guardado.</p>
       {constancias.map(e => <div key={e.id} className="tusdatos-evidencia">
         <span>Constancia técnica del sistema · {e.creada_en && new Date(e.creada_en).toLocaleString()}</span>
         {e.estado === 'DISPONIBLE' && <button type="button" className="btn-modal btn-modal-secondary"

@@ -170,14 +170,20 @@ gastado el crédito. Hay que revisarla y, si hace falta, forzar una nueva.
   fuente tal como la vio al consultar. El sistema guarda una por fuente, con su huella, y
   se abre con «Ver captura de la fuente». No cuestan crédito. Si alguna no está, la
   consulta se cierra igual. Para apagarlas, `LISTAS_TUSDATOS_CAPTURAS=false`. Listas y PEP
-  no tiene captura: su evidencia es el registro que trae el reporte.
+  no tiene captura: su evidencia es el registro que trae el reporte. Si dos consultas
+  reciben una imagen idéntica (siempre en el sandbox; en producción, por ejemplo, al forzar
+  una consulta), las dos la conservan: comparten el mismo archivo custodiado (migración
+  `o65e78f901ab`, 2026-11-27). Antes de ese cambio la segunda se quedaba sin captura.
 - **Constancia técnica del sistema** (sección «Auditoría», generador
-  `constancia-tusdatos-v1`): documento de auditoría interna de SAGRILAFT, **no el informe
+  `constancia-tusdatos-v2`): documento de auditoría interna de SAGRILAFT, **no el informe
   oficial**. La genera el sistema al cerrar cada consulta (la base de datos la exige para
-  cerrar) y registra, sin posibilidad de cambios, qué se consultó, qué respondió Tusdatos en
-  las fuentes SAGRILAFT y qué concluyó el sistema. Su contenido es técnico (incluye el
-  registro en JSON). Las consultas cerradas antes del 2026-11-27 conservan la versión
-  anterior, titulada «Informe de consulta de listas».
+  cerrar). Tiene dos tablas: los datos de la consulta (documento consultado, estado,
+  conclusión del sistema, id del reporte en Tusdatos y huellas SHA-256 de la respuesta de
+  Tusdatos y del resultado conservado) y el estado de cada fuente con su número de
+  registros. No repite el detalle de los registros (está en la pantalla y en el PDF
+  oficial) ni el registro en JSON: el resultado completo queda en la base de datos y las
+  huellas permiten cotejarlo. Las constancias anteriores conservan su versión (`v1`, con
+  JSON; antes del 2026-11-27, «Informe de consulta de listas»).
 
 Pueden abrir y descargar todo quienes tengan acceso al expediente (`acceso_clientes` o
 `acceso_proveedores`, según su tipo). Cada descarga del PDF o de una captura queda registrada.
