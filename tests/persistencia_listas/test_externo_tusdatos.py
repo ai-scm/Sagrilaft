@@ -267,12 +267,18 @@ def test_constancia_de_tusdatos_es_auditoria_interna_y_no_el_informe_oficial(ext
     consulta_id = crear(externo, valor="112").json()["consulta_id"]
     procesar(externo)
     constancia = next(e for e in detalle(externo, consulta_id)["evidencias"] if e["tipo"] == "INFORME_INTERNO")
-    assert constancia["generador_version"] == "constancia-tusdatos-v1"
+    assert constancia["generador_version"] == "constancia-tusdatos-v2"
     respuesta = externo.cliente.get(f"/api/consultas-listas/{consulta_id}/evidencias/{constancia['id']}")
     assert respuesta.status_code == 200 and respuesta.content.startswith(b"%PDF-")
     texto = " ".join(" ".join(p.extract_text().split()) for p in PdfReader(io.BytesIO(respuesta.content)).pages)
     assert "Constancia técnica del sistema" in texto and "Informe de consulta de listas" not in texto
     assert "No es el informe oficial" in texto and "PDF que entrega Tusdatos" in texto
+    # Dos tablas legibles, sin el registro en JSON; con las huellas para cotejar con lo guardado.
+    assert "Datos de la consulta" in texto and "Fuentes" in texto and "Registro técnico" not in texto
+    assert '"consulta_id"' not in texto and "{" not in texto
+    assert "CC 112" in texto and "Sin registro" in texto and "Huella SHA-256 del resultado conservado" in texto
+    progreso_externo = progreso(externo, consulta_id)
+    assert progreso_externo.reporte_id in texto and progreso_externo.huella_respuesta in texto
 
 
 # ── Respuestas sin reporte ───────────────────────────────────────────────────
@@ -728,14 +734,23 @@ def test_capturas_de_las_fuentes_quedan_como_evidencia_restringida(externo):
     assert externo.cliente.get(ruta, headers=proveedores).status_code in (403, 404)
 
 
-def test_la_misma_imagen_en_dos_consultas_no_rompe_el_cierre(externo):
+def test_la_misma_imagen_en_dos_consultas_queda_como_evidencia_de_ambas(externo):
+    """Antes la segunda consulta se quedaba sin la captura (la clave de custodia era única en la tabla)."""
     externo.simulador.extras[("GET", f"{DEST_CC}/ofac.jpg")] = httpx.Response(200, content=JPEG)
     primera = crear(externo, valor="111").json()["consulta_id"]
     procesar(externo)
     segunda = crear(externo, valor="111", forzar=True).json()["consulta_id"]
     procesar(externo)
+    capturas_de = {c: [e for e in detalle(externo, c)["evidencias"] if e["tipo"] == "CAPTURA_PROVEEDOR"] for c in (primera, segunda)}
     assert detalle(externo, segunda)["estado_ejecucion"] == "COMPLETADA"
-    assert [e["fuente_codigo"] for e in detalle(externo, primera)["evidencias"] if e["tipo"] == "CAPTURA_PROVEEDOR"] == ["ofac"]
+    assert [e["fuente_codigo"] for e in capturas_de[primera]] == [e["fuente_codigo"] for e in capturas_de[segunda]] == ["ofac"]
+    assert "CAPTURAS_PROVEEDOR_CUSTODIADAS" in eventos(externo, segunda)
+    for consulta_id, (captura,) in capturas_de.items():
+        respuesta = externo.cliente.get(f"/api/consultas-listas/{consulta_id}/evidencias/{captura['id']}")
+        assert respuesta.status_code == 200 and respuesta.content == JPEG
+    with externo.sesiones() as sesion:  # un solo objeto custodiado, referido por las dos consultas
+        claves = sesion.scalars(select(EvidenciaConsulta.clave).where(EvidenciaConsulta.tipo == "CAPTURA_PROVEEDOR")).all()
+    assert len(claves) == 2 and len(set(claves)) == 1
 
 
 def test_sin_capturas_o_apagadas_la_consulta_cierra_igual(externo, monkeypatch):
